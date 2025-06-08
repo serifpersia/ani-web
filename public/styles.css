@@ -204,12 +204,11 @@
      align-items: center;
      gap: 4px;
 }
- .icon-cc {
+.icon-cc {
      display: inline-block;
      width: 16px;
      height: 16px;
-     background-image: url('data:image/svg+xml;
-    utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%239ca3af"><path d="M4 4h16v2H4V4zm0 6h16v2H4v-2zm0 6h16v2H4v-2z"/></svg>');
+     background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%239ca3af"><path d="M4 4h16v2H4V4zm0 6h16v2H4v-2zm0 6h16v2H4v-2z"/></svg>');
 }
  .result-item {
      padding: 12px;
