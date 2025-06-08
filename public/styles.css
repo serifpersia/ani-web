@@ -22,6 +22,17 @@
      display: flex;
      flex-direction: column;
 }
+.site-header {
+   display: flex;
+   align-items: center;
+   padding: 0px 25px;
+   background: var(--background-dark);
+}
+.logo {
+   width: 115px;
+   height: auto;
+   object-fit: contain;
+}
  main {
      flex-grow: 1;
 }
