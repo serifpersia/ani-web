@@ -35,10 +35,7 @@ function showPage(page, data = {}) {
 
 	switch (page) {
 		case 'home':
-			fetchAndDisplayContinueWatching();
-			fetchAndDisplaySeasonal();
-			fetchAndDisplayTop10();
-			fetchAndDisplayLatestReleases();
+			loadHomePage();
 			break;
 		case 'watchlist':
 			fetchAndDisplayWatchlist();
@@ -60,12 +57,29 @@ function showPage(page, data = {}) {
 	}
 }
 
-function fixThumbnailUrl(url) {
-	if (!url) return '/placeholder.png';
-	const absoluteUrl = url.startsWith('http') ? url : `https://allanime.day/${url.replace(/^\/*/, '')}`;
-	return `/image-proxy?url=${encodeURIComponent(absoluteUrl)}`;
+async function loadHomePage() {
+    try {
+        await Promise.all([
+            fetchAndDisplaySeasonal(),
+            fetchAndDisplayTop10()
+        ]);
+        // Load less critical sections after
+        fetchAndDisplayContinueWatching();
+        fetchAndDisplayLatestReleases();
+    } catch (error) {
+        console.error('Failed to load home page sections:', error);
+    }
 }
 
+const thumbnailCache = new Map();
+function fixThumbnailUrl(url) {
+    if (!url) return '/placeholder.png';
+    if (thumbnailCache.has(url)) return thumbnailCache.get(url);
+    const absoluteUrl = url.startsWith('http') ? url : `https://allanime.day/${url.replace(/^\/*/, '')}`;
+    const proxiedUrl = `/image-proxy?url=${encodeURIComponent(absoluteUrl)}`;
+    thumbnailCache.set(url, proxiedUrl);
+    return proxiedUrl;
+}
 async function fetchAndDisplaySection(endpoint, containerId) {
 	try {
 		const response = await fetch(endpoint);
@@ -582,6 +596,22 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
 	video.addEventListener('play', () => playPauseBtn.innerHTML = pauseIcon);
 	video.addEventListener('pause', () => playPauseBtn.innerHTML = playIcon);
 
+	let lastClickTime = 0;
+	const doubleClickThreshold = 300;
+
+	video.addEventListener('click', (e) => {
+		const currentTime = new Date().getTime();
+		if (currentTime - lastClickTime <= doubleClickThreshold) {
+			if (!document.fullscreenElement) {
+				playerContent.requestFullscreen();
+			} else {
+				document.exitFullscreen();
+			}
+			e.stopPropagation();
+		}
+		lastClickTime = currentTime;
+	}, true);
+
 	const formatTime = (timeInSeconds) => {
 		const result = new Date(timeInSeconds * 1000).toISOString().substr(11, 8);
 		return {
@@ -852,6 +882,14 @@ function playVideo(sourceName, linkInfo, subtitleInfo) {
 		videoElement.src = proxiedUrl;
 		videoElement.play().catch(e => {});
 	}
+	
+    hls.on(Hls.Events.ERROR, (event, data) => {
+        if (data.fatal) {
+            hls.destroy();
+            currentHlsInstance = null;
+            document.getElementById('player-section-container').innerHTML = '<p class="error">Failed to load video stream.</p>';
+        }
+    });
 }
 
 async function setPreferredSource(sourceName) {
