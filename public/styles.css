@@ -51,10 +51,74 @@ body {
    padding: 0px 0;
    border-bottom: 1px solid var(--border-color);
 }
+.header-right {
+    display: flex;
+    align-items: center;
+}
 .logo {
 	width: auto;
 	height: 210px;
 	object-fit: contain;
+}
+
+.profile-area {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-right: 15px;
+}
+
+#profile-selector {
+    background-color: var(--tertiary-bg);
+    color: var(--primary-text);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 5px;
+    max-width: 150px;
+    height: 32px;
+}
+
+.profile-controls {
+    display: flex;
+    gap: 5px;
+}
+
+.profile-controls button {
+    background: none;
+    border: 1px solid var(--border-color);
+    color: var(--primary-text);
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    font-size: 16px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.profile-controls button:hover {
+    background-color: var(--tertiary-bg);
+    border-color: var(--accent-color);
+}
+
+#delete-profile-btn:hover {
+    background-color: var(--error-color);
+    border-color: var(--error-color);
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 #theme-selector {
@@ -63,6 +127,7 @@ body {
    border: 1px solid var(--border-color);
    border-radius: 4px;
    padding: 5px;
+   height: 32px;
 }
 main {
    padding: 20px 0;

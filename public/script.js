@@ -2,6 +2,24 @@ let currentHlsInstance = null;
 let searchState = { page: 1, isLoading: false, hasMore: true };
 let seasonalState = { page: 1, isLoading: false, hasMore: true };
 let playerInactivityTimer = null;
+let profiles = [];
+let activeProfileId = null;
+
+async function fetchWithProfile(url, options = {}) {
+   if (!activeProfileId) {
+      console.error("No active profile selected. Cannot make request.");
+      return Promise.reject(new Error("No active profile."));
+   }
+   const newOptions = { ...options };
+   if (!newOptions.headers) {
+      newOptions.headers = {};
+   }
+   newOptions.headers['X-Profile-ID'] = activeProfileId;
+   if (newOptions.body && typeof newOptions.body === 'string') {
+      newOptions.headers['Content-Type'] = 'application/json';
+   }
+   return fetch(url, newOptions);
+}
 function navigateTo(hash) {
    window.location.hash = hash;
 }
@@ -13,12 +31,119 @@ function router() {
 }
 document.addEventListener('DOMContentLoaded', () => {
    setupThemeSelector();
+   initProfileSystem();
    setupSearchFilters();
    setupHomePage();
    setupWatchlistPage();
    window.addEventListener('hashchange', router);
-   router();
 });
+async function initProfileSystem() {
+   try {
+      const response = await fetch('/api/profiles');
+      if (!response.ok) throw new Error('Could not load profiles.');
+      profiles = await response.json();
+      if (profiles.length > 0) {
+         const storedId = localStorage.getItem('activeProfileId');
+         const isValidId = profiles.some(p => p.id.toString() === storedId);
+         activeProfileId = isValidId ? storedId : profiles[0].id.toString();
+         localStorage.setItem('activeProfileId', activeProfileId);
+         populateProfileSelector();
+         setupProfileEventListeners();
+         document.getElementById('profile-area').style.display = 'flex';
+         router();
+      } else {
+         console.error("No profiles found on the server.");
+         alert("Error: No user profiles found. The application may not work correctly.");
+      }
+   } catch (error) {
+      console.error("Failed to initialize profile system:", error);
+      alert(`Critical Error: Could not load profile system. ${error.message}`);
+   }
+}
+function populateProfileSelector() {
+   const selector = document.getElementById('profile-selector');
+   selector.innerHTML = '';
+   profiles.forEach(profile => {
+      const option = document.createElement('option');
+      option.value = profile.id;
+      option.textContent = profile.name;
+      selector.appendChild(option);
+   });
+   selector.value = activeProfileId;
+}
+function setupProfileEventListeners() {
+   document.getElementById('profile-selector').addEventListener('change', (e) => switchProfile(e.target.value));
+   document.getElementById('add-profile-btn').addEventListener('click', createProfile);
+   document.getElementById('rename-profile-btn').addEventListener('click', renameProfile);
+   document.getElementById('delete-profile-btn').addEventListener('click', deleteProfile);
+}
+function switchProfile(newProfileId) {
+   activeProfileId = newProfileId;
+   localStorage.setItem('activeProfileId', newProfileId);
+   const hash = window.location.hash || '#home';
+   const [path] = hash.substring(1).split('/');
+   if (path === 'home' || path === '') {
+      document.getElementById('continue-watching').innerHTML = '';
+      document.getElementById('continue-watching').parentElement.style.display = 'none';
+   } else if (path === 'watchlist') {
+      document.getElementById('watchlist').innerHTML = '';
+   }
+   router();
+}
+async function createProfile() {
+   const name = prompt("Enter new profile name:");
+   if (name && name.trim()) {
+      try {
+         const response = await fetch('/api/profiles', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name.trim() })
+         });
+         if (!response.ok) throw new Error((await response.json()).error || 'Failed to create profile.');
+         const newProfile = await response.json();
+         await initProfileSystem();
+         switchProfile(newProfile.id.toString());
+      } catch (error) {
+         alert(`Error: ${error.message}`);
+      }
+   }
+}
+async function renameProfile() {
+   const currentProfile = profiles.find(p => p.id.toString() === activeProfileId);
+   if (!currentProfile) return;
+   const newName = prompt("Enter new name for profile:", currentProfile.name);
+   if (newName && newName.trim() && newName.trim() !== currentProfile.name) {
+      try {
+         const response = await fetch(`/api/profiles/${activeProfileId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: newName.trim() })
+         });
+         if (!response.ok) throw new Error((await response.json()).error || 'Failed to rename profile.');
+         await initProfileSystem();
+      } catch (error) {
+         alert(`Error: ${error.message}`);
+      }
+   }
+}
+async function deleteProfile() {
+   if (profiles.length <= 1) {
+      alert("Cannot delete the last profile.");
+      return;
+   }
+   const currentProfile = profiles.find(p => p.id.toString() === activeProfileId);
+   if (!currentProfile) return;
+   if (confirm(`Are you sure you want to delete the profile "${currentProfile.name}"? All its data will be lost forever.`)) {
+      try {
+         const response = await fetch(`/api/profiles/${activeProfileId}`, { method: 'DELETE' });
+         if (!response.ok) throw new Error((await response.json()).error || 'Failed to delete profile.');
+         localStorage.removeItem('activeProfileId');
+         await initProfileSystem();
+      } catch (error) {
+         alert(`Error: ${error.message}`);
+      }
+   }
+}
 function stopVideoPlayback() {
    if (playerInactivityTimer) {
       clearTimeout(playerInactivityTimer);
@@ -47,6 +172,8 @@ function renderPageContent(page, data = {}) {
       if (page === 'home') {
          if (document.getElementById('seasonal-anime').innerHTML === '') {
             loadHomePage();
+         } else {
+            fetchAndDisplayContinueWatching();
          }
       } else if (page === 'watchlist') {
          fetchAndDisplayWatchlist();
@@ -101,9 +228,8 @@ async function handleMalImport() {
    const reader = new FileReader();
    reader.onload = async (e) => {
       try {
-         const response = await fetch('/import/mal-xml', {
+         const response = await fetchWithProfile('/import/mal-xml', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                xml: e.target.result,
                erase: eraseToggle.checked
@@ -299,7 +425,7 @@ async function fetchAndDisplaySeasonal() {
 }
 async function fetchAndDisplayContinueWatching() {
    try {
-      const response = await fetch('/continue-watching');
+      const response = await fetchWithProfile('/continue-watching');
       if (!response.ok) throw new Error('Network response was not ok');
       const shows = await response.json();
       const container = document.getElementById('continue-watching');
@@ -319,7 +445,7 @@ async function fetchAndDisplayContinueWatching() {
 }
 async function fetchAndDisplayWatchlist() {
    try {
-      const response = await fetch('/watchlist');
+      const response = await fetchWithProfile('/watchlist');
       if (!response.ok) throw new Error('Network response was not ok.');
       const shows = await response.json();
       const container = document.getElementById('watchlist');
@@ -347,16 +473,14 @@ async function fetchAndDisplayWatchlist() {
          `;
          item.querySelector('img').addEventListener('click', () => navigateTo(`#player/${show.id}`));
          item.querySelector('.status-select').addEventListener('change', async (e) => {
-            await fetch('/watchlist/status', {
+            await fetchWithProfile('/watchlist/status', {
                method: 'POST',
-               headers: { 'Content-Type': 'application/json' },
                body: JSON.stringify({ id: show.id, status: e.target.value })
             });
          });
          item.querySelector('.remove-button').addEventListener('click', async () => {
-            await fetch('/watchlist/remove', {
+            await fetchWithProfile('/watchlist/remove', {
                method: 'POST',
-               headers: { 'Content-Type': 'application/json' },
                body: JSON.stringify({ id: show.id })
             });
             item.remove();
@@ -450,13 +574,19 @@ async function fetchEpisodes(showId, showName, showThumbnail, mode = 'sub', epis
    page.innerHTML = '<div class="loading"></div>';
    try {
       const showMetaResponse = await fetch(`/show-meta/${showId}`);
+      if (!showMetaResponse.ok) throw new Error(`Failed to fetch show metadata: ${showMetaResponse.statusText}`);
       const showMeta = await showMetaResponse.json();
+
       const [episodesResponse, watchedResponse, watchlistResponse] = await Promise.all([
          fetch(`/episodes?showId=${encodeURIComponent(showId)}&mode=${mode}`),
-         fetch(`/watched-episodes/${showId}`),
-         fetch(`/watchlist/check/${showId}`)
+         fetchWithProfile(`/watched-episodes/${showId}`),
+         fetchWithProfile(`/watchlist/check/${showId}`)
       ]);
-      if (!episodesResponse.ok) throw new Error('Network response was not ok');
+
+      if (!episodesResponse.ok) throw new Error(`Failed to fetch episodes list: ${episodesResponse.statusText}`);
+      if (!watchedResponse.ok) throw new Error(`Failed to fetch watched status: ${watchedResponse.statusText}`);
+      if (!watchlistResponse.ok) throw new Error(`Failed to fetch watchlist status: ${watchlistResponse.statusText}`);
+
       const { episodes, description } = await episodesResponse.json();
       const sortedEpisodes = episodes.sort((a, b) => parseFloat(a) - parseFloat(b));
       const watchedEpisodes = await watchedResponse.json();
@@ -511,9 +641,8 @@ function displayEpisodes(episodes, showId, showName, showThumbnail, watchedEpiso
       const isInList = watchlistBtn.classList.contains('in-list');
       const endpoint = isInList ? '/watchlist/remove' : '/watchlist/add';
       const body = { id: showId, name: showName, thumbnail: showThumbnail };
-      const response = await fetch(endpoint, {
+      const response = await fetchWithProfile(endpoint, {
          method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
          body: JSON.stringify(body)
       });
       if (response.ok) {
@@ -537,9 +666,10 @@ async function fetchVideoLinks(showId, episodeNumber, showName, showThumbnail, m
    try {
       const [sourcesResponse, settingsResponse] = await Promise.all([
          fetch(`/video?showId=${encodeURIComponent(showId)}&episodeNumber=${encodeURIComponent(episodeNumber)}&mode=${mode}`),
-         fetch('/settings/preferredSource')
+         fetchWithProfile(`/settings/preferredSource`)
       ]);
-      if (!sourcesResponse.ok) throw new Error('Failed to fetch data');
+      if (!sourcesResponse.ok) throw new Error('Failed to fetch video sources');
+      if (!settingsResponse.ok) throw new Error('Failed to fetch user settings');
       const sources = await sourcesResponse.json();
       const { value: preferredSource } = await settingsResponse.json();
       displayEpisodePlayer(sources, showId, episodeNumber, showName, showThumbnail, preferredSource);
@@ -592,7 +722,7 @@ function displayEpisodePlayer(sources, showId, episodeNumber, showName, showThum
                      </label>
                   </div>
                   <button id="cc-btn" class="control-button disabled"><svg viewBox="0 0 24 24"><path d="M19 4H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 7H9.5v-.5h-2v3h2v-.5H11v1c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1zm7 0h-1.5v-.5h-2v3h2v-.5H18v1c0 .55-.45 1-1 1h-3c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1z"/></svg></button>
-                  <button id="settings-btn" class="control-button"><svg viewBox="0 0 24 24"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49 1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/></svg></button>
+                  <button id="settings-btn" class="control-button"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.785.45c1.039 0 1.932.715 2.127 1.705l.087.44c.342 1.73 2.187 2.762 3.903 2.184l.436-.147c.982-.33 2.067.062 2.587.934l.785 1.318c.52.872.326 1.98-.46 2.639l-.35.293a2.83 2.83 0 0 0 0 4.368l.35.293c.787.66.98 1.767.46 2.64l-.785 1.317c-.52.872-1.605 1.264-2.587.934l-.436-.147c-1.716-.578-3.561.454-3.903 2.184l-.087.44c-.195.99-1.088 1.705-2.127 1.705h-1.57c-1.039 0-1.932-.716-2.127-1.705L9 21.405c-.342-1.73-2.187-2.762-3.903-2.184l-.436.146c-.982.331-2.067-.06-2.587-.933l-.785-1.318a2.055 2.055 0 0 1 .46-2.639l.35-.293a2.83 2.83 0 0 0 0-4.368l-.35-.293a2.055 2.055 0 0 1-.46-2.64l.785-1.317c.52-.872 1.605-1.264 2.587-.934l.436.147C6.813 5.357 8.658 4.324 9 2.595l.087-.44C9.283 1.165 10.176.45 11.215.45zM12 15.3a3.3 3.3 0 1 0 0-6.6 3.3 3.3 0 0 0 0 6.6" fill="currentColor"/></svg></button>
                   <button id="fullscreen-btn" class="control-button">${fullscreenIcon}</button>
                   <div id="settings-menu" class="settings-menu hidden">
                      <h4>Quality</h4>
@@ -981,11 +1111,17 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
 }
 
 async function setPreferredSource(sourceName) {
-   await fetch('/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: 'preferredSource', value: sourceName })
-   });
+   try {
+      const response = await fetchWithProfile('/settings', {
+         method: 'POST',
+         body: JSON.stringify({ key: 'preferredSource', value: sourceName })
+      });
+      if (!response.ok) {
+         console.error('Failed to set preferred source:', await response.text());
+      }
+   } catch (error) {
+      console.error('Error setting preferred source:', error);
+   }
 }
 function displayGrid(containerId, items, onClick, titleFn = item => item.name, append = false) {
    const container = document.getElementById(containerId);
@@ -1007,9 +1143,8 @@ function displayGrid(containerId, items, onClick, titleFn = item => item.name, a
    });
 }
 async function markEpisodeWatched(showId, episodeNumber, showName, showThumbnail) {
-   await fetch('/watched-episode', {
+   await fetchWithProfile('/watched-episode', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ showId, episodeNumber, showName, showThumbnail })
    });
    const epItem = document.querySelector(`#episode-grid-player .result-item[data-episode='${episodeNumber}']`);

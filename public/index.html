@@ -12,6 +12,15 @@
          <header class="site-header">
             <a href="#home"><img src="logo.png" alt="Site Logo" class="logo"></a>
             <div class="header-right">
+               <div id="profile-area" class="profile-area" style="display: none;">
+                  <label for="profile-selector" class="visually-hidden">Select Profile</label>
+                  <select id="profile-selector"></select>
+                  <div class="profile-controls">
+                      <button id="rename-profile-btn" title="Rename Current Profile">&#9998;</button>
+                      <button id="add-profile-btn" title="Add New Profile">+</button>
+                      <button id="delete-profile-btn" title="Delete Current Profile">&times;</button>
+                  </div>
+              </div>
                <select id="theme-selector">
                   <option value="default">Default Theme</option>
                   <option value="dark">Dark Theme</option>
