@@ -469,11 +469,13 @@ input:checked+.slider:before {
 	border: 1px solid var(--border-color);
 	border-radius: 4px;
 	font-size: 12px;
+	min-width: 80px;
 }
 
 .remove-button {
 	padding: 8px 12px;
 	font-size: 12px;
+	flex-shrink: 0;
 }
 
 .player-content.fullscreen {
@@ -578,7 +580,7 @@ input:checked+.slider:before {
 	height: 5px;
 	background-color: rgba(255, 255, 255, 0.3);
 	border-radius: 5px;
-	position: relative;	
+	position: relative;
 	transition: height 0.2s ease;
 }
 
@@ -835,6 +837,81 @@ input:checked+.slider:before {
 .day-button .day-date {
     display: block;
     font-size: 12px;
+}
+
+.import-section {
+    background-color: var(--background-light);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 15px 20px;
+    margin-bottom: 25px;
+}
+
+.import-section h3 {
+    border: none;
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.import-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+.import-controls input[type="file"] {
+    flex-grow: 1;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.import-controls input[type="file"]::file-selector-button {
+    padding: 8px 15px;
+    background-color: var(--background-lighter);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+    margin-right: 10px;
+}
+
+.import-controls input[type="file"]::file-selector-button:hover {
+    background-color: #4b5563;
+}
+
+.import-controls button {
+    padding: 10px 20px;
+    background-color: var(--accent-primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+}
+
+.import-controls button:hover {
+    background-color: var(--accent-secondary);
+}
+
+.import-options {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+#importStatus {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 14px;
+    display: none;
 }
 
 footer {

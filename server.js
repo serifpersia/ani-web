@@ -1,6 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const sqlite3 = require('sqlite3').verbose();
+const { parseString } = require('xml2js');
 const app = express();
 const port = 3000;
 
@@ -16,7 +17,7 @@ db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT)`);
 });
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static('public'));
 
 const apiBaseUrl = 'https://allanime.day';
@@ -373,6 +374,7 @@ app.get('/video', async (req, res) => {
 		res.status(500).send(`Error fetching video data: ${e.message}`);
 	}
 });
+
 app.get('/image-proxy', async (req, res) => {
     try {
         const { data } = await axios({
@@ -442,6 +444,69 @@ app.get('/subtitle-proxy', async (req, res) => {
     }
 });
 
+app.post('/import/mal-xml', async (req, res) => {
+    const { xml, erase } = req.body;
+    if (!xml) {
+        return res.status(400).json({ error: 'XML content is required' });
+    }
+
+    if (erase) {
+        await new Promise((resolve, reject) => {
+            db.run(`DELETE FROM watchlist`, [], (err) => {
+                if (err) reject(new Error('DB error on erase.'));
+                else resolve();
+            });
+        });
+    }
+
+    parseString(xml, async (err, result) => {
+        if (err || !result || !result.myanimelist || !result.myanimelist.anime) {
+            return res.status(400).json({ error: 'Invalid or empty MyAnimeList XML file.' });
+        }
+
+        const animeList = result.myanimelist.anime;
+        let importedCount = 0;
+        let skippedCount = 0;
+
+        for (const item of animeList) {
+            try {
+                const title = item.series_title[0];
+                const malStatus = item.my_status[0];
+
+                const searchResponse = await axios.get(apiEndpoint, {
+                    headers: { 'User-Agent': userAgent, 'Referer': referer },
+                    params: {
+                        query: showsQuery,
+                        variables: JSON.stringify({ search: { query: title }, limit: 1 })
+                    },
+                    timeout: 5000
+                });
+
+                const foundShow = searchResponse.data?.data?.shows?.edges[0];
+                if (foundShow) {
+                    await new Promise((resolve, reject) => {
+                        db.run(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status) VALUES (?, ?, ?, ?)`,
+                            [foundShow._id, foundShow.name, deobfuscateUrl(foundShow.thumbnail), malStatus],
+                            (err) => {
+                                if (err) reject(err);
+                                else {
+                                    importedCount++;
+                                    resolve();
+                                }
+                            }
+                        );
+                    });
+                } else {
+                    skippedCount++;
+                }
+            } catch (searchError) {
+                skippedCount++;
+            }
+        }
+        res.json({ imported: importedCount, skipped: skippedCount });
+    });
+});
+
 app.post('/watchlist/add', (req, res) => {
     const { id, name, thumbnail, status } = req.body;
     db.run(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status) VALUES (?, ?, ?, ?)`, 
@@ -466,7 +531,7 @@ app.post('/watchlist/status', (req, res) => {
 });
 
 app.get('/watchlist', (req, res) => {
-    db.all(`SELECT * FROM watchlist`, [], 
+    db.all(`SELECT * FROM watchlist ORDER BY name ASC`, [], 
         (err, rows) => err ? res.status(500).send('DB error') : res.json(rows)
     );
 });

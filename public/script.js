@@ -21,6 +21,7 @@ const seasonalState = {
 document.addEventListener('DOMContentLoaded', () => {
 	setupSearchFilters();
 	setupHomePage();
+	setupWatchlistPage();
 	showPage('home');
 });
 
@@ -79,6 +80,76 @@ function setupHomePage() {
             fetchAndDisplayTopPopular(e.target.value);
         });
     }
+}
+
+function setupWatchlistPage() {
+    const importBtn = document.getElementById('importMalBtn');
+    if (importBtn) {
+        importBtn.addEventListener('click', handleMalImport);
+    }
+}
+
+async function handleMalImport() {
+    const fileInput = document.getElementById('malFile');
+    const eraseToggle = document.getElementById('eraseWatchlistToggle');
+    const statusDiv = document.getElementById('importStatus');
+    const importBtn = document.getElementById('importMalBtn');
+
+    if (fileInput.files.length === 0) {
+        statusDiv.textContent = 'Please select an XML file to import.';
+        statusDiv.style.display = 'block';
+        statusDiv.style.backgroundColor = '#371a1a';
+        statusDiv.style.color = '#fca5a5';
+        return;
+    }
+    const file = fileInput.files[0];
+    
+    importBtn.disabled = true;
+    statusDiv.textContent = 'Importing... This may take a while.';
+    statusDiv.style.display = 'block';
+    statusDiv.style.backgroundColor = 'var(--background-lighter)';
+    statusDiv.style.color = 'var(--text-primary)';
+    
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const xmlContent = e.target.result;
+        try {
+            const response = await fetch('/import/mal-xml', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    xml: xmlContent,
+                    erase: eraseToggle.checked
+                })
+            });
+
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to import watchlist.');
+            }
+
+            statusDiv.textContent = `Import complete! Imported: ${result.imported}, Skipped: ${result.skipped}.`;
+            statusDiv.style.backgroundColor = '#166534';
+            statusDiv.style.color = '#a7f3d0';
+            fetchAndDisplayWatchlist();
+            fileInput.value = '';
+
+        } catch (error) {
+            statusDiv.textContent = `Error: ${error.message}`;
+            statusDiv.style.backgroundColor = '#371a1a';
+            statusDiv.style.color = '#fca5a5';
+        } finally {
+            importBtn.disabled = false;
+        }
+    };
+    reader.onerror = () => {
+        statusDiv.textContent = 'Error reading the selected file.';
+        statusDiv.style.display = 'block';
+        statusDiv.style.backgroundColor = '#371a1a';
+        statusDiv.style.color = '#fca5a5';
+        importBtn.disabled = false;
+    };
+    reader.readAsText(file);
 }
 
 async function loadHomePage() {
@@ -317,18 +388,19 @@ async function fetchAndDisplayWatchlist() {
 				item.className = 'grid-item';
 				item.setAttribute('data-raw-thumbnail', show.thumbnail || '');
 				item.innerHTML = `
-          <img src="${fixThumbnailUrl(show.thumbnail)}" alt="${show.name}" loading="lazy" onerror="this.src='/placeholder.png'; this.className='image-fallback';">
-          <p>${show.name}</p>
-          <div class="watchlist-controls">
-            <select class="status-select">
-              <option value="Watching" ${show.status === 'Watching' ? 'selected' : ''}>Watching</option>
-              <option value="Completed" ${show.status === 'Completed' ? 'selected' : ''}>Completed</option>
-              <option value="On-Hold" ${show.status === 'On-Hold' ? 'selected' : ''}>On-Hold</option>
-              <option value="Dropped" ${show.status === 'Dropped' ? 'selected' : ''}>Dropped</option>
-            </select>
-            <button class="remove-button">Remove</button>
-          </div>
-        `;
+                  <img src="${fixThumbnailUrl(show.thumbnail)}" alt="${show.name}" loading="lazy" onerror="this.src='/placeholder.png'; this.className='image-fallback';">
+                  <p>${show.name}</p>
+                  <div class="watchlist-controls">
+                    <select class="status-select">
+                      <option value="Watching" ${show.status === 'Watching' ? 'selected' : ''}>Watching</option>
+                      <option value="Plan to Watch" ${show.status === 'Plan to Watch' ? 'selected' : ''}>Plan to Watch</option>
+                      <option value="Completed" ${show.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                      <option value="On-Hold" ${show.status === 'On-Hold' ? 'selected' : ''}>On-Hold</option>
+                      <option value="Dropped" ${show.status === 'Dropped' ? 'selected' : ''}>Dropped</option>
+                    </select>
+                    <button class="remove-button">Remove</button>
+                  </div>
+                `;
 				item.querySelector('img').addEventListener('click', () => showPage('player', {
 					showId: show.id,
 					showName: show.name,
