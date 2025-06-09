@@ -578,11 +578,21 @@ input:checked+.slider:before {
 	height: 5px;
 	background-color: rgba(255, 255, 255, 0.3);
 	border-radius: 5px;
-	position: relative;
+	position: relative;	
+	transition: height 0.2s ease;
+}
+
+.progress-bar-container:hover .progress-bar {
+	height: 8px;
+}
+
+.progress-bar-container:hover .progress-bar-thumb {
+	opacity: 1;
 }
 
 .progress-bar-watched,
-.progress-bar-buffered {
+.progress-bar-buffered,
+.progress-bar-thumb {
 	position: absolute;
 	top: 0;
 	left: 0;
@@ -598,6 +608,18 @@ input:checked+.slider:before {
 .progress-bar-buffered {
 	background-color: rgba(255, 255, 255, 0.5);
 	z-index: 1;
+}
+
+.progress-bar-thumb {
+    top: 50%;
+    width: 15px;
+    height: 15px;
+    background-color: white;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 3;
 }
 
 .settings-menu {

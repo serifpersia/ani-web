@@ -99,24 +99,16 @@ async function fetchAndSendShows(res, variables) {
 }
 
 const popularQueryHash = "1fc9651b0d4c3b9dfd2fa6e1d50b8f4d11ce37f988c23b8ee20f82159f7c1147";
+
 app.get('/popular/:timeframe', async (req, res) => {
     const timeframe = req.params.timeframe.toLowerCase();
     let dateRange;
     switch (timeframe) {
-        case 'daily':
-            dateRange = 1;
-            break;
-        case 'weekly':
-            dateRange = 7;
-            break;
-        case 'monthly':
-            dateRange = 30;
-            break;
-        case 'all':
-            dateRange = 0;
-            break;
-        default:
-            return res.status(400).send('Invalid timeframe. Use daily, weekly, monthly, or all.');
+        case 'daily': dateRange = 1; break;
+        case 'weekly': dateRange = 7; break;
+        case 'monthly': dateRange = 30; break;
+        case 'all': dateRange = 0; break;
+        default: return res.status(400).send('Invalid timeframe.');
     }
 
     const variables = {
@@ -137,10 +129,7 @@ app.get('/popular/:timeframe', async (req, res) => {
 
     try {
         const response = await axios.get(apiEndpoint, {
-            headers: {
-                'User-Agent': userAgent,
-                'Referer': referer
-            },
+            headers: { 'User-Agent': userAgent, 'Referer': referer },
             params: {
                 variables: JSON.stringify(variables),
                 extensions: JSON.stringify(extensions)
@@ -149,16 +138,18 @@ app.get('/popular/:timeframe', async (req, res) => {
         });
 
         const recommendations = response.data?.data?.queryPopular?.recommendations || [];
-        const shows = recommendations.map(rec => rec.anyCard).filter(Boolean);
+        
+        const shows = recommendations.map(rec => {
+            const card = rec.anyCard;
+            return {
+                ...card,
+                thumbnail: deobfuscateUrl(card.thumbnail || '')
+            };
+        });
 
-        const transformedShows = shows.map(show => ({
-            ...show,
-            thumbnail: deobfuscateUrl(show.thumbnail || '')
-        }));
-
-        res.json(transformedShows);
+        res.json(shows);
     } catch (error) {
-        console.error('Error fetching popular data:', error.message);
+        console.error('Error fetching popular data:', error.response ? error.response.data : error.message);
         res.status(500).send('Error fetching popular data');
     }
 });

@@ -200,7 +200,9 @@ async function fetchAndDisplayTopPopular(timeframe = 'all') {
 			const item = document.createElement('div');
 			item.className = 'top-10-item';
 			item.setAttribute('data-raw-thumbnail', show.thumbnail || '');
-			const totalEpisodes = Math.max(show.availableEpisodesDetail?.sub?.length || 0, show.availableEpisodesDetail?.dub?.length || 0);
+            
+			const totalEpisodes = show.availableEpisodes ? Math.max(show.availableEpisodes.sub || 0, show.availableEpisodes.dub || 0) : '?';
+
 			item.innerHTML = `
                 <span class="rank-number">${String(index + 1).padStart(2, '0')}</span>
                 <img src="${fixThumbnailUrl(show.thumbnail)}" alt="${show.name}" loading="lazy" onerror="this.src='/placeholder.png';"/>
@@ -641,6 +643,7 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
 	const progressBar = document.querySelector('.progress-bar');
 	const watchedBar = document.querySelector('.progress-bar-watched');
 	const bufferedBar = document.querySelector('.progress-bar-buffered');
+	const progressBarThumb = document.querySelector('.progress-bar-thumb');
 	const currentTimeEl = document.getElementById('current-time');
 	const totalTimeEl = document.getElementById('total-time');
 	const fullscreenBtn = document.getElementById('fullscreen-btn');
@@ -743,6 +746,7 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
 			`${formatTime(video.currentTime).hours}:${formatTime(video.currentTime).minutes}:${formatTime(video.currentTime).seconds}`;
 		const percent = (video.currentTime / video.duration) * 100;
 		watchedBar.style.width = `${percent}%`;
+		progressBarThumb.style.left = `${percent}%`;
 	});
 	video.addEventListener('progress', () => {
 		if (video.duration > 0 && video.buffered.length > 0) {
