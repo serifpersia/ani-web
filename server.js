@@ -553,6 +553,17 @@ app.get('/continue-watching', (req, res) => {
         }
     });
 });
+
+app.post('/continue-watching/remove', (req, res) => {
+    const profileId = req.headers['x-profile-id'];
+    if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
+    const { showId } = req.body;
+    db.run(`DELETE FROM watched_episodes WHERE profile_id = ? AND showId = ?`, 
+        [profileId, showId], 
+        (err) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
+    );
+});
+
 app.get('/settings/:key', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });

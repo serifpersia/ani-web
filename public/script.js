@@ -423,6 +423,7 @@ async function fetchAndDisplaySeasonal() {
       seasonalState.isLoading = false;
    }
 }
+
 async function fetchAndDisplayContinueWatching() {
    try {
       const response = await fetchWithProfile('/continue-watching');
@@ -443,6 +444,65 @@ async function fetchAndDisplayContinueWatching() {
       if (container) container.parentElement.style.display = 'none';
    }
 }
+
+function displayGrid(containerId, items, onClick, titleFn = item => item.name, append = false) {
+   const container = document.getElementById(containerId);
+   if (!container) return;
+   if (!append) container.innerHTML = '';
+   items.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'grid-item';
+      div.setAttribute('data-raw-thumbnail', item.thumbnail || '');
+      const totalEpisodes = Math.max(item.availableEpisodesDetail?.sub?.length || 0, item.availableEpisodesDetail?.dub?.length || 0);
+      const title = typeof titleFn === 'function' ? titleFn(item) : item.name;
+
+      let overlayContent = '';
+      if (containerId === 'continue-watching') {
+         overlayContent = `<button class="remove-from-cw-btn" title="Remove from Continue Watching">×</button>`;
+      } else if (totalEpisodes > 0) {
+         overlayContent = `<span class="card-ep-count">EP ${totalEpisodes}</span>`;
+      }
+      
+      div.innerHTML = `
+         <img src="${fixThumbnailUrl(item.thumbnail)}" alt="${item.name}" loading="lazy" onerror="this.src='/placeholder.png'; this.className='image-fallback';">
+         <p>${title}</p>
+         ${overlayContent}
+      `;
+
+      div.addEventListener('click', (e) => {
+         if (e.target.classList.contains('remove-from-cw-btn')) {
+            return;
+         }
+         onClick(item);
+      });
+      
+      if (containerId === 'continue-watching') {
+         const removeBtn = div.querySelector('.remove-from-cw-btn');
+         removeBtn.addEventListener('click', async () => {
+            try {
+               const response = await fetchWithProfile('/continue-watching/remove', {
+                  method: 'POST',
+                  body: JSON.stringify({ showId: item.showId })
+               });
+               if (response.ok) {
+                  div.remove();
+                  if (container.children.length === 0) {
+                     container.parentElement.style.display = 'none';
+                  }
+               } else {
+                  alert('Failed to remove from continue watching.');
+               }
+            } catch (error) {
+               console.error('Error removing from continue watching:', error);
+               alert('An error occurred.');
+            }
+         });
+      }
+
+      container.appendChild(div);
+   });
+}
+
 async function fetchAndDisplayWatchlist() {
    try {
       const response = await fetchWithProfile('/watchlist');
@@ -1122,25 +1182,6 @@ async function setPreferredSource(sourceName) {
    } catch (error) {
       console.error('Error setting preferred source:', error);
    }
-}
-function displayGrid(containerId, items, onClick, titleFn = item => item.name, append = false) {
-   const container = document.getElementById(containerId);
-   if (!container) return;
-   if (!append) container.innerHTML = '';
-   items.forEach(item => {
-      const div = document.createElement('div');
-      div.className = 'grid-item';
-      div.setAttribute('data-raw-thumbnail', item.thumbnail || '');
-      const totalEpisodes = Math.max(item.availableEpisodesDetail?.sub?.length || 0, item.availableEpisodesDetail?.dub?.length || 0);
-      const title = typeof titleFn === 'function' ? titleFn(item) : item.name;
-      div.innerHTML = `
-         <img src="${fixThumbnailUrl(item.thumbnail)}" alt="${item.name}" loading="lazy" onerror="this.src='/placeholder.png'; this.className='image-fallback';">
-         <p>${title}</p>
-         ${totalEpisodes > 0 && containerId !== 'continue-watching' ? `<span class="card-ep-count">EP ${totalEpisodes}</span>` : ''}
-      `;
-      div.addEventListener('click', () => onClick(item));
-      container.appendChild(div);
-   });
 }
 async function markEpisodeWatched(showId, episodeNumber, showName, showThumbnail) {
    await fetchWithProfile('/watched-episode', {
