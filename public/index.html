@@ -5,14 +5,20 @@
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>ani-web</title>
       <link rel="stylesheet" href="styles.css">
-      <link rel="icon" href="favicon.ico" type="image/x-icon">
       <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.5/dist/hls.min.js"></script>
    </head>
    <body>
       <div class="app-container">
-		<header class="site-header">
-			<a href="#home"><img src="logo.png" alt="Site Logo" class="logo"></a>
-		</header>
+         <header class="site-header">
+            <a href="#home"><img src="logo.png" alt="Site Logo" class="logo"></a>
+            <div class="header-right">
+               <select id="theme-selector">
+                  <option value="default">Default Theme</option>
+                  <option value="dark">Dark Theme</option>
+                  <option value="original">Original</option>
+               </select>
+            </div>
+         </header>
          <nav>
             <a href="#home">Home</a>
             <a href="#search">Search</a>
@@ -33,7 +39,7 @@
                      <div class="section">
                         <h2 id="seasonal-title">Current Season</h2>
                         <div id="seasonal-anime" class="grid"></div>
-                     </div>					 
+                     </div>
                   </div>
                   <aside class="sidebar">
                      <div class="sidebar-header">
@@ -84,14 +90,17 @@
                      <option value="Name_ASC">Alphabetical (A-Z)</option>
                      <option value="Name_DESC">Alphabetical (Z-A)</option>
                   </select>
+                  <button id="searchBtn">Search</button>
                </div>
                <div id="results" class="grid"></div>
             </div>
             <div id="watchlist-page" class="page" style="display: none;">
                <div class="section">
                   <h2>My Watchlist</h2>
+                  <div id="watchlist" class="grid"></div>
                   <div class="import-section">
-                     <h3>Import from MyAnimeList</h3>
+                     <h3>Import & Export</h3>
+                     <h4>Import from MyAnimeList</h4>
                      <div class="import-controls">
                         <input type="file" id="malFile" accept=".xml,application/xml">
                         <button id="importMalBtn">Import from File</button>
@@ -102,7 +111,18 @@
                      </div>
                      <div id="importStatus"></div>
                   </div>
-                  <div id="watchlist" class="grid"></div>
+                  <div class="backup-restore-section">
+                     <h4>Backup & Restore Database</h4>
+                     <p>Save your entire watch history, watchlist, and settings.</p>
+                     <div class="backup-restore-controls">
+                        <a href="/backup-db" class="backup-btn" download="ani-web-backup.db">Backup Database</a>
+                        <div class="restore-control">
+                           <input type="file" id="restoreFile" accept=".db">
+                           <button id="restoreDbBtn">Restore from File</button>
+                        </div>
+                     </div>
+                     <div id="restoreStatus"></div>
+                  </div>
                </div>
             </div>
             <div id="player-page" class="page" style="display: none;">
