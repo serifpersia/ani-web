@@ -1,9 +1,18 @@
 let currentHlsInstance = null;
 const searchState = {
 	query: '',
+	type: 'ALL',
 	season: 'ALL',
 	year: 'ALL',
-	sortBy: 'Popular',
+	country: 'ALL',
+	translation: 'sub',
+	sortBy: 'Recent',
+	page: 1,
+	isLoading: false,
+	hasMore: true
+};
+
+const seasonalState = {
 	page: 1,
 	isLoading: false,
 	hasMore: true
@@ -11,6 +20,7 @@ const searchState = {
 
 document.addEventListener('DOMContentLoaded', () => {
 	setupSearchFilters();
+	setupHomePage();
 	showPage('home');
 });
 
@@ -35,7 +45,12 @@ function showPage(page, data = {}) {
 
 	switch (page) {
 		case 'home':
-			loadHomePage();
+			if (document.getElementById('seasonal-anime').innerHTML === '') {
+				seasonalState.page = 1;
+				seasonalState.hasMore = true;
+				seasonalState.isLoading = false;
+				loadHomePage();
+			}
 			break;
 		case 'watchlist':
 			fetchAndDisplayWatchlist();
@@ -57,17 +72,26 @@ function showPage(page, data = {}) {
 	}
 }
 
+function setupHomePage() {
+    const topPopularFilter = document.getElementById('top-popular-filter');
+    if (topPopularFilter) {
+        topPopularFilter.addEventListener('change', (e) => {
+            fetchAndDisplayTopPopular(e.target.value);
+        });
+    }
+}
+
 async function loadHomePage() {
     try {
+        setupScheduleSelector();
         await Promise.all([
             fetchAndDisplaySeasonal(),
-            fetchAndDisplayTop10()
+            fetchAndDisplayTopPopular('all'),
+			fetchAndDisplayEpisodeSchedule()
         ]);
-        // Load less critical sections after
         fetchAndDisplayContinueWatching();
         fetchAndDisplayLatestReleases();
     } catch (error) {
-        console.error('Failed to load home page sections:', error);
     }
 }
 
@@ -80,7 +104,10 @@ function fixThumbnailUrl(url) {
     thumbnailCache.set(url, proxiedUrl);
     return proxiedUrl;
 }
-async function fetchAndDisplaySection(endpoint, containerId) {
+
+async function fetchAndDisplaySection(endpoint, containerId, append = false) {
+    const container = document.getElementById(containerId);
+    if (!append) container.innerHTML = `<p class="loading">Loading...</p>`;
 	try {
 		const response = await fetch(endpoint);
 		if (!response.ok) throw new Error(`Failed to fetch ${endpoint}`);
@@ -99,13 +126,76 @@ async function fetchAndDisplaySection(endpoint, containerId) {
 
 const fetchAndDisplayLatestReleases = () => fetchAndDisplaySection('/latest-releases', 'latest-releases');
 
-async function fetchAndDisplayTop10() {
+async function fetchAndDisplayEpisodeSchedule(date = null) {
+    if (!date) {
+        date = new Date().toISOString().split('T')[0];
+    }
+    await fetchAndDisplaySection(`/schedule/${date}`, 'episode-schedule');
+}
+
+function setupScheduleSelector() {
+    const selectorContainer = document.getElementById('schedule-day-selector');
+    if (!selectorContainer) return;
+    selectorContainer.innerHTML = '';
+
+    const today = new Date();
+    const days = [];
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+    for (let i = -6; i <= 0; i++) {
+        const date = new Date();
+        date.setDate(today.getDate() + i);
+        days.push(date);
+    }
+
+    days.forEach(date => {
+        const button = document.createElement('button');
+        button.className = 'day-button';
+        
+        const dateString = date.toISOString().split('T')[0];
+        button.dataset.date = dateString;
+
+        let dayLabel = dayNames[date.getDay()];
+        if (date.toDateString() === today.toDateString()) {
+            dayLabel = 'Today';
+            button.classList.add('active');
+        } else {
+            const yesterday = new Date();
+            yesterday.setDate(today.getDate() - 1);
+            if (date.toDateString() === yesterday.toDateString()) {
+                dayLabel = 'Yesterday';
+            }
+        }
+        
+        const formattedDate = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}-${date.getFullYear()}`;
+        button.innerHTML = `<span class="day-name">${dayLabel}</span><span class="day-date">${formattedDate}</span>`;
+
+        button.addEventListener('click', () => {
+            document.querySelectorAll('.day-button').forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            fetchAndDisplayEpisodeSchedule(dateString);
+        });
+        selectorContainer.appendChild(button);
+    });
+
+    const activeButton = selectorContainer.querySelector('.day-button.active');
+    if (activeButton) {
+        activeButton.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+}
+
+async function fetchAndDisplayTopPopular(timeframe = 'all') {
+    const container = document.getElementById('top-10-popular');
+    container.innerHTML = `<p class="loading">Loading...</p>`;
 	try {
-		const response = await fetch('/popular');
+		const response = await fetch(`/popular/${timeframe}`);
 		if (!response.ok) throw new Error('Failed to fetch popular');
 		const shows = await response.json();
-		const container = document.getElementById('top-10-popular');
 		container.innerHTML = '';
+		if(shows.length === 0) {
+		    container.innerHTML = `<p class="error">No popular shows found.</p>`;
+		    return;
+		}
 		shows.forEach((show, index) => {
 			const item = document.createElement('div');
 			item.className = 'top-10-item';
@@ -135,28 +225,55 @@ async function fetchAndDisplayTop10() {
 }
 
 async function fetchAndDisplaySeasonal() {
+	if (seasonalState.isLoading || !seasonalState.hasMore) return;
+
+	seasonalState.isLoading = true;
+	const isInitialLoad = seasonalState.page === 1;
+	const container = document.getElementById('seasonal-anime');
+
+	if (isInitialLoad) {
+		container.innerHTML = `<p class="loading">Loading...</p>`;
+	}
+
 	try {
-		const response = await fetch('/seasonal');
+		const response = await fetch(`/seasonal?page=${seasonalState.page}`);
 		if (!response.ok) throw new Error(`Failed to fetch /seasonal`);
 		const shows = await response.json();
-		const firstShowWithDesc = shows.find(s => s.description);
-		if (firstShowWithDesc) {
-			const desc = firstShowWithDesc.description;
-			const yearMatch = desc.match(/Season: (?:Winter|Spring|Summer|Fall) (\d{4})/);
-			const seasonMatch = desc.match(/Season: (Winter|Spring|Summer|Fall)/);
-			if (yearMatch && seasonMatch) {
-				document.getElementById('seasonal-title').textContent = `${seasonMatch[1]} ${yearMatch[1]}`;
+
+		if (isInitialLoad) {
+            container.innerHTML = '';
+			const firstShowWithDesc = shows.find(s => s.description);
+			if (firstShowWithDesc) {
+				const desc = firstShowWithDesc.description;
+				const yearMatch = desc.match(/Season: (?:Winter|Spring|Summer|Fall) (\d{4})/);
+				const seasonMatch = desc.match(/Season: (Winter|Spring|Summer|Fall)/);
+				if (yearMatch && seasonMatch) {
+					document.getElementById('seasonal-title').textContent = `${seasonMatch[1]} ${yearMatch[1]}`;
+				}
 			}
 		}
-		displayGrid('seasonal-anime', shows, (show) => {
-			showPage('player', {
-				showId: show._id,
-				showName: show.name,
-				showThumbnail: show.thumbnail
-			});
-		});
+		
+		if (shows.length < 25) {
+			seasonalState.hasMore = false;
+		}
+
+		if (shows.length > 0) {
+			displayGrid('seasonal-anime', shows, (show) => {
+				showPage('player', {
+					showId: show._id,
+					showName: show.name,
+					showThumbnail: show.thumbnail
+				});
+			}, item => item.name, !isInitialLoad);
+		} else if (isInitialLoad) {
+			container.innerHTML = '<p class="error">Could not load seasonal anime.</p>';
+		}
 	} catch (error) {
-		document.getElementById('seasonal-anime').innerHTML = `<p class="error">Could not load seasonal anime.</p>`;
+		if (isInitialLoad) {
+			document.getElementById('seasonal-anime').innerHTML = `<p class="error">Could not load seasonal anime.</p>`;
+		}
+	} finally {
+		seasonalState.isLoading = false;
 	}
 }
 
@@ -250,10 +367,13 @@ async function fetchAndDisplayWatchlist() {
 }
 
 function setupSearchFilters() {
+	const searchInput = document.getElementById('searchInput');
+	const typeFilter = document.getElementById('typeFilter');
 	const seasonFilter = document.getElementById('seasonFilter');
 	const yearFilter = document.getElementById('yearFilter');
+	const countryFilter = document.getElementById('countryFilter');
+	const translationFilter = document.getElementById('translationFilter');
 	const sortFilter = document.getElementById('sortFilter');
-	const searchInput = document.getElementById('searchInput');
 
 	const seasons = ['ALL', 'Winter', 'Spring', 'Summer', 'Fall'];
 	seasons.forEach(s => seasonFilter.add(new Option(s, s)));
@@ -270,23 +390,34 @@ function setupSearchFilters() {
 		clearTimeout(debounceTimer);
 		debounceTimer = setTimeout(() => {
 			searchState.query = searchInput.value;
+			searchState.type = typeFilter.value;
 			searchState.season = seasonFilter.value;
 			searchState.year = yearFilter.value;
+			searchState.country = countryFilter.value;
+			searchState.translation = translationFilter.value;
 			searchState.sortBy = sortFilter.value;
 			triggerSearch();
 		}, 300);
 	};
 
-	seasonFilter.addEventListener('change', handleFilterChange);
-	yearFilter.addEventListener('change', handleFilterChange);
-	sortFilter.addEventListener('change', handleFilterChange);
-	searchInput.addEventListener('input', handleFilterChange);
+	[searchInput, typeFilter, seasonFilter, yearFilter, countryFilter, translationFilter, sortFilter].forEach(el => {
+		el.addEventListener('change', handleFilterChange);
+		if (el.tagName === 'INPUT') el.addEventListener('input', handleFilterChange);
+	});
 
 	window.addEventListener('scroll', () => {
-		if (document.getElementById('search-page').style.display !== 'block') return;
-		if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500 && !searchState.isLoading && searchState.hasMore) {
+		if ((window.innerHeight + window.scrollY) < document.body.offsetHeight - 500) {
+			return;
+		}
+
+		if (document.getElementById('search-page').style.display === 'block' && !searchState.isLoading && searchState.hasMore) {
 			searchState.page++;
 			performSearch(false);
+		}
+
+		if (document.getElementById('home-page').style.display === 'block' && !seasonalState.isLoading && seasonalState.hasMore) {
+			seasonalState.page++;
+			fetchAndDisplaySeasonal();
 		}
 	});
 }
@@ -302,24 +433,12 @@ async function performSearch(isNewSearch) {
 	if (searchState.isLoading) return;
 	searchState.isLoading = true;
 
-	const {
-		query,
-		season,
-		year,
-		sortBy,
-		page
-	} = searchState;
+	const { query, type, season, year, country, translation, sortBy, page } = searchState;
 	const resultsDiv = document.getElementById('results');
 	if (isNewSearch) resultsDiv.innerHTML = '<p class="loading">Searching...</p>';
 
 	try {
-		const params = new URLSearchParams({
-			query,
-			season,
-			year,
-			sortBy,
-			page
-		});
+		const params = new URLSearchParams({ query, type, season, year, country, translation, sortBy, page });
 		const response = await fetch(`/search?${params}`);
 		if (!response.ok) throw new Error('Network response was not ok');
 		const shows = await response.json();
@@ -353,15 +472,10 @@ async function fetchEpisodes(showId, showName, showThumbnail, mode = 'sub', epis
 		]);
 
 		if (!episodesResponse.ok) throw new Error('Network response was not ok');
-		const {
-			episodes,
-			description
-		} = await episodesResponse.json();
+		const { episodes, description } = await episodesResponse.json();
 		const sortedEpisodes = episodes.sort((a, b) => parseFloat(a) - parseFloat(b));
 		const watchedEpisodes = await watchedResponse.json();
-		const {
-			inWatchlist
-		} = await watchlistResponse.json();
+		const { inWatchlist } = await watchlistResponse.json();
 		displayEpisodes(sortedEpisodes, showId, showName, showThumbnail, watchedEpisodes, mode, description, inWatchlist);
 
 		if (episodeToPlay) {
@@ -447,9 +561,7 @@ async function fetchVideoLinks(showId, episodeNumber, showName, showThumbnail, m
 		]);
 		if (!sourcesResponse.ok) throw new Error('Failed to fetch data');
 		const sources = await sourcesResponse.json();
-		const {
-			value: preferredSource
-		} = await settingsResponse.json();
+		const { value: preferredSource } = await settingsResponse.json();
 		displayEpisodePlayer(sources, showId, episodeNumber, showName, showThumbnail, preferredSource);
 	} catch (error) {
 		playerContainer.innerHTML = `<p class="error">${error.message}</p>`;
@@ -775,121 +887,117 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
 }
 
 function playVideo(sourceName, linkInfo, subtitleInfo) {
-	if (currentHlsInstance) {
-		currentHlsInstance.destroy();
-		currentHlsInstance = null;
-	}
-	if (!linkInfo || !linkInfo.link) {
-		return;
-	}
+    if (currentHlsInstance) {
+        currentHlsInstance.destroy();
+        currentHlsInstance = null;
+    }
+    if (!linkInfo || !linkInfo.link) {
+        return;
+    }
 
-	const videoElement = document.getElementById('videoPlayer');
-	const ccOptionsContainer = document.getElementById('cc-options-container');
-	const ccBtn = document.getElementById('cc-btn');
-	const fontSizeSlider = document.getElementById('fontSizeSlider');
-	const positionSlider = document.getElementById('positionSlider');
+    const videoElement = document.getElementById('videoPlayer');
+    const ccOptionsContainer = document.getElementById('cc-options-container');
+    const ccBtn = document.getElementById('cc-btn');
+    const fontSizeSlider = document.getElementById('fontSizeSlider');
+    const positionSlider = document.getElementById('positionSlider');
 
-	if (!videoElement || !ccOptionsContainer || !ccBtn || !fontSizeSlider || !positionSlider) return;
+    if (!videoElement || !ccOptionsContainer || !ccBtn || !fontSizeSlider || !positionSlider) return;
 
-	setPreferredSource(sourceName);
+    setPreferredSource(sourceName);
 
-	while (videoElement.firstChild) {
-		videoElement.removeChild(videoElement.firstChild);
-	}
-	videoElement.crossOrigin = 'anonymous';
-	ccOptionsContainer.innerHTML = '';
+    while (videoElement.firstChild) {
+        videoElement.removeChild(videoElement.firstChild);
+    }
+    videoElement.crossOrigin = 'anonymous';
+    ccOptionsContainer.innerHTML = '';
 
-	const updateActiveCCButton = (activeButton) => {
-		ccOptionsContainer.querySelectorAll('.cc-item').forEach(btn => btn.classList.remove('active'));
-		if (activeButton) {
-			activeButton.classList.add('active');
-		}
-	};
-
-	if (subtitleInfo?.src) {
-		ccBtn.disabled = false;
-		ccBtn.classList.remove('disabled');
-		fontSizeSlider.disabled = false;
-		positionSlider.disabled = false;
-
-		const offButton = document.createElement('button');
-		offButton.className = 'cc-item';
-		offButton.textContent = 'Off';
-		offButton.onclick = () => {
-			if (videoElement.textTracks[0]) videoElement.textTracks[0].mode = 'hidden';
-			updateActiveCCButton(offButton);
-		};
-
-		const langButton = document.createElement('button');
-		langButton.className = 'cc-item active';
-		langButton.textContent = subtitleInfo.label || 'English';
-		langButton.onclick = () => {
-			if (videoElement.textTracks[0]) videoElement.textTracks[0].mode = 'showing';
-			updateActiveCCButton(langButton);
-		};
-
-		ccOptionsContainer.appendChild(offButton);
-		ccOptionsContainer.appendChild(langButton);
-
-		const track = document.createElement('track');
-		track.kind = 'subtitles';
-		track.label = subtitleInfo.label || 'English';
-		track.srclang = subtitleInfo.lang || 'en';
-		track.src = `/subtitle-proxy?url=${encodeURIComponent(subtitleInfo.src)}`;
-		track.default = true;
-		videoElement.appendChild(track);
-
-		videoElement.textTracks.addEventListener('addtrack', (event) => {
-			const addedTrack = event.track;
-			addedTrack.mode = 'showing';
-			addedTrack.addEventListener('cuechange', () => {
-				const position = localStorage.getItem('subtitlePosition') || '-4';
-				const activeCues = addedTrack.activeCues;
-				if (activeCues) {
-					for (let i = 0; i < activeCues.length; i++) {
-						activeCues[i].line = parseInt(position, 10);
-					}
-				}
-			});
-		}, {
-			once: true
-		});
-
-	} else {
-		ccBtn.disabled = true;
-		ccBtn.classList.add('disabled');
-		fontSizeSlider.disabled = true;
-		positionSlider.disabled = true;
-
-		const disabledButton = document.createElement('button');
-		disabledButton.className = 'cc-item active';
-		disabledButton.textContent = 'Unavailable';
-		disabledButton.disabled = true;
-		ccOptionsContainer.appendChild(disabledButton);
-	}
-
-	let proxiedUrl = `/proxy?url=${encodeURIComponent(linkInfo.link)}`;
-	if (linkInfo.headers?.Referer) {
-		proxiedUrl += `&referer=${encodeURIComponent(linkInfo.headers.Referer)}`;
-	}
-	if (linkInfo.hls && Hls.isSupported()) {
-		const hls = new Hls();
-		hls.loadSource(proxiedUrl);
-		hls.attachMedia(videoElement);
-		hls.on(Hls.Events.ERROR, (event, data) => {});
-		currentHlsInstance = hls;
-	} else {
-		videoElement.src = proxiedUrl;
-		videoElement.play().catch(e => {});
-	}
-	
-    hls.on(Hls.Events.ERROR, (event, data) => {
-        if (data.fatal) {
-            hls.destroy();
-            currentHlsInstance = null;
-            document.getElementById('player-section-container').innerHTML = '<p class="error">Failed to load video stream.</p>';
+    const updateActiveCCButton = (activeButton) => {
+        ccOptionsContainer.querySelectorAll('.cc-item').forEach(btn => btn.classList.remove('active'));
+        if (activeButton) {
+            activeButton.classList.add('active');
         }
-    });
+    };
+
+    if (subtitleInfo?.src) {
+        ccBtn.disabled = false;
+        ccBtn.classList.remove('disabled');
+        fontSizeSlider.disabled = false;
+        positionSlider.disabled = false;
+
+        const offButton = document.createElement('button');
+        offButton.className = 'cc-item';
+        offButton.textContent = 'Off';
+        offButton.onclick = () => {
+            if (videoElement.textTracks[0]) videoElement.textTracks[0].mode = 'hidden';
+            updateActiveCCButton(offButton);
+        };
+
+        const langButton = document.createElement('button');
+        langButton.className = 'cc-item active';
+        langButton.textContent = subtitleInfo.label || 'English';
+        langButton.onclick = () => {
+            if (videoElement.textTracks[0]) videoElement.textTracks[0].mode = 'showing';
+            updateActiveCCButton(langButton);
+        };
+
+        ccOptionsContainer.appendChild(offButton);
+        ccOptionsContainer.appendChild(langButton);
+
+        const track = document.createElement('track');
+        track.kind = 'subtitles';
+        track.label = subtitleInfo.label || 'English';
+        track.srclang = subtitleInfo.lang || 'en';
+        track.src = `/subtitle-proxy?url=${encodeURIComponent(subtitleInfo.src)}`;
+        track.default = true;
+        videoElement.appendChild(track);
+
+        videoElement.textTracks.addEventListener('addtrack', (event) => {
+            const addedTrack = event.track;
+            addedTrack.mode = 'showing';
+            addedTrack.addEventListener('cuechange', () => {
+                const position = localStorage.getItem('subtitlePosition') || '-4';
+                const activeCues = addedTrack.activeCues;
+                if (activeCues) {
+                    for (let i = 0; i < activeCues.length; i++) {
+                        activeCues[i].line = parseInt(position, 10);
+                    }
+                }
+            });
+        }, { once: true });
+    } else {
+        ccBtn.disabled = true;
+        ccBtn.classList.add('disabled');
+        fontSizeSlider.disabled = true;
+        positionSlider.disabled = true;
+
+        const disabledButton = document.createElement('button');
+        disabledButton.className = 'cc-item active';
+        disabledButton.textContent = 'Unavailable';
+        disabledButton.disabled = true;
+        ccOptionsContainer.appendChild(disabledButton);
+    }
+
+    let proxiedUrl = `/proxy?url=${encodeURIComponent(linkInfo.link)}`;
+    if (linkInfo.headers?.Referer) {
+        proxiedUrl += `&referer=${encodeURIComponent(linkInfo.headers.Referer)}`;
+    }
+    if (linkInfo.hls && Hls.isSupported()) {
+        const hls = new Hls();
+        hls.loadSource(proxiedUrl);
+        hls.attachMedia(videoElement);
+        hls.on(Hls.Events.ERROR, (event, data) => {
+            if (data.fatal) {
+                hls.destroy();
+                currentHlsInstance = null;
+                document.getElementById('player-section-container').innerHTML = '<p class="error">Failed to load video stream.</p>';
+            }
+        });
+        currentHlsInstance = hls;
+    } else {
+        videoElement.src = proxiedUrl;
+        videoElement.play().catch(e => {
+        });
+    }
 }
 
 async function setPreferredSource(sourceName) {

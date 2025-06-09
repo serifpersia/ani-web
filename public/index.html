@@ -27,28 +27,62 @@
                         <div id="continue-watching" class="grid"></div>
                      </div>
                      <div class="section">
-                        <h2 id="seasonal-title">Current Season</h2>
-                        <div id="seasonal-anime" class="grid"></div>
-                     </div>
-                     <div class="section">
                         <h2>Latest Releases</h2>
                         <div id="latest-releases" class="grid"></div>
                      </div>
+                     <div class="section">
+                        <h2 id="seasonal-title">Current Season</h2>
+                        <div id="seasonal-anime" class="grid"></div>
+                     </div>					 
                   </div>
                   <aside class="sidebar">
-                     <h2>Top 10 Popular</h2>
+                     <div class="sidebar-header">
+                        <h2>Top 10 Popular</h2>
+                        <select id="top-popular-filter" class="sidebar-filter">
+                           <option value="all">All Time</option>
+                           <option value="monthly">Monthly</option>
+                           <option value="weekly">Weekly</option>
+                           <option value="daily">Daily</option>
+                        </select>
+                     </div>
                      <div id="top-10-popular" class="top-10-list"></div>
                   </aside>
+               </div>
+               <div id="schedule-section" class="section">
+                  <h2>Episode Schedule</h2>
+                  <div id="schedule-day-selector-container">
+                     <div id="schedule-day-selector" class="day-selector"></div>
+                  </div>
+                  <div id="episode-schedule" class="grid"></div>
                </div>
             </div>
             <div id="search-page" class="page" style="display: none;">
                <div class="search-filters">
                   <input type="text" id="searchInput" placeholder="Search for an anime...">
+                  <select id="typeFilter">
+                     <option value="ALL">All Types</option>
+                     <option value="TV">TV</option>
+                     <option value="ONA">ONA</option>
+                     <option value="OVA">OVA</option>
+                     <option value="Movie">Movie</option>
+                     <option value="Special">Special</option>
+                  </select>
                   <select id="seasonFilter"></select>
                   <select id="yearFilter"></select>
+                  <select id="countryFilter">
+                     <option value="ALL">All Countries</option>
+                     <option value="JP">Japan</option>
+                     <option value="KR">Korea</option>
+                     <option value="CH">China</option>
+                  </select>
+                  <select id="translationFilter">
+                     <option value="sub">Sub</option>
+                     <option value="dub">Dub</option>
+                  </select>
                   <select id="sortFilter">
-                     <option value="Popular">Popularity</option>
-                     <option value="Recent">Recent</option>
+                     <option value="Recent" selected>Recent</option>
+                     <option value="Name_ASC">Alphabetical (A-Z)</option>
+                     <option value="Name_DESC">Alphabetical (Z-A)</option>
                   </select>
                </div>
                <div id="results" class="grid"></div>

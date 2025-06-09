@@ -33,8 +33,8 @@ body {
 }
 
 .logo {
-	width: 115px;
-	height: auto;
+	width: auto;
+	height: 200px;
 	object-fit: contain;
 }
 
@@ -100,8 +100,28 @@ h4 {
 	border: 1px solid var(--border-color);
 }
 
+.sidebar-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.sidebar-header h2 {
+	margin-bottom: 15px;
+}
+
+.sidebar-filter {
+	padding: 6px 8px;
+	background: var(--background-dark);
+	color: var(--text-primary);
+	border: 1px solid var(--border-color);
+	border-radius: 6px;
+	font-size: 12px;
+}
+
 .search-filters {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 15px;
 	margin-bottom: 25px;
 	align-items: center;
@@ -119,6 +139,7 @@ h4 {
 	color: var(--text-primary);
 	border-radius: 6px;
 	font-size: 16px;
+	min-width: 200px;
 }
 
 .search-filters select {
@@ -737,6 +758,61 @@ input:checked+.slider:before {
 .player-content input[type="range"]:disabled::-moz-range-thumb {
 	background-color: var(--text-secondary);
 	transform: scale(1);
+}
+
+#schedule-day-selector-container {
+    overflow-x: auto;
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+}
+
+#schedule-day-selector-container::-webkit-scrollbar {
+    display: none;
+}
+
+#schedule-day-selector-container {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.day-selector {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 10px;
+}
+
+.day-button {
+    flex-shrink: 0;
+    padding: 10px 20px;
+    background-color: var(--background-light);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.day-button:hover {
+    background-color: var(--background-lighter);
+    color: var(--text-primary);
+}
+
+.day-button.active {
+    background-color: var(--accent-primary);
+    color: white;
+    border-color: var(--accent-secondary);
+}
+
+.day-button .day-name {
+    display: block;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.day-button .day-date {
+    display: block;
+    font-size: 12px;
 }
 
 footer {
