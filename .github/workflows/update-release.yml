@@ -1,0 +1,73 @@
+name: Update Latest Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete Existing Latest Release (Published and Draft)
+        run: |
+          echo "Checking for existing releases with tag 'latest'..."
+          # List all releases and check for any with tag 'latest'
+          RELEASES=$(gh release list --json tagName,isDraft,name --limit 100)
+
+          # Check for published releases with tag 'latest'
+          PUBLISHED_EXISTS=$(echo "$RELEASES" | jq -r '.[] | select(.tagName == "latest" and .isDraft == false) | .tagName')
+          if [ -n "$PUBLISHED_EXISTS" ]; then
+            echo "Deleting published release with tag 'latest'..."
+            gh release delete "latest" --yes
+          else
+            echo "No published release with tag 'latest' found."
+          fi
+
+          # Check for draft releases with tag 'latest'
+          DRAFT_EXISTS=$(echo "$RELEASES" | jq -r '.[] | select(.tagName == "latest" and .isDraft == true) | .tagName')
+          if [ -n "$DRAFT_EXISTS" ]; then
+            echo "Deleting draft release with tag 'latest'..."
+            gh release delete "latest" --yes
+          else
+            echo "No draft release with tag 'latest' found."
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete Existing Latest Tag
+        run: |
+          echo "Checking for existing tag 'latest'..."
+          if git rev-parse "latest" >/dev/null 2>&1; then
+            echo "Deleting tag 'latest'..."
+            git tag -d "latest"
+            git push origin :refs/tags/latest
+          else
+            echo "No tag 'latest' found."
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create New Latest Tag
+        run: |
+          echo "Creating new tag 'latest'..."
+          git tag latest
+          git push origin latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create New Latest Release
+        run: |
+          echo "Creating new release with tag 'latest'..."
+          gh release create "latest" \
+            --title "latest" \
+            --notes "Automatically updated to the latest commit on ${{ github.sha }}" \
+            --target ${{ github.sha }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
