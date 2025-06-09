@@ -244,6 +244,32 @@ app.get('/schedule/:date', (req, res) => {
     fetchAndSendShows(res, variables);
 });
 
+app.get('/show-meta/:id', async (req, res) => {
+    const showId = req.params.id;
+    try {
+        const response = await axios.get(apiEndpoint, {
+            headers: { 'User-Agent': userAgent, 'Referer': referer },
+            params: {
+                query: `query($showId: String!) { show(_id: $showId) { name, thumbnail } }`,
+                variables: JSON.stringify({ showId })
+            },
+            timeout: 15000
+        });
+        const show = response.data.data.show;
+        if (show) {
+            res.json({
+                name: show.name,
+                thumbnail: deobfuscateUrl(show.thumbnail)
+            });
+        } else {
+            res.status(404).json({ error: 'Show not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch show metadata' });
+    }
+});
+
+
 app.get('/episodes', async (req, res) => {
     const { showId, mode = 'sub' } = req.query;
     try {

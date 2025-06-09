@@ -18,11 +18,25 @@ const seasonalState = {
 	hasMore: true
 };
 
+function navigateTo(hash) {
+    window.location.hash = hash;
+}
+
+function router() {
+    const hash = window.location.hash || '#home';
+    const [path, param] = hash.substring(1).split('/');
+
+    const data = { showId: param };
+    renderPageContent(path, data);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
 	setupSearchFilters();
 	setupHomePage();
 	setupWatchlistPage();
-	showPage('home');
+	
+    window.addEventListener('hashchange', router);
+    router();
 });
 
 function stopVideoPlayback() {
@@ -38,10 +52,14 @@ function stopVideoPlayback() {
 	playerPage.innerHTML = '';
 }
 
-function showPage(page, data = {}) {
+function renderPageContent(page, data = {}) {
 	stopVideoPlayback();
 	document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
 	const pageElement = document.getElementById(`${page}-page`);
+    if (!pageElement) {
+        document.getElementById('home-page').style.display = 'block';
+        return;
+    }
 	pageElement.style.display = 'block';
 
 	switch (page) {
@@ -63,11 +81,7 @@ function showPage(page, data = {}) {
 			break;
 		case 'player':
 			if (data.showId) {
-				if (data.episodeToPlay) {
-					fetchEpisodes(data.showId, data.showName, data.showThumbnail, 'sub', data.episodeToPlay);
-				} else {
-					fetchEpisodes(data.showId, data.showName, data.showThumbnail);
-				}
+                fetchEpisodes(data.showId, data.showName, data.showThumbnail);
 			}
 			break;
 	}
@@ -184,11 +198,7 @@ async function fetchAndDisplaySection(endpoint, containerId, append = false) {
 		if (!response.ok) throw new Error(`Failed to fetch ${endpoint}`);
 		const shows = await response.json();
 		displayGrid(containerId, shows, (show) => {
-			showPage('player', {
-				showId: show._id,
-				showName: show.name,
-				showThumbnail: show.thumbnail
-			});
+			navigateTo(`#player/${show._id}`);
 		});
 	} catch (error) {
 		document.getElementById(containerId).innerHTML = `<p class="error">Could not load this section.</p>`;
@@ -285,11 +295,7 @@ async function fetchAndDisplayTopPopular(timeframe = 'all') {
                     </div>
                 </div>
             `;
-			item.addEventListener('click', () => showPage('player', {
-				showId: show._id,
-				showName: show.name,
-				showThumbnail: show.thumbnail
-			}));
+			item.addEventListener('click', () => navigateTo(`#player/${show._id}`));
 			container.appendChild(item);
 		});
 	} catch (error) {
@@ -332,11 +338,7 @@ async function fetchAndDisplaySeasonal() {
 
 		if (shows.length > 0) {
 			displayGrid('seasonal-anime', shows, (show) => {
-				showPage('player', {
-					showId: show._id,
-					showName: show.name,
-					showThumbnail: show.thumbnail
-				});
+				navigateTo(`#player/${show._id}`);
 			}, item => item.name, !isInitialLoad);
 		} else if (isInitialLoad) {
 			container.innerHTML = '<p class="error">Could not load seasonal anime.</p>';
@@ -359,12 +361,7 @@ async function fetchAndDisplayContinueWatching() {
 		if (shows.length > 0) {
 			container.parentElement.style.display = 'block';
 			displayGrid('continue-watching', shows, (show) => {
-				showPage('player', {
-					showId: show.showId,
-					showName: show.name,
-					showThumbnail: show.thumbnail,
-					episodeToPlay: show.nextEpisodeNumber
-				});
+                navigateTo(`#player/${show.showId}/${show.nextEpisodeNumber}`);
 			}, show => `${show.name} - Ep ${show.nextEpisodeNumber}`);
 		} else {
 			container.parentElement.style.display = 'none';
@@ -401,11 +398,7 @@ async function fetchAndDisplayWatchlist() {
                     <button class="remove-button">Remove</button>
                   </div>
                 `;
-				item.querySelector('img').addEventListener('click', () => showPage('player', {
-					showId: show.id,
-					showName: show.name,
-					showThumbnail: show.thumbnail
-				}));
+				item.querySelector('img').addEventListener('click', () => navigateTo(`#player/${show.id}`));
 				item.querySelector('.status-select').addEventListener('change', async (e) => {
 					await fetch('/watchlist/status', {
 						method: 'POST',
@@ -521,11 +514,7 @@ async function performSearch(isNewSearch) {
 		if (shows.length === 0) searchState.hasMore = false;
 
 		displayGrid('results', shows, (show) => {
-			showPage('player', {
-				showId: show._id,
-				showName: show.name,
-				showThumbnail: show.thumbnail
-			});
+			navigateTo(`#player/${show._id}`);
 		}, item => item.name, !isNewSearch);
 
 	} catch (error) {
@@ -539,6 +528,9 @@ async function fetchEpisodes(showId, showName, showThumbnail, mode = 'sub', epis
 	const page = document.getElementById('player-page');
 	page.innerHTML = '<div class="player-page-content"><p class="loading">Loading episodes...</p></div>';
 	try {
+        const showMetaResponse = await fetch(`/show-meta/${showId}`);
+        const showMeta = await showMetaResponse.json();
+        
 		const [episodesResponse, watchedResponse, watchlistResponse] = await Promise.all([
 			fetch(`/episodes?showId=${encodeURIComponent(showId)}&mode=${mode}`),
 			fetch(`/watched-episodes/${showId}`),
@@ -550,10 +542,10 @@ async function fetchEpisodes(showId, showName, showThumbnail, mode = 'sub', epis
 		const sortedEpisodes = episodes.sort((a, b) => parseFloat(a) - parseFloat(b));
 		const watchedEpisodes = await watchedResponse.json();
 		const { inWatchlist } = await watchlistResponse.json();
-		displayEpisodes(sortedEpisodes, showId, showName, showThumbnail, watchedEpisodes, mode, description, inWatchlist);
+		displayEpisodes(sortedEpisodes, showId, showMeta.name, showMeta.thumbnail, watchedEpisodes, mode, description, inWatchlist);
 
 		if (episodeToPlay) {
-			fetchVideoLinks(showId, episodeToPlay, showName, showThumbnail, mode);
+			fetchVideoLinks(showId, episodeToPlay, showMeta.name, showMeta.thumbnail, mode);
 		}
 
 	} catch (error) {

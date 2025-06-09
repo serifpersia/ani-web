@@ -36,6 +36,7 @@ body {
 	width: auto;
 	height: 200px;
 	object-fit: contain;
+	cursor: pointer;
 }
 
 main {
@@ -85,6 +86,7 @@ h4 {
 .home-container {
 	display: flex;
 	gap: 25px;
+	align-items: flex-start;
 }
 
 .main-content {
