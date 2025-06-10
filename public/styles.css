@@ -9,6 +9,7 @@
    --border-color: #333;
    --error-color: #cf6679;
    --watched-color: #03dac6;
+   --skip-segment-color: #ff9800;
    --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 [data-theme="dark"] {
@@ -226,6 +227,16 @@ h4 {
 #searchBtn:hover {
    background-color: var(--accent-hover);
 }
+
+.img-container {
+    position: relative;
+    width: 100%;
+    padding-top: 140%; 
+    background-color: var(--tertiary-bg);
+    overflow: hidden;
+    border-radius: 8px 8px 0 0;
+}
+
 .grid {
    display: grid;
    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -244,11 +255,28 @@ h4 {
    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
 }
 .grid-item img {
-   width: 100%;
-   height: 250px;
-   object-fit: cover;
-   display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: blur(15px);
+    opacity: 0;
+    transition: filter 0.7s ease, opacity 0.5s ease;
 }
+
+.grid-item img.loaded {
+    filter: blur(0);
+    opacity: 1;
+}
+
+.grid-item img.image-fallback {
+    object-fit: contain;
+    padding: 20%;
+}
+
+
 .grid-item p {
    margin: 0;
    padding: 10px;
@@ -292,11 +320,18 @@ h4 {
    text-align: center;
 }
 .top-10-item img {
-   width: 50px;
-   height: 70px;
-   object-fit: cover;
-   border-radius: 4px;
+    width: 50px;
+    height: 70px;
+    object-fit: cover;
+    border-radius: 4px;
+    filter: blur(15px);
+    transition: filter 0.7s ease;
 }
+
+.top-10-item img.loaded {
+    filter: blur(0);
+}
+
 .item-details {
    flex-grow: 1;
 }
@@ -601,6 +636,14 @@ input:checked + .slider:before {
    z-index: 4;
    opacity: 0;
    transition: opacity 0.2s;
+}
+.progress-bar-skip-segment {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background-color: var(--skip-segment-color);
+    z-index: 1;
+    pointer-events: none;
 }
 .settings-menu {
    position: absolute;

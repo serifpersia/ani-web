@@ -306,20 +306,24 @@ app.get('/video', async (req, res) => {
 		res.status(500).send(`Error fetching video data: ${e.message}`);
 	}
 });
+
 app.get('/image-proxy', async (req, res) => {
     try {
-        const { data } = await axios({
+        const { data, headers } = await axios({
             method: 'get',
             url: req.query.url,
             responseType: 'stream',
             headers: { Referer: apiBaseUrl, 'User-Agent': userAgent },
             timeout: 10000
         });
+        res.set('Cache-Control', 'public, max-age=604800, immutable');
+        res.set('Content-Type', headers['content-type']);
         data.pipe(res);
     } catch (e) {
-        res.status(500).sendFile(__dirname + '/public/placeholder.png');
+        res.status(500).sendFile(path.join(__dirname, '/public/placeholder.png'));
     }
 });
+
 app.get('/proxy', async (req, res) => {
     const { url, referer: dynamicReferer } = req.query;
     try {
@@ -552,6 +556,43 @@ app.get('/continue-watching', (req, res) => {
             res.status(500).json({ error: 'API error' });
         }
     });
+});
+
+app.get('/skip-times/:showId/:episodeNumber', async (req, res) => {
+    const { showId, episodeNumber } = req.params;
+    const cacheKey = `skip-${showId}-${episodeNumber}`;
+    const notFoundResponse = { found: false, results: [] };
+
+    if (apiCache.has(cacheKey)) {
+        return res.json(apiCache.get(cacheKey));
+    }
+
+    try {
+        const malIdQuery = `query($showId: String!) { show(_id: $showId) { malId } }`;
+        const malIdResponse = await axios.get(apiEndpoint, {
+            headers: { 'User-Agent': userAgent, 'Referer': referer },
+            params: { query: malIdQuery, variables: JSON.stringify({ showId }) },
+            timeout: 10000
+        });
+
+        const malId = malIdResponse.data?.data?.show?.malId;
+
+        if (!malId) {
+            apiCache.set(cacheKey, notFoundResponse);
+            return res.json(notFoundResponse);
+        }
+
+        const response = await axios.get(`https://api.aniskip.com/v1/skip-times/${malId}/${episodeNumber}?types=op&types=ed`, {
+            headers: { 'User-Agent': userAgent },
+            timeout: 5000
+        });
+
+        apiCache.set(cacheKey, response.data);
+        res.json(response.data);
+    } catch (error) {
+        apiCache.set(cacheKey, notFoundResponse);
+        res.json(notFoundResponse);
+    }
 });
 
 app.post('/continue-watching/remove', (req, res) => {

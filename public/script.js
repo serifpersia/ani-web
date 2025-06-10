@@ -357,6 +357,7 @@ function setupScheduleSelector() {
       selectorContainer.appendChild(button);
    });
 }
+
 async function fetchAndDisplayTopPopular(timeframe = 'all') {
    const container = document.getElementById('top-10-popular');
    if (!container) return;
@@ -372,7 +373,7 @@ async function fetchAndDisplayTopPopular(timeframe = 'all') {
          item.setAttribute('data-raw-thumbnail', show.thumbnail || '');
          item.innerHTML = `
             <span class="rank-number">${String(index + 1).padStart(2, '0')}</span>
-            <img src="${fixThumbnailUrl(show.thumbnail)}" alt="${show.name}" loading="lazy" onerror="this.src='/placeholder.png';"/>
+            <img src="${fixThumbnailUrl(show.thumbnail)}" alt="${show.name}" loading="lazy" onload="this.classList.add('loaded')" onerror="this.src='/placeholder.png'; this.classList.add('loaded');"/>
             <div class="item-details">
                <p class="item-title">${show.name}</p>
                <div class="ep-counts">
@@ -389,6 +390,7 @@ async function fetchAndDisplayTopPopular(timeframe = 'all') {
       container.innerHTML = `<p class="error">Could not load top 10.</p>`;
    }
 }
+
 async function fetchAndDisplaySeasonal() {
    if (seasonalState.isLoading || !seasonalState.hasMore) return;
    seasonalState.isLoading = true;
@@ -464,7 +466,9 @@ function displayGrid(containerId, items, onClick, titleFn = item => item.name, a
       }
       
       div.innerHTML = `
-         <img src="${fixThumbnailUrl(item.thumbnail)}" alt="${item.name}" loading="lazy" onerror="this.src='/placeholder.png'; this.className='image-fallback';">
+         <div class="img-container">
+            <img src="${fixThumbnailUrl(item.thumbnail)}" alt="${item.name}" loading="lazy" onload="this.classList.add('loaded')" onerror="this.src='/placeholder.png'; this.className='image-fallback loaded';">
+         </div>
          <p>${title}</p>
          ${overlayContent}
       `;
@@ -502,6 +506,7 @@ function displayGrid(containerId, items, onClick, titleFn = item => item.name, a
       container.appendChild(div);
    });
 }
+
 
 async function fetchAndDisplayWatchlist() {
    try {
@@ -585,11 +590,13 @@ window.addEventListener('scroll', () => {
       }
    }
 });
+	
 function triggerSearch() {
    searchState = { page: 1, isLoading: false, hasMore: true };
    document.getElementById('results').innerHTML = '';
    performSearch(true);
 }
+
 async function performSearch(isNewSearch) {
    if (searchState.isLoading || !searchState.hasMore) return;
    searchState.isLoading = true;
@@ -778,6 +785,13 @@ function displayEpisodePlayer(sources, showId, episodeNumber, showName, showThum
                   <button id="seek-backward-btn" class="control-button seek-button">${seekBackwardIcon}</button>
                   <button id="seek-forward-btn" class="control-button seek-button">${seekForwardIcon}</button>
                   <div class="toggle-container">
+                     <label for="autoSkipToggle">Auto Skip</label>
+                     <label class="switch">
+                        <input type="checkbox" id="autoSkipToggle">
+                        <span class="slider"></span>
+                     </label>
+                  </div>
+                  <div class="toggle-container">
                      <label for="autoplayToggle">Autoplay</label>
                      <label class="switch">
                         <input type="checkbox" id="autoplayToggle">
@@ -847,6 +861,7 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
    const fontSizeBubble = document.getElementById('fontSizeBubble');
    const positionSlider = document.getElementById('positionSlider');
    const positionBubble = document.getElementById('positionBubble');
+   const autoSkipToggle = document.getElementById('autoSkipToggle');
    const playIcon = `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
    const pauseIcon = `<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
    const fullscreenIcon = `<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>`;
@@ -854,6 +869,45 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
    const volumeHighIcon = `<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>`;
    const volumeMediumIcon = `<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>`;
    const volumeMuteIcon = `<svg viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>`;
+   
+   let skipIntervals = [];
+   let skippedInThisSession = new Set();
+   let isAutoSkipEnabled = localStorage.getItem('autoSkipEnabled') === 'true';
+   autoSkipToggle.checked = isAutoSkipEnabled;
+   autoSkipToggle.addEventListener('change', (e) => {
+      isAutoSkipEnabled = e.target.checked;
+      localStorage.setItem('autoSkipEnabled', isAutoSkipEnabled);
+   });
+
+   function renderSkipSegments() {
+      if (!video.duration || skipIntervals.length === 0) return;
+      progressBar.querySelectorAll('.progress-bar-skip-segment').forEach(el => el.remove());
+      skipIntervals.forEach(result => {
+         const interval = result.interval;
+         const startPercent = (interval.start_time / video.duration) * 100;
+         const widthPercent = ((interval.end_time - interval.start_time) / video.duration) * 100;
+         const segment = document.createElement('div');
+         segment.className = 'progress-bar-skip-segment';
+         segment.style.left = `${startPercent}%`;
+         segment.style.width = `${widthPercent}%`;
+         segment.dataset.skipType = result.skip_type;
+         progressBar.appendChild(segment);
+      });
+   }
+
+   async function fetchAndApplySkipTimes() {
+      try {
+         const response = await fetch(`/skip-times/${showId}/${episodeNumber}`);
+         if (!response.ok) return;
+         const data = await response.json();
+         if (data.found && data.results) {
+            skipIntervals = data.results;
+            renderSkipSegments();
+         }
+      } catch (error) {
+         console.error("Could not fetch skip times:", error);
+      }
+   }
 
    function setupSlider(slider, bubble, valueFormatter) {
       const updateSliderUI = () => {
@@ -959,12 +1013,38 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
    };
    video.addEventListener('loadedmetadata', () => {
       totalTimeEl.textContent = formatTime(video.duration);
+      fetchAndApplySkipTimes();
    });
    video.addEventListener('timeupdate', () => {
       currentTimeEl.textContent = formatTime(video.currentTime);
       const progressPercent = (video.currentTime / video.duration) * 100;
       watchedBar.style.width = `${progressPercent}%`;
       progressBarThumb.style.left = `${progressPercent}%`;
+      const currentTime = video.currentTime;
+
+      if (skippedInThisSession.size > 0) {
+         for (const skippedId of skippedInThisSession) {
+            const result = skipIntervals.find(r => r.skip_id === skippedId);
+            if (result && currentTime < result.interval.start_time) {
+               skippedInThisSession.delete(skippedId);
+            }
+         }
+      }
+
+      if (isAutoSkipEnabled && skipIntervals.length > 0) {
+         for (const result of skipIntervals) {
+            if (!skippedInThisSession.has(result.skip_id)) {
+               const interval = result.interval;
+               if (currentTime >= interval.start_time && currentTime < interval.end_time) {
+                  if (interval.end_time < video.duration) {
+                     video.currentTime = interval.end_time;
+                  }
+                  skippedInThisSession.add(result.skip_id);
+                  break;
+               }
+            }
+         }
+      }
    });
    video.addEventListener('progress', () => {
       if (video.buffered.length > 0) {
@@ -1163,6 +1243,11 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
       const ccOptionsContainer = document.getElementById('cc-options-container');
       ccOptionsContainer.innerHTML = '';
       setPreferredSource(sourceName);
+
+      skipIntervals = [];
+      skippedInThisSession.clear();
+      progressBar.querySelectorAll('.progress-bar-skip-segment').forEach(el => el.remove());
+
       while (videoElement.firstChild) {
          videoElement.removeChild(videoElement.firstChild);
       }
