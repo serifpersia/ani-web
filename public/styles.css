@@ -57,11 +57,11 @@ body {
     align-items: center;
 }
 .logo {
-	width: auto;
-	height: 210px;
-	object-fit: contain;
+    width: auto;
+    height: 210px;
+    object-fit: contain;
+    display: block;
 }
-
 .profile-area {
     display: flex;
     align-items: center;
