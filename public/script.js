@@ -1083,25 +1083,43 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
          volumeBtn.innerHTML = volumeHighIcon;
       }
    };
+
    video.addEventListener('volumechange', () => {
       updateVolumeUI();
-      setupSlider(volumeSlider, volumeBubble, val => `${Math.round(val * 100)}%`);
+      if (!video.muted) {
+         volumeSlider.value = video.volume;
+      }
+      
+      const min = parseFloat(volumeSlider.min);
+      const max = parseFloat(volumeSlider.max);
+      const percent = ((parseFloat(volumeSlider.value) - min) / (max - min)) * 100;
+      volumeSlider.style.setProperty('--value-percent', `${percent}%`);
+
       localStorage.setItem('playerVolume', video.volume);
       localStorage.setItem('playerMuted', video.muted.toString());
    });
+
    volumeSlider.addEventListener('input', (e) => {
       video.muted = false;
       video.volume = e.target.value;
    });
+
    volumeBtn.addEventListener('click', () => {
       video.muted = !video.muted;
    });
+
    const savedVolume = localStorage.getItem('playerVolume');
    const savedMuted = localStorage.getItem('playerMuted');
-   if (savedVolume !== null) video.volume = parseFloat(savedVolume);
-   if (savedMuted !== null) video.muted = savedMuted === 'true';
+   
+   video.volume = (savedVolume !== null) ? parseFloat(savedVolume) : 1.0;
+   volumeSlider.value = video.volume;
+   video.muted = (savedMuted === 'true');
+   
    setupSlider(volumeSlider, volumeBubble, val => `${Math.round(val * 100)}%`);
    updateVolumeUI();
+   
+   const initialPercent = ((parseFloat(volumeSlider.value) - parseFloat(volumeSlider.min)) / (parseFloat(volumeSlider.max) - parseFloat(volumeSlider.min))) * 100;
+   volumeSlider.style.setProperty('--value-percent', `${initialPercent}%`);
    
    fullscreenBtn.addEventListener('click', () => {
       if (!document.fullscreenElement) {

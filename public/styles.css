@@ -913,7 +913,7 @@
  footer a:hover {
      text-decoration: underline;
 }
-/* Media Queries */
+
 @media (max-width: 1200px) {
     .grid {
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -970,7 +970,6 @@
     }
     
     nav a {
-        padding: var(--spacing-sm);
         font-size: 0.9rem;
     }
     
@@ -1052,6 +1051,6 @@
     }
     
     video::cue {
-		font-size: 1.2rem;
+    font-size: 1.2rem;
     }
 }
