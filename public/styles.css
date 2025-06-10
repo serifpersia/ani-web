@@ -346,7 +346,7 @@ h4 {
 }
 .quality-button:hover,
 .watchlist-toggle-button:hover {
-   background-color: #444;
+   background-color: var(--accent-hover);
 }
 .quality-button.active,
 .watchlist-toggle-button.in-list {
@@ -558,6 +558,7 @@ input:checked + .slider:before {
 .progress-bar-container {
    padding: 5px 0 10px;
    cursor: pointer;
+   position: relative;
 }
 .progress-bar {
    width: 100%;
@@ -650,7 +651,7 @@ input:checked + .slider:before {
    transition: background-color 0.2s;
 }
 .quality-item:hover, .cc-item:hover:not(:disabled) {
-   background-color: #444;
+   background-color: var(--accent-hover);
 }
 .quality-item.active, .cc-item.active {
    background-color: var(--accent-color);
@@ -676,36 +677,40 @@ input:checked + .slider:before {
    display: flex;
    align-items: center;
 }
+.volume-slider-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    margin-left: 10px;
+}
 #volume-slider {
-   width: 0;
-   opacity: 0;
-   transition: width 0.3s, opacity 0.3s;
-}
-.volume-container:hover #volume-slider {
    width: 80px;
-   opacity: 1;
-   margin-left: 10px;
 }
-.player-content input[type="range"] {
+.player-content input[type="range"],
+.settings-menu input[type="range"] {
    -webkit-appearance: none;
    background: transparent;
    cursor: pointer;
    width: 100%;
 }
-.player-content input[type="range"]:disabled {
+.player-content input[type="range"]:disabled,
+.settings-menu input[type="range"]:disabled {
    cursor: not-allowed;
 }
-.player-content input[type="range"]::-webkit-slider-runnable-track {
-   background: #555;
+.player-content input[type="range"]::-webkit-slider-runnable-track,
+.settings-menu input[type="range"]::-webkit-slider-runnable-track {
+   background: linear-gradient(to right, white 0%, white var(--value-percent, 100%), rgba(255, 255, 255, 0.3) var(--value-percent, 100%), rgba(255, 255, 255, 0.3) 100%);
    height: 6px;
    border-radius: 3px;
 }
-.player-content input[type="range"]::-moz-range-track {
-   background: #555;
+.player-content input[type="range"]::-moz-range-track,
+.settings-menu input[type="range"]::-moz-range-track {
+    background: linear-gradient(to right, white 0%, white var(--value-percent, 100%), rgba(255, 255, 255, 0.3) var(--value-percent, 100%), rgba(255, 255, 255, 0.3) 100%);
    height: 6px;
    border-radius: 3px;
 }
-.player-content input[type="range"]::-webkit-slider-thumb {
+.player-content input[type="range"]::-webkit-slider-thumb,
+.settings-menu input[type="range"]::-webkit-slider-thumb {
    -webkit-appearance: none;
    margin-top: -5px;
    background-color: #fff;
@@ -713,17 +718,20 @@ input:checked + .slider:before {
    width: 16px;
    border-radius: 50%;
 }
-.player-content input[type="range"]::-moz-range-thumb {
+.player-content input[type="range"]::-moz-range-thumb,
+.settings-menu input[type="range"]::-moz-range-thumb {
    border: none;
    border-radius: 50%;
    background-color: #fff;
    height: 16px;
    width: 16px;
 }
-.player-content input[type="range"]:hover::-webkit-slider-thumb {
+.player-content input[type="range"]:hover::-webkit-slider-thumb,
+.settings-menu input[type="range"]:hover::-webkit-slider-thumb {
    background-color: #eee;
 }
-.player-content input[type="range"]:disabled::-webkit-slider-thumb {
+.player-content input[type="range"]:disabled::-webkit-slider-thumb,
+.settings-menu input[type="range"]:disabled::-webkit-slider-thumb {
    background-color: #777;
 }
 #schedule-day-selector-container {
@@ -802,11 +810,11 @@ input:checked + .slider:before {
    transition: background-color 0.2s;
 }
 .import-controls input[type="file"]::file-selector-button:hover, #restoreFile::file-selector-button:hover {
-   background-color: #444;
+   background-color: var(--accent-hover);
 }
 .import-controls button, .backup-restore-controls button, .backup-restore-controls a {
    background-color: var(--accent-color);
-   color: var(--primary-bg);
+   color: var(--primary-text);
    font-weight: bold;
    border: none;
    padding: 9px 15px;
@@ -835,6 +843,7 @@ input:checked + .slider:before {
     position: absolute;
 	bottom: 8px;
     right: 8px;
+    transform: translateX(-50%);
     z-index: 5;
     background-color: rgba(0, 0, 0, 0.7);
     color: white;
@@ -854,6 +863,45 @@ input:checked + .slider:before {
 .remove-from-cw-btn:hover {
     background-color: var(--error-color);
 }
+
+.slider-bubble {
+    position: absolute;
+    top: -28px;
+    transform: translateX(-50%);
+    background-color: rgba(30, 30, 30, 0.95);
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease-in-out;
+    z-index: 15;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.slider-bubble::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 5px;
+    border-style: solid;
+    border-color: rgba(30, 30, 30, 0.95) transparent transparent transparent;
+}
+
+.progress-bar-container .slider-bubble {
+    top: -20px;
+}
+
+.generic-slider-wrapper {
+    position: relative;
+    padding: 5px 0;
+}
+
 
 footer {
    text-align: center;

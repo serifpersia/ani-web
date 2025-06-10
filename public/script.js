@@ -746,7 +746,6 @@ function displayEpisodePlayer(sources, showId, episodeNumber, showName, showThum
    const fullscreenIcon = `<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>`;
    const exitFullscreenIcon = `<svg viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>`;
    const volumeHighIcon = `<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>`;
-   const volumeMuteIcon = `<svg viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>`;
    const seekForwardIcon = `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="m19.293 8-3.147-3.146a.5.5 0 1 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 1 1-.708-.708L19.293 9H5.5A1.5 1.5 0 0 0 4 10.5v6A1.5 1.5 0 0 0 5.5 18h15a.5.5 0 0 1 0 1h-15A2.5 2.5 0 0 1 3 16.5v-6A2.5 2.5 0 0 1 5.5 8z"/><text x="6.5" y="16.25" font-size="8">10</text></svg>`;
    const seekBackwardIcon = `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="m4.707 8 3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 1 0 .708-.708L4.707 9H18.5a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-1.5 1.5h-15a.5.5 0 0 0 0 1h15a2.5 2.5 0 0 0 2.5-2.5v-6A2.5 2.5 0 0 0 18.5 8z"/><text x="8" y="16.25" font-size="8">10</text></svg>`;
    playerSection.innerHTML = `
@@ -754,6 +753,7 @@ function displayEpisodePlayer(sources, showId, episodeNumber, showName, showThum
          <video id="videoPlayer"></video>
          <div id="video-controls-container" class="video-controls-container">
             <div class="progress-bar-container">
+               <div id="progress-bubble" class="slider-bubble">00:00</div>
                <div class="progress-bar">
                   <div class="progress-bar-watched"></div>
                   <div class="progress-bar-buffered"></div>
@@ -765,7 +765,10 @@ function displayEpisodePlayer(sources, showId, episodeNumber, showName, showThum
                   <button id="play-pause-btn" class="control-button">${playIcon}</button>
                   <div class="volume-container">
                      <button id="volume-btn" class="control-button">${volumeHighIcon}</button>
-                     <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="1">
+                     <div class="volume-slider-container">
+                        <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="1">
+                        <div id="volume-bubble" class="slider-bubble">100%</div>
+                     </div>
                   </div>
                   <div class="time-display">
                      <span id="current-time">00:00</span> / <span id="total-time">00:00</span>
@@ -795,11 +798,17 @@ function displayEpisodePlayer(sources, showId, episodeNumber, showName, showThum
                      <h4>Subtitle Settings</h4>
                      <div class="cc-slider-container">
                         <label for="fontSizeSlider">Font Size</label>
-                        <input type="range" id="fontSizeSlider" min="1" max="3" step="0.1" value="1.8">
+                        <div class="generic-slider-wrapper">
+                           <input type="range" id="fontSizeSlider" min="1" max="3" step="0.1" value="1.8">
+                           <div id="fontSizeBubble" class="slider-bubble">1.8</div>
+                        </div>
                      </div>
                      <div class="cc-slider-container">
                         <label for="positionSlider">Position</label>
-                        <input type="range" id="positionSlider" min="-10" max="0" step="1" value="-4">
+                        <div class="generic-slider-wrapper">
+                           <input type="range" id="positionSlider" min="-10" max="0" step="1" value="-4">
+                           <div id="positionBubble" class="slider-bubble">-4</div>
+                        </div>
                      </div>
                   </div>
                </div>
@@ -818,6 +827,8 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
    const seekBackwardBtn = document.getElementById('seek-backward-btn');
    const seekForwardBtn = document.getElementById('seek-forward-btn');
    const progressBar = document.querySelector('.progress-bar');
+   const progressBarContainer = document.querySelector('.progress-bar-container');
+   const progressBubble = document.getElementById('progress-bubble');
    const watchedBar = document.querySelector('.progress-bar-watched');
    const bufferedBar = document.querySelector('.progress-bar-buffered');
    const progressBarThumb = document.querySelector('.progress-bar-thumb');
@@ -831,14 +842,53 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
    const sourceOptions = document.getElementById('source-options');
    const volumeBtn = document.getElementById('volume-btn');
    const volumeSlider = document.getElementById('volume-slider');
+   const volumeBubble = document.getElementById('volume-bubble');
    const fontSizeSlider = document.getElementById('fontSizeSlider');
+   const fontSizeBubble = document.getElementById('fontSizeBubble');
    const positionSlider = document.getElementById('positionSlider');
+   const positionBubble = document.getElementById('positionBubble');
    const playIcon = `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
    const pauseIcon = `<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
    const fullscreenIcon = `<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>`;
    const exitFullscreenIcon = `<svg viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>`;
    const volumeHighIcon = `<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>`;
+   const volumeMediumIcon = `<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>`;
    const volumeMuteIcon = `<svg viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>`;
+
+   function setupSlider(slider, bubble, valueFormatter) {
+      const updateSliderUI = () => {
+         const min = parseFloat(slider.min);
+         const max = parseFloat(slider.max);
+         const val = parseFloat(slider.value);
+         const percent = ((val - min) / (max - min)) * 100;
+         slider.style.setProperty('--value-percent', `${percent}%`);
+         if (bubble) {
+            bubble.textContent = valueFormatter ? valueFormatter(val) : val;
+            const sliderWidth = slider.offsetWidth;
+            const thumbPosition = (percent / 100) * (sliderWidth - 16) + 8;
+            const bubbleWidth = bubble.offsetWidth;
+            let left = thumbPosition - (bubbleWidth / 2);
+            left = Math.max(0, Math.min(left, sliderWidth - bubbleWidth));
+            bubble.style.left = `${left}px`;
+         }
+      };
+      if (bubble) {
+         const container = slider.parentElement;
+         const showBubble = () => {
+            updateSliderUI();
+            bubble.style.opacity = '1';
+         };
+         const hideBubble = () => bubble.style.opacity = '0';
+         slider.addEventListener('input', updateSliderUI);
+         container.addEventListener('mouseenter', showBubble);
+         container.addEventListener('mouseleave', hideBubble);
+         slider.addEventListener('mousedown', showBubble);
+         slider.addEventListener('mouseup', hideBubble);
+      }
+      slider.addEventListener('input', updateSliderUI);
+      updateSliderUI();
+   }
+
    let styleElement = document.getElementById('subtitle-style-override');
    if (!styleElement) {
       styleElement = document.createElement('style');
@@ -865,9 +915,12 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
    };
    fontSizeSlider.value = localStorage.getItem('subtitleFontSize') || '1.8';
    positionSlider.value = localStorage.getItem('subtitlePosition') || '-4';
-   updateFontSize();
+   setupSlider(fontSizeSlider, fontSizeBubble, val => val.toFixed(1));
+   setupSlider(positionSlider, positionBubble, val => val.toString());
    fontSizeSlider.addEventListener('input', updateFontSize);
    positionSlider.addEventListener('input', updatePosition);
+   updateFontSize();
+
    const togglePlay = () => {
       if (video.paused) {
          video.play();
@@ -899,21 +952,16 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
    seekForwardBtn.addEventListener('click', () => { video.currentTime += 10; });
    const formatTime = (timeInSeconds) => {
       const result = new Date(timeInSeconds * 1000).toISOString().substr(11, 8);
-      return {
-         minutes: result.substr(3, 2),
-         seconds: result.substr(6, 2),
-         hours: result.substr(0, 2)
-      };
+      const hours = result.substr(0, 2);
+      const minutes = result.substr(3, 2);
+      const seconds = result.substr(6, 2);
+      return hours === '00' ? `${minutes}:${seconds}` : `${hours}:${minutes}:${seconds}`;
    };
    video.addEventListener('loadedmetadata', () => {
-      totalTimeEl.textContent = formatTime(video.duration).hours === '00' ?
-         `${formatTime(video.duration).minutes}:${formatTime(video.duration).seconds}` :
-         `${formatTime(video.duration).hours}:${formatTime(video.duration).minutes}:${formatTime(video.duration).seconds}`;
+      totalTimeEl.textContent = formatTime(video.duration);
    });
    video.addEventListener('timeupdate', () => {
-      currentTimeEl.textContent = formatTime(video.currentTime).hours === '00' ?
-         `${formatTime(video.currentTime).minutes}:${formatTime(video.currentTime).seconds}` :
-         `${formatTime(video.currentTime).hours}:${formatTime(video.currentTime).minutes}:${formatTime(video.currentTime).seconds}`;
+      currentTimeEl.textContent = formatTime(video.currentTime);
       const progressPercent = (video.currentTime / video.duration) * 100;
       watchedBar.style.width = `${progressPercent}%`;
       progressBarThumb.style.left = `${progressPercent}%`;
@@ -930,15 +978,40 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
       const percent = (e.clientX - rect.left) / rect.width;
       video.currentTime = percent * video.duration;
    });
+   progressBarContainer.addEventListener('mousemove', e => {
+      const rect = progressBar.getBoundingClientRect();
+      const percent = Math.min(Math.max(0, (e.clientX - rect.left) / rect.width), 1);
+      const hoverTime = percent * video.duration;
+      progressBubble.textContent = formatTime(hoverTime);
+      const bubbleWidth = progressBubble.offsetWidth;
+      const containerWidth = progressBarContainer.offsetWidth;
+      let left = e.clientX - rect.left - bubbleWidth / 2;
+      left = Math.max(0, Math.min(left, containerWidth - bubbleWidth));
+      progressBubble.style.left = `${left}px`;
+      progressBubble.style.opacity = '1';
+   });
+   progressBarContainer.addEventListener('mouseleave', () => {
+      progressBubble.style.opacity = '0';
+   });
+   const updateVolumeUI = () => {
+      const volume = video.muted ? 0 : video.volume;
+      if (video.muted || volume === 0) {
+         volumeBtn.innerHTML = volumeMuteIcon;
+      } else if (volume <= 0.5) {
+         volumeBtn.innerHTML = volumeMediumIcon;
+      } else {
+         volumeBtn.innerHTML = volumeHighIcon;
+      }
+   };
    video.addEventListener('volumechange', () => {
-      volumeSlider.value = video.volume;
-      volumeBtn.innerHTML = video.volume === 0 || video.muted ? volumeMuteIcon : volumeHighIcon;
+      updateVolumeUI();
+      setupSlider(volumeSlider, volumeBubble, val => `${Math.round(val * 100)}%`);
       localStorage.setItem('playerVolume', video.volume);
-      localStorage.setItem('playerMuted', video.muted);
+      localStorage.setItem('playerMuted', video.muted.toString());
    });
    volumeSlider.addEventListener('input', (e) => {
-      video.volume = e.target.value;
       video.muted = false;
+      video.volume = e.target.value;
    });
    volumeBtn.addEventListener('click', () => {
       video.muted = !video.muted;
@@ -947,7 +1020,9 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
    const savedMuted = localStorage.getItem('playerMuted');
    if (savedVolume !== null) video.volume = parseFloat(savedVolume);
    if (savedMuted !== null) video.muted = savedMuted === 'true';
-   volumeSlider.value = video.volume;
+   setupSlider(volumeSlider, volumeBubble, val => `${Math.round(val * 100)}%`);
+   updateVolumeUI();
+   
    fullscreenBtn.addEventListener('click', () => {
       if (!document.fullscreenElement) {
          playerContent.requestFullscreen();
