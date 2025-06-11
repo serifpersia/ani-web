@@ -11,6 +11,12 @@ const port = 3000;
 const apiCache = new NodeCache({ stdTTL: 3600 });
 const dbPath = path.join(__dirname, 'anime.db');
 let db;
+
+const profilePicsDir = path.join(__dirname, 'public', 'profile_pics');
+if (!fs.existsSync(profilePicsDir)) {
+    fs.mkdirSync(profilePicsDir, { recursive: true });
+}
+
 function initializeDatabase() {
    db = new sqlite3.Database(dbPath, (err) => {
       if (err) {
@@ -18,7 +24,7 @@ function initializeDatabase() {
       } else {
          console.log('Connected to SQLite database.');
          db.serialize(() => {
-            db.run(`CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)`);
+            db.run(`CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, picture_path TEXT)`);
             db.get(`SELECT COUNT(*) as count FROM profiles`, (err, row) => {
                if (row && row.count === 0) {
                   db.run(`INSERT INTO profiles (name) VALUES ('Default')`, (err) => {
@@ -27,7 +33,7 @@ function initializeDatabase() {
                }
             });
             db.run(`CREATE TABLE IF NOT EXISTS watchlist (profile_id INTEGER NOT NULL, id TEXT NOT NULL, name TEXT, thumbnail TEXT, status TEXT, PRIMARY KEY (profile_id, id))`);
-            db.run(`CREATE TABLE IF NOT EXISTS watched_episodes (profile_id INTEGER NOT NULL, showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, watchedAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (profile_id, showId, episodeNumber))`);
+            db.run(`CREATE TABLE IF NOT EXISTS watched_episodes (profile_id INTEGER NOT NULL, showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, watchedAt DATETIME DEFAULT CURRENT_TIMESTAMP, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, PRIMARY KEY (profile_id, showId, episodeNumber))`);
             db.run(`CREATE TABLE IF NOT EXISTS settings (profile_id INTEGER NOT NULL, key TEXT NOT NULL, value TEXT, PRIMARY KEY (profile_id, key))`);
             db.run(`CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT)`);
          });
@@ -35,7 +41,20 @@ function initializeDatabase() {
    });
 }
 initializeDatabase();
-const storage = multer.diskStorage({
+
+const profilePicStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, profilePicsDir);
+    },
+    filename: function (req, file, cb) {
+        const profileId = req.params.id;
+        const extension = path.extname(file.originalname);
+        cb(null, `${profileId}${extension}`);
+    }
+});
+const profilePicUpload = multer({ storage: profilePicStorage });
+
+const dbUploadStorage = multer.diskStorage({
    destination: function (req, file, cb) {
       cb(null, __dirname);
    },
@@ -43,7 +62,8 @@ const storage = multer.diskStorage({
       cb(null, 'anime.db.temp');
    }
 });
-const upload = multer({ storage: storage });
+const dbUpload = multer({ storage: dbUploadStorage });
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static('public'));
 app.get('/favicon.ico', (req, res) => res.status(204).send());
@@ -92,6 +112,7 @@ query ($search: SearchInput, $limit: Int, $page: Int, $translationType: VaildTra
       name
       thumbnail
       description
+      type
       availableEpisodesDetail
     }
   }
@@ -185,8 +206,7 @@ app.get('/search', (req, res) => {
     if (sortBy) searchObj.sortBy = sortBy;
     if (type && type !== 'ALL') searchObj.types = [type];
     const variables = { search: searchObj, limit: 28, page: parseInt(page) || 1, translationType: (translation && translation !== 'ALL') ? translation : 'sub', countryOrigin: (country && country !== 'ALL') ? country : 'ALL' };
-    const cacheKey = `search-${JSON.stringify(variables)}`;
-    fetchAndSendShows(res, variables, cacheKey);
+    fetchAndSendShows(res, variables, null);
 });
 app.get('/schedule/:date', (req, res) => {
     const dateStr = req.params.date;
@@ -332,9 +352,9 @@ app.get('/proxy', async (req, res) => {
         if (url.includes('.m3u8')) {
             const response = await axios.get(url, { headers, responseType: 'text', timeout: 15000 });
             const baseUrl = new URL(url);
-            const rewritten = response.data.split('\n').map(l => 
-                (l.trim().length > 0 && !l.startsWith('#')) 
-                    ? `/proxy?url=${encodeURIComponent(new URL(l, baseUrl).href)}&referer=${encodeURIComponent(dynamicReferer || referer)}` 
+            const rewritten = response.data.split('\n').map(l =>
+                (l.trim().length > 0 && !l.startsWith('#'))
+                    ? `/proxy?url=${encodeURIComponent(new URL(l, baseUrl).href)}&referer=${encodeURIComponent(dynamicReferer || referer)}`
                     : l
             ).join('\n');
             res.set('Content-Type', 'application/vnd.apple.mpegurl').send(rewritten);
@@ -362,6 +382,13 @@ app.get('/api/profiles', (req, res) => {
         res.json(rows);
     });
 });
+app.get('/api/profiles/:id', (req, res) => {
+    db.get('SELECT * FROM profiles WHERE id = ?', [req.params.id], (err, row) => {
+        if (err) return res.status(500).json({ error: 'DB error' });
+        if (!row) return res.status(404).json({ error: 'Profile not found' });
+        res.json(row);
+    });
+});
 app.post('/api/profiles', (req, res) => {
     const { name } = req.body;
     if (!name || name.trim().length === 0) {
@@ -372,6 +399,17 @@ app.post('/api/profiles', (req, res) => {
             return res.status(500).json({ error: 'Failed to create profile. Name might already exist.' });
         }
         res.json({ id: this.lastID, name: name.trim() });
+    });
+});
+app.post('/api/profiles/:id/picture', profilePicUpload.single('profilePic'), (req, res) => {
+    const profileId = req.params.id;
+    if (!req.file) {
+        return res.status(400).json({ error: 'No picture uploaded.' });
+    }
+    const picturePath = `/profile_pics/${req.file.filename}`;
+    db.run('UPDATE profiles SET picture_path = ? WHERE id = ?', [picturePath, profileId], function (err) {
+        if (err) return res.status(500).json({ error: 'Failed to update profile picture in DB.' });
+        res.json({ success: true, path: picturePath });
     });
 });
 app.put('/api/profiles/:id', (req, res) => {
@@ -455,16 +493,17 @@ app.post('/watchlist/add', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const { id, name, thumbnail, status } = req.body;
-    db.run(`INSERT OR REPLACE INTO watchlist (profile_id, id, name, thumbnail, status) VALUES (?, ?, ?, ?, ?)`, 
-        [profileId, id, name, thumbnail, status || 'Watching'], 
+    const finalThumbnail = deobfuscateUrl(thumbnail || '');
+    db.run(`INSERT OR REPLACE INTO watchlist (profile_id, id, name, thumbnail, status) VALUES (?, ?, ?, ?, ?)`,
+        [profileId, id, name, finalThumbnail, status || 'Watching'],
         (err) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
     );
 });
 app.get('/watchlist/check/:showId', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
-    db.get('SELECT EXISTS(SELECT 1 FROM watchlist WHERE profile_id = ? AND id = ?) as inWatchlist', 
-        [profileId, req.params.showId], 
+    db.get('SELECT EXISTS(SELECT 1 FROM watchlist WHERE profile_id = ? AND id = ?) as inWatchlist',
+        [profileId, req.params.showId],
         (err, row) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ inWatchlist: !!row.inWatchlist })
     );
 });
@@ -472,55 +511,92 @@ app.post('/watchlist/status', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const { id, status } = req.body;
-    db.run(`UPDATE watchlist SET status = ? WHERE profile_id = ? AND id = ?`, 
-        [status, profileId, id], 
+    db.run(`UPDATE watchlist SET status = ? WHERE profile_id = ? AND id = ?`,
+        [status, profileId, id],
         (err) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
     );
 });
 app.get('/watchlist', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
-    db.all(`SELECT * FROM watchlist WHERE profile_id = ? ORDER BY name ASC`, [profileId], 
+
+    const sort = req.query.sort || 'last_added';
+    let orderByClause;
+
+    switch (sort) {
+        case 'name_asc':
+            orderByClause = 'ORDER BY name ASC';
+            break;
+        case 'name_desc':
+            orderByClause = 'ORDER BY name DESC';
+            break;
+        case 'last_added':
+        default:
+            orderByClause = 'ORDER BY ROWID DESC';
+            break;
+    }
+
+    db.all(`SELECT * FROM watchlist WHERE profile_id = ? ${orderByClause}`, [profileId],
         (err, rows) => err ? res.status(500).json({ error: 'DB error' }) : res.json(rows)
     );
 });
 app.post('/watchlist/remove', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
-    db.run(`DELETE FROM watchlist WHERE profile_id = ? AND id = ?`, 
-        [profileId, req.body.id], 
+    db.run(`DELETE FROM watchlist WHERE profile_id = ? AND id = ?`,
+        [profileId, req.body.id],
         (err) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
     );
 });
-app.post('/watched-episode', (req, res) => {
+
+app.post('/update-progress', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
-    const { showId, episodeNumber, showName, showThumbnail } = req.body;
+    const { showId, episodeNumber, currentTime, duration, showName, showThumbnail } = req.body;
+
     db.serialize(() => {
-        db.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail) VALUES (?, ?, ?)', 
+        db.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail) VALUES (?, ?, ?)',
             [showId, showName, deobfuscateUrl(showThumbnail)]);
-        db.run(`INSERT OR REPLACE INTO watched_episodes (profile_id, showId, episodeNumber, watchedAt) VALUES (?, ?, ?, CURRENT_TIMESTAMP)`, 
-            [profileId, showId, episodeNumber], 
-            (err) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
+
+        db.run(`INSERT OR REPLACE INTO watched_episodes (profile_id, showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)`,
+            [profileId, showId, episodeNumber, currentTime, duration],
+            (err) => {
+                if (err) return res.status(500).json({ error: 'DB error on progress update' });
+                res.json({ success: true });
+            }
         );
     });
 });
+
+app.get('/episode-progress/:showId/:episodeNumber', (req, res) => {
+    const profileId = req.headers['x-profile-id'];
+    if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
+    const { showId, episodeNumber } = req.params;
+
+    db.get('SELECT currentTime, duration FROM watched_episodes WHERE profile_id = ? AND showId = ? AND episodeNumber = ?',
+        [profileId, showId, episodeNumber], (err, row) => {
+        if (err) return res.status(500).json({ error: 'DB error' });
+        res.json(row || { currentTime: 0, duration: 0 });
+    });
+});
+
 app.get('/watched-episodes/:showId', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
-    db.all(`SELECT episodeNumber FROM watched_episodes WHERE profile_id = ? AND showId = ?`, 
-        [profileId, req.params.showId], 
+    db.all(`SELECT episodeNumber FROM watched_episodes WHERE profile_id = ? AND showId = ?`,
+        [profileId, req.params.showId],
         (err, rows) => err ? res.status(500).json({ error: 'DB error' }) : res.json(rows.map(r => r.episodeNumber))
     );
 });
+
 app.get('/continue-watching', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const query = `
-        SELECT sm.id, sm.name, sm.thumbnail, we.episodeNumber as lastWatchedEpisode, we.watchedAt
+        SELECT sm.id as showId, sm.name, sm.thumbnail, we.episodeNumber, we.currentTime, we.duration
         FROM shows_meta sm
         JOIN (
-           SELECT showId, episodeNumber, MAX(watchedAt) as watchedAt
+           SELECT showId, episodeNumber, currentTime, duration, MAX(watchedAt) as watchedAt
            FROM watched_episodes
            WHERE profile_id = ?
            GROUP BY showId
@@ -532,31 +608,42 @@ app.get('/continue-watching', (req, res) => {
         if (err) return res.status(500).json({ error: 'DB error' });
         try {
             const results = await Promise.all(rows.map(async (show) => {
-                if (!show.lastWatchedEpisode) return null;
-                const epResponse = await axios.get(apiEndpoint, {
-                    headers: { 'User-Agent': userAgent, 'Referer': referer },
-                    params: { query: `query($showId: String!) { show(_id: $showId) { availableEpisodesDetail } }`, variables: JSON.stringify({ showId: show.id }) },
-                    timeout: 10000
-                });
-                const allEps = epResponse.data.data.show.availableEpisodesDetail.sub?.sort((a, b) => parseFloat(a) - parseFloat(b)) || [];
-                const lastWatchedIndex = allEps.indexOf(show.lastWatchedEpisode);
-                if (lastWatchedIndex > -1 && lastWatchedIndex < allEps.length) {
+                const isComplete = show.duration > 0 && show.currentTime / show.duration >= 0.95;
+                if (!isComplete && show.currentTime > 0) {
                     return {
-                        showId: show.id,
-                        name: show.name,
+                        ...show,
                         thumbnail: deobfuscateUrl(show.thumbnail),
-                        lastWatched: show.lastWatchedEpisode,
-                        nextEpisodeNumber: allEps[lastWatchedIndex]
+                        episodeToPlay: show.episodeNumber
                     };
+                } else {
+                     const epResponse = await axios.get(apiEndpoint, {
+                        headers: { 'User-Agent': userAgent, 'Referer': referer },
+                        params: { query: `query($showId: String!) { show(_id: $showId) { availableEpisodesDetail } }`, variables: JSON.stringify({ showId: show.showId }) },
+                        timeout: 10000
+                    });
+                    const allEps = epResponse.data.data.show.availableEpisodesDetail.sub?.sort((a, b) => parseFloat(a) - parseFloat(b)) || [];
+                    const lastWatchedIndex = allEps.indexOf(show.episodeNumber);
+
+                    if (lastWatchedIndex > -1 && lastWatchedIndex < allEps.length - 1) {
+                        return {
+                            ...show,
+                            thumbnail: deobfuscateUrl(show.thumbnail),
+                            episodeToPlay: allEps[lastWatchedIndex + 1],
+                            currentTime: 0,
+                            duration: 0
+                        };
+                    }
+                    return null;
                 }
-                return null;
             }));
             res.json(results.filter(Boolean));
         } catch (apiError) {
-            res.status(500).json({ error: 'API error' });
+            console.error("API Error in /continue-watching", apiError);
+            res.status(500).json({ error: 'API error while resolving next episodes' });
         }
     });
 });
+
 
 app.get('/skip-times/:showId/:episodeNumber', async (req, res) => {
     const { showId, episodeNumber } = req.params;
@@ -599,8 +686,8 @@ app.post('/continue-watching/remove', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const { showId } = req.body;
-    db.run(`DELETE FROM watched_episodes WHERE profile_id = ? AND showId = ?`, 
-        [profileId, showId], 
+    db.run(`DELETE FROM watched_episodes WHERE profile_id = ? AND showId = ?`,
+        [profileId, showId],
         (err) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
     );
 });
@@ -630,7 +717,7 @@ app.get('/backup-db', (req, res) => {
       }
    });
 });
-app.post('/restore-db', upload.single('dbfile'), (req, res) => {
+app.post('/restore-db', dbUpload.single('dbfile'), (req, res) => {
    if (!req.file) {
       return res.status(400).json({ error: 'No database file uploaded.' });
    }

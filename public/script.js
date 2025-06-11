@@ -4,6 +4,7 @@ let seasonalState = { page: 1, isLoading: false, hasMore: true };
 let playerInactivityTimer = null;
 let profiles = [];
 let activeProfileId = null;
+let videoProgressUpdateTimer = null;
 
 async function fetchWithProfile(url, options = {}) {
    if (!activeProfileId) {
@@ -15,20 +16,29 @@ async function fetchWithProfile(url, options = {}) {
       newOptions.headers = {};
    }
    newOptions.headers['X-Profile-ID'] = activeProfileId;
-   if (newOptions.body && typeof newOptions.body === 'string') {
+   if (newOptions.body && typeof newOptions.body === 'string' && !newOptions.headers['Content-Type']) {
       newOptions.headers['Content-Type'] = 'application/json';
    }
    return fetch(url, newOptions);
 }
+
 function navigateTo(hash) {
    window.location.hash = hash;
 }
+
 function router() {
    const hash = window.location.hash || '#home';
-   const [path, param, episode] = hash.substring(1).split('/');
-   const data = { showId: param, episodeToPlay: episode };
+   const [pathPart, ...rest] = hash.substring(1).split('/');
+   const [path, queryString] = pathPart.split('?');
+   
+   const data = { showId: rest[0], episodeToPlay: rest[1] };
+   if (queryString) {
+       data.params = new URLSearchParams(queryString);
+   }
+
    renderPageContent(path || 'home', data);
 }
+
 document.addEventListener('DOMContentLoaded', () => {
    setupThemeSelector();
    initProfileSystem();
@@ -37,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
    setupWatchlistPage();
    window.addEventListener('hashchange', router);
 });
+
 async function initProfileSystem() {
    try {
       const response = await fetch('/api/profiles');
@@ -47,7 +58,8 @@ async function initProfileSystem() {
          const isValidId = profiles.some(p => p.id.toString() === storedId);
          activeProfileId = isValidId ? storedId : profiles[0].id.toString();
          localStorage.setItem('activeProfileId', activeProfileId);
-         populateProfileSelector();
+         
+         updateProfileDisplay();
          setupProfileEventListeners();
          document.getElementById('profile-area').style.display = 'flex';
          router();
@@ -60,36 +72,83 @@ async function initProfileSystem() {
       alert(`Critical Error: Could not load profile system. ${error.message}`);
    }
 }
-function populateProfileSelector() {
-   const selector = document.getElementById('profile-selector');
-   selector.innerHTML = '';
-   profiles.forEach(profile => {
-      const option = document.createElement('option');
-      option.value = profile.id;
-      option.textContent = profile.name;
-      selector.appendChild(option);
-   });
-   selector.value = activeProfileId;
+
+function updateProfileDisplay() {
+    const activeProfile = profiles.find(p => p.id.toString() === activeProfileId);
+    if (!activeProfile) return;
+
+    const avatar = document.getElementById('profile-avatar');
+    const dropdownAvatar = document.getElementById('dropdown-avatar');
+    const dropdownUsername = document.getElementById('dropdown-username');
+    
+    const avatarUrl = activeProfile.picture_path ? `${activeProfile.picture_path}?t=${new Date().getTime()}` : '/profile_pics/default.png';
+    avatar.src = avatarUrl;
+    dropdownAvatar.src = avatarUrl;
+    dropdownUsername.textContent = activeProfile.name;
+
+    const selectorContainer = document.getElementById('profile-selector-container');
+    selectorContainer.innerHTML = '';
+    profiles.forEach(profile => {
+        const item = document.createElement('div');
+        item.className = 'dropdown-item profile-switch-item';
+        if (profile.id.toString() === activeProfileId) {
+            item.classList.add('active');
+        }
+        item.dataset.id = profile.id;
+        item.innerHTML = `
+            <img src="${profile.picture_path || '/profile_pics/default.png'}" class="profile-avatar-small">
+            <span>${profile.name}</span>
+        `;
+        item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            switchProfile(profile.id.toString());
+            document.getElementById('profile-dropdown').classList.remove('active');
+        });
+        selectorContainer.appendChild(item);
+    });
 }
+
+
 function setupProfileEventListeners() {
-   document.getElementById('profile-selector').addEventListener('change', (e) => switchProfile(e.target.value));
-   document.getElementById('add-profile-btn').addEventListener('click', createProfile);
-   document.getElementById('rename-profile-btn').addEventListener('click', renameProfile);
-   document.getElementById('delete-profile-btn').addEventListener('click', deleteProfile);
+    const profileDisplay = document.getElementById('profile-display');
+    const profileDropdown = document.getElementById('profile-dropdown');
+    
+    if (profileDisplay) {
+        profileDisplay.addEventListener('click', (e) => {
+            e.stopPropagation();
+            profileDropdown.classList.toggle('active');
+        });
+    }
+
+    document.addEventListener('click', () => {
+        if(profileDropdown) profileDropdown.classList.remove('active');
+    });
+
+    if(profileDropdown) profileDropdown.addEventListener('click', e => e.stopPropagation());
+
+    const addProfileBtn = document.getElementById('add-profile-btn-dropdown');
+    if (addProfileBtn) addProfileBtn.addEventListener('click', createProfile);
+    
+    const settingsDeleteBtn = document.getElementById('delete-profile-btn-settings');
+    if (settingsDeleteBtn) settingsDeleteBtn.addEventListener('click', deleteProfile);
 }
+
 function switchProfile(newProfileId) {
    activeProfileId = newProfileId;
    localStorage.setItem('activeProfileId', newProfileId);
+   updateProfileDisplay();
+   
    const hash = window.location.hash || '#home';
    const [path] = hash.substring(1).split('/');
    if (path === 'home' || path === '') {
       document.getElementById('continue-watching').innerHTML = '';
       document.getElementById('continue-watching').parentElement.style.display = 'none';
-   } else if (path === 'watchlist') {
-      document.getElementById('watchlist').innerHTML = '';
+      router();
+   } else {
+      window.location.reload();
    }
-   router();
 }
+
 async function createProfile() {
    const name = prompt("Enter new profile name:");
    if (name && name.trim()) {
@@ -108,24 +167,7 @@ async function createProfile() {
       }
    }
 }
-async function renameProfile() {
-   const currentProfile = profiles.find(p => p.id.toString() === activeProfileId);
-   if (!currentProfile) return;
-   const newName = prompt("Enter new name for profile:", currentProfile.name);
-   if (newName && newName.trim() && newName.trim() !== currentProfile.name) {
-      try {
-         const response = await fetch(`/api/profiles/${activeProfileId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: newName.trim() })
-         });
-         if (!response.ok) throw new Error((await response.json()).error || 'Failed to rename profile.');
-         await initProfileSystem();
-      } catch (error) {
-         alert(`Error: ${error.message}`);
-      }
-   }
-}
+
 async function deleteProfile() {
    if (profiles.length <= 1) {
       alert("Cannot delete the last profile.");
@@ -133,22 +175,28 @@ async function deleteProfile() {
    }
    const currentProfile = profiles.find(p => p.id.toString() === activeProfileId);
    if (!currentProfile) return;
-   if (confirm(`Are you sure you want to delete the profile "${currentProfile.name}"? All its data will be lost forever.`)) {
+   if (confirm(`Are you sure you want to delete the profile "${currentProfile.name}"? All its data will be permanently deleted.`)) {
       try {
          const response = await fetch(`/api/profiles/${activeProfileId}`, { method: 'DELETE' });
          if (!response.ok) throw new Error((await response.json()).error || 'Failed to delete profile.');
          localStorage.removeItem('activeProfileId');
          await initProfileSystem();
+         navigateTo('#home');
       } catch (error) {
          alert(`Error: ${error.message}`);
       }
    }
 }
+
 function stopVideoPlayback() {
    if (playerInactivityTimer) {
       clearTimeout(playerInactivityTimer);
       playerInactivityTimer = null;
    }
+    if (videoProgressUpdateTimer) {
+        clearInterval(videoProgressUpdateTimer);
+        videoProgressUpdateTimer = null;
+    }
    document.body.style.cursor = 'default';
    if (currentHlsInstance) {
       currentHlsInstance.destroy();
@@ -162,6 +210,7 @@ function stopVideoPlayback() {
       videoElement.load();
    }
 }
+
 function renderPageContent(page, data = {}) {
    stopVideoPlayback();
    document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
@@ -178,14 +227,28 @@ function renderPageContent(page, data = {}) {
       } else if (page === 'watchlist') {
          fetchAndDisplayWatchlist();
       } else if (page === 'search') {
+          if (data.params) {
+              const searchInput = document.getElementById('searchInput');
+              searchInput.value = data.params.get('query') || '';
+              document.getElementById('typeFilter').value = data.params.get('type') || 'ALL';
+              document.getElementById('seasonFilter').value = data.params.get('season') || 'ALL';
+              document.getElementById('yearFilter').value = data.params.get('year') || 'ALL';
+              document.getElementById('countryFilter').value = data.params.get('country') || 'ALL';
+              document.getElementById('translationFilter').value = data.params.get('translation') || 'sub';
+              document.getElementById('sortFilter').value = data.params.get('sortBy') || 'Recent';
+              triggerSearch(false);
+          }
          document.getElementById('searchInput').focus();
       } else if (page === 'player' && data.showId) {
-         fetchEpisodes(data.showId, null, null, 'sub', data.episodeToPlay);
+         fetchEpisodes(data.showId, data.episodeToPlay);
+      } else if (page === 'settings') {
+          renderSettingsPage();
       }
    } else {
       document.getElementById('home-page').style.display = 'block';
    }
 }
+
 function setupThemeSelector() {
     const themeSelector = document.getElementById('theme-selector');
     const savedTheme = localStorage.getItem('theme') || 'default';
@@ -208,12 +271,25 @@ function setupHomePage() {
 function setupWatchlistPage() {
    const importBtn = document.getElementById('importMalBtn');
    const restoreDbBtn = document.getElementById('restoreDbBtn');
+   const sortSelect = document.getElementById('watchlist-sort');
+   const filterButtons = document.querySelectorAll('.status-filter-btn');
+
    if (importBtn) {
       importBtn.addEventListener('click', handleMalImport);
    }
    if (restoreDbBtn) {
       restoreDbBtn.addEventListener('click', handleDbRestore);
    }
+   if (sortSelect) {
+      sortSelect.addEventListener('change', fetchAndDisplayWatchlist);
+   }
+   filterButtons.forEach(button => {
+       button.addEventListener('click', () => {
+           filterButtons.forEach(btn => btn.classList.remove('active'));
+           button.classList.add('active');
+           fetchAndDisplayWatchlist();
+       });
+   });
 }
 async function handleMalImport() {
    const fileInput = document.getElementById('malFile');
@@ -305,7 +381,8 @@ async function fetchAndDisplaySection(endpoint, containerId, append = false) {
       const response = await fetch(endpoint);
       if (!response.ok) throw new Error(`Failed to fetch ${endpoint}`);
       const shows = await response.json();
-      displayGrid(containerId, shows, (show) => {
+      displayGrid(containerId, shows, (e, show) => {
+         if (e.target.closest('.status-select-wrapper, .card-controls')) return;
          navigateTo(`#player/${show._id}`);
       }, item => item.name, append);
    } catch (error) {
@@ -414,9 +491,7 @@ async function fetchAndDisplaySeasonal() {
             }
          }
       }
-      displayGrid('seasonal-anime', shows, (show) => {
-         navigateTo(`#player/${show._id}`);
-      }, item => item.name, true);
+      displayGrid('seasonal-anime', shows, (e, show) => navigateTo(`#player/${show._id}`), item => item.name, true);
       seasonalState.page++;
    } catch (error) {
       console.error('Error fetching seasonal anime:', error);
@@ -434,9 +509,10 @@ async function fetchAndDisplayContinueWatching() {
       const container = document.getElementById('continue-watching');
       if (shows && shows.length > 0) {
          container.parentElement.style.display = 'block';
-         displayGrid('continue-watching', shows, (show) => {
-            navigateTo(`#player/${show.showId}/${show.nextEpisodeNumber}`);
-         }, item => `${item.name}<br><span class="card-ep-count">EP ${item.lastWatched} -> ${item.nextEpisodeNumber}</span>`);
+         displayGrid('continue-watching', shows, (e, show) => {
+             if (e.target.classList.contains('remove-from-cw-btn')) return;
+             navigateTo(`#player/${show.showId}/${show.episodeToPlay}`);
+         });
       } else {
          if (container) container.parentElement.style.display = 'none';
       }
@@ -447,83 +523,131 @@ async function fetchAndDisplayContinueWatching() {
    }
 }
 
+const formatTime = (timeInSeconds) => {
+      if (isNaN(timeInSeconds) || timeInSeconds <= 0) return '00:00';
+      const result = new Date(timeInSeconds * 1000).toISOString().slice(11, 19);
+      const hours = parseInt(result.slice(0, 2), 10);
+      return hours > 0 ? result : result.slice(3);
+};
+
 function displayGrid(containerId, items, onClick, titleFn = item => item.name, append = false) {
-   const container = document.getElementById(containerId);
-   if (!container) return;
-   if (!append) container.innerHTML = '';
-   items.forEach(item => {
-      const div = document.createElement('div');
-      div.className = 'grid-item';
-      div.setAttribute('data-raw-thumbnail', item.thumbnail || '');
-      const totalEpisodes = Math.max(item.availableEpisodesDetail?.sub?.length || 0, item.availableEpisodesDetail?.dub?.length || 0);
-      const title = typeof titleFn === 'function' ? titleFn(item) : item.name;
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    if (!append) container.innerHTML = '';
 
-      let overlayContent = '';
-      if (containerId === 'continue-watching') {
-         overlayContent = `<button class="remove-from-cw-btn" title="Remove from Continue Watching">×</button>`;
-      } else if (totalEpisodes > 0) {
-         overlayContent = `<span class="card-ep-count">EP ${totalEpisodes}</span>`;
-      }
-      
-      div.innerHTML = `
-         <div class="img-container">
-            <img src="${fixThumbnailUrl(item.thumbnail)}" alt="${item.name}" loading="lazy" onload="this.classList.add('loaded')" onerror="this.src='/placeholder.png'; this.className='image-fallback loaded';">
-         </div>
-         <p>${title}</p>
-         ${overlayContent}
-      `;
+    items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'grid-item';
+        div.setAttribute('data-raw-thumbnail', item.thumbnail || '');
+        const title = typeof titleFn === 'function' ? titleFn(item) : item.name;
 
-      div.addEventListener('click', (e) => {
-         if (e.target.classList.contains('remove-from-cw-btn')) {
-            return;
-         }
-         onClick(item);
-      });
-      
-      if (containerId === 'continue-watching') {
-         const removeBtn = div.querySelector('.remove-from-cw-btn');
-         removeBtn.addEventListener('click', async () => {
-            try {
-               const response = await fetchWithProfile('/continue-watching/remove', {
-                  method: 'POST',
-                  body: JSON.stringify({ showId: item.showId })
-               });
-               if (response.ok) {
-                  div.remove();
-                  if (container.children.length === 0) {
-                     container.parentElement.style.display = 'none';
-                  }
-               } else {
-                  alert('Failed to remove from continue watching.');
-               }
-            } catch (error) {
-               console.error('Error removing from continue watching:', error);
-               alert('An error occurred.');
+        let overlayContent = '';
+        let infoOverlay = '';
+        let progressOverlay = '';
+
+        if (containerId === 'continue-watching') {
+            overlayContent = `<button class="remove-from-cw-btn" title="Remove from Continue Watching">×</button>`;
+            const isResuming = item.currentTime > 0 && item.duration > 0;
+            const progressPercent = isResuming ? (item.currentTime / item.duration) * 100 : 0;
+
+            infoOverlay = `<div class="card-info-overlay"><span class="card-ep-count">EP ${item.episodeToPlay}</span></div>`;
+            if(isResuming) {
+                progressOverlay = `
+                    <div class="card-progress-overlay">
+                        <div class="card-progress-bar" style="width: ${progressPercent}%"></div>
+                        <span class="card-progress-time">${formatTime(item.currentTime)} / ${formatTime(item.duration)}</span>
+                    </div>
+                `;
             }
-         });
-      }
+        } else {
+            const subCount = item.availableEpisodesDetail?.sub?.length || 0;
+            const dubCount = item.availableEpisodesDetail?.dub?.length || 0;
+            const type = item.type || '';
+            
+            infoOverlay = `
+                <div class="card-info-overlay">
+                    ${type ? `<span class="card-type-tag">${type.replace(/_/g, ' ')}</span>` : ''}
+                    <div class="card-ep-details">
+                        ${subCount > 0 ? `<span>SUB: ${subCount}</span>` : ''}
+                        ${dubCount > 0 ? `<span>DUB: ${dubCount}</span>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+      
+        div.innerHTML = `
+            <div class="img-container">
+                <img src="${fixThumbnailUrl(item.thumbnail)}" alt="${item.name}" loading="lazy" onload="this.classList.add('loaded')" onerror="this.src='/placeholder.png'; this.className='image-fallback loaded';">
+                ${infoOverlay}
+                ${progressOverlay}
+            </div>
+            <p>${title}</p>
+            ${overlayContent}
+        `;
 
-      container.appendChild(div);
-   });
+        div.addEventListener('click', (e) => onClick(e, item));
+      
+        if (containerId === 'continue-watching') {
+            const removeBtn = div.querySelector('.remove-from-cw-btn');
+            removeBtn.addEventListener('click', async () => {
+                try {
+                    const response = await fetchWithProfile('/continue-watching/remove', {
+                        method: 'POST',
+                        body: JSON.stringify({ showId: item.showId })
+                    });
+                    if (response.ok) {
+                        div.remove();
+                        if (container.children.length === 0) {
+                            container.parentElement.style.display = 'none';
+                        }
+                    } else {
+                        alert('Failed to remove from continue watching.');
+                    }
+                } catch (error) {
+                    console.error('Error removing from continue watching:', error);
+                    alert('An error occurred.');
+                }
+            });
+        }
+        container.appendChild(div);
+    });
 }
-
 
 async function fetchAndDisplayWatchlist() {
    try {
-      const response = await fetchWithProfile('/watchlist');
+      const sortSelect = document.getElementById('watchlist-sort');
+      const activeFilterBtn = document.querySelector('.status-filter-btn.active');
+      const sortBy = sortSelect ? sortSelect.value : 'last_added';
+      const filterBy = activeFilterBtn ? activeFilterBtn.dataset.status : 'All';
+
+      const response = await fetchWithProfile(`/watchlist?sort=${sortBy}`);
       if (!response.ok) throw new Error('Network response was not ok.');
-      const shows = await response.json();
+      let shows = await response.json();
       const container = document.getElementById('watchlist');
       container.innerHTML = '';
+
+      if (filterBy !== 'All') {
+          shows = shows.filter(show => show.status === filterBy);
+      }
+
       if (shows.length === 0) {
-         container.innerHTML = '<p>Your watchlist is empty.</p>';
+         container.innerHTML = `<p>${filterBy === 'All' ? 'Your watchlist is empty.' : `No items with status "${filterBy}".`}</p>`;
          return;
       }
       shows.forEach(show => {
          const item = document.createElement('div');
          item.className = 'grid-item watchlist-item';
+         
+         const clickHandler = (e) => {
+             if (e.target.closest('.watchlist-controls')) return;
+             navigateTo(`#player/${show.id}`);
+         };
+
+         item.addEventListener('click', clickHandler);
          item.innerHTML = `
-            <img src="${fixThumbnailUrl(show.thumbnail)}" alt="${show.name}" loading="lazy" onerror="this.src='/placeholder.png'; this.className='image-fallback';">
+            <div class="img-container">
+                <img src="${fixThumbnailUrl(show.thumbnail)}" alt="${show.name}" loading="lazy" onload="this.classList.add('loaded')" onerror="this.src='/placeholder.png'; this.className='image-fallback loaded';">
+            </div>
             <p>${show.name}</p>
             <div class="watchlist-controls">
                <select class="status-select" data-id="${show.id}">
@@ -536,12 +660,12 @@ async function fetchAndDisplayWatchlist() {
                <button class="remove-button" data-id="${show.id}">Remove</button>
             </div>
          `;
-         item.querySelector('img').addEventListener('click', () => navigateTo(`#player/${show.id}`));
          item.querySelector('.status-select').addEventListener('change', async (e) => {
             await fetchWithProfile('/watchlist/status', {
                method: 'POST',
                body: JSON.stringify({ id: show.id, status: e.target.value })
             });
+            fetchAndDisplayWatchlist();
          });
          item.querySelector('.remove-button').addEventListener('click', async () => {
             await fetchWithProfile('/watchlist/remove', {
@@ -557,6 +681,7 @@ async function fetchAndDisplayWatchlist() {
       document.getElementById('watchlist').innerHTML = '<p class="error">Could not load watchlist.</p>';
    }
 }
+
 function setupSearchFilters() {
    const searchInput = document.getElementById('searchInput');
    const typeFilter = document.getElementById('typeFilter');
@@ -573,10 +698,10 @@ function setupSearchFilters() {
    for (let y = currentYear; y >= 1940; y--) {
       yearFilter.add(new Option(y, y));
    }
-   searchBtn.addEventListener('click', triggerSearch);
+   searchBtn.addEventListener('click', () => triggerSearch(true));
    searchInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
-         triggerSearch();
+         triggerSearch(true);
       }
    });
 }
@@ -591,11 +716,26 @@ window.addEventListener('scroll', () => {
    }
 });
 	
-function triggerSearch() {
+function triggerSearch(updateUrl = true) {
    searchState = { page: 1, isLoading: false, hasMore: true };
    document.getElementById('results').innerHTML = '';
-   performSearch(true);
+   
+   if(updateUrl) {
+       const params = new URLSearchParams({
+           query: document.getElementById('searchInput').value,
+           type: document.getElementById('typeFilter').value,
+           season: document.getElementById('seasonFilter').value,
+           year: document.getElementById('yearFilter').value,
+           country: document.getElementById('countryFilter').value,
+           translation: document.getElementById('translationFilter').value,
+           sortBy: document.getElementById('sortFilter').value
+       });
+       navigateTo(`#search?${params.toString()}`);
+   } else {
+       performSearch(true);
+   }
 }
+
 
 async function performSearch(isNewSearch) {
    if (searchState.isLoading || !searchState.hasMore) return;
@@ -625,9 +765,7 @@ async function performSearch(isNewSearch) {
          if (isNewSearch) resultsDiv.innerHTML = '<p>No results found.</p>';
          return;
       }
-      displayGrid('results', shows, (show) => {
-         navigateTo(`#player/${show._id}`);
-      }, item => item.name, !isNewSearch);
+      displayGrid('results', shows, (e, show) => navigateTo(`#player/${show._id}`), item => item.name, !isNewSearch);
       searchState.page++;
    } catch (error) {
       console.error('Search error:', error);
@@ -636,7 +774,7 @@ async function performSearch(isNewSearch) {
       searchState.isLoading = false;
    }
 }
-async function fetchEpisodes(showId, showName, showThumbnail, mode = 'sub', episodeToPlay = null) {
+async function fetchEpisodes(showId, episodeToPlay = null, mode = 'sub') {
    const page = document.getElementById('player-page');
    page.innerHTML = '<div class="loading"></div>';
    try {
@@ -658,22 +796,50 @@ async function fetchEpisodes(showId, showName, showThumbnail, mode = 'sub', epis
       const sortedEpisodes = episodes.sort((a, b) => parseFloat(a) - parseFloat(b));
       const watchedEpisodes = await watchedResponse.json();
       const { inWatchlist } = await watchlistResponse.json();
-      displayEpisodes(sortedEpisodes, showId, showMeta.name, showMeta.thumbnail, watchedEpisodes, mode, description, inWatchlist);
+      
+      displayEpisodes(sortedEpisodes, showId, showMeta, mode, watchedEpisodes, description, inWatchlist);
+      
       const epToPlay = episodeToPlay || sortedEpisodes[0];
       if (epToPlay) {
-         fetchVideoLinks(showId, epToPlay, showMeta.name, showMeta.thumbnail, mode);
+         fetchVideoLinks(showId, epToPlay, showMeta, mode);
       }
    } catch (error) {
       console.error('Error fetching episode data:', error);
       page.innerHTML = `<p class="error">Could not load episode data.</p>`;
    }
 }
-function displayEpisodes(episodes, showId, showName, showThumbnail, watchedEpisodes, mode, description, inWatchlist) {
+
+function createEpisodeJumpControls(episodes) {
+    if (episodes.length <= 100) return '';
+
+    let ranges = '';
+    const sortedNumericEpisodes = episodes.map(Number).sort((a, b) => a - b);
+
+    for (let i = 0; i < sortedNumericEpisodes.length; i += 100) {
+        const start = sortedNumericEpisodes[i];
+        const end = sortedNumericEpisodes[Math.min(i + 99, sortedNumericEpisodes.length - 1)];
+        ranges += `<button class="ep-range-btn" data-start-ep="${start}">Ep ${start}-${end}</button>`;
+    }
+
+    return `
+        <div class="ep-jump-controls">
+            <div class="ep-range-buttons">${ranges}</div>
+            <div class="ep-jump-input-group">
+                <input type="number" id="ep-jump-input" placeholder="Go to Ep #" min="1">
+                <button id="ep-jump-btn">Go</button>
+            </div>
+        </div>
+    `;
+}
+
+function displayEpisodes(episodes, showId, showMeta, mode, watchedEpisodes, description, inWatchlist) {
    const page = document.getElementById('player-page');
+   const jumpControls = createEpisodeJumpControls(episodes);
+
    page.innerHTML = `
       <div class="player-page-content">
          <div class="show-header">
-            <h2>${showName}</h2>
+            <h2>${showMeta.name}</h2>
             <div class="header-controls">
                <button id="watchlistToggleBtn" class="watchlist-toggle-button ${inWatchlist ? 'in-list' : ''}">
                   ${inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
@@ -690,6 +856,7 @@ function displayEpisodes(episodes, showId, showName, showThumbnail, watchedEpiso
          </div>
          <div class="show-description">${description ? description.replace(/<br>/g, ' ').replace(/\[.*?\]/g, '') : 'No description available.'}</div>
          <div id="player-section-container"></div>
+         ${jumpControls}
          <div id="episode-grid-player" class="episode-grid">
             ${episodes.map(ep => `
                <div class="result-item ${watchedEpisodes.includes(ep.toString()) ? 'watched' : ''}" data-episode="${ep}">Episode ${ep}</div>
@@ -698,16 +865,46 @@ function displayEpisodes(episodes, showId, showName, showThumbnail, watchedEpiso
       </div>
    `;
    page.querySelectorAll('.result-item').forEach(item => {
-      item.addEventListener('click', () => fetchVideoLinks(showId, item.dataset.episode, showName, showThumbnail, mode));
+      item.addEventListener('click', () => {
+         const episodeNumber = item.dataset.episode;
+         navigateTo(`#player/${showId}/${episodeNumber}`);
+      });
    });
+
+   if (episodes.length > 100) {
+       document.querySelectorAll('.ep-range-btn').forEach(btn => {
+           btn.addEventListener('click', () => {
+               const epNum = btn.dataset.startEp;
+               const epElement = document.querySelector(`.result-item[data-episode="${epNum}"]`);
+               if(epElement) epElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+           });
+       });
+       const jumpInput = document.getElementById('ep-jump-input');
+       const jumpBtn = document.getElementById('ep-jump-btn');
+       const jumpAction = () => {
+           const epNum = jumpInput.value;
+           if (episodes.includes(epNum)) {
+               const epElement = document.querySelector(`.result-item[data-episode="${epNum}"]`);
+               if(epElement) epElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+           } else {
+               alert(`Episode ${epNum} not found.`);
+           }
+       };
+       jumpBtn.addEventListener('click', jumpAction);
+       jumpInput.addEventListener('keypress', (e) => {
+           if (e.key === 'Enter') jumpAction();
+       });
+   }
+
+
    document.getElementById('modeToggle').addEventListener('change', (e) => {
-      fetchEpisodes(showId, showName, showThumbnail, e.target.checked ? 'dub' : 'sub');
+      fetchEpisodes(showId, null, e.target.checked ? 'dub' : 'sub');
    });
    const watchlistBtn = document.getElementById('watchlistToggleBtn');
    watchlistBtn.addEventListener('click', async () => {
       const isInList = watchlistBtn.classList.contains('in-list');
       const endpoint = isInList ? '/watchlist/remove' : '/watchlist/add';
-      const body = { id: showId, name: showName, thumbnail: showThumbnail };
+      const body = { id: showId, name: showMeta.name, thumbnail: showMeta.thumbnail };
       const response = await fetchWithProfile(endpoint, {
          method: 'POST',
          body: JSON.stringify(body)
@@ -718,7 +915,7 @@ function displayEpisodes(episodes, showId, showName, showThumbnail, watchedEpiso
       }
    });
 }
-async function fetchVideoLinks(showId, episodeNumber, showName, showThumbnail, mode = 'sub') {
+async function fetchVideoLinks(showId, episodeNumber, showMeta, mode = 'sub') {
    const playerPageContent = document.querySelector('.player-page-content');
    if (!playerPageContent) return;
    const oldPlayer = document.getElementById('player-section-container');
@@ -726,26 +923,30 @@ async function fetchVideoLinks(showId, episodeNumber, showName, showThumbnail, m
    const playerContainer = document.createElement('div');
    playerContainer.id = 'player-section-container';
    playerContainer.innerHTML = '<div class="loading"></div>';
-   playerPageContent.insertBefore(playerContainer, document.getElementById('episode-grid-player'));
+   playerPageContent.insertBefore(playerContainer, document.querySelector('.ep-jump-controls, #episode-grid-player'));
    document.querySelectorAll('#episode-grid-player .result-item').forEach(item => item.classList.remove('active'));
    const activeEpItem = document.querySelector(`#episode-grid-player .result-item[data-episode='${episodeNumber}']`);
    if (activeEpItem) activeEpItem.classList.add('active');
    try {
-      const [sourcesResponse, settingsResponse] = await Promise.all([
+      const [sourcesResponse, settingsResponse, progressResponse] = await Promise.all([
          fetch(`/video?showId=${encodeURIComponent(showId)}&episodeNumber=${encodeURIComponent(episodeNumber)}&mode=${mode}`),
-         fetchWithProfile(`/settings/preferredSource`)
+         fetchWithProfile(`/settings/preferredSource`),
+         fetchWithProfile(`/episode-progress/${showId}/${episodeNumber}`)
       ]);
       if (!sourcesResponse.ok) throw new Error('Failed to fetch video sources');
       if (!settingsResponse.ok) throw new Error('Failed to fetch user settings');
+      if (!progressResponse.ok) throw new Error('Failed to fetch episode progress');
+
       const sources = await sourcesResponse.json();
       const { value: preferredSource } = await settingsResponse.json();
-      displayEpisodePlayer(sources, showId, episodeNumber, showName, showThumbnail, preferredSource);
+      const progress = await progressResponse.json();
+      displayEpisodePlayer(sources, showId, episodeNumber, showMeta, preferredSource, progress);
    } catch (error) {
       console.error('Error fetching video links:', error);
       playerContainer.innerHTML = `<p class="error">Could not load video sources.</p>`;
    }
 }
-function displayEpisodePlayer(sources, showId, episodeNumber, showName, showThumbnail, preferredSource) {
+function displayEpisodePlayer(sources, showId, episodeNumber, showMeta, preferredSource, progress) {
    const playerSection = document.getElementById('player-section-container');
    if (!playerSection) return;
    const playIcon = `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
@@ -830,10 +1031,10 @@ function displayEpisodePlayer(sources, showId, episodeNumber, showName, showThum
          </div>
       </div>
    `;
-   initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnail, preferredSource);
+   initCustomPlayer(sources, showId, episodeNumber, showMeta, preferredSource, progress);
 }
 
-function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnail, preferredSource) {
+function initCustomPlayer(sources, showId, episodeNumber, showMeta, preferredSource, progress) {
    const playerContent = document.getElementById('player-content');
    const video = document.getElementById('videoPlayer');
    const controlsContainer = document.getElementById('video-controls-container');
@@ -1009,49 +1210,72 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
    video.addEventListener('pause', () => playPauseBtn.innerHTML = playIcon);
    seekBackwardBtn.addEventListener('click', () => { video.currentTime -= 10; });
    seekForwardBtn.addEventListener('click', () => { video.currentTime += 10; });
-   const formatTime = (timeInSeconds) => {
-      const result = new Date(timeInSeconds * 1000).toISOString().substr(11, 8);
-      const hours = result.substr(0, 2);
-      const minutes = result.substr(3, 2);
-      const seconds = result.substr(6, 2);
-      return hours === '00' ? `${minutes}:${seconds}` : `${hours}:${minutes}:${seconds}`;
-   };
+   
    video.addEventListener('loadedmetadata', () => {
       totalTimeEl.textContent = formatTime(video.duration);
+      if (progress && progress.currentTime > 0 && progress.currentTime < video.duration * 0.95) {
+          video.currentTime = progress.currentTime;
+      }
       fetchAndApplySkipTimes();
    });
    
-   video.addEventListener('timeupdate', () => {
-      currentTimeEl.textContent = formatTime(video.currentTime);
-      const progressPercent = (video.currentTime / video.duration) * 100;
-      watchedBar.style.width = `${progressPercent}%`;
-      progressBarThumb.style.left = `${progressPercent}%`;
-      const currentTime = video.currentTime;
+    let hasMarkedWatched = false;
+    video.addEventListener('timeupdate', () => {
+        currentTimeEl.textContent = formatTime(video.currentTime);
+        const progressPercent = (video.currentTime / video.duration) * 100;
+        watchedBar.style.width = `${progressPercent}%`;
+        progressBarThumb.style.left = `${progressPercent}%`;
+        const currentTime = video.currentTime;
 
-      if (skippedInThisSession.size > 0) {
-         for (const skippedId of skippedInThisSession) {
-            const result = skipIntervals.find(r => r.skip_id === skippedId);
-            if (result && currentTime < result.interval.start_time) {
-               skippedInThisSession.delete(skippedId);
-            }
-         }
-      }
+        if (progressPercent > 95 && !hasMarkedWatched) {
+            markEpisodeWatched(showId, episodeNumber);
+            hasMarkedWatched = true;
+        }
 
-      if (isAutoSkipEnabled && skipIntervals.length > 0) {
-         for (const result of skipIntervals) {
-            if (!skippedInThisSession.has(result.skip_id)) {
-               const interval = result.interval;
-               if (currentTime >= interval.start_time && currentTime < interval.end_time) {
-                  if (interval.end_time < video.duration) {
-                     video.currentTime = interval.end_time;
-                  }
-                  skippedInThisSession.add(result.skip_id);
-                  break;
-               }
+        if (skippedInThisSession.size > 0) {
+            for (const skippedId of skippedInThisSession) {
+                const result = skipIntervals.find(r => r.skip_id === skippedId);
+                if (result && currentTime < result.interval.start_time) {
+                    skippedInThisSession.delete(skippedId);
+                }
             }
-         }
-      }
-   });
+        }
+
+        if (isAutoSkipEnabled && skipIntervals.length > 0) {
+            for (const result of skipIntervals) {
+                if (!skippedInThisSession.has(result.skip_id)) {
+                    const interval = result.interval;
+                    if (currentTime >= interval.start_time && currentTime < interval.end_time) {
+                        if (interval.end_time < video.duration) {
+                            video.currentTime = interval.end_time;
+                        }
+                        skippedInThisSession.add(result.skip_id);
+                        break;
+                    }
+                }
+            }
+        }
+    });
+
+    if (videoProgressUpdateTimer) clearInterval(videoProgressUpdateTimer);
+    videoProgressUpdateTimer = setInterval(() => {
+        if (!video.paused && video.duration > 0) {
+            fetchWithProfile('/update-progress', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    showId,
+                    episodeNumber,
+                    currentTime: video.currentTime,
+                    duration: video.duration,
+                    showName: showMeta.name,
+                    showThumbnail: showMeta.thumbnail,
+                })
+            });
+        }
+    }, 5000);
+
+
    video.addEventListener('progress', () => {
       if (video.buffered.length > 0) {
          const bufferedEnd = video.buffered.end(video.buffered.length - 1);
@@ -1247,7 +1471,6 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
          qualityItem.textContent = linkInfo.resolutionStr;
          qualityItem.onclick = () => {
             playVideo(source.sourceName, linkInfo, englishSub);
-            markEpisodeWatched(showId, episodeNumber, showName, showThumbnail);
             sourceOptions.querySelectorAll('.quality-item').forEach(btn => btn.classList.remove('active'));
             qualityItem.classList.add('active');
          };
@@ -1268,6 +1491,7 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
    autoplayToggle.checked = localStorage.getItem('autoplayEnabled') === 'true';
    autoplayToggle.addEventListener('change', (e) => localStorage.setItem('autoplayEnabled', e.target.checked));
    video.addEventListener('ended', () => {
+      markEpisodeWatched(showId, episodeNumber);
       if (autoplayToggle.checked) {
          const allEpItems = [...document.querySelectorAll('#episode-grid-player .result-item')];
          const currentEpItem = document.querySelector(`#episode-grid-player .result-item[data-episode='${episodeNumber}']`);
@@ -1386,11 +1610,62 @@ async function setPreferredSource(sourceName) {
       console.error('Error setting preferred source:', error);
    }
 }
-async function markEpisodeWatched(showId, episodeNumber, showName, showThumbnail) {
-   await fetchWithProfile('/watched-episode', {
-      method: 'POST',
-      body: JSON.stringify({ showId, episodeNumber, showName, showThumbnail })
-   });
+async function markEpisodeWatched(showId, episodeNumber) {
+   await fetchWithProfile('/update-progress', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ showId, episodeNumber, currentTime: 1, duration: 1 })
+    });
    const epItem = document.querySelector(`#episode-grid-player .result-item[data-episode='${episodeNumber}']`);
    if (epItem) epItem.classList.add('watched');
+}
+
+async function renderSettingsPage() {
+    const nameInput = document.getElementById('profile-name-input');
+    const picPreview = document.getElementById('settings-profile-pic');
+    const picUpload = document.getElementById('profile-pic-upload');
+    const saveBtn = document.getElementById('save-profile-settings-btn');
+    
+    try {
+        const response = await fetchWithProfile(`/api/profiles/${activeProfileId}`);
+        const profile = await response.json();
+        
+        nameInput.value = profile.name;
+        picPreview.src = profile.picture_path ? `${profile.picture_path}?t=${new Date().getTime()}` : '/profile_pics/default.png';
+
+        picUpload.onchange = () => {
+            if (picUpload.files && picUpload.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    picPreview.src = e.target.result;
+                }
+                reader.readAsDataURL(picUpload.files[0]);
+            }
+        };
+
+        saveBtn.onclick = async () => {
+            const newName = nameInput.value.trim();
+            if (newName && newName !== profile.name) {
+                await fetchWithProfile(`/api/profiles/${activeProfileId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: newName })
+                });
+            }
+
+            if (picUpload.files && picUpload.files[0]) {
+                const formData = new FormData();
+                formData.append('profilePic', picUpload.files[0]);
+                await fetchWithProfile(`/api/profiles/${activeProfileId}/picture`, {
+                    method: 'POST',
+                    body: formData
+                });
+            }
+            alert('Profile updated!');
+            await initProfileSystem();
+        };
+
+    } catch (error) {
+        console.error("Failed to load settings page:", error);
+    }
 }

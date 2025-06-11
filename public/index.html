@@ -12,15 +12,20 @@
          <header class="site-header">
             <a href="#home"><img src="logo.png" alt="Site Logo" class="logo"></a>
             <div class="header-right">
-               <div id="profile-area" class="profile-area" style="display: none;">
-                  <label for="profile-selector" class="visually-hidden">Select Profile</label>
-                  <select id="profile-selector"></select>
-                  <div class="profile-controls">
-                      <button id="rename-profile-btn" title="Rename Current Profile">&#9998;</button>
-                      <button id="add-profile-btn" title="Add New Profile">+</button>
-                      <button id="delete-profile-btn" title="Delete Current Profile">&times;</button>
-                  </div>
-              </div>
+                <div id="profile-area" class="profile-area" style="display: none;">
+                    <div id="profile-display" class="profile-display">
+                        <img id="profile-avatar" src="/profile_pics/default.png" alt="Profile Avatar" class="profile-avatar">
+                        <div id="profile-dropdown" class="profile-dropdown">
+                            <div id="profile-dropdown-header">
+                               <img id="dropdown-avatar" src="/profile_pics/default.png" alt="Profile Avatar" class="profile-avatar">
+                               <span id="dropdown-username"></span>
+                            </div>
+                            <div id="profile-selector-container"></div>
+                            <a href="#settings" class="dropdown-item">Profile Settings</a>
+                            <div class="dropdown-item" id="add-profile-btn-dropdown">Add Profile</div>
+                        </div>
+                    </div>
+                </div>
                <select id="theme-selector">
                   <option value="default">Default Theme</option>
                   <option value="dark">Dark Theme</option>
@@ -32,6 +37,7 @@
             <a href="#home">Home</a>
             <a href="#search">Search</a>
             <a href="#watchlist">Watchlist</a>
+            <a href="#settings">Settings</a>
          </nav>
          <main>
             <div id="home-page" class="page">
@@ -105,7 +111,24 @@
             </div>
             <div id="watchlist-page" class="page" style="display: none;">
                <div class="section">
-                  <h2>My Watchlist</h2>
+                  <div class="watchlist-header">
+                     <h2>My Watchlist</h2>
+                     <div class="watchlist-controls-header">
+                         <div class="status-filter-group">
+                             <button class="status-filter-btn active" data-status="All">All</button>
+                             <button class="status-filter-btn" data-status="Watching">Watching</button>
+                             <button class="status-filter-btn" data-status="Completed">Completed</button>
+                             <button class="status-filter-btn" data-status="On-Hold">On-Hold</button>
+                             <button class="status-filter-btn" data-status="Dropped">Dropped</button>
+                             <button class="status-filter-btn" data-status="Planned">Planned</button>
+                         </div>
+                         <select id="watchlist-sort">
+                            <option value="last_added">Last Added</option>
+                            <option value="name_asc">Alphabetical (A-Z)</option>
+                            <option value="name_desc">Alphabetical (Z-A)</option>
+                         </select>
+                     </div>
+                  </div>
                   <div id="watchlist" class="grid"></div>
                   <div class="import-section">
                      <h3>Import & Export</h3>
@@ -135,6 +158,34 @@
                </div>
             </div>
             <div id="player-page" class="page" style="display: none;">
+            </div>
+            <div id="settings-page" class="page" style="display: none;">
+                <h2>Profile Settings</h2>
+                <div class="settings-container">
+                    <div class="settings-card">
+                        <h3>Edit Profile</h3>
+                        <div id="profile-settings-form">
+                            <div class="profile-picture-section">
+                                <img id="settings-profile-pic" src="/profile_pics/default.png" alt="Profile Picture">
+                                <label for="profile-pic-upload" class="upload-btn">
+                                    <svg fill="currentColor" viewBox="0 0 20 20"><path d="M13 10V3L4 14h7v7l9-11h-7z" clip-rule="evenodd" fill-rule="evenodd"></path></svg>
+                                    Change Picture
+                                </label>
+                                <input type="file" id="profile-pic-upload" accept="image/png, image/jpeg, image/gif" style="display:none;">
+                            </div>
+                            <div class="form-group">
+                                <label for="profile-name-input">Profile Name</label>
+                                <input type="text" id="profile-name-input" class="settings-input">
+                            </div>
+                            <button id="save-profile-settings-btn" class="settings-save-btn">Save Changes</button>
+                        </div>
+                    </div>
+                    <div class="settings-card">
+                        <h3>Delete Profile</h3>
+                        <p>This action cannot be undone. All watch history and settings for this profile will be permanently deleted.</p>
+                        <button id="delete-profile-btn-settings" class="settings-delete-btn">Delete This Profile</button>
+                    </div>
+                </div>
             </div>
          </main>
          <footer>
