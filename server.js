@@ -540,13 +540,13 @@ app.get('/continue-watching', (req, res) => {
                 });
                 const allEps = epResponse.data.data.show.availableEpisodesDetail.sub?.sort((a, b) => parseFloat(a) - parseFloat(b)) || [];
                 const lastWatchedIndex = allEps.indexOf(show.lastWatchedEpisode);
-                if (lastWatchedIndex > -1 && lastWatchedIndex < allEps.length - 1) {
+                if (lastWatchedIndex > -1 && lastWatchedIndex < allEps.length) {
                     return {
                         showId: show.id,
                         name: show.name,
                         thumbnail: deobfuscateUrl(show.thumbnail),
                         lastWatched: show.lastWatchedEpisode,
-                        nextEpisodeNumber: allEps[lastWatchedIndex + 1]
+                        nextEpisodeNumber: allEps[lastWatchedIndex]
                     };
                 }
                 return null;
