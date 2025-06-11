@@ -272,8 +272,8 @@
 }
  .card-ep-count {
      position: absolute;
-     top: 8px;
-     right: 8px;
+     bottom: 8px;
+     left: 8px;
      background-color: rgba(0, 0, 0, 0.7);
      color: white;
      padding: 3px 8px;
@@ -850,8 +850,8 @@ video {
 }
  .remove-from-cw-btn {
      position: absolute;
-     bottom: 8px;
-     right: 8px;
+     top: 8px;
+     right: -8px;
      transform: translateX(-50%);
      z-index: 5;
      background-color: rgba(0, 0, 0, 0.7);
