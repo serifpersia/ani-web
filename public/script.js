@@ -908,40 +908,45 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
          console.error("Could not fetch skip times:", error);
       }
    }
+   
+	function setupSlider(slider, bubble, valueFormatter) {
+	  const updateSliderUI = () => {
+		 const min = parseFloat(slider.min);
+		 const max = parseFloat(slider.max);
+		 const val = parseFloat(slider.value);
+		 const percent = ((val - min) / (max - min)) * 100;
+		 slider.style.setProperty('--value-percent', `${percent}%`);
 
-   function setupSlider(slider, bubble, valueFormatter) {
-      const updateSliderUI = () => {
-         const min = parseFloat(slider.min);
-         const max = parseFloat(slider.max);
-         const val = parseFloat(slider.value);
-         const percent = ((val - min) / (max - min)) * 100;
-         slider.style.setProperty('--value-percent', `${percent}%`);
-         if (bubble) {
-            bubble.textContent = valueFormatter ? valueFormatter(val) : val;
-            const sliderWidth = slider.offsetWidth;
-            const thumbPosition = (percent / 100) * (sliderWidth - 16) + 8;
-            const bubbleWidth = bubble.offsetWidth;
-            let left = thumbPosition - (bubbleWidth / 2);
-            left = Math.max(0, Math.min(left, sliderWidth - bubbleWidth));
-            bubble.style.left = `${left}px`;
-         }
-      };
-      if (bubble) {
-         const container = slider.parentElement;
-         const showBubble = () => {
-            updateSliderUI();
-            bubble.style.opacity = '1';
-         };
-         const hideBubble = () => bubble.style.opacity = '0';
-         slider.addEventListener('input', updateSliderUI);
-         container.addEventListener('mouseenter', showBubble);
-         container.addEventListener('mouseleave', hideBubble);
-         slider.addEventListener('mousedown', showBubble);
-         slider.addEventListener('mouseup', hideBubble);
-      }
-      slider.addEventListener('input', updateSliderUI);
-      updateSliderUI();
-   }
+		 if (bubble) {
+			bubble.textContent = valueFormatter ? valueFormatter(val) : val;
+
+			const sliderWidth = slider.offsetWidth;
+			const thumbWidth = 16;
+			const trackWidth = sliderWidth - thumbWidth;
+			const thumbPosition = (percent / 100) * trackWidth;
+			const bubbleLeft = thumbPosition + (thumbWidth / 2);
+
+			bubble.style.left = `${bubbleLeft}px`;
+		 }
+	  };
+
+	  if (bubble) {
+		 const container = slider.parentElement;
+		 const showBubble = () => {
+			updateSliderUI();
+			bubble.style.opacity = '1';
+		 };
+		 const hideBubble = () => bubble.style.opacity = '0';
+		 slider.addEventListener('input', updateSliderUI);
+		 container.addEventListener('mouseenter', showBubble);
+		 container.addEventListener('mouseleave', hideBubble);
+		 slider.addEventListener('mousedown', showBubble);
+		 document.addEventListener('mouseup', hideBubble);
+	  }
+	  
+	  slider.addEventListener('input', updateSliderUI);
+	  updateSliderUI();
+	}
 
    let styleElement = document.getElementById('subtitle-style-override');
    if (!styleElement) {
@@ -1015,6 +1020,7 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
       totalTimeEl.textContent = formatTime(video.duration);
       fetchAndApplySkipTimes();
    });
+   
    video.addEventListener('timeupdate', () => {
       currentTimeEl.textContent = formatTime(video.currentTime);
       const progressPercent = (video.currentTime / video.duration) * 100;
@@ -1058,21 +1064,40 @@ function initCustomPlayer(sources, showId, episodeNumber, showName, showThumbnai
       const percent = (e.clientX - rect.left) / rect.width;
       video.currentTime = percent * video.duration;
    });
-   progressBarContainer.addEventListener('mousemove', e => {
-      const rect = progressBar.getBoundingClientRect();
-      const percent = Math.min(Math.max(0, (e.clientX - rect.left) / rect.width), 1);
-      const hoverTime = percent * video.duration;
-      progressBubble.textContent = formatTime(hoverTime);
-      const bubbleWidth = progressBubble.offsetWidth;
-      const containerWidth = progressBarContainer.offsetWidth;
-      let left = e.clientX - rect.left - bubbleWidth / 2;
-      left = Math.max(0, Math.min(left, containerWidth - bubbleWidth));
-      progressBubble.style.left = `${left}px`;
-      progressBubble.style.opacity = '1';
-   });
+   
+	progressBarContainer.addEventListener('mousemove', e => {
+		const rect = progressBar.getBoundingClientRect();
+		const percent = Math.min(Math.max(0, (e.clientX - rect.left) / rect.width), 1);
+		const hoverTime = percent * video.duration;
+		progressBubble.textContent = formatTime(hoverTime);
+
+		const mouseX = e.clientX - rect.left;
+		progressBubble.style.left = `${mouseX}px`;
+
+		progressBubble.style.opacity = '1';
+	});
+   
+    let isDragging = false;
+    progressBarThumb.addEventListener('mousedown', () => {
+        isDragging = true;
+        progressBubble.style.opacity = '1';
+    });
+    document.addEventListener('mousemove', e => {
+        if (isDragging) {
+            const rect = progressBar.getBoundingClientRect();
+            const percent = Math.min(Math.max(0, (e.clientX - rect.left) / rect.width), 1);
+            video.currentTime = percent * video.duration;
+        }
+    });
+	
    progressBarContainer.addEventListener('mouseleave', () => {
       progressBubble.style.opacity = '0';
    });
+   
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
+	
    const updateVolumeUI = () => {
       const volume = video.muted ? 0 : video.volume;
       if (video.muted || volume === 0) {

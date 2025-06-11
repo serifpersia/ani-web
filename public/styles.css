@@ -601,10 +601,10 @@ video {
 }
  .progress-bar-thumb {
      position: absolute;
-     top: 50%;
+     top: 20%;
      transform: translate(-50%, -50%);
-     width: 12px;
-     height: 12px;
+     width: 16px;
+     height: 16px;
      background-color: white;
      border-radius: 50%;
      z-index: 4;
@@ -736,6 +736,7 @@ video {
      background-color: #fff;
      height: 16px;
      width: 16px;
+
 }
  .player-content input[type="range"]:hover::-webkit-slider-thumb, .settings-menu input[type="range"]:hover::-webkit-slider-thumb {
      background-color: #eee;
@@ -874,8 +875,8 @@ video {
      position: absolute;
      top: -28px;
      transform: translateX(-50%);
-     background-color: rgba(30, 30, 30, 0.95);
-     color: #fff;
+     color: black;
+	 background: white;
      padding: 4px 8px;
      border-radius: 4px;
      font-size: 13px;
@@ -895,10 +896,10 @@ video {
      transform: translateX(-50%);
      border-width: 5px;
      border-style: solid;
-     border-color: rgba(30, 30, 30, 0.95) transparent transparent transparent;
+     border-color: rgba(255, 255, 255, 1) transparent transparent transparent;
 }
  .progress-bar-container .slider-bubble {
-     top: -20px;
+     top: -26px;
 }
  .generic-slider-wrapper {
      position: relative;
