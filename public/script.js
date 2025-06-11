@@ -1213,9 +1213,22 @@ function initCustomPlayer(sources, showId, episodeNumber, showMeta, preferredSou
    
    video.addEventListener('loadedmetadata', () => {
       totalTimeEl.textContent = formatTime(video.duration);
+
       if (progress && progress.currentTime > 0 && progress.currentTime < video.duration * 0.95) {
-          video.currentTime = progress.currentTime;
+         const continueWatchingTime = progress.currentTime;
+         const formattedTime = formatTime(continueWatchingTime);
+
+         const userConfirmed = confirm(`You were watching Episode ${episodeNumber} at ${formattedTime}. Would you like to continue from there?`);
+
+         if (userConfirmed) {
+            video.currentTime = continueWatchingTime;
+         } else {
+            video.currentTime = 0;
+         }
+      } else {
+          video.currentTime = 0;
       }
+
       fetchAndApplySkipTimes();
    });
    
