@@ -47,7 +47,7 @@ jobs:
         run: |
           gh release create "latest" \
             "ani-web.zip" \
-            --title "Latest Build" \
+            --title "latest" \
             --notes "Automatically built from the latest commit. Download the 'ani-web.zip' file below to run the project." \
             --target ${{ github.sha }}
         env:
