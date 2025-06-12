@@ -455,6 +455,61 @@ app.get('/api/profiles/:id', (req, res) => {
         res.json(row);
     });
 });
+
+app.get('/schedule-info/:showId', async (req, res) => {
+    const { showId } = req.params;
+    const cacheKey = `schedule-info-${showId}`;
+    if (apiCache.has(cacheKey)) {
+        return res.json(apiCache.get(cacheKey));
+    }
+
+    try {
+        const metaQuery = `query($showId: String!) { show(_id: $showId) { name } }`;
+        const metaResponse = await axios.get(apiEndpoint, {
+            headers: { 'User-Agent': userAgent, 'Referer': referer },
+            params: { query: metaQuery, variables: JSON.stringify({ showId }) },
+            timeout: 10000
+        });
+        const showName = metaResponse.data?.data?.show?.name;
+
+        if (!showName) {
+            return res.status(404).json({ error: 'Show not found' });
+        }
+
+        const scheduleSearchUrl = `https://animeschedule.net/api/v3/anime?q=${encodeURIComponent(showName)}`;
+        const scheduleResponse = await axios.get(scheduleSearchUrl, { timeout: 10000 });
+        
+        const firstResult = scheduleResponse.data?.anime?.[0];
+        
+        if (firstResult && firstResult.route) {
+            const status = firstResult.status || "Unknown";
+            let nextEpisodeAirDate = null;
+
+            if (status === 'Ongoing') {
+                const pageResponse = await axios.get(`https://animeschedule.net/anime/${firstResult.route}`, { timeout: 10000 });
+                const countdownMatch = pageResponse.data.match(/countdown-time" datetime="([^"]*)"/);
+                if (countdownMatch) {
+                    nextEpisodeAirDate = countdownMatch[1];
+                }
+            }
+
+            const result = {
+                nextEpisodeAirDate: nextEpisodeAirDate,
+                status: status.replace(/([A-Z])/g, ' $1').trim()
+            };
+
+            apiCache.set(cacheKey, result, 3600);
+            return res.json(result);
+        }
+
+        return res.json({ status: "Not Found on Schedule" });
+
+    } catch (error) {
+        console.error("Error fetching schedule info:", error.message);
+        return res.json({ status: "Error" });
+    }
+});
+
 app.post('/api/profiles', (req, res) => {
     const { name } = req.body;
     if (!name || name.trim().length === 0) {

@@ -840,6 +840,7 @@ function displayEpisodes(episodes, showId, showMeta, mode, watchedEpisodes, desc
       <div class="player-page-content">
          <div class="show-header">
             <h2>${showMeta.name}</h2>
+            <div id="schedule-status-container" class="schedule-status"></div>
             <div class="header-controls">
                <button id="watchlistToggleBtn" class="watchlist-toggle-button ${inWatchlist ? 'in-list' : ''}">
                   ${inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
@@ -864,6 +865,35 @@ function displayEpisodes(episodes, showId, showMeta, mode, watchedEpisodes, desc
          </div>
       </div>
    `;
+
+   fetch(`/schedule-info/${showId}`)
+     .then(res => res.json())
+     .then(data => {
+        const container = document.getElementById('schedule-status-container');
+        if (!container) return;
+
+        if (data.status && data.status !== 'Not Found on Schedule' && data.status !== 'Error') {
+            const statusClass = `status-${data.status.toLowerCase().replace(/ /g, '-')}`;
+            let html = `<span class="status-tag ${statusClass}">${data.status}</span>`;
+            
+            if (data.nextEpisodeAirDate) {
+                let nextEpText = '';
+                if (data.nextEpisodeAirDate.includes('T') && data.nextEpisodeAirDate.includes('Z')) {
+                    const airDate = new Date(data.nextEpisodeAirDate);
+                    if (!isNaN(airDate)) {
+                        nextEpText = `Next ep: ${airDate.toLocaleString()}`;
+                    } else {
+                        nextEpText = `Next ep in: ${data.nextEpisodeAirDate}`;
+                    }
+                } else {
+                    nextEpText = `Next ep in: ${data.nextEpisodeAirDate}`;
+                }
+                html += `<span class="countdown-text">${nextEpText}</span>`;
+            }
+            container.innerHTML = html;
+        }
+     }).catch(err => console.error('Failed to load schedule status.'));
+
    page.querySelectorAll('.result-item').forEach(item => {
       item.addEventListener('click', () => {
          const episodeNumber = item.dataset.episode;
@@ -900,6 +930,7 @@ function displayEpisodes(episodes, showId, showMeta, mode, watchedEpisodes, desc
    document.getElementById('modeToggle').addEventListener('change', (e) => {
       fetchEpisodes(showId, null, e.target.checked ? 'dub' : 'sub');
    });
+   
    const watchlistBtn = document.getElementById('watchlistToggleBtn');
    watchlistBtn.addEventListener('click', async () => {
       const isInList = watchlistBtn.classList.contains('in-list');
@@ -915,6 +946,7 @@ function displayEpisodes(episodes, showId, showMeta, mode, watchedEpisodes, desc
       }
    });
 }
+
 async function fetchVideoLinks(showId, episodeNumber, showMeta, mode = 'sub') {
    const playerPageContent = document.querySelector('.player-page-content');
    if (!playerPageContent) return;

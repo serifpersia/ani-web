@@ -1183,6 +1183,42 @@ video {
     cursor: pointer;
     font-size: 1em;
  }
+ 
+ 
+ .schedule-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: 15px;
+    flex-grow: 1;
+}
+
+.status-tag {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: bold;
+    color: white;
+    text-transform: capitalize;
+}
+
+.status-tag.status-finished {
+    background-color: #f44336;
+}
+
+.status-tag.status-upcoming {
+    background-color: #2196F3;
+}
+
+.status-tag.status-unknown {
+    background-color: #808080;
+}
+
+.countdown-text {
+    font-size: 0.9em;
+    color: var(--secondary-text);
+}
+ 
  footer {
      text-align: center;
      padding: 20px;
