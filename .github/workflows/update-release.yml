@@ -3,6 +3,7 @@ name: Build and Release Latest
 on:
   push:
     branches:
+      - main
       - master
   workflow_dispatch:
 
@@ -27,7 +28,7 @@ jobs:
       - name: Delete Existing Latest Tag
         run: |
           git tag -d "latest" || echo "No local 'latest' tag to delete."
-          git push origin :refs/tags/latest || echo "No remote 'latest' tag to delete."
+          git push origin --delete "latest" || echo "No remote 'latest' tag to delete."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -46,8 +47,8 @@ jobs:
         run: |
           gh release create "latest" \
             "ani-web.zip" \
-            --title "latest" \
-            --notes "Automatically updated to the latest commit. Download the 'ani-web.zip' file below." \
-            --target ${{ github.sha }}
+            --title "Latest Build" \
+            --notes "Automatically built from the latest commit. Download the 'ani-web.zip' file below to run the project." \
+            --target "latest"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
