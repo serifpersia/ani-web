@@ -762,7 +762,7 @@ video {
      font-size: 14px;
 }
  .progress-bar-container {
-     padding: 5px 0 10px;
+     padding: 16px 0;
      cursor: pointer;
      position: relative;
 }
@@ -775,7 +775,7 @@ video {
      transition: height 0.2s;
 }
  .progress-bar-container:hover .progress-bar {
-     height: 6px;
+     height: 8px;
 }
  .progress-bar-container:hover .progress-bar-thumb {
      opacity: 1;
@@ -1094,7 +1094,7 @@ video {
      border-color: rgba(255, 255, 255, 1) transparent transparent transparent;
 }
  .progress-bar-container .slider-bubble {
-     top: -26px;
+     top: -18px;
 }
  .generic-slider-wrapper {
      position: relative;

@@ -269,8 +269,15 @@ app.get('/episodes', async (req, res) => {
         res.status(500).send('Error fetching episodes from API');
     }
 });
+
 app.get('/video', async (req, res) => {
 	const { showId, episodeNumber, mode = 'sub' } = req.query;
+	const cacheKey = `video-${showId}-${episodeNumber}-${mode}`;
+	
+	if (apiCache.has(cacheKey)) {
+		return res.json(apiCache.get(cacheKey));
+	}
+
 	const graphqlQuery = `query($showId: String!, $translationType: VaildTranslationTypeEnumType!, $episodeString: String!) { episode(showId: $showId, translationType: $translationType, episodeString: $episodeString) { sourceUrls } }`;
 	try {
 		const { data } = await axios.get(apiEndpoint, {
@@ -278,16 +285,24 @@ app.get('/video', async (req, res) => {
 			params: { query: graphqlQuery, variables: JSON.stringify({ showId, translationType: mode, episodeString: episodeNumber }) },
 			timeout: 15000
 		});
+
 		const sources = data.data.episode.sourceUrls.filter(s => s.sourceUrl.startsWith('--')).sort((a, b) => b.priority - a.priority);
-		const availableSources = [];
-		for (const source of sources) {
-			try {
-				let decryptedUrl = (s => {
+		
+		const trustedSources = ['Default', 'wixmp', 'Yt-mp4', 'S-mp4', 'Luf-Mp4'];
+
+        const sourcePromises = sources.map(source => (async () => {
+            if (!trustedSources.includes(source.sourceName) && source.sourceName !== 'wixmp' /*wixmp is the Default source*/) {
+                return null;
+            }
+
+            try {
+                let decryptedUrl = (s => {
 					const m = DEOBFUSCATION_MAP;
 					let d = '';
 					for (let i = 0; i < s.length; i += 2) d += m[s.substring(i, i + 2)] || s.substring(i, i + 2);
 					return d.includes('/clock') && !d.includes('.json') ? d.replace('/clock', '/clock.json') : d;
 				})(source.sourceUrl.substring(2)).replace(/([^:]\/)\/+/g, "$1");
+
 				let videoLinks = [];
 				let subtitles = [];
 				if (decryptedUrl.includes('/clock.json')) {
@@ -310,18 +325,40 @@ app.get('/video', async (req, res) => {
 						})(clockData.links[0].link, clockData.links[0].headers) : clockData.links;
 						subtitles = clockData.links[0].subtitles || [];
 					}
+                } else if (decryptedUrl.includes('repackager.wixmp.com')) {
+                    const urlTemplate = decryptedUrl.replace('repackager.wixmp.com/', '').replace(/\.urlset.*/, '');
+                    const qualitiesMatch = decryptedUrl.match(/\/,\s*([^/]*),\s*\/mp4/);
+                    if (qualitiesMatch && qualitiesMatch[1]) {
+                        const qualities = qualitiesMatch[1].split(',');
+                        videoLinks = qualities.map(q => ({
+                            resolutionStr: q,
+                            link: urlTemplate.replace(/,\s*[^/]*$/, q),
+                            hls: false
+                        })).sort((a,b) => parseInt(b.resolutionStr) - parseInt(a.resolutionStr));
+                    }
 				} else {
 					videoLinks.push({ link: decryptedUrl, resolutionStr: 'default', hls: decryptedUrl.includes('.m3u8'), headers: { Referer: referer } });
 				}
 				if (videoLinks.length > 0) {
-					availableSources.push({ sourceName: source.sourceName, links: videoLinks, subtitles });
+					return { sourceName: source.sourceName, links: videoLinks, subtitles };
 				}
+                return null;
 			} catch (e) {
-                console.warn(`Warning: Failed to fetch from source '${source.sourceName}'. This is likely a temporary issue with the provider. Trying next source...`);
+                return null;
             }
-		}
-		if (availableSources.length > 0) res.json(availableSources);
-		else res.status(404).send('No playable video URLs found.');
+        })());
+
+        const results = await Promise.allSettled(sourcePromises);
+        const availableSources = results
+            .filter(result => result.status === 'fulfilled' && result.value)
+            .map(result => result.value);
+
+		if (availableSources.length > 0) {
+            apiCache.set(cacheKey, availableSources, 300);
+            res.json(availableSources);
+        } else {
+            res.status(404).send('No playable video URLs found.');
+        }
 	} catch (e) {
 		res.status(500).send(`Error fetching video data: ${e.message}`);
 	}
@@ -347,8 +384,16 @@ app.get('/image-proxy', async (req, res) => {
 app.get('/proxy', async (req, res) => {
     const { url, referer: dynamicReferer } = req.query;
     try {
-        const headers = { 'User-Agent': userAgent, 'Accept': '*/*' };
+        const headers = { 
+            'User-Agent': userAgent, 
+            'Accept': '*/*' 
+        };
         if (dynamicReferer) headers['Referer'] = dynamicReferer;
+
+        if (req.headers.range) {
+            headers['Range'] = req.headers.range;
+        }
+
         if (url.includes('.m3u8')) {
             const response = await axios.get(url, { headers, responseType: 'text', timeout: 15000 });
             const baseUrl = new URL(url);
@@ -359,14 +404,35 @@ app.get('/proxy', async (req, res) => {
             ).join('\n');
             res.set('Content-Type', 'application/vnd.apple.mpegurl').send(rewritten);
         } else {
-            const streamResponse = await axios({ method: 'get', url, responseType: 'stream', headers, timeout: 20000 });
-            res.set(streamResponse.headers);
+            const streamResponse = await axios({ 
+                method: 'get', 
+                url, 
+                responseType: 'stream', 
+                headers, 
+                timeout: 20000 
+            });
+
+            res.status(streamResponse.status);
+            res.set({
+                'Content-Range': streamResponse.headers['content-range'],
+                'Content-Length': streamResponse.headers['content-length'],
+                'Accept-Ranges': streamResponse.headers['accept-ranges'],
+                'Content-Type': streamResponse.headers['content-type'],
+            });
+
             streamResponse.data.pipe(res);
         }
     } catch (e) {
-        res.status(500).send(`Proxy error: ${e.message}`);
+        if (e.response) {
+            console.error(`Proxy error for ${url}: Status ${e.response.status}`);
+            res.status(e.response.status).send(`Proxy error: ${e.message}`);
+        } else {
+            console.error(`Proxy error for ${url}: ${e.message}`);
+            res.status(500).send(`Proxy error: ${e.message}`);
+        }
     }
 });
+
 app.get('/subtitle-proxy', async (req, res) => {
     try {
         const response = await axios.get(req.query.url, { responseType: 'text', timeout: 10000 });

@@ -1288,7 +1288,6 @@ function initCustomPlayer(sources, showId, episodeNumber, showMeta, preferredSou
         }
     }, 5000);
 
-
    video.addEventListener('progress', () => {
       if (video.buffered.length > 0) {
          const bufferedEnd = video.buffered.end(video.buffered.length - 1);
@@ -1296,43 +1295,76 @@ function initCustomPlayer(sources, showId, episodeNumber, showMeta, preferredSou
          bufferedBar.style.width = `${bufferedPercent}%`;
       }
    });
-   progressBar.addEventListener('click', (e) => {
-      const rect = progressBar.getBoundingClientRect();
-      const percent = (e.clientX - rect.left) / rect.width;
-      video.currentTime = percent * video.duration;
-   });
-   
-	progressBarContainer.addEventListener('mousemove', e => {
-		const rect = progressBar.getBoundingClientRect();
-		const percent = Math.min(Math.max(0, (e.clientX - rect.left) / rect.width), 1);
-		const hoverTime = percent * video.duration;
-		progressBubble.textContent = formatTime(hoverTime);
-
-		const mouseX = e.clientX - rect.left;
-		progressBubble.style.left = `${mouseX}px`;
-
-		progressBubble.style.opacity = '1';
-	});
    
     let isDragging = false;
+    let wasPlayingBeforeDrag = false;
+
+    const updateScrubberUI = (percent) => {
+        watchedBar.style.width = `${percent}%`;
+        progressBarThumb.style.left = `${percent}%`;
+    };
+
+    progressBar.addEventListener('click', (e) => {
+        const rect = progressBar.getBoundingClientRect();
+        const percent = (e.clientX - rect.left) / rect.width;
+        video.currentTime = percent * video.duration;
+    });
+
+    progressBarContainer.addEventListener('mousemove', e => {
+        const rect = progressBar.getBoundingClientRect();
+        const percent = Math.min(Math.max(0, (e.clientX - rect.left) / rect.width), 1);
+        const hoverTime = percent * video.duration;
+        progressBubble.textContent = formatTime(hoverTime);
+
+        const mouseX = e.clientX - rect.left;
+        progressBubble.style.left = `${mouseX}px`;
+
+        if (!isDragging) {
+            progressBubble.style.opacity = '1';
+        }
+    });
+   
+    progressBarContainer.addEventListener('mouseleave', () => {
+        if (!isDragging) {
+            progressBubble.style.opacity = '0';
+        }
+    });
+    
     progressBarThumb.addEventListener('mousedown', () => {
         isDragging = true;
+        wasPlayingBeforeDrag = !video.paused;
+        video.pause();
         progressBubble.style.opacity = '1';
     });
+
     document.addEventListener('mousemove', e => {
         if (isDragging) {
             const rect = progressBar.getBoundingClientRect();
             const percent = Math.min(Math.max(0, (e.clientX - rect.left) / rect.width), 1);
-            video.currentTime = percent * video.duration;
+            
+            updateScrubberUI(percent * 100);
+
+            const hoverTime = percent * video.duration;
+            progressBubble.textContent = formatTime(hoverTime);
+            const mouseX = e.clientX - rect.left;
+            progressBubble.style.left = `${mouseX}px`;
         }
     });
-	
-   progressBarContainer.addEventListener('mouseleave', () => {
-      progressBubble.style.opacity = '0';
-   });
-   
-    document.addEventListener('mouseup', () => {
-        isDragging = false;
+    
+    document.addEventListener('mouseup', (e) => {
+        if (isDragging) {
+            isDragging = false;
+            progressBubble.style.opacity = '0';
+
+            const rect = progressBar.getBoundingClientRect();
+            const percent = Math.min(Math.max(0, (e.clientX - rect.left) / rect.width), 1);
+            
+            video.currentTime = percent * video.duration;
+            
+            if (wasPlayingBeforeDrag) {
+                video.play();
+            }
+        }
     });
 	
    const updateVolumeUI = () => {
