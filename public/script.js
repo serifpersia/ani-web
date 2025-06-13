@@ -6,6 +6,19 @@ let profiles = [];
 let activeProfileId = null;
 let videoProgressUpdateTimer = null;
 
+function throttle(func, limit) {
+    let inThrottle;
+    return function() {
+        const args = arguments;
+        const context = this;
+        if (!inThrottle) {
+            func.apply(context, args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    }
+}
+
 async function fetchWithProfile(url, options = {}) {
    if (!activeProfileId) {
       console.error("No active profile selected. Cannot make request.");
@@ -1263,44 +1276,44 @@ function initCustomPlayer(sources, showId, episodeNumber, showMeta, preferredSou
 
       fetchAndApplySkipTimes();
    });
-   
-    let hasMarkedWatched = false;
-    video.addEventListener('timeupdate', () => {
-        currentTimeEl.textContent = formatTime(video.currentTime);
-        const progressPercent = (video.currentTime / video.duration) * 100;
-        watchedBar.style.width = `${progressPercent}%`;
-        progressBarThumb.style.left = `${progressPercent}%`;
-        const currentTime = video.currentTime;
 
-        if (progressPercent > 95 && !hasMarkedWatched) {
-            markEpisodeWatched(showId, episodeNumber);
-            hasMarkedWatched = true;
-        }
+	let hasMarkedWatched = false;
+	video.addEventListener('timeupdate', () => {
+		currentTimeEl.textContent = formatTime(video.currentTime);
+		const progressPercent = (video.currentTime / video.duration) * 100;
+		watchedBar.style.width = `${progressPercent}%`;
+		progressBarThumb.style.left = `${progressPercent}%`;
+		const currentTime = video.currentTime;
 
-        if (skippedInThisSession.size > 0) {
-            for (const skippedId of skippedInThisSession) {
-                const result = skipIntervals.find(r => r.skip_id === skippedId);
-                if (result && currentTime < result.interval.start_time) {
-                    skippedInThisSession.delete(skippedId);
-                }
-            }
-        }
+		if (progressPercent > 95 && !hasMarkedWatched) {
+			markEpisodeWatched(showId, episodeNumber);
+			hasMarkedWatched = true;
+		}
 
-        if (isAutoSkipEnabled && skipIntervals.length > 0) {
-            for (const result of skipIntervals) {
-                if (!skippedInThisSession.has(result.skip_id)) {
-                    const interval = result.interval;
-                    if (currentTime >= interval.start_time && currentTime < interval.end_time) {
-                        if (interval.end_time < video.duration) {
-                            video.currentTime = interval.end_time;
-                        }
-                        skippedInThisSession.add(result.skip_id);
-                        break;
-                    }
-                }
-            }
-        }
-    });
+		if (skippedInThisSession.size > 0) {
+			for (const skippedId of skippedInThisSession) {
+				const result = skipIntervals.find(r => r.skip_id === skippedId);
+				if (result && currentTime < result.interval.start_time) {
+					skippedInThisSession.delete(skippedId);
+				}
+			}
+		}
+
+		if (isAutoSkipEnabled && skipIntervals.length > 0) {
+			for (const result of skipIntervals) {
+				if (!skippedInThisSession.has(result.skip_id)) {
+					const interval = result.interval;
+					if (currentTime >= interval.start_time && currentTime < interval.end_time) {
+						if (interval.end_time < video.duration) {
+							video.currentTime = interval.end_time;
+						}
+						skippedInThisSession.add(result.skip_id);
+						break;
+					}
+				}
+			}
+		}
+	});
 
     if (videoProgressUpdateTimer) clearInterval(videoProgressUpdateTimer);
     videoProgressUpdateTimer = setInterval(() => {
