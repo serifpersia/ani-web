@@ -1578,116 +1578,107 @@ function initCustomPlayer(sources, showId, episodeNumber, showMeta, preferredSou
          }
       }
    });
-	function playVideo(sourceName, linkInfo, subtitleInfo) {
-		if (currentHlsInstance) {
-			currentHlsInstance.destroy();
-			currentHlsInstance = null;
-		}
-		const videoElement = document.getElementById('videoPlayer');
-		const ccOptionsContainer = document.getElementById('cc-options-container');
-		ccOptionsContainer.innerHTML = '';
-		setPreferredSource(sourceName);
 
-		skipIntervals = [];
-		skippedInThisSession.clear();
-		progressBar.querySelectorAll('.progress-bar-skip-segment').forEach(el => el.remove());
-
-		while (videoElement.firstChild) {
-			videoElement.removeChild(videoElement.firstChild);
-		}
-		if (subtitleInfo && subtitleInfo.src) {
-			const updateActiveCCButton = (activeButton) => {
-				ccOptionsContainer.querySelectorAll('.cc-item').forEach(btn => btn.classList.remove('active'));
-				if (activeButton) activeButton.classList.add('active');
-			};
-			ccBtn.classList.remove('disabled');
-			const offButton = document.createElement('button');
-			offButton.className = 'cc-item';
-			offButton.textContent = 'Off';
-			offButton.onclick = () => {
-				for (let i = 0; i < videoElement.textTracks.length; i++) {
-					videoElement.textTracks[i].mode = 'hidden';
-				}
-				updateActiveCCButton(offButton);
-			};
-			const langButton = document.createElement('button');
-			langButton.className = 'cc-item active';
-			langButton.textContent = 'English';
-			langButton.onclick = () => {
-				for (let i = 0; i < videoElement.textTracks.length; i++) {
-					videoElement.textTracks[i].mode = 'showing';
-				}
-				updateActiveCCButton(langButton);
-			};
-			ccOptionsContainer.appendChild(offButton);
-			ccOptionsContainer.appendChild(langButton);
-			const track = document.createElement('track');
-			track.kind = 'subtitles';
-			track.label = 'English';
-			track.srclang = 'en';
-			track.src = `/subtitle-proxy?url=${encodeURIComponent(subtitleInfo.src)}`;
-			track.default = true;
-			videoElement.appendChild(track);
-			videoElement.textTracks.addEventListener('addtrack', (event) => {
-				const addedTrack = event.track;
-				addedTrack.mode = 'showing';
-				addedTrack.addEventListener('cuechange', () => {
-					const position = localStorage.getItem('subtitlePosition') || '-4';
-					const activeCues = addedTrack.activeCues;
-					if (activeCues) {
-						for (let i = 0; i < activeCues.length; i++) {
-							activeCues[i].line = parseInt(position, 10);
-						}
-					}
-				});
-			});
-		} else {
-			ccBtn.classList.add('disabled');
-			const disabledButton = document.createElement('button');
-			disabledButton.className = 'cc-item';
-			disabledButton.textContent = 'Not Available';
-			disabledButton.disabled = true;
-			ccOptionsContainer.appendChild(disabledButton);
-		}
-
-		if (linkInfo.hls && Hls.isSupported()) {
-			const hlsConfig = {
-				pLoader: function(config) {
-					const loader = new Hls.DefaultConfig.loader(config);
-					this.load = function(context, config, callbacks) {
-						let proxiedUrl = `/proxy?url=${encodeURIComponent(context.url)}`;
-						if (linkInfo.headers && linkInfo.headers.Referer) {
-							 proxiedUrl += `&referer=${encodeURIComponent(linkInfo.headers.Referer)}`;
-						}
-						context.url = proxiedUrl;                    
-						loader.load(context, config, callbacks);
-					};
-					this.abort = function() { loader.abort(); };
-					this.destroy = function() { loader.destroy(); };
-				}
-			};
-			const hls = new Hls(hlsConfig);
-			hls.loadSource(linkInfo.link);
-			hls.attachMedia(videoElement);
-			hls.on(Hls.Events.ERROR, (event, data) => {
-				if (data.fatal) {
-					console.error('HLS fatal error:', data);
-					hls.destroy();
-				}
-			});
-			currentHlsInstance = hls;
-		} else {
-			let proxiedUrl = `/proxy?url=${encodeURIComponent(linkInfo.link)}`;
-			if (linkInfo.headers && linkInfo.headers.Referer) {
-				proxiedUrl += `&referer=${encodeURIComponent(linkInfo.headers.Referer)}`;
-			}
-			videoElement.src = proxiedUrl;
-		}
-		
-		videoElement.play().catch(e => {
-			console.log("Autoplay was prevented. User interaction needed.");
-		});
+function playVideo(sourceName, linkInfo, subtitleInfo) {
+	if (currentHlsInstance) {
+		currentHlsInstance.destroy();
+		currentHlsInstance = null;
 	}
+	const videoElement = document.getElementById('videoPlayer');
+	const ccOptionsContainer = document.getElementById('cc-options-container');
+	ccOptionsContainer.innerHTML = '';
+	setPreferredSource(sourceName);
+
+	skipIntervals = [];
+	skippedInThisSession.clear();
+	progressBar.querySelectorAll('.progress-bar-skip-segment').forEach(el => el.remove());
+
+	while (videoElement.firstChild) {
+		videoElement.removeChild(videoElement.firstChild);
+	}
+	if (subtitleInfo && subtitleInfo.src) {
+		const updateActiveCCButton = (activeButton) => {
+			ccOptionsContainer.querySelectorAll('.cc-item').forEach(btn => btn.classList.remove('active'));
+			if (activeButton) activeButton.classList.add('active');
+		};
+		ccBtn.classList.remove('disabled');
+		const offButton = document.createElement('button');
+		offButton.className = 'cc-item';
+		offButton.textContent = 'Off';
+		offButton.onclick = () => {
+			for (let i = 0; i < videoElement.textTracks.length; i++) {
+				videoElement.textTracks[i].mode = 'hidden';
+			}
+			updateActiveCCButton(offButton);
+		};
+		const langButton = document.createElement('button');
+		langButton.className = 'cc-item active';
+		langButton.textContent = 'English';
+		langButton.onclick = () => {
+			for (let i = 0; i < videoElement.textTracks.length; i++) {
+				videoElement.textTracks[i].mode = 'showing';
+			}
+			updateActiveCCButton(langButton);
+		};
+		ccOptionsContainer.appendChild(offButton);
+		ccOptionsContainer.appendChild(langButton);
+		const track = document.createElement('track');
+		track.kind = 'subtitles';
+		track.label = 'English';
+		track.srclang = 'en';
+		track.src = `/subtitle-proxy?url=${encodeURIComponent(subtitleInfo.src)}`;
+		track.default = true;
+		videoElement.appendChild(track);
+		videoElement.textTracks.addEventListener('addtrack', (event) => {
+			const addedTrack = event.track;
+			addedTrack.mode = 'showing';
+			addedTrack.addEventListener('cuechange', () => {
+				const position = localStorage.getItem('subtitlePosition') || '-4';
+				const activeCues = addedTrack.activeCues;
+				if (activeCues) {
+					for (let i = 0; i < activeCues.length; i++) {
+						activeCues[i].line = parseInt(position, 10);
+					}
+				}
+			});
+		});
+	} else {
+		ccBtn.classList.add('disabled');
+		const disabledButton = document.createElement('button');
+		disabledButton.className = 'cc-item';
+		disabledButton.textContent = 'Not Available';
+		disabledButton.disabled = true;
+		ccOptionsContainer.appendChild(disabledButton);
+	}
+
+	if (linkInfo.hls && Hls.isSupported()) {
+		let proxiedUrl = `/proxy?url=${encodeURIComponent(linkInfo.link)}`;
+		if (linkInfo.headers && linkInfo.headers.Referer) {
+			proxiedUrl += `&referer=${encodeURIComponent(linkInfo.headers.Referer)}`;
+		}
+		const hls = new Hls();
+		hls.loadSource(proxiedUrl);
+		hls.attachMedia(videoElement);
+		hls.on(Hls.Events.ERROR, (event, data) => {
+			if (data.fatal) {
+				console.error('HLS fatal error:', data);
+				hls.destroy();
+			}
+		});
+		currentHlsInstance = hls;
+	} else {
+		let proxiedUrl = `/proxy?url=${encodeURIComponent(linkInfo.link)}`;
+		if (linkInfo.headers && linkInfo.headers.Referer) {
+			proxiedUrl += `&referer=${encodeURIComponent(linkInfo.headers.Referer)}`;
+		}
+		videoElement.src = proxiedUrl;
+	}
+	
+	videoElement.play().catch(e => {
+		console.log("Autoplay was prevented. User interaction needed.");
+	});
+}
+
 }
 
 async function setPreferredSource(sourceName) {

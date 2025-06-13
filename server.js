@@ -413,12 +413,7 @@ app.get('/proxy', async (req, res) => {
             });
 
             res.status(streamResponse.status);
-            res.set({
-                'Content-Range': streamResponse.headers['content-range'],
-                'Content-Length': streamResponse.headers['content-length'],
-                'Accept-Ranges': streamResponse.headers['accept-ranges'],
-                'Content-Type': streamResponse.headers['content-type'],
-            });
+            res.set(streamResponse.headers);
 
             streamResponse.data.pipe(res);
         }
