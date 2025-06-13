@@ -3,21 +3,32 @@
    <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="description" content="Watch the latest anime releases.">
+      <meta name="keywords" content="anime, streaming, watchlist, ani-web">
+      <meta name="author" content="serifpersia">
+      <meta property="og:title" content="ani-web">
+      <meta property="og:description" content="Your go-to platform for anime streaming.">
+      <meta property="og:image" content="logo.png">
+      <meta property="og:url" content="https://github.com/serifpersia/ani-web">
+      <link rel="icon" type="image/png" href="favicon.png">
       <title>ani-web</title>
-      <link rel="stylesheet" href="styles.css">
+      <link rel="stylesheet" href="styles.css" media="print" onload="this.media='all'">
       <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.5/dist/hls.min.js"></script>
    </head>
    <body>
-      <div class="app-container">
+      <div class="app-container" role="main">
          <header class="site-header">
-            <a href="#home"><img src="logo.png" alt="Site Logo" class="logo"></a>
+            <a href="#home"><img src="logo.png" alt="Ani-Web Logo" class="logo" loading="lazy"></a>
+            <button class="menu-toggle" aria-label="Toggle navigation">
+               <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+            </button>
             <div class="header-right">
                 <div id="profile-area" class="profile-area" style="display: none;">
                     <div id="profile-display" class="profile-display">
-                        <img id="profile-avatar" src="/profile_pics/default.png" alt="Profile Avatar" class="profile-avatar">
-                        <div id="profile-dropdown" class="profile-dropdown">
+                        <img id="profile-avatar" src="/profile_pics/default.png" alt="Profile Avatar" class="profile-avatar" loading="lazy">
+                        <div id="profile-dropdown" class="profile-dropdown" aria-hidden="true">
                             <div id="profile-dropdown-header">
-                               <img id="dropdown-avatar" src="/profile_pics/default.png" alt="Profile Avatar" class="profile-avatar">
+                               <img id="dropdown-avatar" src="/profile_pics/default.png" alt="Profile Avatar" class="profile-avatar" loading="lazy">
                                <span id="dropdown-username"></span>
                             </div>
                             <div id="profile-selector-container"></div>
@@ -33,7 +44,7 @@
                </select>
             </div>
          </header>
-         <nav>
+         <nav role="navigation" aria-label="Main navigation">
             <a href="#home">Home</a>
             <a href="#search">Search</a>
             <a href="#watchlist">Watchlist</a>
@@ -79,8 +90,8 @@
             </div>
             <div id="search-page" class="page" style="display: none;">
                <div class="search-filters">
-                  <input type="text" id="searchInput" placeholder="Search for an anime...">
-                  <select id="typeFilter">
+                  <input type="text" id="searchInput" placeholder="Search for an anime..." aria-label="Search for anime">
+                  <select id="typeFilter" aria-label="Filter by type">
                      <option value="ALL">All Types</option>
                      <option value="TV">TV</option>
                      <option value="ONA">ONA</option>
@@ -88,24 +99,24 @@
                      <option value="Movie">Movie</option>
                      <option value="Special">Special</option>
                   </select>
-                  <select id="seasonFilter"></select>
-                  <select id="yearFilter"></select>
-                  <select id="countryFilter">
+                  <select id="seasonFilter" aria-label="Filter by season"></select>
+                  <select id="yearFilter" aria-label="Filter by year"></select>
+                  <select id="countryFilter" aria-label="Filter by country">
                      <option value="ALL">All Countries</option>
                      <option value="JP">Japan</option>
                      <option value="KR">Korea</option>
                      <option value="CH">China</option>
                   </select>
-                  <select id="translationFilter">
+                  <select id="translationFilter" aria-label="Filter by translation">
                      <option value="sub">Sub</option>
                      <option value="dub">Dub</option>
                   </select>
-                  <select id="sortFilter">
+                  <select id="sortFilter" aria-label="Sort results">
                      <option value="Recent" selected>Recent</option>
                      <option value="Name_ASC">Alphabetical (A-Z)</option>
                      <option value="Name_DESC">Alphabetical (Z-A)</option>
                   </select>
-                  <button id="searchBtn">Search</button>
+                  <button id="searchBtn" aria-label="Search">Search</button>
                </div>
                <div id="results" class="grid"></div>
             </div>
@@ -122,7 +133,7 @@
                              <button class="status-filter-btn" data-status="Dropped">Dropped</button>
                              <button class="status-filter-btn" data-status="Planned">Planned</button>
                          </div>
-                         <select id="watchlist-sort">
+                         <select id="watchlist-sort" aria-label="Sort watchlist">
                             <option value="last_added">Last Added</option>
                             <option value="name_asc">Alphabetical (A-Z)</option>
                             <option value="name_desc">Alphabetical (Z-A)</option>
@@ -134,11 +145,11 @@
                      <h3>Import & Export</h3>
                      <h4>Import from MyAnimeList</h4>
                      <div class="import-controls">
-                        <input type="file" id="malFile" accept=".xml,application/xml">
+                        <input type="file" id="malFile" accept=".xml,application/xml" aria-label="Import MyAnimeList file">
                         <button id="importMalBtn">Import from File</button>
                      </div>
                      <div class="import-options">
-                        <input type="checkbox" id="eraseWatchlistToggle">
+                        <input type="checkbox" id="eraseWatchlistToggle" aria-label="Erase current watchlist before import">
                         <label for="eraseWatchlistToggle">Erase current watchlist before import</label>
                      </div>
                      <div id="importStatus"></div>
@@ -149,7 +160,7 @@
                      <div class="backup-restore-controls">
                         <a href="/backup-db" class="backup-btn" download="ani-web-backup.db">Backup Database</a>
                         <div class="restore-control">
-                           <input type="file" id="restoreFile" accept=".db">
+                           <input type="file" id="restoreFile" accept=".db" aria-label="Restore database file">
                            <button id="restoreDbBtn">Restore from File</button>
                         </div>
                      </div>
@@ -158,6 +169,69 @@
                </div>
             </div>
             <div id="player-page" class="page" style="display: none;">
+               <div class="player-content">
+                  <video id="videoPlayer" controls>
+                     <track kind="subtitles" id="subtitleTrack" label="English" srclang="en">
+                  </video>
+                  <div class="video-controls-container">
+                     <div class="progress-bar-container">
+                        <div class="progress-bar">
+                           <div class="progress-bar-buffered"></div>
+                           <div class="progress-bar-watched"></div>
+                           <div class="progress-bar-thumb"></div>
+                        </div>
+                        <div class="slider-bubble"></div>
+                     </div>
+                     <div class="bottom-controls">
+                        <div class="left-controls">
+                           <button class="control-button play-pause" aria-label="Play">
+                              <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                           </button>
+                           <button class="control-button seek-button" aria-label="Rewind 10 seconds">
+                              <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                           </button>
+                           <button class="control-button seek-button" aria-label="Forward 10 seconds">
+                              <svg viewBox="0 0 24 24"><path d="M18 6h-2v12h2zm-3.5-6l-8.5 6v12l8.5-6z"/></svg>
+                           </button>
+                           <div class="time-display">0:00 / 0:00</div>
+                        </div>
+                        <div class="right-controls">
+                           <div class="volume-container">
+                              <button class="control-button volume-button" aria-label="Mute">
+                                 <svg viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/></svg>
+                              </button>
+                              <div class="volume-slider-container">
+                                 <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="1" aria-label="Volume control">
+                                 <div class="slider-bubble"></div>
+                              </div>
+                           </div>
+                           <button class="control-button skip-intro" aria-label="Skip Intro">Skip Intro</button>
+                           <button class="control-button settings-btn" aria-label="Settings">
+                              <svg viewBox="0 0 24 24"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/></svg>
+                           </button>
+                           <button class="control-button fullscreen-btn" aria-label="Toggle fullscreen">
+                              <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+                           </button>
+                        </div>
+                     </div>
+                     <div class="settings-menu hidden">
+                        <h4>Settings</h4>
+                        <div id="source-options"></div>
+                        <div class="cc-divider"></div>
+                        <div id="cc-options-container"></div>
+                        <div class="cc-slider-container">
+                           <label for="subtitle-size-slider">Subtitle Size</label>
+                           <input type="range" id="subtitle-size-slider" min="0.5" max="2" step="0.1" value="1" aria-label="Subtitle size">
+                           <div class="slider-bubble"></div>
+                        </div>
+                        <div class="cc-slider-container">
+                           <label for="subtitle-position-slider">Subtitle Position</label>
+                           <input type="range" id="subtitle-position-slider" min="-10" max="10" step="1" value="-4" aria-label="Subtitle position">
+                           <div class="slider-bubble"></div>
+                        </div>
+                     </div>
+                  </div>
+               </div>
             </div>
             <div id="settings-page" class="page" style="display: none;">
                 <h2>Profile Settings</h2>
@@ -166,7 +240,7 @@
                         <h3>Edit Profile</h3>
                         <div id="profile-settings-form">
                             <div class="profile-picture-section">
-                                <img id="settings-profile-pic" src="/profile_pics/default.png" alt="Profile Picture">
+                                <img id="settings-profile-pic" src="/profile_pics/default.png" alt="Profile Picture" loading="lazy">
                                 <label for="profile-pic-upload" class="upload-btn">
                                     <svg fill="currentColor" viewBox="0 0 20 20"><path d="M13 10V3L4 14h7v7l9-11h-7z" clip-rule="evenodd" fill-rule="evenodd"></path></svg>
                                     Change Picture
@@ -191,7 +265,12 @@
          <footer>
             <p>© 2025 <a href="https://github.com/serifpersia/ani-web" target="_blank" rel="noopener noreferrer">serifpersia</a></p>
          </footer>
+         <div class="modal" id="welcome-modal">
+            <h2>Welcome to Ani-Web!</h2>
+            <p>Create a profile to start tracking your anime.</p>
+            <button class="modal-close">Get Started</button>
+         </div>
       </div>
-      <script src="script.js"></script>
+      <script src="script.js" defer></script>
    </body>
 </html>
