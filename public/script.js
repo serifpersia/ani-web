@@ -1716,25 +1716,6 @@ function playVideo(sourceName, linkInfo, subtitleInfo) {
       videoElement.src = proxiedUrl;
    }
 
-   videoElement.addEventListener('loadedmetadata', () => {
-      const skipIntroButton = document.querySelector('.skip-intro');
-      skipIntroButton.style.display = 'none';
-      if (linkInfo.intro) {
-         videoElement.addEventListener('timeupdate', () => {
-            if (videoElement.currentTime >= linkInfo.intro.start && videoElement.currentTime <= linkInfo.intro.end && !skippedInThisSession.has('intro')) {
-               skipIntroButton.style.display = 'block';
-            } else {
-               skipIntroButton.style.display = 'none';
-            }
-         });
-         skipIntroButton.onclick = () => {
-            videoElement.currentTime = linkInfo.intro.end;
-            skippedInThisSession.add('intro');
-            skipIntroButton.style.display = 'none';
-         };
-      }
-   });
-
    videoElement.play().catch(e => {
       console.log("Autoplay was prevented. User interaction needed.");
    });
