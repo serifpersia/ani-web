@@ -745,11 +745,11 @@ app.get('/continue-watching', (req, res) => {
                     const allEps = epResponse.data.data.show.availableEpisodesDetail.sub?.sort((a, b) => parseFloat(a) - parseFloat(b)) || [];
                     const lastWatchedIndex = allEps.indexOf(show.episodeNumber);
 
-                    if (lastWatchedIndex > -1 && lastWatchedIndex < allEps.length - 1) {
+                    if (lastWatchedIndex > -1 && lastWatchedIndex < allEps.length) {
                         return {
                             ...show,
                             thumbnail: deobfuscateUrl(show.thumbnail),
-                            episodeToPlay: allEps[lastWatchedIndex + 1],
+                            episodeToPlay: allEps[lastWatchedIndex],
                             currentTime: 0,
                             duration: 0
                         };
