@@ -6,19 +6,6 @@ let profiles = [];
 let activeProfileId = null;
 let videoProgressUpdateTimer = null;
 
-function throttle(func, limit) {
-    let inThrottle;
-    return function() {
-        const args = arguments;
-        const context = this;
-        if (!inThrottle) {
-            func.apply(context, args);
-            inThrottle = true;
-            setTimeout(() => inThrottle = false, limit);
-        }
-    }
-}
-
 async function fetchWithProfile(url, options = {}) {
    if (!activeProfileId) {
       console.error("No active profile selected. Cannot make request.");
