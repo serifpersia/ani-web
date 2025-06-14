@@ -336,9 +336,14 @@ app.get('/video', async (req, res) => {
                             hls: false
                         })).sort((a,b) => parseInt(b.resolutionStr) - parseInt(a.resolutionStr));
                     }
-				} else {
-					videoLinks.push({ link: decryptedUrl, resolutionStr: 'default', hls: decryptedUrl.includes('.m3u8'), headers: { Referer: referer } });
-				}
+				}	else {
+						let finalLink = decryptedUrl;
+						
+						if (finalLink.startsWith('/')) {
+							finalLink = new URL(finalLink, apiBaseUrl).href;
+						}
+						videoLinks.push({ link: finalLink, resolutionStr: 'default', hls: finalLink.includes('.m3u8'), headers: { Referer: referer } });
+					}
 				if (videoLinks.length > 0) {
 					return { sourceName: source.sourceName, links: videoLinks, subtitles };
 				}
