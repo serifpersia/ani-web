@@ -273,6 +273,33 @@ function setupWatchlistPage() {
    const restoreDbBtn = document.getElementById('restoreDbBtn');
    const sortSelect = document.getElementById('watchlist-sort');
    const filterButtons = document.querySelectorAll('.status-filter-btn');
+   const shareDbBtn = document.getElementById('share-backup-btn');
+
+   if (shareDbBtn && navigator.share) {
+      shareDbBtn.style.display = 'inline-block';
+      shareDbBtn.addEventListener('click', async () => {
+         try {
+            const response = await fetch('/backup-db');
+            const blob = await response.blob();
+            const file = new File([blob], 'ani-web-backup.db', { type: 'application/octet-stream' });
+            
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+               await navigator.share({
+                  title: 'Ani-Web Database Backup',
+                  text: 'Here is my ani-web database backup.',
+                  files: [file],
+               });
+            } else {
+               alert('Your browser does not support sharing files.');
+            }
+         } catch (error) {
+            if (error.name !== 'AbortError') {
+               console.error('Share failed:', error);
+               alert('An error occurred while trying to share the backup.');
+            }
+         }
+      });
+   }
 
    if (importBtn) {
       importBtn.addEventListener('click', handleMalImport);
