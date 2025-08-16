@@ -357,6 +357,46 @@ async function handleDbRestore() {
       statusDiv.textContent = `Error: ${error.message}`;
    }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    const rcloneUploadBtn = document.getElementById('rcloneUploadBtn');
+    if(rcloneUploadBtn) rcloneUploadBtn.addEventListener('click', handleRcloneUpload);
+
+    const rcloneDownloadBtn = document.getElementById('rcloneDownloadBtn');
+    if(rcloneDownloadBtn) rcloneDownloadBtn.addEventListener('click', handleRcloneDownload);
+});
+
+async function handleRcloneUpload() {
+    const statusDiv = document.getElementById('rcloneStatus');
+    statusDiv.textContent = 'Uploading...';
+    try {
+        const response = await fetch('/rclone-upload', { method: 'POST' });
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to upload.');
+        }
+        statusDiv.textContent = result.message;
+    } catch (error) {
+        statusDiv.textContent = `Error: ${error.message}`;
+    }
+}
+
+async function handleRcloneDownload() {
+    const statusDiv = document.getElementById('rcloneStatus');
+    statusDiv.textContent = 'Downloading...';
+    try {
+        const response = await fetch('/rclone-download', { method: 'POST' });
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to download.');
+        }
+        statusDiv.textContent = result.message;
+        alert('Database downloaded successfully! The page will now reload.');
+        setTimeout(() => window.location.reload(), 1000);
+    } catch (error) {
+        statusDiv.textContent = `Error: ${error.message}`;
+    }
+}
 async function loadHomePage() {
    setupScheduleSelector();
    await Promise.all([
