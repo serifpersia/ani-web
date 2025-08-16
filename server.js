@@ -2,6 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const sqlite3 = require('sqlite3').verbose();
 const { parseString } = require('xml2js');
+const { exec } = require('child_process');
 const NodeCache = require('node-cache');
 const multer = require('multer');
 const fs = require('fs');
@@ -920,5 +921,36 @@ app.post('/restore-db', dbUpload.single('dbfile'), (req, res) => {
          res.json({ success: true, message: 'Database restored successfully. The application will now refresh.' });
       });
    });
+});
+
+app.post('/rclone-upload', (req, res) => {
+    exec('./upload_db.sh', (error, stdout, stderr) => {
+        if (error) {
+            console.error(`exec error: ${error}`);
+            return res.status(500).json({ error: `Script Error: ${stderr}` });
+        }
+        res.json({ message: `Upload successful: ${stdout}` });
+    });
+});
+
+app.post('/rclone-download', (req, res) => {
+    db.close((err) => {
+        if (err) {
+            console.error('Failed to close database before rclone download:', err.message);
+            initializeDatabase(); 
+            return res.status(500).json({ error: 'Failed to close current database for update.' });
+        }
+
+        exec('./download_db.sh', (error, stdout, stderr) => {
+            initializeDatabase();
+
+            if (error) {
+                console.error(`exec error: ${error}`);
+                return res.status(500).json({ error: `Script Error: ${stderr}` });
+            }
+            
+            res.json({ message: `Download successful: ${stdout}` });
+        });
+    });
 });
 app.listen(port, () => console.log(`Server running at http://localhost:${port}`));

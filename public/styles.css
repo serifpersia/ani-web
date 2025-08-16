@@ -1272,6 +1272,47 @@ input:checked + .slider:before {
    font-style: italic;
 }
 
+.rclone-sync-section {
+   background-color: var(--secondary-bg);
+   padding: 20px;
+   border-radius: 8px;
+   margin-top: 30px;
+}
+
+.rclone-sync-section h4 {
+   margin-top: 0;
+   border-bottom: 1px solid var(--border-color);
+   padding-bottom: 10px;
+}
+
+.rclone-sync-controls {
+   display: flex;
+   gap: 15px;
+   align-items: center;
+   flex-wrap: wrap;
+}
+
+.rclone-btn {
+   background-color: var(--accent-color);
+   color: var(--primary-text);
+   font-weight: bold;
+   border: none;
+   padding: 9px 15px;
+   border-radius: 4px;
+   cursor: pointer;
+   transition: background-color 0.2s;
+   text-decoration: none;
+}
+
+.rclone-btn:hover {
+   background-color: var(--accent-hover);
+}
+
+#rcloneStatus {
+   margin-top: 15px;
+   font-style: italic;
+}
+
 .remove-from-cw-btn {
    position: absolute;
    top: 5px;
