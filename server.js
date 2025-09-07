@@ -924,7 +924,8 @@ app.post('/restore-db', dbUpload.single('dbfile'), (req, res) => {
 });
 
 app.post('/rclone-upload', (req, res) => {
-    exec('./upload_db.sh', (error, stdout, stderr) => {
+    const script = process.platform === 'win32' ? 'upload_db.bat' : './upload_db.sh';
+    exec(script, (error, stdout, stderr) => {
         if (error) {
             console.error(`exec error: ${error}`);
             return res.status(500).json({ error: `Script Error: ${stderr}` });
@@ -941,7 +942,8 @@ app.post('/rclone-download', (req, res) => {
             return res.status(500).json({ error: 'Failed to close current database for update.' });
         }
 
-        exec('./download_db.sh', (error, stdout, stderr) => {
+        const script = process.platform === 'win32' ? 'download_db.bat' : './download_db.sh';
+        exec(script, (error, stdout, stderr) => {
             initializeDatabase();
 
             if (error) {
