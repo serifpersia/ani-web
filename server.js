@@ -67,7 +67,7 @@ const dbUploadStorage = multer.diskStorage({
 const dbUpload = multer({ storage: dbUploadStorage });
 
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static('public'));
+app.use(express.static('dist'));
 app.get('/favicon.ico', (req, res) => res.status(204).send());
 const apiBaseUrl = 'https://allanime.day';
 const apiEndpoint = `https://api.allanime.day/api`;
@@ -395,7 +395,8 @@ app.get('/image-proxy', async (req, res) => {
         res.set('Content-Type', headers['content-type']);
         data.pipe(res);
     } catch (e) {
-        res.status(500).sendFile(path.join(__dirname, '/public/placeholder.png'));
+        console.error('Image proxy error:', e.message); // Log the error for debugging
+        res.status(200).sendFile(path.join(__dirname, '/public/placeholder.svg')); // Send placeholder with 200 OK
     }
 });
 
