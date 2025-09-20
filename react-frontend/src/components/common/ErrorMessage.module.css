@@ -1,0 +1,16 @@
+
+.errorBox {
+    background-color: rgba(229, 62, 62, 0.1);
+    border: 1px solid var(--danger-color);
+    color: var(--danger-color);
+    padding: 1rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.icon {
+    font-size: 1.5rem;
+}

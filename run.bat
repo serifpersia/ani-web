@@ -5,6 +5,7 @@ color 0a
 
 cls
 
+
 echo.
 echo   [1;33m---------------------------------------------[0m
 echo   [1;36m                ani-web                      [0m        
@@ -15,10 +16,6 @@ echo.
 echo [1;32mStarting ani-web...[0m
 echo.
 
-if not exist "node_modules" (
-    echo Installing dependencies...
-    call npm install --omit=dev
-)
-echo Running npm start...
-call npm start
+node start-dev.js
+
 pause

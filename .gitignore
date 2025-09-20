@@ -129,3 +129,4 @@ out
 .pnp.*
 *.db
 /public/profile_pics
+/dist
