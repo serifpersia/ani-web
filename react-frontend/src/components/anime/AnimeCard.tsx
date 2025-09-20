@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { fixThumbnailUrl, formatTime } from '../../lib/utils';
 import styles from './AnimeCard.module.css';
+import { FaMicrophone, FaClosedCaptioning } from 'react-icons/fa'; // Import the microphone and CC icons
 
 // Define the types for the anime prop
 interface Anime {
@@ -28,6 +29,7 @@ interface AnimeCardProps {
 const AnimeCard: React.FC<AnimeCardProps> = ({ anime, continueWatching = false, onRemove }) => {
   const [currentImageSrc, setCurrentImageSrc] = React.useState(fixThumbnailUrl(anime.thumbnail));
   const [imageLoaded, setImageLoaded] = React.useState(false);
+  const [isHovered, setIsHovered] = React.useState(false); // New state for hover
 
   React.useEffect(() => {
     setCurrentImageSrc(fixThumbnailUrl(anime.thumbnail));
@@ -50,9 +52,46 @@ const AnimeCard: React.FC<AnimeCardProps> = ({ anime, continueWatching = false, 
   };
 
   return (
-    <Link to={continueWatching ? `/player/${anime._id}/${anime.episodeNumber}` : `/player/${anime._id}`} className={styles.card}>
+    <Link 
+      to={continueWatching ? `/player/${anime._id}/${anime.episodeNumber}` : `/player/${anime._id}`}
+      className={styles.card}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <div className={styles.posterContainer}> {/* New container for image and placeholder */}
+        {continueWatching && anime.episodeNumber && (
+          <div className={styles.episodeNumberOverlay}>EP {anime.episodeNumber}</div>
+        )}
+        {continueWatching && anime.availableEpisodesDetail && (
+              <div className={styles.episodeCountOverlay}>
+                            {anime.availableEpisodesDetail.sub && anime.availableEpisodesDetail.sub.length > 0 && (
+                              <div className={`${styles.episodeCountItem} ${styles.subCount}`}><FaClosedCaptioning /> {anime.availableEpisodesDetail.sub.length}</div>
+                            )}
+                            {anime.availableEpisodesDetail.dub && anime.availableEpisodesDetail.dub.length > 0 && (
+                              <div className={`${styles.episodeCountItem} ${styles.dubCount}`}><FaMicrophone /> {anime.availableEpisodesDetail.dub.length}</div>
+                            )}              </div>
+            )}
         {!imageLoaded && <div className={styles.imagePlaceholder}></div>} {/* Temporary placeholder */}
+        {continueWatching && (
+          <div className={styles.progressOverlay}>
+            <div className={styles.progressBar}>
+              <div className={styles.progress} style={{ width: `${progressPercent}%` }}></div>
+            </div>
+            <div className={styles.timestampCentered}>
+              {formattedCurrentTime} / {formattedDuration}
+            </div>
+          </div>
+        )}
+        {!continueWatching && anime.availableEpisodesDetail && (
+          <div className={`${styles.episodeCountOverlay} ${styles.normalCardEpisodeCount}`}>
+            {anime.availableEpisodesDetail.sub && anime.availableEpisodesDetail.sub.length > 0 && (
+              <div className={`${styles.episodeCountItem} ${styles.subCount}`}><FaClosedCaptioning /> {anime.availableEpisodesDetail.sub.length}</div>
+            )}
+            {anime.availableEpisodesDetail.dub && anime.availableEpisodesDetail.dub.length > 0 && (
+              <div className={`${styles.episodeCountItem} ${styles.dubCount}`}><FaMicrophone /> {anime.availableEpisodesDetail.dub.length}</div>
+            )}
+          </div>
+        )}
         <img 
           src={currentImageSrc} 
           alt={anime.name} 
@@ -66,28 +105,14 @@ const AnimeCard: React.FC<AnimeCardProps> = ({ anime, continueWatching = false, 
         />
       </div>
       <div className={styles.info}>
-        {continueWatching && (
+        {continueWatching && isHovered && (
           <button className={styles.removeBtn} onClick={handleRemove}>x</button>
         )}
         <div className={styles.title}>{anime.name}</div>
         <div className={styles.showType}>{anime.type || 'TV'}</div>
-        {continueWatching ? (
-          <>
-            <div className={styles.progressBar}>
-              <div className={styles.progress} style={{ width: `${progressPercent}%` }}></div>
-            </div>
-            <div className={styles.details}>
-              Ep {anime.episodeNumber} | {formattedCurrentTime} / {formattedDuration}
-            </div>
-          </>
-        ) : (
+        {continueWatching ? null : (
           <div className={styles.details}>
-            {anime.availableEpisodesDetail?.sub && (
-              <span>Sub: {anime.availableEpisodesDetail.sub.length}</span>
-            )}
-            {anime.availableEpisodesDetail?.dub && (
-              <span> Dub: {anime.availableEpisodesDetail.dub.length}</span>
-            )}
+            {/* availableEpisodesDetail moved to posterContainer */}
           </div>
         )}
       </div>

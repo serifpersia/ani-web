@@ -280,6 +280,56 @@ body.light .watchlistBtn {
     transition: width 0.3s, opacity 0.3s;
     cursor: pointer;
     margin-left: 0.5rem;
+    /* Custom styles for range input */
+    -webkit-appearance: none; /* Remove default WebKit styles */
+    appearance: none;
+    background: transparent; /* Hide default track */
+}
+
+/* WebKit (Chrome, Safari) */
+.volumeSlider::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 6px; /* Thicker track */
+    background: linear-gradient(to right, var(--accent) var(--track-fill-percent, 0%), #ccc var(--track-fill-percent, 0%));
+    border-radius: 3px; /* Adjust border-radius for thicker track */
+}
+
+.volumeSlider::-webkit-slider-thumb {
+    -webkit-appearance: none; /* Remove default WebKit styles */
+    appearance: none;
+    width: 16px; /* Thicker thumb */
+    height: 16px; /* Thicker thumb */
+    background-color: white;
+    border-radius: 50%;
+    cursor: pointer;
+    margin-top: -5px; /* Adjust to keep thumb vertically centered with thicker track */
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Firefox */
+.volumeSlider::-moz-range-track {
+    width: 100%;
+    height: 6px; /* Thicker track */
+    background: linear-gradient(to right, var(--accent) var(--track-fill-percent, 0%), #ccc var(--track-fill-percent, 0%));
+    border-radius: 3px; /* Adjust border-radius for thicker track */
+}
+
+.volumeSlider::-moz-range-thumb {
+    width: 16px; /* Thicker thumb */
+    height: 16px; /* Thicker thumb */
+    background-color: white;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Update track fill percentage dynamically with JS */
+.volumeSlider:not(:active)::-webkit-slider-runnable-track {
+    background: linear-gradient(to right, var(--accent) calc(var(--volume-percent) * 100%), #ccc calc(var(--volume-percent) * 100%));
+}
+
+.volumeSlider:not(:active)::-moz-range-track {
+    background: linear-gradient(to right, var(--accent) calc(var(--volume-percent) * 100%), #ccc calc(var(--volume-percent) * 100%));
 }
 
 .rightControls {
@@ -399,6 +449,8 @@ body.light .descriptionBox {
 .episodeItem:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    background-color: var(--accent); /* Change background to accent on hover */
+    color: white; /* Ensure text is white on accent background */
     border-color: var(--accent);
 }
 
@@ -515,7 +567,7 @@ body.light .epJumpInputGroup input {
 
 .settingsMenu {
     position: absolute;
-    bottom: 100%; /* Position above the controls */
+    bottom: 165%;
     right: 0;
     background-color: rgba(0, 0, 0, 0.8);
     color: white;
@@ -560,7 +612,54 @@ body.light .epJumpInputGroup input {
 }
 
 .ccSliderContainer input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
     width: 100%;
+}
+
+.ccSliderContainer input[type="range"]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 6px;
+    background: linear-gradient(to right, var(--accent) var(--track-fill-percent, 0%), #ccc var(--track-fill-percent, 0%));
+    border-radius: 3px;
+}
+
+.ccSliderContainer input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background-color: white;
+    border-radius: 50%;
+    cursor: pointer;
+    margin-top: -5px;
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+}
+
+.ccSliderContainer input[type="range"]::-moz-range-track {
+    width: 100%;
+    height: 6px;
+    background: linear-gradient(to right, var(--accent) var(--track-fill-percent, 0%), #ccc var(--track-fill-percent, 0%));
+    border-radius: 3px;
+}
+
+.ccSliderContainer input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background-color: white;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Dynamic fill for CC sliders */
+.ccSliderContainer input[type="range"]:not(:active)::-webkit-slider-runnable-track {
+    background: linear-gradient(to right, var(--accent) calc(var(--slider-percent) * 100%), #ccc calc(var(--slider-percent) * 100%));
+}
+
+.ccSliderContainer input[type="range"]:not(:active)::-moz-range-track {
+    background: linear-gradient(to right, var(--accent) calc(var(--slider-percent) * 100%), #ccc calc(var(--slider-percent) * 100%));
 }
 
 .ccSliderContainer span {

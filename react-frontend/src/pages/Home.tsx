@@ -41,7 +41,18 @@ const Home: React.FC = () => {
       const response = await fetch("/api/latest-releases");
       if (!response.ok) throw new Error("Failed to fetch latest releases");
       const data = await response.json();
-      setLatestReleases(data);
+
+      const detailedLatestReleases = await Promise.all(
+        data.map(async (item: any) => {
+          const animeDetails = await fetchAnimeDetails(item._id);
+          if (animeDetails) {
+            return { ...animeDetails, ...item }; // Merge existing item data with fetched details
+          } else {
+            return null; // Handle cases where details couldn't be fetched
+          }
+        })
+      );
+      setLatestReleases(detailedLatestReleases.filter(Boolean) as Anime[]);
     } catch (error) {
       console.error("Error fetching latest releases:", error);
     } finally {
@@ -60,7 +71,17 @@ const Home: React.FC = () => {
       if (newShows.length === 0) {
         seasonalState.current.hasMore = false;
       } else {
-        setCurrentSeason(prev => [...prev, ...newShows]);
+        const detailedNewShows = await Promise.all(
+          newShows.map(async (item: any) => {
+            const animeDetails = await fetchAnimeDetails(item._id);
+            if (animeDetails) {
+              return { ...animeDetails, ...item }; // Merge existing item data with fetched details
+            } else {
+              return null; // Handle cases where details couldn't be fetched
+            }
+          })
+        );
+        setCurrentSeason(prev => [...prev, ...detailedNewShows.filter(Boolean) as Anime[]]);
         seasonalState.current.page++;
       }
     } catch (error) {
@@ -100,6 +121,40 @@ const Home: React.FC = () => {
     }
   };
 
+  const fetchAnimeDetails = async (showId: string) => {
+    try {
+      const [metaResponse, subEpisodesResponse, dubEpisodesResponse] = await Promise.all([
+        fetch(`/api/show-meta/${showId}`),
+        fetch(`/api/episodes?showId=${showId}&mode=sub`),
+        fetch(`/api/episodes?showId=${showId}&mode=dub`)
+      ]);
+
+      if (!metaResponse.ok) throw new Error("Failed to fetch show metadata");
+      if (!subEpisodesResponse.ok) throw new Error("Failed to fetch sub episodes");
+      if (!dubEpisodesResponse.ok) throw new Error("Failed to fetch dub episodes");
+
+      const meta = await metaResponse.json();
+      const subEpisodeData = await subEpisodesResponse.json();
+      const dubEpisodeData = await dubEpisodesResponse.json();
+
+      const animeDetails = {
+        _id: showId,
+        id: showId,
+        name: meta.name,
+        thumbnail: meta.thumbnail,
+        type: meta.type,
+        availableEpisodesDetail: {
+          sub: subEpisodeData.episodes,
+          dub: dubEpisodeData.episodes,
+        },
+      };
+      return animeDetails;
+    } catch (error) {
+      console.error(`Error fetching details for ${showId}:`, error);
+      return null;
+    }
+  };
+
   const fetchContinueWatching = async () => {
     try {
       const response = await fetch("/api/continue-watching", {
@@ -107,15 +162,23 @@ const Home: React.FC = () => {
       });
       if (!response.ok) throw new Error("Failed to fetch continue watching");
       const data = await response.json();
-      const mappedData = data.map((item: any) => ({
-        ...item,
-        _id: item.showId,
-        id: item.showId,
-        episodeNumber: item.episodeNumber,
-        currentTime: item.currentTime,
-        duration: item.duration
-      }));
-      setContinueWatchingList(mappedData);
+
+      const detailedContinueWatchingList = await Promise.all(
+        data.map(async (item: any) => {
+          const animeDetails = await fetchAnimeDetails(item.showId);
+          if (animeDetails) {
+            return {
+              ...animeDetails,
+              episodeNumber: item.episodeNumber,
+              currentTime: item.currentTime,
+              duration: item.duration
+            };
+          } else {
+            return null; // Handle cases where details couldn't be fetched
+          }
+        })
+      );
+      setContinueWatchingList(detailedContinueWatchingList.filter(Boolean) as Anime[]);
     } catch (error) {
       console.error("Error fetching continue watching:", error);
     } finally {

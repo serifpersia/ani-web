@@ -13,7 +13,7 @@
 }
 
 .modalContent {
-    background-color: var(--dark-bg-secondary);
+    background-color: rgb(21, 21, 21);
     padding: 2rem;
     border-radius: var(--card-border-radius);
     text-align: center;
