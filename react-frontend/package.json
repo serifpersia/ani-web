@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -28,5 +28,8 @@
     "typescript": "5.8.3",
     "typescript-eslint": "8.39.1",
     "vite": "7.1.6"
+  },
+  "overrides": {
+    "@rollup/rollup-android-arm64": "4.45.1"
   }
 }

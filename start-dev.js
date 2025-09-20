@@ -1,6 +1,7 @@
 const { execSync, spawn } = require('child_process');
 const path = require('path');
 const http = require('http');
+const fs = require('fs');
 
 const rootDir = process.cwd();
 const frontendDir = path.join(rootDir, 'react-frontend');
@@ -24,9 +25,12 @@ function runCommand(command, options = {}) {
 
 function checkAndInstall(dir, installCommand, successMessage, errorMessage) {
   const nodeModulesPath = path.join(dir, 'node_modules');
-  if (!require('fs').existsSync(nodeModulesPath)) {
+
+  if (!fs.existsSync(nodeModulesPath)) {
+    console.log(`Dependencies not found in ${dir}. Will install.`);
     console.log(`Installing dependencies in ${dir}...`);
-    // Explicitly use cmd.exe for npm install on Windows
+
+    // Explicitly use cmd.exe for npm install on Windows, otherwise just npm
     if (process.platform === 'win32') {
       execSync(`cmd.exe /c "npm ${installCommand}"`, { stdio: 'inherit', cwd: dir });
     } else {
