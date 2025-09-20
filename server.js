@@ -147,6 +147,7 @@ async function fetchAndSendShows(res, variables, cacheKey) {
         if (cacheKey) {
             apiCache.set(cacheKey, transformedShows);
         }
+        res.set('Cache-Control', 'public, max-age=300'); // Cache for 5 minutes
         res.json(transformedShows);
     } catch (error) {
         console.error('Error fetching data:', error.message);
@@ -182,6 +183,7 @@ app.get('/api/popular/:timeframe', async (req, res) => {
             return { ...card, thumbnail: deobfuscateUrl(card.thumbnail || '') };
         });
         apiCache.set(cacheKey, shows);
+        res.set('Cache-Control', 'public, max-age=300'); // Cache for 5 minutes
         res.json(shows);
     } catch (error) {
         console.error('Error fetching popular data:', error.response ? error.response.data : error.message);
@@ -252,6 +254,7 @@ app.get('/api/show-meta/:id', async (req, res) => {
         if (show) {
             const meta = { name: show.name, thumbnail: deobfuscateUrl(show.thumbnail) };
             apiCache.set(cacheKey, meta);
+            res.set('Cache-Control', 'public, max-age=300'); // Cache for 5 minutes
             res.json(meta);
         } else {
             res.status(404).json({ error: 'Show not found' });
@@ -275,6 +278,7 @@ app.get('/api/episodes', async (req, res) => {
         const showData = response.data.data.show;
         const result = { episodes: showData.availableEpisodesDetail[mode] || [], description: showData.description };
         apiCache.set(cacheKey, result);
+        res.set('Cache-Control', 'public, max-age=300'); // Cache for 5 minutes
         res.json(result);
     } catch (error) {
         res.status(500).send('Error fetching episodes from API');

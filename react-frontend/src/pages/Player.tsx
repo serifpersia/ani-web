@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import Hls from 'hls.js';
+// import Hls from 'hls.js'; // Removed static import
 import styles from './Player.module.css';
 import ToggleSwitch from '../components/common/ToggleSwitch';
 import { FaCheck, FaPlus, FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaCompress, FaClosedCaptioning, FaList } from 'react-icons/fa';
@@ -48,7 +48,7 @@ const Player: React.FC = () => {
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const progressBarThumbRef = useRef<HTMLDivElement>(null); // New ref for the thumb
-  const hlsInstance = useRef<Hls | null>(null);
+  const hlsInstance = useRef<any | null>(null); // Changed type to any
   const inactivityTimer = useRef<number | null>(null);
   const wasPlayingBeforeScrub = useRef(false); // To remember if video was playing before scrubbing
   const episodeListRef = useRef<HTMLDivElement>(null); // Ref for episode list scrolling
@@ -337,11 +337,19 @@ const Player: React.FC = () => {
         setActiveSubtitleTrack(null); // No subtitles, so no active track
     }
 
-    if (selectedLink.hls && Hls.isSupported()) {
-      const hls = new Hls({ manifestLoadingTimeOut: 20000 });
-      hlsInstance.current = hls;
-      hls.loadSource(proxiedUrl);
-      hls.attachMedia(videoElement);
+    if (selectedLink.hls) {
+      const loadHls = async () => {
+        const Hls = (await import('hls.js')).default;
+        if (Hls.isSupported()) {
+          const hls = new Hls({ manifestLoadingTimeOut: 20000 });
+          hlsInstance.current = hls;
+          hls.loadSource(proxiedUrl);
+          hls.attachMedia(videoElement);
+        } else {
+          videoElement.src = proxiedUrl; // Fallback if HLS not supported after dynamic import
+        }
+      };
+      loadHls();
     } else {
       videoElement.src = proxiedUrl;
     }
