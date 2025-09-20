@@ -4,8 +4,9 @@ const http = require('http');
 
 const rootDir = process.cwd();
 const frontendDir = path.join(rootDir, 'react-frontend');
-const serverPort = 3000;
+const serverPort = 3000; // Assuming your server runs on port 3000
 
+// Function to run commands, explicitly using cmd.exe for npm commands on Windows
 function runCommand(command, options = {}) {
   try {
     console.log(`Executing: ${command}`);
@@ -25,7 +26,7 @@ function checkAndInstall(dir, installCommand, successMessage, errorMessage) {
   const nodeModulesPath = path.join(dir, 'node_modules');
   if (!require('fs').existsSync(nodeModulesPath)) {
     console.log(`Installing dependencies in ${dir}...`);
-
+    // Explicitly use cmd.exe for npm install on Windows
     if (process.platform === 'win32') {
       execSync(`cmd.exe /c "npm ${installCommand}"`, { stdio: 'inherit', cwd: dir });
     } else {
@@ -63,9 +64,9 @@ checkAndInstall(rootDir, 'install --production', 'Root dependencies installed.',
 
 // Start backend server
 console.log('Starting backend server...');
-const serverProcess = spawn('cmd.exe', ['/c', 'npm run start-server'], {
-  stdio: 'inherit',
-});
+const serverProcess = (process.platform === 'win32')
+  ? spawn('cmd.exe', ['/c', 'npm run start-server'], { stdio: 'inherit' })
+  : spawn('npm', ['run', 'start-server'], { stdio: 'inherit' });
 
 serverProcess.on('error', (err) => {
   console.error('Failed to start backend server process.', err);
@@ -85,6 +86,9 @@ pollServer(() => {
 
   // Start frontend development server
   console.log('Starting frontend development server...');
-  spawn('cmd.exe', ['/c', 'npm run start-frontend'], { stdio: 'inherit', cwd: rootDir });
+  (process.platform === 'win32')
+    ? spawn('cmd.exe', ['/c', 'npm run start-frontend'], { stdio: 'inherit', cwd: rootDir })
+    : spawn('npm', ['run', 'start-frontend'], { stdio: 'inherit', cwd: rootDir });
+
   console.log('Frontend available at http://localhost:5173');
 });
