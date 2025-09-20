@@ -1,0 +1,178 @@
+.card {
+  border-radius: var(--card-border-radius);
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  position: relative;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+}
+
+.card:hover .posterImg {
+    transform: scale(1.1);
+}
+
+.posterContainer {
+  position: relative;
+  width: 100%;
+  height: 250px; /* Match posterImg height */
+  overflow: hidden; /* Hide overflow from image scaling */
+}
+
+.imagePlaceholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #333; /* Dark grey placeholder */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+  font-size: 0.8rem;
+  text-align: center;
+  z-index: 1; /* Ensure it's below the image when loaded */
+}
+
+.posterImg {
+  width: 100%;
+  height: 100%; /* Fill posterContainer */
+  object-fit: cover;
+  background-color: #ccc;
+  transition: transform 0.5s ease, opacity 0.3s ease; /* Add opacity transition */
+  opacity: 0; /* Start hidden */
+  position: relative; /* For z-index */
+  z-index: 2; /* Ensure it's above placeholder */
+}
+
+.posterImg.loaded {
+  opacity: 1; /* Show when loaded */
+}
+
+.info {
+  padding: 1rem;
+}
+
+.title {
+  font-weight: 600;
+  white-space: nowrap; /* Truncate to single line */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.progressBar {
+  height: 5px;
+  border-radius: 5px;
+  margin: 0.5rem 0;
+  background-color: var(--dark-border);
+}
+
+.progress {
+  height: 100%;
+  border-radius: 5px;
+  background-color: var(--accent);
+}
+
+.details {
+  font-size: 0.8rem;
+  color: var(--dark-text-secondary);
+}
+
+.removeBtn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.showType {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  z-index: 10;
+}
+
+/* Mobile List View */
+@media (max-width: 768px) {
+  .card {
+    display: flex;
+    width: 100%;
+    gap: 1rem; /* Increased gap for better spacing */
+    align-items: flex-start; /* Align items to the top */
+  }
+
+  .posterContainer {
+    flex: 0 0 80px; /* Do not grow, do not shrink, base width of 80px */
+    height: 120px; /* Fixed height */
+  }
+
+  .posterImg {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .info {
+    flex: 1; /* Grow to fill available space */
+    padding: 0; /* Remove padding, rely on gap */
+    display: flex;
+    flex-direction: column;
+  }
+
+  .title {
+    font-weight: 600;
+    white-space: normal; /* Allow text to wrap */
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2; /* Limit to 2 lines */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 0.25rem;
+  }
+
+  .progressBar {
+    margin: 0.5rem 0;
+  }
+
+  .details {
+    font-size: 0.8rem;
+    color: var(--dark-text-secondary);
+  }
+
+  .showType {
+    position: static;
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.7rem;
+    margin-bottom: 0.5rem;
+    align-self: flex-start; /* Align to the start of the flex container */
+  }
+
+  .removeBtn {
+    top: 0.5rem;
+    right: 0.5rem;
+  }
+}

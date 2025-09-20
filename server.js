@@ -67,8 +67,6 @@ const dbUploadStorage = multer.diskStorage({
 const dbUpload = multer({ storage: dbUploadStorage });
 
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static('dist'));
-app.get('/favicon.ico', (req, res) => res.status(204).send());
 const apiBaseUrl = 'https://allanime.day';
 const apiEndpoint = `https://api.allanime.day/api`;
 const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0';
@@ -156,7 +154,7 @@ async function fetchAndSendShows(res, variables, cacheKey) {
     }
 }
 const popularQueryHash = "1fc9651b0d4c3b9dfd2fa6e1d50b8f4d11ce37f988c23b8ee20f82159f7c1147";
-app.get('/popular/:timeframe', async (req, res) => {
+app.get('/api/popular/:timeframe', async (req, res) => {
     const timeframe = req.params.timeframe.toLowerCase();
     const cacheKey = `popular-${timeframe}`;
     if (apiCache.has(cacheKey)) {
@@ -190,7 +188,7 @@ app.get('/popular/:timeframe', async (req, res) => {
         res.status(500).send('Error fetching popular data');
     }
 });
-app.get('/latest-releases', (req, res) => {
+app.get('/api/latest-releases', (req, res) => {
     const variables = { search: { sortBy: 'Latest_Update', allowAdult: false }, limit: 10, page: 1, translationType: 'sub', countryOrigin: 'JP' };
     const cacheKey = 'latest-releases';
     fetchAndSendShows(res, variables, cacheKey);
@@ -202,7 +200,7 @@ function getCurrentAnimeSeason() {
 	if (month >= 6 && month <= 8) return "Summer";
 	return "Fall";
 }
-app.get('/seasonal', (req, res) => {
+app.get('/api/seasonal', (req, res) => {
 	const season = getCurrentAnimeSeason();
 	const year = new Date().getFullYear();
     const page = parseInt(req.query.page) || 1;
@@ -210,7 +208,7 @@ app.get('/seasonal', (req, res) => {
     const cacheKey = `seasonal-${season}-${year}-p${page}`;
 	fetchAndSendShows(res, variables, cacheKey);
 });
-app.get('/search', (req, res) => {
+app.get('/api/search', (req, res) => {
     const { query, season, year, sortBy, page, type, country, translation } = req.query;
     const searchObj = { allowAdult: false };
     if (query) searchObj.query = query;
@@ -221,7 +219,7 @@ app.get('/search', (req, res) => {
     const variables = { search: searchObj, limit: 28, page: parseInt(page) || 1, translationType: (translation && translation !== 'ALL') ? translation : 'sub', countryOrigin: (country && country !== 'ALL') ? country : 'ALL' };
     fetchAndSendShows(res, variables, null);
 });
-app.get('/schedule/:date', (req, res) => {
+app.get('/api/schedule/:date', (req, res) => {
     const dateStr = req.params.date;
     const cacheKey = `schedule-${dateStr}`;
     if (apiCache.has(cacheKey)) {
@@ -238,7 +236,7 @@ app.get('/schedule/:date', (req, res) => {
     const variables = { search: { dateRangeStart: Math.floor(startOfDay.getTime() / 1000), dateRangeEnd: Math.floor(endOfDay.getTime() / 1000), sortBy: "Latest_Update" }, limit: 50, page: 1, translationType: "sub", countryOrigin: "ALL" };
     fetchAndSendShows(res, variables, cacheKey);
 });
-app.get('/show-meta/:id', async (req, res) => {
+app.get('/api/show-meta/:id', async (req, res) => {
     const showId = req.params.id;
     const cacheKey = `show-meta-${showId}`;
     if (apiCache.has(cacheKey)) {
@@ -262,7 +260,7 @@ app.get('/show-meta/:id', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch show metadata' });
     }
 });
-app.get('/episodes', async (req, res) => {
+app.get('/api/episodes', async (req, res) => {
     const { showId, mode = 'sub' } = req.query;
     const cacheKey = `episodes-${showId}-${mode}`;
     if (apiCache.has(cacheKey)) {
@@ -283,7 +281,7 @@ app.get('/episodes', async (req, res) => {
     }
 });
 
-app.get('/video', async (req, res) => {
+app.get('/api/video', async (req, res) => {
 	const { showId, episodeNumber, mode = 'sub' } = req.query;
 	const cacheKey = `video-${showId}-${episodeNumber}-${mode}`;
 	
@@ -382,7 +380,7 @@ app.get('/video', async (req, res) => {
 	}
 });
 
-app.get('/image-proxy', async (req, res) => {
+app.get('/api/image-proxy', async (req, res) => {
     try {
         const { data, headers } = await axios({
             method: 'get',
@@ -400,7 +398,7 @@ app.get('/image-proxy', async (req, res) => {
     }
 });
 
-app.get('/proxy', async (req, res) => {
+app.get('/api/proxy', async (req, res) => {
     const requestId = crypto.randomBytes(4).toString('hex');
     //console.log(`\n--- [${requestId}] /proxy: NEW REQUEST ---`);
     //console.log(`[${requestId}] /proxy: Request URL: ${req.originalUrl}`);
@@ -431,7 +429,7 @@ app.get('/proxy', async (req, res) => {
             const baseUrl = new URL(url);
             const rewritten = response.data.split('\n').map(l =>
                 (l.trim().length > 0 && !l.startsWith('#'))
-                    ? `/proxy?url=${encodeURIComponent(new URL(l, baseUrl).href)}&referer=${encodeURIComponent(dynamicReferer || referer)}`
+                    ? `/api/proxy?url=${encodeURIComponent(new URL(l, baseUrl).href)}&referer=${encodeURIComponent(dynamicReferer || referer)}`
                     : l
             ).join('\n');
             res.set('Content-Type', 'application/vnd.apple.mpegurl').send(rewritten);
@@ -496,7 +494,7 @@ app.get('/proxy', async (req, res) => {
     }
 });
 
-app.get('/subtitle-proxy', async (req, res) => {
+app.get('/api/subtitle-proxy', async (req, res) => {
     try {
         const response = await axios.get(req.query.url, { responseType: 'text', timeout: 10000 });
         res.set('Content-Type', 'text/vtt; charset=utf-8').send(response.data);
@@ -519,7 +517,7 @@ app.get('/api/profiles/:id', (req, res) => {
     });
 });
 
-app.get('/schedule-info/:showId', async (req, res) => {
+app.get('/api/schedule-info/:showId', async (req, res) => {
     const { showId } = req.params;
     const cacheKey = `schedule-info-${showId}`;
     if (apiCache.has(cacheKey)) {
@@ -632,7 +630,7 @@ app.delete('/api/profiles/:id', (req, res) => {
     });
 });
 
-app.post('/import/mal-xml', async (req, res) => {
+app.post('/api/import/mal-xml', async (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const { xml, erase } = req.body;
@@ -674,7 +672,7 @@ app.post('/import/mal-xml', async (req, res) => {
         res.json({ imported: importedCount, skipped: skippedCount });
     });
 });
-app.post('/watchlist/add', (req, res) => {
+app.post('/api/watchlist/add', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const { id, name, thumbnail, status } = req.body;
@@ -684,7 +682,7 @@ app.post('/watchlist/add', (req, res) => {
         (err) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
     );
 });
-app.get('/watchlist/check/:showId', (req, res) => {
+app.get('/api/watchlist/check/:showId', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     db.get('SELECT EXISTS(SELECT 1 FROM watchlist WHERE profile_id = ? AND id = ?) as inWatchlist',
@@ -692,7 +690,7 @@ app.get('/watchlist/check/:showId', (req, res) => {
         (err, row) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ inWatchlist: !!row.inWatchlist })
     );
 });
-app.post('/watchlist/status', (req, res) => {
+app.post('/api/watchlist/status', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const { id, status } = req.body;
@@ -701,7 +699,7 @@ app.post('/watchlist/status', (req, res) => {
         (err) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
     );
 });
-app.get('/watchlist', (req, res) => {
+app.get('/api/watchlist', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
 
@@ -725,7 +723,7 @@ app.get('/watchlist', (req, res) => {
         (err, rows) => err ? res.status(500).json({ error: 'DB error' }) : res.json(rows)
     );
 });
-app.post('/watchlist/remove', (req, res) => {
+app.post('/api/watchlist/remove', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     db.run(`DELETE FROM watchlist WHERE profile_id = ? AND id = ?`,
@@ -734,7 +732,7 @@ app.post('/watchlist/remove', (req, res) => {
     );
 });
 
-app.post('/update-progress', (req, res) => {
+app.post('/api/update-progress', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const { showId, episodeNumber, currentTime, duration, showName, showThumbnail } = req.body;
@@ -753,7 +751,7 @@ app.post('/update-progress', (req, res) => {
     });
 });
 
-app.get('/episode-progress/:showId/:episodeNumber', (req, res) => {
+app.get('/api/episode-progress/:showId/:episodeNumber', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const { showId, episodeNumber } = req.params;
@@ -765,7 +763,7 @@ app.get('/episode-progress/:showId/:episodeNumber', (req, res) => {
     });
 });
 
-app.get('/watched-episodes/:showId', (req, res) => {
+app.get('/api/watched-episodes/:showId', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     db.all(`SELECT episodeNumber FROM watched_episodes WHERE profile_id = ? AND showId = ?`,
@@ -774,7 +772,7 @@ app.get('/watched-episodes/:showId', (req, res) => {
     );
 });
 
-app.get('/continue-watching', (req, res) => {
+app.get('/api/continue-watching', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const query = `
@@ -830,7 +828,7 @@ app.get('/continue-watching', (req, res) => {
 });
 
 
-app.get('/skip-times/:showId/:episodeNumber', async (req, res) => {
+app.get('/api/skip-times/:showId/:episodeNumber', async (req, res) => {
     const { showId, episodeNumber } = req.params;
     const cacheKey = `skip-${showId}-${episodeNumber}`;
     const notFoundResponse = { found: false, results: [] };
@@ -867,7 +865,7 @@ app.get('/skip-times/:showId/:episodeNumber', async (req, res) => {
     }
 });
 
-app.post('/continue-watching/remove', (req, res) => {
+app.post('/api/continue-watching/remove', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const { showId } = req.body;
@@ -877,7 +875,7 @@ app.post('/continue-watching/remove', (req, res) => {
     );
 });
 
-app.get('/settings/:key', (req, res) => {
+app.get('/api/settings/:key', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     db.get('SELECT value FROM settings WHERE profile_id = ? AND key = ?', [profileId, req.params.key], (err, row) => {
@@ -885,7 +883,7 @@ app.get('/settings/:key', (req, res) => {
         res.json({ value: row ? row.value : null });
     });
 });
-app.post('/settings', (req, res) => {
+app.post('/api/settings', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const { key, value } = req.body;
@@ -894,7 +892,7 @@ app.post('/settings', (req, res) => {
         res.json({ success: true });
     });
 });
-app.get('/backup-db', (req, res) => {
+app.get('/api/backup-db', (req, res) => {
    res.download(dbPath, 'ani-web-backup.db', (err) => {
       if (err) {
          console.error("Error sending database file:", err);
@@ -902,7 +900,7 @@ app.get('/backup-db', (req, res) => {
       }
    });
 });
-app.post('/restore-db', dbUpload.single('dbfile'), (req, res) => {
+app.post('/api/restore-db', dbUpload.single('dbfile'), (req, res) => {
    if (!req.file) {
       return res.status(400).json({ error: 'No database file uploaded.' });
    }
@@ -924,7 +922,7 @@ app.post('/restore-db', dbUpload.single('dbfile'), (req, res) => {
    });
 });
 
-app.post('/rclone-upload', (req, res) => {
+app.post('/api/rclone-upload', (req, res) => {
     const script = process.platform === 'win32' ? 'upload_db.bat' : './upload_db.sh';
     exec(script, (error, stdout, stderr) => {
         if (error) {
@@ -935,7 +933,7 @@ app.post('/rclone-upload', (req, res) => {
     });
 });
 
-app.post('/rclone-download', (req, res) => {
+app.post('/api/rclone-download', (req, res) => {
     db.close((err) => {
         if (err) {
             console.error('Failed to close database before rclone download:', err.message);
@@ -956,4 +954,4 @@ app.post('/rclone-download', (req, res) => {
         });
     });
 });
-app.listen(port, () => console.log(`Server running at http://localhost:${port}`));
+app.listen(port);

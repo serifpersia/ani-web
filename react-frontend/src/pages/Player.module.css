@@ -1,0 +1,803 @@
+:root {
+    --dark-watched-color: #034e46;
+    --light-watched-color: #a7d9d0; /* A lighter, desaturated version of the dark watched color */
+}
+
+
+.playerPage {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.controls {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap; /* Allow controls to wrap on smaller screens */
+}
+
+.playerActions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap; /* Allow controls to wrap on smaller screens */
+}
+
+.seekBtn {
+    background-color: var(--dark-bg-secondary);
+    color: var(--dark-text);
+    border: 1px solid var(--dark-border);
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+body.light .seekBtn {
+    background-color: var(--light-bg-secondary);
+    color: var(--light-text);
+    border-color: var(--light-border);
+}
+
+.seekBtn:hover {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+.toggleContainer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.watchlistBtn {
+    background-color: var(--dark-bg-secondary);
+    color: var(--dark-text);
+    border: 1px solid var(--dark-border);
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+body.light .watchlistBtn {
+    background-color: var(--light-bg-secondary);
+    color: var(--light-text);
+    border-color: var(--light-border);
+}
+
+.watchlistBtn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.watchlistBtn.inList {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+.videoContainer {
+    position: relative;
+    width: 100%;
+    padding-top: 56.25%; /* 16:9 Aspect Ratio */
+    background-color: black;
+    margin-bottom: 2rem;
+}
+
+.controlsOverlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 1;
+    transition: opacity 0.3s ease-in-out;
+    z-index: 50;
+    pointer-events: none; /* Allow clicks to pass through */
+}
+
+.controlsOverlay > * {
+    pointer-events: auto; /* Make direct children clickable */
+}
+
+.controlsOverlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.centerPlayPause {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid white;
+    color: white;
+    border-radius: 50%;
+    width: 80px;
+    height: 80px;
+    font-size: 2.5rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    padding: 0;
+    padding-left: 10px; /* Optical adjustment for play icon */
+}
+
+.centerPlayPause:hover {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+.bottomControls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 10px 20px;
+    display: flex;
+    flex-direction: column; /* Stack progress bar on top of controls */
+    gap: 0.5rem;
+    background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);
+}
+
+.progressBarContainer {
+    width: 100%;
+    padding: 10px 0;
+    cursor: pointer;
+    position: relative;
+}
+
+.progressBar {
+    width: 100%;
+    height: 4px;
+    background-color: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    position: relative;
+    transition: height 0.2s;
+}
+
+.progressBarContainer:hover .progressBar {
+    height: 8px;
+}
+
+.watchedBar, .bufferedBar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    border-radius: 2px;
+}
+
+.watchedBar {
+    background-color: var(--accent);
+    z-index: 2;
+}
+
+.bufferedBar {
+    background-color: rgba(255, 255, 255, 0.5);
+    z-index: 1;
+}
+
+.thumb {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    width: 16px;
+    height: 16px;
+    background-color: white;
+    border-radius: 50%;
+    z-index: 3;
+    transition: transform 0.2s;
+}
+
+.progressBarContainer:hover .thumb {
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.timeBubble {
+    position: absolute;
+    bottom: 30px; /* Position above the bar */
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+}
+
+.progressBarContainer:hover .timeBubble {
+    opacity: 1;
+}
+
+.bottomControlsRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.controlBtn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.controlBtn:hover {
+    transform: scale(1.1);
+    color: var(--accent);
+}
+
+.timeDisplay {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.leftControls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.volumeContainer {
+    display: flex;
+    align-items: center;
+}
+
+.volumeContainer:hover .volumeSlider {
+    width: 80px;
+    opacity: 1;
+}
+
+.volumeSlider {
+    width: 0;
+    opacity: 0;
+    transition: width 0.3s, opacity 0.3s;
+    cursor: pointer;
+    margin-left: 0.5rem;
+}
+
+.rightControls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.videoContainer:-webkit-full-screen .controlsOverlay {
+    z-index: 2147483647;
+}
+
+.videoContainer video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.sourceSelector {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.sourceGroup {
+    background-color: var(--dark-bg-secondary);
+    padding: 1rem;
+    border-radius: var(--card-border-radius);
+}
+
+body.light .sourceGroup {
+    background-color: var(--light-bg-secondary);
+}
+
+.sourceGroup h4 {
+    margin-top: 0;
+    margin-bottom: 0.8rem;
+    color: var(--dark-text);
+}
+
+body.light .sourceGroup h4 {
+    color: var(--light-text);
+}
+
+.qualityList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.qualityItem {
+    background-color: var(--dark-bg-primary);
+    color: var(--dark-text-secondary);
+    border: 1px solid var(--dark-border);
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+body.light .qualityItem {
+    background-color: var(--light-bg-primary);
+    color: var(--light-text-secondary);
+    border-color: var(--light-border);
+}
+
+.qualityItem.active {
+    background-color: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    font-weight: 600;
+}
+
+.contentLayout {
+    display: block;
+    margin-top: 1.5rem;
+}
+
+.descriptionBox {
+    background-color: var(--dark-bg-secondary);
+    padding: 1.5rem;
+    border-radius: var(--card-border-radius);
+    margin-bottom: 1.5rem; /* Add space below description */
+}
+
+body.light .descriptionBox {
+    background-color: var(--light-bg-secondary);
+}
+
+.episodeListContainer h3 {
+    margin-top: 0;
+}
+
+.episodeList {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 1rem;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+
+.episodeItem {
+    background-color: var(--dark-bg-secondary);
+    color: var(--dark-text);
+    border: 1px solid var(--dark-border);
+    padding: 0.75rem;
+    border-radius: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+
+.episodeItem:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    border-color: var(--accent);
+}
+
+body.light .episodeItem {
+    background-color: var(--light-bg-secondary);
+    color: var(--light-text);
+    border-color: var(--light-border);
+}
+
+.episodeItem.active {
+    background-color: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    font-weight: 600;
+}
+
+.episodeItem.watched {
+    background-color: var(--dark-watched-color);
+    border-color: var(--dark-watched-color);
+    color: #fff; /* Ensure text is readable */
+}
+
+body.light .episodeItem.watched {
+    background-color: var(--light-watched-color);
+    border-color: var(--light-watched-color);
+    color: var(--light-text); /* Adjust text color for light background */
+}
+
+.epJumpControls {
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    background-color: var(--dark-bg-secondary);
+    border-radius: var(--card-border-radius);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+body.light .epJumpControls {
+    background-color: var(--light-bg-secondary);
+}
+
+.epRangeButtons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.epRangeBtn {
+    background-color: var(--dark-bg-primary);
+    color: var(--dark-text);
+    border: 1px solid var(--dark-border);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.85rem;
+}
+
+body.light .epRangeBtn {
+    background-color: var(--light-bg-primary);
+    color: var(--light-text);
+    border-color: var(--light-border);
+}
+
+.epRangeBtn:hover {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+.epJumpInputGroup {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.epJumpInputGroup input {
+    flex-grow: 1;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    border: 1px solid var(--dark-border);
+    background-color: var(--dark-bg-primary);
+    color: var(--dark-text);
+}
+
+body.light .epJumpInputGroup input {
+    border-color: var(--light-border);
+    background-color: var(--light-bg-primary);
+    color: var(--light-text);
+}
+
+.epJumpInputGroup button {
+    background-color: var(--accent);
+    color: #fff;
+    border: 1px solid var(--accent);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.epJumpInputGroup button:hover {
+    opacity: 0.9;
+}
+
+.ccMenuContainer {
+    position: relative;
+}
+
+.settingsMenuContainer {
+    position: relative;
+}
+
+.settingsMenu {
+    position: absolute;
+    bottom: 100%; /* Position above the controls */
+    right: 0;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 1rem;
+    border-radius: 8px;
+    width: 250px;
+    margin-bottom: 10px;
+    z-index: 60;
+    transform: translateX(0);
+}
+
+.settingsMenuContainer .settingsMenu {
+    right: 0;
+    transform: translateX(0);
+}
+
+.ccMenuContainer .settingsMenu {
+    right: 0;
+    transform: translateX(0);
+}
+
+.sourceMenuContainer .settingsMenu {
+    right: 0;
+    transform: translateX(0);
+}
+
+.ccDivider {
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.3);
+    margin: 1rem 0;
+}
+
+.ccSliderContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.ccSliderContainer label {
+    font-size: 0.9rem;
+}
+
+.ccSliderContainer input[type="range"] {
+    width: 100%;
+}
+
+.ccSliderContainer span {
+    font-size: 0.8rem;
+    text-align: right;
+}
+
+.ccOptionsContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.ccItem {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid transparent;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.ccItem:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.ccItem.active {
+    background-color: var(--accent);
+    border-color: var(--accent);
+}
+
+.ccItem.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.mobileControls {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: var(--dark-bg-secondary);
+    border-radius: var(--card-border-radius);
+}
+
+body.light .mobileControls {
+    background-color: var(--light-bg-secondary);
+}
+
+.sourceQualityControls {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.sourceSelection h4, .qualitySelection h4 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+}
+
+.sourceButtons, .qualityButtons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.sourceButton, .qualityButton {
+    background-color: var(--dark-bg-primary);
+    color: var(--dark-text-secondary);
+    border: 1px solid var(--dark-border);
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+body.light .sourceButton, body.light .qualityButton {
+    background-color: var(--light-bg-primary);
+    color: var(--light-text-secondary);
+    border-color: var(--light-border);
+}
+
+.sourceButton.active, .qualityButton.active {
+    background-color: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .contentLayout {
+        grid-template-columns: 1fr;
+    }
+
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .bottomControls {
+        padding: 5px 10px;
+    }
+
+    .bottomControlsRow {
+        flex-wrap: wrap; /* Allow controls to wrap */
+        gap: 0.5rem; /* Add gap between wrapped items */
+    }
+
+    .leftControls, .rightControls {
+        flex-basis: 100%; /* Make each take full width */
+        justify-content: space-around; /* Distribute items evenly */
+        gap: 0.5rem;
+    }
+
+    .rightControls {
+        order: -1; /* Move right controls (settings) to the top row */
+    }
+
+    .timeDisplay {
+        flex-basis: auto; /* Allow time to not take full width */
+        order: -1; /* Move time to the beginning of the left controls */
+        font-size: 0.8rem;
+    }
+
+    .volumeContainer:hover .volumeSlider {
+        width: 0; /* Keep it hidden on hover for mobile */
+        opacity: 0;
+    }
+
+    .volumeContainer.open .volumeSlider {
+        width: 80px; /* Show slider when container has 'open' class */
+        opacity: 1;
+    }
+
+    .controlBtn {
+        font-size: 1.2rem; /* Smaller buttons */
+    }
+
+    .centerPlayPause {
+        width: 60px;
+        height: 60px;
+        font-size: 2rem;
+    }
+
+    .settingsMenu {
+        width: 200px; /* Narrower menu */
+        padding: 0.8rem;
+    }
+
+    .seekBtn {
+        padding: 0.5rem 1rem;
+    }
+
+    .watchlistBtn {
+        padding: 0.5rem 1rem;
+    }
+}
+
+.sourceMenuContainer {
+    position: relative;
+}
+
+.sourceGroupInMenu {
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sourceGroupInMenu:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.sourceGroupInMenu h5 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    color: white;
+}
+
+.qualityListInMenu {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.qualityItemInMenu {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid transparent;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.8rem;
+}
+
+.qualityItemInMenu:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.qualityItemInMenu.active {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    font-weight: 600;
+}
+
+.skipSegment {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    opacity: 0.5;
+    z-index: 1; /* Below watchedBar */
+}
+
+.skipSegment.op, .skipSegment.mixed_op {
+    background-color: #ffc107; /* Yellow for opening */
+}
+
+.skipSegment.ed, .skipSegment.mixed_ed {
+    background-color: #00bcd4; /* Cyan for ending */
+}
+
+.skipSegment.recap, .skipSegment.mixed_recap {
+    background-color: #9c27b0; /* Purple for recap */
+}
+
+.middleControls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}

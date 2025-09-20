@@ -1,0 +1,36 @@
+
+.hamburgerBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 30px;
+  height: 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0;
+  z-index: 1200; /* Ensure it's above sidebar overlay */
+}
+
+.hamburgerBtn span {
+  display: block;
+  height: 3px;
+  width: 100%;
+  border-radius: 3px;
+  transition: all 0.3s ease-in-out;
+  background-color: var(--light-text);
+}
+
+
+
+.hamburgerBtn.open span:nth-child(1) {
+  transform: rotate(45deg) translate(7px, 7px);
+}
+
+.hamburgerBtn.open span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburgerBtn.open span:nth-child(3) {
+  transform: rotate(-45deg) translate(7px, -7px);
+}

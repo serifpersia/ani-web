@@ -1,0 +1,56 @@
+
+.skeletonCard {
+    border-radius: var(--card-border-radius);
+    overflow: hidden;
+    background-color: var(--dark-bg-secondary);
+    display: flex;
+    flex-direction: column;
+}
+
+body.light .skeletonCard {
+    background-color: var(--light-bg-secondary);
+}
+
+.poster {
+    height: 250px;
+    width: 100%;
+    background-color: var(--dark-border);
+    animation: pulse 1.5s infinite ease-in-out;
+}
+
+body.light .poster {
+    background-color: var(--light-border);
+}
+
+.info {
+    padding: 1rem;
+}
+
+.line {
+    height: 20px;
+    border-radius: 4px;
+    background-color: var(--dark-border);
+    animation: pulse 1.5s infinite ease-in-out;
+}
+
+body.light .line {
+    background-color: var(--light-border);
+}
+
+.line.short {
+    width: 60%;
+    margin-top: 0.5rem;
+    height: 16px;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.6;
+    }
+    100% {
+        opacity: 1;
+    }
+}
