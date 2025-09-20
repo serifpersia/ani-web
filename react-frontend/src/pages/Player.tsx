@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 // import Hls from 'hls.js'; // Removed static import
 import styles from './Player.module.css';
 import ToggleSwitch from '../components/common/ToggleSwitch';
-import { FaCheck, FaPlus, FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaCompress, FaClosedCaptioning, FaList } from 'react-icons/fa';
+import { FaCheck, FaPlus, FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaVolumeDown, FaVolumeOff, FaExpand, FaCompress, FaClosedCaptioning, FaList } from 'react-icons/fa';
 import { formatTime } from '../lib/utils';
 import ResumeModal from '../components/common/ResumeModal';
 import useIsMobile from '../hooks/useIsMobile';
@@ -131,6 +131,10 @@ const Player: React.FC = () => {
     videoRef.current.muted = newVolume === 0;
     setIsMuted(newVolume === 0);
     localStorage.setItem('playerVolume', newVolume.toString());
+    // Set CSS custom property for volume fill
+    if (e.target) {
+      (e.target as HTMLElement).style.setProperty('--volume-percent', newVolume.toString());
+    }
   };
 
   const toggleMute = () => {
@@ -144,6 +148,18 @@ const Player: React.FC = () => {
         setVolume(newVolume);
     }
     localStorage.setItem('playerMuted', newMuted.toString());
+  };
+
+  const renderVolumeIcon = () => {
+    if (isMuted) {
+      return <FaVolumeMute />;
+    } else if (volume === 0) {
+      return <FaVolumeOff />;
+    } else if (volume < 0.5) {
+      return <FaVolumeDown />;
+    } else {
+      return <FaVolumeUp />;
+    }
   };
 
   const toggleFullscreen = () => {
@@ -161,12 +177,13 @@ const Player: React.FC = () => {
     const savedMute = localStorage.getItem('playerMuted') === 'true';
     const initialVolume = savedVolume ? parseFloat(savedVolume) : 1;
     setVolume(initialVolume);
-    setIsMuted(savedMute);
+    // Only apply muted state if volume is 0, otherwise unmute by default
     if (videoRef.current) {
         videoRef.current.volume = initialVolume;
-        videoRef.current.muted = savedMute;
+        videoRef.current.muted = (initialVolume === 0) ? savedMute : false; // Only mute if volume is 0
+        setIsMuted(videoRef.current.muted); // Ensure state reflects actual muted status
     }
-  }, []);
+  }, [showId, currentEpisode]);
 
   // Effect to fetch show metadata, episode list, and watched status
   useEffect(() => {
@@ -458,7 +475,7 @@ const Player: React.FC = () => {
             window.clearTimeout(inactivityTimer.current);
         }
     };
-  }, [isPlaying, isMobile]);
+  }, [isPlaying, isMobile, showId, currentEpisode]);
 
   // Effect to handle fullscreen changes
   useEffect(() => {
@@ -903,7 +920,7 @@ const Player: React.FC = () => {
                     <div className={styles.leftControls}>
                         <button className={styles.controlBtn} onClick={togglePlay}>{isPlaying ? <FaPause /> : <FaPlay />}</button>
                         <div className={styles.volumeContainer}>
-                            <button className={styles.controlBtn} onClick={toggleMute}>{isMuted || volume === 0 ? <FaVolumeMute /> : <FaVolumeUp />}</button>
+                            <button className={styles.controlBtn} onClick={toggleMute}>{renderVolumeIcon()}</button>
                             <input 
                                 type="range" 
                                 min="0" 
@@ -968,12 +985,30 @@ const Player: React.FC = () => {
                                     <h4>Subtitle Settings</h4>
                                     <div className={styles.ccSliderContainer}>
                                         <label htmlFor="fontSizeSlider">Font Size</label>
-                                        <input type="range" id="fontSizeSlider" min="1" max="3" step="0.1" value={subtitleFontSize} onChange={handleSubtitleFontSizeChange} />
+                                        <input 
+                                            type="range" 
+                                            id="fontSizeSlider" 
+                                            min="1" 
+                                            max="3" 
+                                            step="0.1" 
+                                            value={subtitleFontSize} 
+                                            onChange={handleSubtitleFontSizeChange}
+                                            style={{ '--slider-percent': ((subtitleFontSize - 1) / (3 - 1)).toString() } as React.CSSProperties}
+                                        />
                                         <span>{subtitleFontSize.toFixed(1)}</span>
                                     </div>
                                     <div className={styles.ccSliderContainer}>
                                         <label htmlFor="positionSlider">Position</label>
-                                        <input type="range" id="positionSlider" min="-10" max="0" step="1" value={subtitlePosition} onChange={handleSubtitlePositionChange} />
+                                        <input 
+                                            type="range" 
+                                            id="positionSlider" 
+                                            min="-10" 
+                                            max="0" 
+                                            step="1" 
+                                            value={subtitlePosition} 
+                                            onChange={handleSubtitlePositionChange}
+                                            style={{ '--slider-percent': ((subtitlePosition - (-10)) / (0 - (-10))).toString() } as React.CSSProperties}
+                                        />
                                         <span>{subtitlePosition}</span>
                                     </div>
                                 </div>

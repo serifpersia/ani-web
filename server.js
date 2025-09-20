@@ -1,5 +1,6 @@
 const express = require('express');
 const axios = require('axios');
+const axiosRetry = require('axios-retry').default;
 const sqlite3 = require('sqlite3').verbose();
 const { parseString } = require('xml2js');
 const { exec } = require('child_process');
@@ -13,6 +14,15 @@ const port = 3000;
 const apiCache = new NodeCache({ stdTTL: 3600 });
 const dbPath = path.join(__dirname, 'anime.db');
 let db;
+
+axiosRetry(axios, {
+    retries: 3, // Number of retry attempts
+    retryDelay: axiosRetry.exponentialDelay, // Exponential back-off
+    retryCondition: (error) => {
+        // Retry on network errors or 5xx HTTP errors
+        return axiosRetry.isNetworkError(error) || axiosRetry.isRetryableError(error);
+    },
+});
 
 const profilePicsDir = path.join(__dirname, 'public', 'profile_pics');
 if (!fs.existsSync(profilePicsDir)) {

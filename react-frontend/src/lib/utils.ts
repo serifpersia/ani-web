@@ -1,7 +1,7 @@
 const thumbnailCache = new Map<string, string>();
 
 export const fixThumbnailUrl = (url: string | undefined): string => {
-  if (!url) return '/placeholder.png';
+  if (!url || url.trim() === '') return '/placeholder.png'; // Handle undefined or empty/whitespace URLs
   if (thumbnailCache.has(url)) return thumbnailCache.get(url)!; // Use '!' because we know it exists
   const proxiedUrl = `/api/image-proxy?url=${encodeURIComponent(url)}`;
   thumbnailCache.set(url, proxiedUrl);
