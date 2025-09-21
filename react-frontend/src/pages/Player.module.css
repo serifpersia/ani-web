@@ -898,5 +898,5 @@ body.light .sourceButton, body.light .qualityButton {
 .middleControls {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.1rem;
 }

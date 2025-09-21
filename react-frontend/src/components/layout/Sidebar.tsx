@@ -13,8 +13,7 @@ const Sidebar: React.FC = () => {
   return (
     <>
       <aside 
-        className={`${styles.sidebar} sidebar`}
-        style={{ transform: isSidebarOpen ? 'translateX(0)' : 'translateX(-100%)' }}
+        className={`${styles.sidebar} ${isSidebarOpen ? styles.open : ''} sidebar`}
       >
         <button className={`${styles.closeBtn} closeBtn`} onClick={closeSidebar} aria-label="Close menu">&times;</button>
         <nav>

@@ -30,6 +30,8 @@ const Search: React.FC = () => {
     const [season, setSeason] = useState(searchParams.get('season') || 'ALL');
     const [year, setYear] = useState(searchParams.get('year') || 'ALL');
     const [sort, setSort] = useState(searchParams.get('sort') || 'Recent');
+    const [country, setCountry] = useState(searchParams.get('country') || 'ALL');
+    const [translation, setTranslation] = useState(searchParams.get('translation') || 'sub');
 
     const performSearch = async (isNewSearch: boolean) => {
         if (isLoading && !isNewSearch) return; // Prevent multiple loads for infinite scroll, but allow new search while loading
@@ -46,10 +48,12 @@ const Search: React.FC = () => {
 
         const params = new URLSearchParams({
             query: query,
-            type: type,
+            type: Array.isArray(type) ? type.join(',') : type,
             season: season,
             year: year,
             sortBy: sort,
+            country: country,
+            translation: translation,
             page: currentPage.toString(),
         });
 
@@ -99,7 +103,7 @@ const Search: React.FC = () => {
     }, [isLoading]);
 
     const handleSearch = () => {
-        setSearchParams({ query, type, season, year, sort });
+        setSearchParams({ query, type, season, year, sort, country, translation });
         performSearch(true);
     };
 
@@ -124,9 +128,12 @@ const Search: React.FC = () => {
                 <select value={type} onChange={e => setType(e.target.value)} className="form-input">
                     <option value="ALL">Type: All</option>
                     <option value="TV">TV</option>
-                    <option value="MOVIE">Movie</option>
+                    <option value="Movie">Movie</option>
                     <option value="OVA">OVA</option>
+                    <option value="ONA">ONA</option>
+                    <option value="Special">Special</option>
                 </select>
+
                 <select value={season} onChange={e => setSeason(e.target.value)} className="form-input">
                     <option value="ALL">Season: All</option>
                     <option value="Winter">Winter</option>
@@ -141,6 +148,16 @@ const Search: React.FC = () => {
                     <option value="Recent">Sort: Recent</option>
                     <option value="Popularity">Popularity</option>
                     <option value="Title">Title</option>
+                </select>
+                <select value={country} onChange={e => setCountry(e.target.value)} className="form-input">
+                    <option value="ALL">Country: All</option>
+                    <option value="JP">Japan</option>
+                    <option value="CN">China</option>
+                    <option value="KR">Korea</option>
+                </select>
+                <select value={translation} onChange={e => setTranslation(e.target.value)} className="form-input">
+                    <option value="sub">Sub</option>
+                    <option value="dub">Dub</option>
                 </select>
                 <button onClick={handleSearch} className="btn-primary">Search</button>
             </div>
