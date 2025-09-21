@@ -21,8 +21,12 @@ const RcloneSync: React.FC = () => {
       }
       setModalMessage('Database uploaded successfully.');
       setModalType('success');
-    } catch (error: any) {
-      setModalMessage(`Upload failed: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setModalMessage(`Upload failed: ${error.message}`);
+      } else {
+        setModalMessage('Upload failed: An unknown error occurred.');
+      }
       setModalType('error');
     } finally {
       setLoading(false);
@@ -43,8 +47,12 @@ const RcloneSync: React.FC = () => {
       setModalMessage('Database downloaded successfully. Reloading page...');
       setModalType('success');
       setTimeout(() => window.location.reload(), 2000);
-    } catch (error: any) {
-      setModalMessage(`Download failed: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setModalMessage(`Download failed: ${error.message}`);
+      } else {
+        setModalMessage('Download failed: An unknown error occurred.');
+      }
       setModalType('error');
     } finally {
       setLoading(false);

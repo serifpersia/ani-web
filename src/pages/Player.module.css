@@ -19,6 +19,45 @@
     margin-bottom: 1rem;
 }
 
+.titleContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.scheduleInfo {
+    display: flex;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+    color: var(--dark-text-secondary);
+}
+
+body.light .scheduleInfo {
+    color: var(--light-text-secondary);
+}
+
+.status {
+    background-color: var(--accent);
+    color: #fff;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.nextEpisode {
+    background-color: var(--dark-bg-primary);
+    color: var(--dark-text);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+body.light .nextEpisode {
+    background-color: var(--light-bg-primary);
+    color: var(--light-text);
+}
+
 .controls {
     display: flex;
     align-items: center;

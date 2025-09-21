@@ -100,6 +100,8 @@ const Player: React.FC = () => {
   const [loadingShowData, setLoadingShowData] = useState(true);
   const [loadingVideo, setLoadingVideo] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nextEpisodeAirDate, setNextEpisodeAirDate] = useState<string | null>(null);
+  const [animeStatus, setAnimeStatus] = useState<string | null>(null);
 
   const fetchWithProfile = async (url: string, options: RequestInit = {}) => {
     const activeProfileId = '1';
@@ -385,7 +387,7 @@ const Player: React.FC = () => {
         hlsInstance.current.destroy();
       }
     };
-  }, [selectedSource, selectedLink, isAutoplayEnabled, setPreferredSource]);
+  }, [selectedSource, selectedLink, isAutoplayEnabled]);
 
   useEffect(() => {
     const videoElement = videoRef.current;
@@ -524,6 +526,25 @@ const Player: React.FC = () => {
     }
     setShowResumeModal(false);
   };
+
+  useEffect(() => {
+    const fetchNextEpisodeInfo = async () => {
+      if (!showId) return;
+      try {
+        const response = await fetch(`/api/schedule-info/${showId}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        setNextEpisodeAirDate(data.nextEpisodeAirDate || null);
+        setAnimeStatus(data.status || null);
+      } catch (error) {
+        console.error(`[DEBUG] Error fetching next episode info for ${showId}:`, error);
+      }
+    };
+
+    fetchNextEpisodeInfo();
+  }, [showId]);
 
   useEffect(() => {
     const videoElement = videoRef.current;
@@ -839,8 +860,17 @@ const Player: React.FC = () => {
             onStartOver={handleStartOver}
         />
       <div className={styles.header}>
-        <h2>{showMeta.name}</h2>
+        <div className={styles.titleContainer}>
+          <h2>{showMeta.name}</h2>
+          {(animeStatus || nextEpisodeAirDate) && (
+            <div className={styles.scheduleInfo}>
+              {animeStatus && <span className={styles.status}>{animeStatus}</span>}
+              {nextEpisodeAirDate && <span className={styles.nextEpisode}>Next: {nextEpisodeAirDate}</span>}
+            </div>
+          )}
+        </div>
         <div className={styles.controls}>
+            <button className={styles.watchlistBtn} onClick={() => navigate('/settings')}>Settings</button>
             <button className={`${styles.watchlistBtn} ${inWatchlist ? styles.inList : ''}`} onClick={toggleWatchlist}>
               {inWatchlist ? <FaCheck /> : <FaPlus />}
               {inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}

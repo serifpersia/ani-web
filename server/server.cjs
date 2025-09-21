@@ -594,7 +594,7 @@ app.get('/api/schedule-info/:showId', async (req, res) => {
 
             if (status === 'Ongoing') {
                 const pageResponse = await axios.get(`https://animeschedule.net/anime/${firstResult.route}`, { timeout: 10000 });
-                const countdownMatch = pageResponse.data.match(/countdown-time\\" datetime=\\"([^\\]*)\\\"/);
+                const countdownMatch = pageResponse.data.match(/countdown-time" datetime="([^"]*)"/);
                 if (countdownMatch) {
                     nextEpisodeAirDate = countdownMatch[1];
                 }
