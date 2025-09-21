@@ -407,20 +407,63 @@ app.get('/api/video', async (req, res) => {
 
 app.get('/api/image-proxy', async (req, res) => {
     try {
-        const { data, headers } = await axios({
+        const axiosConfig = {
             method: 'get',
             url: req.query.url,
             responseType: 'stream',
-            headers: { Referer: apiBaseUrl, 'User-Agent': userAgent },
+            headers: { Referer: apiBaseUrl, 'User-Agent': userAgent }, // Use server's userAgent for external request
             timeout: 10000,
-            maxRedirects: 5 // Explicitly follow redirects
-        });
+            maxRedirects: 5
+        };
+
+        const { data: streamData, headers: originalHeaders } = await axios(axiosConfig);
+
+        const contentType = originalHeaders['content-type'] && typeof originalHeaders['content-type'] === 'string'
+            ? originalHeaders['content-type']
+            : (function() {
+                const url = req.query.url;
+                const extensionMatch = url.match(/\.([a-zA-Z0-9]+)(?:[\?#]|$)/);
+                if (extensionMatch && extensionMatch[1]) {
+                    const ext = extensionMatch[1].toLowerCase();
+                    switch (ext) {
+                        case 'png': return 'image/png';
+                        case 'jpg':
+                        case 'jpeg': return 'image/jpeg';
+                        case 'webp': return 'image/webp';
+                        case 'gif': return 'image/gif';
+                        default: return 'image/webp';
+                    }
+                }
+                return 'image/webp';
+            })();
+
         res.set('Cache-Control', 'public, max-age=604800, immutable');
-        res.set('Content-Type', headers['content-type']);
-        data.pipe(res);
+        res.set('Content-Type', contentType);
+
+        // Robust streaming
+        streamData.pipe(res);
+
+        streamData.on('error', (err) => {
+            console.error('Image proxy stream error (source):', err.message);
+            if (!res.headersSent) {
+                res.status(500).send('Error streaming image.');
+            } else {
+                res.end();
+            }
+        });
+
+        res.on('close', () => {
+            streamData.destroy();
+        });
+
+        res.on('error', (err) => {
+            console.error('Image proxy stream error (response):', err.message);
+            streamData.destroy();
+        });
+
     } catch (e) {
-        console.error('Image proxy error:', e.message); // Log the error for debugging
-        res.status(200).sendFile(path.join(__dirname, '..','public/placeholder.svg')); // Send placeholder with 200 OK
+        console.error('Image proxy error:', e.message);
+        res.status(200).sendFile(path.join(__dirname, '..','public/placeholder.svg'));
     }
 });
 
