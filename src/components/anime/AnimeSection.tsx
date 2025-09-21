@@ -3,6 +3,8 @@ import React from 'react';
 import AnimeCard from './AnimeCard';
 
 // Define the types for the props
+import AnimeCardSkeleton from './AnimeCardSkeleton';
+
 interface Anime {
   _id: string;
   id: string;
@@ -23,28 +25,33 @@ interface AnimeSectionProps {
   animeList: Anime[];
   continueWatching?: boolean;
   onRemove?: (id: string) => void; // <--- Add this prop
+  loading?: boolean; // New loading prop
 }
 
-const AnimeSection: React.FC<AnimeSectionProps> = ({ title, animeList, continueWatching = false, onRemove }) => { // <--- Destructure onRemove
+const AnimeSection: React.FC<AnimeSectionProps> = ({ title, animeList, continueWatching = false, onRemove, loading }) => {
   const handleRemoveCard = (id: string) => {
-    if (onRemove) { // <--- Call the passed onRemove prop
+    if (onRemove) {
       onRemove(id);
     }
-    console.log("Remove card event dispatched for id:", id); // Keep for debugging if needed, but main logic moves to parent
+    console.log("Remove card event dispatched for id:", id);
   };
 
   return (
     <section>
       <h2 className="section-title">{title}</h2>
       <div className="grid-container">
-        {animeList.map(anime => (
-          <AnimeCard 
-            key={anime._id} 
-            anime={anime} 
-            continueWatching={continueWatching} 
-            onRemove={handleRemoveCard} 
-          />
-        ))}
+        {loading ? (
+          Array.from({ length: 10 }).map((_, i) => <AnimeCardSkeleton key={i} />)
+        ) : (
+          animeList.map(anime => (
+            <AnimeCard 
+              key={anime._id} 
+              anime={anime} 
+              continueWatching={continueWatching} 
+              onRemove={handleRemoveCard} 
+            />
+          ))
+        )}
       </div>
     </section>
   );

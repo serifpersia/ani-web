@@ -27,14 +27,7 @@ interface AnimeCardProps {
 }
 
 const AnimeCard: React.FC<AnimeCardProps> = ({ anime, continueWatching = false, onRemove }) => {
-  const [currentImageSrc, setCurrentImageSrc] = React.useState(fixThumbnailUrl(anime.thumbnail));
-  const [imageLoaded, setImageLoaded] = React.useState(false);
   const [isHovered, setIsHovered] = React.useState(false); // New state for hover
-
-  React.useEffect(() => {
-    setCurrentImageSrc(fixThumbnailUrl(anime.thumbnail));
-    setImageLoaded(false);
-  }, [anime.thumbnail]);
 
   const progressPercent = continueWatching && anime.currentTime && anime.duration
     ? (anime.currentTime / anime.duration) * 100
@@ -71,7 +64,6 @@ const AnimeCard: React.FC<AnimeCardProps> = ({ anime, continueWatching = false, 
                               <div className={`${styles.episodeCountItem} ${styles.dubCount}`}><FaMicrophone /> {anime.availableEpisodesDetail.dub.length}</div>
                             )}              </div>
             )}
-        {!imageLoaded && <div className={styles.imagePlaceholder}></div>} {/* Temporary placeholder */}
         {continueWatching && (
           <div className={styles.progressOverlay}>
             <div className={styles.progressBar}>
@@ -93,14 +85,17 @@ const AnimeCard: React.FC<AnimeCardProps> = ({ anime, continueWatching = false, 
           </div>
         )}
         <img 
-          src={currentImageSrc} 
+          src={fixThumbnailUrl(anime.thumbnail)} 
           alt={anime.name} 
-          className={`${styles.posterImg} ${imageLoaded ? styles.loaded : ''}`} 
+          className={styles.posterImg} 
           loading="lazy"
-          onLoad={() => setImageLoaded(true)} /* Set imageLoaded to true on successful load */
-          onError={() => {
-            setCurrentImageSrc('/placeholder.svg'); /* Update state to placeholder */
-            setImageLoaded(true); /* Set imageLoaded to true even if placeholder is loaded */
+          style={{ opacity: 0 }} /* Start hidden */
+          onLoad={(e) => {
+            e.currentTarget.style.opacity = '1'; /* Fade in on load */
+          }}
+          onError={(e) => {
+            e.currentTarget.src = '/placeholder.svg'; /* Fallback to placeholder */
+            e.currentTarget.style.opacity = '1'; /* Ensure placeholder is visible */
           }}
         />
       </div>

@@ -25,35 +25,14 @@
   overflow: hidden; /* Hide overflow from image scaling */
 }
 
-.imagePlaceholder {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: #333; /* Dark grey placeholder */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #888;
-  font-size: 0.8rem;
-  text-align: center;
-  z-index: 1; /* Ensure it's below the image when loaded */
-}
-
 .posterImg {
   width: 100%;
   height: 100%; /* Fill posterContainer */
   object-fit: cover;
-  background-color: #ccc;
+  background-color: #ccc; /* Keep background color for fallback */
   transition: transform 0.5s ease, opacity 0.3s ease; /* Add opacity transition */
-  opacity: 0; /* Start hidden */
   position: relative; /* For z-index */
   z-index: 2; /* Ensure it's above placeholder */
-}
-
-.posterImg.loaded {
-  opacity: 1; /* Show when loaded */
 }
 
 .info {

@@ -33,6 +33,7 @@ const Home: React.FC = () => {
 
   const [loadingLatestReleases, setLoadingLatestReleases] = useState(true);
   const [loadingContinueWatching, setLoadingContinueWatching] = useState(true);
+  const [loadingCurrentSeason, setLoadingCurrentSeason] = useState(true); // New state for initial loading of Current Season
 
   const seasonalState = useRef({ page: 1, isLoading: false, hasMore: true });
 
@@ -88,6 +89,7 @@ const Home: React.FC = () => {
       console.error("Error fetching current season:", error);
     } finally {
       seasonalState.current.isLoading = false;
+      setLoadingCurrentSeason(false);
     }
   };
 
@@ -209,25 +211,18 @@ const Home: React.FC = () => {
     <div>
       <div className="home-container">
         <div className="main-content">
-          {loadingContinueWatching ? (
-            <SkeletonGrid />
-          ) : continueWatchingList.length > 0 && (
-            <AnimeSection 
-              title="Continue Watching" 
-              continueWatching={true} 
-              animeList={continueWatchingList} 
-              onRemove={handleRemoveContinueWatching} // <--- Add this prop
-            />
-          )}
+          <AnimeSection 
+            title="Continue Watching" 
+            continueWatching={true} 
+            animeList={continueWatchingList} 
+            onRemove={handleRemoveContinueWatching} 
+            loading={loadingContinueWatching}
+          />
 
-          {loadingLatestReleases ? (
-            <SkeletonGrid />
-          ) : (
-            <AnimeSection title="Latest Releases" continueWatching={false} animeList={latestReleases} />
-          )}
+          <AnimeSection title="Latest Releases" continueWatching={false} animeList={latestReleases} loading={loadingLatestReleases} />
 
-          <AnimeSection title="Current Season" continueWatching={false} animeList={currentSeason} />
-          {seasonalState.current.isLoading && <SkeletonGrid />}
+          <AnimeSection title="Current Season" continueWatching={false} animeList={currentSeason} loading={loadingCurrentSeason} />
+          {!loadingCurrentSeason && seasonalState.current.isLoading && <SkeletonGrid />}
           {!seasonalState.current.hasMore && currentSeason.length > 0 && <p style={{textAlign: 'center', margin: '1rem'}}>No more Current Season anime.</p>}
         </div>
         <aside className="sidebar">
