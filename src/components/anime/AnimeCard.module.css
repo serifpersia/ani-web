@@ -178,7 +178,7 @@
     display: flex;
     width: 100%;
     gap: 1rem; /* Increased gap for better spacing */
-    align-items: flex-start; /* Align items to the top */
+    align-items: stretch; /* Make children stretch to fill vertical space */
   }
 
   .posterContainer {
@@ -194,9 +194,12 @@
 
   .info {
     flex: 1; /* Grow to fill available space */
-    padding: 0; /* Remove padding, rely on gap */
+    padding: 0.5rem; /* Add some padding */
     display: flex;
     flex-direction: column;
+    justify-content: space-between; /* Push content to top and bottom */
+    align-items: center; /* Horizontally center all items */
+    position: relative; /* Allow absolute positioning within info if needed */
   }
 
   .title {
@@ -207,29 +210,84 @@
     -webkit-line-clamp: 2; /* Limit to 2 lines */
     -webkit-box-orient: vertical;
     overflow: hidden;
-    margin-bottom: 0.25rem;
+    /* margin-bottom: 0.25rem; */ /* Removed */
+    text-align: center; /* Center the title */
+    /* margin-top: auto; */ /* Removed */
+    flex-grow: 1; /* Allow title to take available space */
+    display: flex; /* Make title a flex container */
+    align-items: center; /* Vertically center text within title */
+    justify-content: center; /* Horizontally center text within title */
+    width: 100%; /* Ensure title takes full width for centering */
   }
 
-  .progressBar {
-    margin: 0.5rem 0;
+  .mobileDetailsBottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    width: 100%;
+    margin-top: auto; /* Push to bottom */
   }
 
-  .details {
-    font-size: 0.8rem;
-    color: var(--dark-text-secondary);
+  .mobileDetailsBottomLeft {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
   }
 
-  .showType {
-    position: static;
-    display: inline-block;
+  .mobileDetailsBottomRight {
+    display: flex;
+    align-items: center;
+  }
+
+  .episodeNumberInline,
+  .episodeCountInline,
+  .showTypeInline {
+    position: static; /* Remove absolute positioning */
+    background-color: rgba(0, 0, 0, 0.7); /* Keep background for readability */
+    color: white;
     padding: 0.1rem 0.4rem;
+    border-radius: 4px;
     font-size: 0.7rem;
-    margin-bottom: 0.5rem;
-    align-self: flex-start; /* Align to the start of the flex container */
+    width: fit-content; /* Only take necessary width */
   }
 
-  .removeBtn {
+  .episodeCountInline {
+    display: flex;
+    flex-direction: row; /* Display sub/dub side-by-side */
+    gap: 0.5rem;
+  }
+
+  .progressInline {
+    width: 100%; /* Take full width of info section */
+    margin-top: auto; /* Push to bottom */
+  }
+
+  .removeBtnInline {
+    position: absolute;
     top: 0.5rem;
     right: 0.5rem;
+    background-color: rgba(255, 255, 255, 0.8);
+    color: #111;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    transition: background-color 0.3s ease, transform 0.3s ease;
+  }
+
+  /* Hide original overlay elements on mobile */
+  .episodeNumberOverlay,
+  .episodeCountOverlay,
+  .progressOverlay,
+  .showType,
+  .removeBtn {
+    display: none !important;
   }
 }
