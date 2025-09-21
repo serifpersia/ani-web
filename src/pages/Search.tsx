@@ -29,7 +29,6 @@ const Search: React.FC = () => {
     const [type, setType] = useState(searchParams.get('type') || 'ALL');
     const [season, setSeason] = useState(searchParams.get('season') || 'ALL');
     const [year, setYear] = useState(searchParams.get('year') || 'ALL');
-    const [sort, setSort] = useState(searchParams.get('sort') || 'Recent');
     const [country, setCountry] = useState(searchParams.get('country') || 'ALL');
     const [translation, setTranslation] = useState(searchParams.get('translation') || 'sub');
 
@@ -51,7 +50,6 @@ const Search: React.FC = () => {
             type: Array.isArray(type) ? type.join(',') : type,
             season: season,
             year: year,
-            sortBy: sort,
             country: country,
             translation: translation,
             page: currentPage.toString(),
@@ -103,7 +101,7 @@ const Search: React.FC = () => {
     }, [isLoading]);
 
     const handleSearch = () => {
-        setSearchParams({ query, type, season, year, sort, country, translation });
+        setSearchParams({ query, type, season, year, country, translation });
         performSearch(true);
     };
 
@@ -143,11 +141,6 @@ const Search: React.FC = () => {
                 </select>
                 <select value={year} onChange={e => setYear(e.target.value)} className="form-input">
                     {years.map(y => <option key={y} value={y}>{y === 'ALL' ? 'Year: All' : y}</option>)}
-                </select>
-                <select value={sort} onChange={e => setSort(e.target.value)} className="form-input">
-                    <option value="Recent">Sort: Recent</option>
-                    <option value="Popularity">Popularity</option>
-                    <option value="Title">Title</option>
                 </select>
                 <select value={country} onChange={e => setCountry(e.target.value)} className="form-input">
                     <option value="ALL">Country: All</option>
