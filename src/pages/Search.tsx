@@ -33,15 +33,14 @@ const Search: React.FC = () => {
     const [translation, setTranslation] = useState(searchParams.get('translation') || 'sub');
 
     const performSearch = async (isNewSearch: boolean) => {
-        if (isLoading && !isNewSearch) return; // Prevent multiple loads for infinite scroll, but allow new search while loading
+        if (isLoading && !isNewSearch) return;
 
-        setIsLoading(true); // Set loading true immediately
+        setIsLoading(true);
         setError(null);
 
         let currentPage = page.current;
         if (isNewSearch) {
             currentPage = 1;
-            // Do NOT setResults([]) here. Let the old results stay until new ones are ready.
             hasMore.current = true;
         }
 
@@ -61,13 +60,11 @@ const Search: React.FC = () => {
             const newFetchedResults: Anime[] = await response.json();
 
             if (isNewSearch) {
-                // Filter duplicates within newFetchedResults itself for a new search
                 const uniqueNewResults = Array.from(new Map(newFetchedResults.map((item: Anime) => [item._id, item])).values());
                 setResults(uniqueNewResults);
             } else {
                 setResults(prev => {
                     const existingIds = new Set(prev.map(anime => anime._id));
-                    // Filter duplicates from newFetchedResults against existing and within itself
                     const uniqueNewResults = newFetchedResults.filter((anime: Anime) => !existingIds.has(anime._id));
                     const finalUniqueResults = Array.from(new Map(uniqueNewResults.map((item: Anime) => [item._id, item])).values()); // Ensure uniqueness within new batch
                     return [...prev, ...finalUniqueResults];
@@ -83,7 +80,7 @@ const Search: React.FC = () => {
             setError(err.message);
             console.error('Search error:', err);
             if (isNewSearch) {
-                setResults([]); // Clear results on error for new search
+                setResults([]);
             }
         } finally {
             setIsLoading(false);

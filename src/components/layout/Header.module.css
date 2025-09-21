@@ -9,7 +9,7 @@
   flex-direction: column;
   justify-content: space-between;
   padding: 0;
-  z-index: 1200; /* Ensure it's above sidebar overlay */
+  z-index: 1200;
 }
 
 .hamburgerBtn span {

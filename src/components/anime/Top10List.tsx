@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { fixThumbnailUrl } from '../../lib/utils';
 import ErrorMessage from '../common/ErrorMessage';
 
-// Define the type for the anime item
 interface AnimeItem {
   _id: string;
   name: string;

@@ -4,7 +4,6 @@ import styles from './Schedule.module.css';
 import AnimeCardSkeleton from './AnimeCardSkeleton';
 import ErrorMessage from '../common/ErrorMessage';
 
-// Define the type for the anime item
 interface Anime {
     _id: string;
     id: string;

@@ -3,7 +3,6 @@ import AnimeCard from '../components/anime/AnimeCard';
 import AnimeCardSkeleton from '../components/anime/AnimeCardSkeleton';
 import ErrorMessage from '../components/common/ErrorMessage';
 
-// Define the type for a watchlist item
 interface WatchlistItem {
   id: string;
   name: string;
@@ -25,7 +24,7 @@ const Watchlist: React.FC = () => {
   const [filterBy, setFilterBy] = useState("All");
 
   const fetchWithProfile = async (url: string, options: RequestInit = {}) => {
-    const activeProfileId = '1'; // Placeholder
+    const activeProfileId = '1';
     const newOptions: RequestInit = { ...options };
     newOptions.headers = { ...newOptions.headers, 'X-Profile-ID': activeProfileId };
     if (newOptions.body && typeof newOptions.body === 'string') {

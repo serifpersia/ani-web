@@ -1,14 +1,14 @@
-import { useEffect, Suspense, lazy } from 'react'; // Modified import
+import { useEffect, Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import Footer from './components/layout/Footer';
-// Lazy-loaded page components
+
 const Home = lazy(() => import('./pages/Home'));
 const Watchlist = lazy(() => import('./pages/Watchlist'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Player = lazy(() => import('./pages/Player'));
-const Search = lazy(() => import('./pages/Search')); // Lazy-load Search as well
+const Search = lazy(() => import('./pages/Search'));
 
 import { useSidebar } from './contexts/SidebarContext';
 
@@ -41,7 +41,7 @@ function App() {
       <Header />
       <Sidebar />
       <main className={isSidebarOpen ? 'main-content-blur' : ''}>
-        <Suspense fallback={<div>Loading...</div>}> {/* Added Suspense */}
+        <Suspense fallback={<div>Loading...</div>}>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/watchlist" element={<Watchlist />} />
@@ -50,7 +50,7 @@ function App() {
             <Route path="/player/:id" element={<Player />} />
             <Route path="/player/:id/:episodeNumber" element={<Player />} />
           </Routes>
-        </Suspense> {/* Closed Suspense */}
+        </Suspense>
       </main>
       <Footer />
     </div>

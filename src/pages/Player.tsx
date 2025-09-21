@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-// import Hls from 'hls.js'; // Removed static import
 import styles from './Player.module.css';
 import ToggleSwitch from '../components/common/ToggleSwitch';
 import { FaCheck, FaPlus, FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaVolumeDown, FaVolumeOff, FaExpand, FaCompress, FaClosedCaptioning, FaList } from 'react-icons/fa';
@@ -8,7 +7,6 @@ import { formatTime } from '../lib/utils';
 import ResumeModal from '../components/common/ResumeModal';
 import useIsMobile from '../hooks/useIsMobile';
 
-// Define types for the data structures
 interface ShowMeta {
   name: string;
   thumbnail: string;
@@ -47,36 +45,33 @@ const Player: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
-  const progressBarThumbRef = useRef<HTMLDivElement>(null); // New ref for the thumb
-  const volumeSliderRef = useRef<HTMLInputElement>(null); // Ref for volume slider
-  const hlsInstance = useRef<any | null>(null); // Changed type to any
+  const progressBarThumbRef = useRef<HTMLDivElement>(null);
+  const volumeSliderRef = useRef<HTMLInputElement>(null);
+  const hlsInstance = useRef<any | null>(null);
   const inactivityTimer = useRef<number | null>(null);
-  const wasPlayingBeforeScrub = useRef(false); // To remember if video was playing before scrubbing
-  const episodeListRef = useRef<HTMLDivElement>(null); // Ref for episode list scrolling
+  const wasPlayingBeforeScrub = useRef(false);
+  const episodeListRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 
-  // State for show and episode metadata
   const [showMeta, setShowMeta] = useState<ShowMeta | null>(null);
   const [episodes, setEpisodes] = useState<string[]>([]);
   const [watchedEpisodes, setWatchedEpisodes] = useState<string[]>([]);
-      const [currentEpisode, setCurrentEpisode] = useState<string | undefined>(episodeNumber);
+  const [currentEpisode, setCurrentEpisode] = useState<string | undefined>(episodeNumber);
     
   const [currentMode, setCurrentMode] = useState('sub');
   const [inWatchlist, setInWatchlist] = useState(false);
 
-  // State for video sources and selection
   const [videoSources, setVideoSources] = useState<VideoSource[]>([]);
   const [selectedSource, setSelectedSource] = useState<VideoSource | null>(null);
   const [selectedLink, setSelectedLink] = useState<VideoLink | null>(null);
 
-  // State for player controls
   const [isAutoplayEnabled, setAutoplayEnabled] = useState(() => localStorage.getItem('autoplayEnabled') === 'true');
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [resumeTime, setResumeTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [showSourceMenu, setShowSourceMenu] = useState(false); // New state for source menu
-  const [autoplayBlocked, setAutoplayBlocked] = useState(false); // New state for autoplay blocked
+  const [showSourceMenu, setShowSourceMenu] = useState(false);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
@@ -85,24 +80,22 @@ const Player: React.FC = () => {
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [buffered, setBuffered] = useState(0);
   const [hoverTime, setHoverTime] = useState<{ time: number; position: number | null }>({ time: 0, position: null });
-  const [skipIntervals, setSkipIntervals] = useState<SkipInterval[]>([]); // State for skip intervals
-  const [isAutoSkipEnabled, setIsAutoSkipEnabled] = useState(() => localStorage.getItem('autoSkipEnabled') === 'true'); // State for auto skip
-  const [currentSkipInterval, setCurrentSkipInterval] = useState<SkipInterval | null>(null); // State for active skip interval
+  const [skipIntervals, setSkipIntervals] = useState<SkipInterval[]>([]);
+  const [isAutoSkipEnabled, setIsAutoSkipEnabled] = useState(() => localStorage.getItem('autoSkipEnabled') === 'true');
+  const [currentSkipInterval, setCurrentSkipInterval] = useState<SkipInterval | null>(null);
 
-  // State for CC menu
   const [showCCMenu, setShowCCMenu] = useState(false);
   const [subtitleFontSize, setSubtitleFontSize] = useState(() => parseFloat(localStorage.getItem('subtitleFontSize') || '1.8'));
   const [subtitlePosition, setSubtitlePosition] = useState(() => parseInt(localStorage.getItem('subtitlePosition') || '-4'));
   const [availableSubtitles, setAvailableSubtitles] = useState<TextTrack[]>([]);
   const [activeSubtitleTrack, setActiveSubtitleTrack] = useState<string | null>(null);
 
-  // State for UI
   const [loadingShowData, setLoadingShowData] = useState(true);
   const [loadingVideo, setLoadingVideo] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchWithProfile = async (url: string, options: RequestInit = {}) => {
-    const activeProfileId = '1'; // Placeholder
+    const activeProfileId = '1';
     const newOptions: RequestInit = { ...options };
     newOptions.headers = { ...newOptions.headers, 'X-Profile-ID': activeProfileId };
     if (newOptions.body && typeof newOptions.body === 'string') {
@@ -115,9 +108,9 @@ const Player: React.FC = () => {
     if (!videoRef.current) return;
     if (videoRef.current.paused) {
         videoRef.current.play().then(() => {
-            setAutoplayBlocked(false); // Reset if user manually plays
+            setAutoplayBlocked(false);
         }).catch(error => {
-            console.error("Manual play blocked:", error); // Should not happen after user interaction
+            console.error("Manual play blocked:", error);
         });
     } else {
         videoRef.current.pause();
@@ -132,7 +125,7 @@ const Player: React.FC = () => {
     videoRef.current.muted = newVolume === 0;
     setIsMuted(newVolume === 0);
     localStorage.setItem('playerVolume', newVolume.toString());
-    // Set CSS custom property for volume fill
+
     if (e.target) {
       (e.target as HTMLElement).style.setProperty('--volume-percent', newVolume.toString());
     }
@@ -144,7 +137,7 @@ const Player: React.FC = () => {
     videoRef.current.muted = newMuted;
     setIsMuted(newMuted);
     if (!newMuted && volume === 0) {
-        const newVolume = 0.5; // Unmute to a default volume
+        const newVolume = 0.5;
         videoRef.current.volume = newVolume;
         setVolume(newVolume);
     }
@@ -172,26 +165,23 @@ const Player: React.FC = () => {
     }
   };
 
-  // Effect to load initial volume from localStorage
   useEffect(() => {
     const savedVolume = localStorage.getItem('playerVolume');
     const savedMute = localStorage.getItem('playerMuted') === 'true';
     const initialVolume = savedVolume ? parseFloat(savedVolume) : 1;
     setVolume(initialVolume);
-    // Only apply muted state if volume is 0, otherwise unmute by default
+
     if (videoRef.current) {
         videoRef.current.volume = initialVolume;
-        videoRef.current.muted = (initialVolume === 0) ? savedMute : false; // Only mute if volume is 0
-        setIsMuted(videoRef.current.muted); // Ensure state reflects actual muted status
+        videoRef.current.muted = (initialVolume === 0) ? savedMute : false; 
+        setIsMuted(videoRef.current.muted);
     }
 
-    // Set initial CSS property for volume track
     if (volumeSliderRef.current) {
         volumeSliderRef.current.style.setProperty('--volume-percent', initialVolume.toString());
     }
   }, [showId, currentEpisode]);
 
-  // Effect to fetch show metadata, episode list, and watched status
   useEffect(() => {
     const fetchShowData = async () => {
       if (!showId) return;
@@ -221,7 +211,7 @@ const Player: React.FC = () => {
         setWatchedEpisodes(watchedData);
 
         if (!episodeNumber && episodeData.episodes.length > 0) {
-          setCurrentEpisode(episodeData.episodes[0]); // Default to the first episode if none in URL
+          setCurrentEpisode(episodeData.episodes[0]);
         } else if (episodeNumber) {
           setCurrentEpisode(episodeNumber);
         }
@@ -235,7 +225,6 @@ const Player: React.FC = () => {
     fetchShowData();
   }, [showId, currentMode, episodeNumber]);
 
-  // Effect to fetch available video sources when currentEpisode changes
   useEffect(() => {
     if (!showId || !currentEpisode) return;
 
@@ -249,7 +238,7 @@ const Player: React.FC = () => {
           fetch(`/api/video?showId=${showId}&episodeNumber=${currentEpisode}&mode=${currentMode}`),
           fetchWithProfile(`/api/episode-progress/${showId}/${currentEpisode}`),
           fetchWithProfile(`/api/settings/preferredSource`),
-          fetch(`/api/skip-times/${showId}/${currentEpisode}`) // Fetch skip times
+          fetch(`/api/skip-times/${showId}/${currentEpisode}`)
         ]);
 
         if (!sourcesResponse.ok) throw new Error("Failed to fetch video sources");
@@ -277,7 +266,7 @@ const Player: React.FC = () => {
             const progress = await progressResponse.json();
             if (progress?.currentTime > 0 && progress.currentTime < progress.duration * 0.95) {
                 setResumeTime(progress.currentTime);
-                setShowResumeModal(true); // Show the modal again
+                setShowResumeModal(true);
             }
         }
 
@@ -303,7 +292,6 @@ const Player: React.FC = () => {
     fetchVideoSources();
   }, [showId, currentEpisode, currentMode]);
 
-  // Effect to set the video source when it changes
   useEffect(() => {
     if (!selectedSource || !selectedLink || !videoRef.current) return;
 
@@ -319,15 +307,13 @@ const Player: React.FC = () => {
     }
     videoElement.src = '';
 
-    // Clear existing tracks and available subtitles
     while (videoElement.firstChild) {
       videoElement.removeChild(videoElement.firstChild);
     }
-    setAvailableSubtitles([]); // Clear availableSubtitles here immediately
+    setAvailableSubtitles([]);
 
-    const newAvailableSubtitles: TextTrack[] = []; // To collect newly added tracks
+    const newAvailableSubtitles: TextTrack[] = [];
 
-    // Iterate through all subtitles in the selected source and add them as tracks
     if (selectedSource.subtitles && selectedSource.subtitles.length > 0) {
       selectedSource.subtitles.forEach(sub => {
         const track = document.createElement('track');
@@ -335,22 +321,20 @@ const Player: React.FC = () => {
         track.label = sub.label;
         track.srclang = sub.lang;
         track.src = `/api/subtitle-proxy?url=${encodeURIComponent(sub.src)}`;
-        // Set default to true for the first English track found, or just the first track
+
         if (sub.lang === 'en' || sub.label === 'English') {
           track.default = true;
         }
         videoElement.appendChild(track);
-        // After appending, the TextTrack object is available in videoElement.textTracks
+
         if (videoElement.textTracks.length > 0) {
             newAvailableSubtitles.push(videoElement.textTracks[videoElement.textTracks.length - 1]);
         }
       });
     }
 
-    // Set available subtitles after all tracks have been appended
     setAvailableSubtitles(newAvailableSubtitles);
 
-    // Set initial active track based on newAvailableSubtitles
     if (newAvailableSubtitles.length > 0) {
         const englishTrack = newAvailableSubtitles.find(track => track.language === 'en' || track.label === 'English');
         if (englishTrack) {
@@ -361,7 +345,7 @@ const Player: React.FC = () => {
             newAvailableSubtitles[0].mode = 'showing';
         }
     } else {
-        setActiveSubtitleTrack(null); // No subtitles, so no active track
+        setActiveSubtitleTrack(null);
     }
 
     if (selectedLink.hls) {
@@ -373,7 +357,7 @@ const Player: React.FC = () => {
           hls.loadSource(proxiedUrl);
           hls.attachMedia(videoElement);
         } else {
-          videoElement.src = proxiedUrl; // Fallback if HLS not supported after dynamic import
+          videoElement.src = proxiedUrl;
         }
       };
       loadHls();
@@ -397,7 +381,6 @@ const Player: React.FC = () => {
     };
   }, [selectedSource, selectedLink, isAutoplayEnabled]);
 
-  // Effect to save progress periodically
   useEffect(() => {
     const videoElement = videoRef.current;
     if (!videoElement || !showId || !currentEpisode || !showMeta) return;
@@ -424,7 +407,6 @@ const Player: React.FC = () => {
     };
   }, [showId, currentEpisode, showMeta]);
 
-  // Effect for Autoplay
   useEffect(() => {
     const videoElement = videoRef.current;
     if (!videoElement) return;
@@ -445,11 +427,9 @@ const Player: React.FC = () => {
     };
   }, [isAutoplayEnabled, episodes, currentEpisode, showId, navigate]);
 
-  // Effect to manage control visibility from inactivity
   useEffect(() => {
     const container = playerContainerRef.current;
-    if (!container || isMobile) return; // Don't run on mobile
-
+    if (!container || isMobile) return;
     const handleMouseMove = () => {
         setShowControls(true);
         if (inactivityTimer.current) {
@@ -487,7 +467,6 @@ const Player: React.FC = () => {
     };
   }, [isPlaying, isMobile, showId, currentEpisode]);
 
-  // Effect to handle fullscreen changes
   useEffect(() => {
     const handleFullscreenChange = () => {
         setIsFullscreen(!!document.fullscreenElement);
@@ -540,7 +519,6 @@ const Player: React.FC = () => {
     setShowResumeModal(false);
   };
 
-  // Effect for subtitle track management
   useEffect(() => {
     const videoElement = videoRef.current;
     if (!videoElement) return;
@@ -549,7 +527,6 @@ const Player: React.FC = () => {
       const tracks = Array.from(videoElement.textTracks);
       setAvailableSubtitles(tracks);
 
-      // Set initial active track if not already set
       if (activeSubtitleTrack === null) {
         const englishTrack = tracks.find(track => track.language === 'en' || track.label === 'English');
         if (englishTrack) {
@@ -571,7 +548,6 @@ const Player: React.FC = () => {
     videoElement.textTracks.addEventListener('addtrack', handleAddTrack);
     videoElement.textTracks.addEventListener('removetrack', handleRemoveTrack);
 
-    // Initial check for tracks already present
     handleAddTrack();
 
     return () => {
@@ -599,7 +575,7 @@ const Player: React.FC = () => {
   const renderSubtitleOptions = () => {
     const options = [];
 
-    if (availableSubtitles.length > 0) { // Only show "Off" if there are actual subtitles
+    if (availableSubtitles.length > 0) {
       options.push(
         <button
           key="off"
@@ -623,7 +599,7 @@ const Player: React.FC = () => {
       );
     });
 
-    if (availableSubtitles.length === 0) { // If no subtitles at all, show "Not Available"
+    if (availableSubtitles.length === 0) {
         return <button className={`${styles.ccItem} ${styles.disabled}`}>Not Available</button>;
     }
 
@@ -642,7 +618,6 @@ const Player: React.FC = () => {
     localStorage.setItem('subtitlePosition', newPosition.toString());
   };
 
-  // Effect for subtitle styling
   useEffect(() => {
     let styleElement = document.getElementById('subtitle-style-override') as HTMLStyleElement;
     if (!styleElement) {
@@ -660,7 +635,7 @@ const Player: React.FC = () => {
 
   const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!videoRef.current || !progressBarRef.current) return;
-    if (isNaN(duration) || duration === 0) return; // <--- Add this check
+    if (isNaN(duration) || duration === 0) return;
 
     const rect = progressBarRef.current.getBoundingClientRect();
     const percent = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
@@ -680,14 +655,13 @@ const Player: React.FC = () => {
   };
 
   const handleThumbMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    e.preventDefault(); // Prevent default drag behavior
+    e.preventDefault();
     if (!videoRef.current) return;
     setIsScrubbing(true);
     wasPlayingBeforeScrub.current = !videoRef.current.paused;
     videoRef.current.pause();
   };
 
-  // Effect for global mouse move and mouse up for scrubbing
   useEffect(() => {
     const handleDocumentMouseMove = (e: MouseEvent) => {
       if (!isScrubbing || !videoRef.current || !progressBarRef.current || !duration) return;
@@ -696,8 +670,8 @@ const Player: React.FC = () => {
       const percent = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
       const scrubTime = percent * duration;
 
-      videoRef.current.currentTime = scrubTime; // Update video time for preview
-      setCurrentTime(scrubTime); // Update state for watched bar
+      videoRef.current.currentTime = scrubTime;
+      setCurrentTime(scrubTime);
 
       setHoverTime({ time: scrubTime, position: e.clientX - rect.left });
     };
@@ -756,7 +730,7 @@ const Player: React.FC = () => {
         } else {
           alert(`Episode ${epNum} not found.`);
         }
-        inputElement.value = ''; // Clear input after jump
+        inputElement.value = '';
       }
     };
 
@@ -768,7 +742,7 @@ const Player: React.FC = () => {
       } else {
         alert(`Episode ${epNum} not found.`);
       }
-      inputElement.value = ''; // Clear input after jump
+      inputElement.value = '';
     };
 
     return (
@@ -1074,7 +1048,7 @@ const Player: React.FC = () => {
             onClick={!isMobile ? togglePlay : undefined}
             onLoadedMetadata={() => {
                 setDuration(videoRef.current?.duration || 0);
-                // Attempt to play after metadata is loaded, if autoplay is enabled
+
                 if (isAutoplayEnabled && videoRef.current) {
                     videoRef.current.play().then(() => {
                         setAutoplayBlocked(false);
@@ -1089,17 +1063,15 @@ const Player: React.FC = () => {
                 if (!isScrubbing) {
                     setCurrentTime(videoRef.current?.currentTime || 0);
                 }
-                // Check for active skip intervals
                 const currentTime = videoRef.current?.currentTime || 0;
                 const activeSkip = skipIntervals.find(interval =>
                     currentTime >= interval.start_time && currentTime < interval.end_time
                 );
                 setCurrentSkipInterval(activeSkip || null);
 
-                // Auto-skip logic
                 if (isAutoSkipEnabled && activeSkip && videoRef.current && !videoRef.current.paused) {
                     videoRef.current.currentTime = activeSkip.end_time;
-                    setCurrentSkipInterval(null); // Clear after skipping
+                    setCurrentSkipInterval(null);
                 }
             }}
             onProgress={() => {
