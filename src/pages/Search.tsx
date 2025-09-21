@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AnimeCard from '../components/anime/AnimeCard';
 import AnimeCardSkeleton from '../components/anime/AnimeCardSkeleton';
@@ -32,7 +32,7 @@ const Search: React.FC = () => {
     const [country, setCountry] = useState(searchParams.get('country') || 'ALL');
     const [translation, setTranslation] = useState(searchParams.get('translation') || 'sub');
 
-    const performSearch = async (isNewSearch: boolean) => {
+    const performSearch = useCallback(async (isNewSearch: boolean) => {
         if (isLoading && !isNewSearch) return;
 
         setIsLoading(true);
@@ -76,8 +76,8 @@ const Search: React.FC = () => {
             } else {
                 page.current = currentPage + 1;
             }
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'An unknown error occurred');
             console.error('Search error:', err);
             if (isNewSearch) {
                 setResults([]);
@@ -85,7 +85,7 @@ const Search: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [isLoading, query, type, season, year, country, translation]);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -95,7 +95,7 @@ const Search: React.FC = () => {
         };
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
-    }, [isLoading]);
+    }, [isLoading, performSearch]);
 
     const handleSearch = () => {
         setSearchParams({ query, type, season, year, country, translation });

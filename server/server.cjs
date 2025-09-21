@@ -705,7 +705,7 @@ app.post('/api/import/mal-xml', async (req, res) => {
                 const foundShow = searchResponse.data?.data?.shows?.edges[0];
                 if (foundShow) {
                     await new Promise((resolve, reject) => {
-                        db.run(`INSERT OR REPLACE INTO watchlist (profile_id, id, name, thumbnail, status) VALUES (?, ?, ?, ?, ?)`,
+                        db.run(`INSERT OR REPLACE INTO watchlist (profile_id, id, name, thumbnail, status) VALUES (?, ?, ?, ?, ?)`, 
                             [profileId, foundShow._id, foundShow.name, deobfuscateUrl(foundShow.thumbnail), malStatus],
                             (err) => { if (err) reject(err); else { importedCount++; resolve(); } }
                         );
@@ -716,17 +716,17 @@ app.post('/api/import/mal-xml', async (req, res) => {
         res.json({ imported: importedCount, skipped: skippedCount });
     });
 });
+
 app.post('/api/watchlist/add', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const { id, name, thumbnail, status } = req.body;
     const finalThumbnail = deobfuscateUrl(thumbnail || '');
-    db.run(`INSERT OR REPLACE INTO watchlist (profile_id, id, name, thumbnail, status) VALUES (?, ?, ?, ?, ?)`,
+    db.run(`INSERT OR REPLACE INTO watchlist (profile_id, id, name, thumbnail, status) VALUES (?, ?, ?, ?, ?)`, 
         [profileId, id, name, finalThumbnail, status || 'Watching'],
         (err) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
     );
-});
-app.get('/api/watchlist/check/:showId', (req, res) => {
+});app.get('/api/watchlist/check/:showId', (req, res) => {
     const profileId = req.headers['x-profile-id'];
     if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     db.get('SELECT EXISTS(SELECT 1 FROM watchlist WHERE profile_id = ? AND id = ?) as inWatchlist',

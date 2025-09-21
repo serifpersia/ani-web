@@ -46,8 +46,8 @@ const Watchlist: React.FC = () => {
           data = data.filter((item: WatchlistItem) => item.status === filterBy);
         }
         setWatchlist(data);
-      } catch (e: any) {
-        setError(e.message);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'An unknown error occurred');
         console.error("Error fetching watchlist:", e);
       } finally {
         setLoading(false);
@@ -66,9 +66,9 @@ const Watchlist: React.FC = () => {
       if (!response.ok) throw new Error("Failed to update status");
       const newWatchlist = watchlist.map(item => item.id === id ? { ...item, status } : item);
       setWatchlist(newWatchlist);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Error updating status:", e);
-      alert("Failed to update status.");
+      alert(`Failed to update status: ${e instanceof Error ? e.message : 'An unknown error occurred'}`);
     }
   };
 
@@ -83,9 +83,9 @@ const Watchlist: React.FC = () => {
       });
       if (!response.ok) throw new Error("Failed to remove from watchlist");
       setWatchlist(watchlist.filter(item => item.id !== id));
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Error removing from watchlist:", e);
-      alert("Failed to remove from watchlist.");
+      alert(`Failed to remove from watchlist: ${e instanceof Error ? e.message : 'An unknown error occurred'}`);
     }
   };
 

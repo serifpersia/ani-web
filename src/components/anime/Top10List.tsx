@@ -32,8 +32,8 @@ const Top10List: React.FC<Top10ListProps> = ({ title }) => {
         if (!response.ok) throw new Error("Failed to fetch top 10 popular");
         const data = await response.json();
         setTop10List(data);
-      } catch (e: any) {
-        setError(e.message);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'An unknown error occurred');
         console.error(`Error fetching top 10 popular for ${timeframe}:`, e);
       } finally {
         setLoading(false);

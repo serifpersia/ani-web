@@ -9,20 +9,21 @@ const Watchlist = lazy(() => import('./pages/Watchlist'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Player = lazy(() => import('./pages/Player'));
 const Search = lazy(() => import('./pages/Search'));
+const MAL = lazy(() => import('./pages/MAL'));
 
-import { useSidebar } from './contexts/SidebarContext';
+import { useSidebar } from './hooks/useSidebar';
 
 function App() {
-  const { isSidebarOpen, closeSidebar } = useSidebar();
+  const { isOpen, setIsOpen } = useSidebar();
 
   useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {
-      if (isSidebarOpen && event.key === 'Escape') {
-        closeSidebar();
+      if (isOpen && event.key === 'Escape') {
+        setIsOpen(false);
       }
     };
 
-    if (isSidebarOpen) {
+    if (isOpen) {
       document.body.classList.add('sidebar-open');
     } else {
       document.body.classList.remove('sidebar-open');
@@ -34,19 +35,20 @@ function App() {
       window.removeEventListener('keydown', handleKeydown);
       document.body.classList.remove('sidebar-open');
     };
-  }, [isSidebarOpen, closeSidebar]);
+  }, [isOpen, setIsOpen]);
 
   return (
     <div className={`app-container`}>
       <Header />
       <Sidebar />
-      <main className={isSidebarOpen ? 'main-content-blur' : ''}>
+      <main className={isOpen ? 'main-content-blur' : ''}>
         <Suspense fallback={<div>Loading...</div>}>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/watchlist" element={<Watchlist />} />
             <Route path="/search" element={<Search />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/mal" element={<MAL />} />
             <Route path="/player/:id" element={<Player />} />
             <Route path="/player/:id/:episodeNumber" element={<Player />} />
           </Routes>
