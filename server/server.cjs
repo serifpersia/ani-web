@@ -9,6 +9,8 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const cors = require('cors');
+
 const app = express();
 const port = 3000;
 const apiCache = new NodeCache({ stdTTL: 3600 });
@@ -24,7 +26,7 @@ axiosRetry(axios, {
     },
 });
 
-const profilePicsDir = path.join(__dirname, 'public', 'profile_pics');
+const profilePicsDir = path.join(__dirname, '..', 'public', 'profile_pics');
 if (!fs.existsSync(profilePicsDir)) {
     fs.mkdirSync(profilePicsDir, { recursive: true });
 }
@@ -76,6 +78,7 @@ const dbUploadStorage = multer.diskStorage({
 });
 const dbUpload = multer({ storage: dbUploadStorage });
 
+app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 const apiBaseUrl = 'https://allanime.day';
 const apiEndpoint = `https://api.allanime.day/api`;
@@ -361,11 +364,11 @@ app.get('/api/video', async (req, res) => {
                             hls: false
                         })).sort((a,b) => parseInt(b.resolutionStr) - parseInt(a.resolutionStr));
                     }
-				}	else {
+				} else {
 						let finalLink = decryptedUrl;
 						
 						if (finalLink.startsWith('/')) {
-							finalLink = new URL(finalLink, apiBaseUrl).href;
+								finalLink = new URL(finalLink, apiBaseUrl).href;
 						}
 						videoLinks.push({ link: finalLink, resolutionStr: 'default', hls: finalLink.includes('.m3u8'), headers: { Referer: referer } });
 					}
@@ -408,7 +411,7 @@ app.get('/api/image-proxy', async (req, res) => {
         data.pipe(res);
     } catch (e) {
         console.error('Image proxy error:', e.message); // Log the error for debugging
-        res.status(200).sendFile(path.join(__dirname, '/public/placeholder.svg')); // Send placeholder with 200 OK
+        res.status(200).sendFile(path.join(__dirname, '..','public/placeholder.svg')); // Send placeholder with 200 OK
     }
 });
 
@@ -562,7 +565,7 @@ app.get('/api/schedule-info/:showId', async (req, res) => {
 
             if (status === 'Ongoing') {
                 const pageResponse = await axios.get(`https://animeschedule.net/anime/${firstResult.route}`, { timeout: 10000 });
-                const countdownMatch = pageResponse.data.match(/countdown-time" datetime="([^"]*)"/);
+                const countdownMatch = pageResponse.data.match(/countdown-time\\" datetime=\\"([^\\]*)\\\"/);
                 if (countdownMatch) {
                     nextEpisodeAirDate = countdownMatch[1];
                 }
@@ -755,7 +758,7 @@ app.post('/api/update-progress', (req, res) => {
         db.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail) VALUES (?, ?, ?)',
             [showId, showName, deobfuscateUrl(showThumbnail)]);
 
-        db.run(`INSERT OR REPLACE INTO watched_episodes (profile_id, showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)`,
+        db.run(`INSERT OR REPLACE INTO watched_episodes (profile_id, showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)`, 
             [profileId, showId, episodeNumber, currentTime, duration],
             (err) => {
                 if (err) return res.status(500).json({ error: 'DB error on progress update' });
@@ -968,4 +971,18 @@ app.post('/api/rclone-download', (req, res) => {
         });
     });
 });
-app.listen(port);
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, '../dist')));
+app.use('/profile_pics', express.static(profilePicsDir));
+
+
+// The "catchall" handler: for any request that doesn't
+// match one above, send back React's index.html file.
+app.get(/^(?!(\/api|\/profile_pics)).*$/, (req, res) => {
+  res.sendFile(path.join(__dirname, '../dist/index.html'));
+});
+
+app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+    console.log(`Application available at: http://localhost:3000`);
+});
