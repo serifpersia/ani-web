@@ -100,10 +100,11 @@ const DEOBFUSCATION_MAP = {
 };
 function deobfuscateUrl(obfuscatedUrl) {
     if (!obfuscatedUrl) return '';
+    let finalUrl = obfuscatedUrl;
+
     if (!obfuscatedUrl.startsWith('--') && obfuscatedUrl.includes('s4.anilist.co')) {
-        return obfuscatedUrl.replace('https://s4.anilist.co', 'https://wp.youtube-anime.com/s4.anilist.co');
-    }
-    if (obfuscatedUrl.startsWith('--')) {
+        finalUrl = obfuscatedUrl.replace('https://s4.anilist.co', 'https://wp.youtube-anime.com/s4.anilist.co');
+    } else if (obfuscatedUrl.startsWith('--')) {
         obfuscatedUrl = obfuscatedUrl.slice(2);
         let deobfuscated = '';
         for (let i = 0; i < obfuscatedUrl.length; i += 2) {
@@ -111,11 +112,18 @@ function deobfuscateUrl(obfuscatedUrl) {
             deobfuscated += DEOBFUSCATION_MAP[chunk] || chunk;
         }
         if (deobfuscated.startsWith('/')) {
-            return `https://wp.youtube-anime.com${deobfuscated}`;
+            finalUrl = `https://wp.youtube-anime.com${deobfuscated}`;
+        } else {
+            finalUrl = deobfuscated;
         }
-        return deobfuscated;
     }
-    return obfuscatedUrl;
+
+    // Ensure all external image URLs go through the proxy
+    if (finalUrl.startsWith('http://') || finalUrl.startsWith('https://')) {
+        return `http://localhost:3000/api/image-proxy?url=${encodeURIComponent(finalUrl)}`;
+    }
+
+    return finalUrl;
 }
 
 async function streamToString(stream) {
@@ -404,7 +412,8 @@ app.get('/api/image-proxy', async (req, res) => {
             url: req.query.url,
             responseType: 'stream',
             headers: { Referer: apiBaseUrl, 'User-Agent': userAgent },
-            timeout: 10000
+            timeout: 10000,
+            maxRedirects: 5 // Explicitly follow redirects
         });
         res.set('Cache-Control', 'public, max-age=604800, immutable');
         res.set('Content-Type', headers['content-type']);
