@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AnimeSection from '../components/anime/AnimeSection';
 import Top10List from '../components/anime/Top10List';
 import Schedule from '../components/anime/Schedule';
@@ -25,6 +25,26 @@ const SkeletonGrid = () => (
     </div>
 );
 
+interface ShowItem {
+  _id: string;
+  name?: string;
+  thumbnail?: string;
+  type?: string;
+  availableEpisodesDetail?: {
+    sub?: string[];
+    dub?: string[];
+  };
+}
+
+interface ContinueWatchingItem {
+  showId: string;
+  episodeNumber: string;
+  currentTime: number;
+  duration: number;
+  name?: string;
+  thumbnail?: string;
+}
+
 const Home: React.FC = () => {
   const [latestReleases, setLatestReleases] = useState<Anime[]>([]);
   const [currentSeason, setCurrentSeason] = useState<Anime[]>([]);
@@ -36,88 +56,7 @@ const Home: React.FC = () => {
 
   const seasonalState = useRef({ page: 1, isLoading: false, hasMore: true });
 
-  const fetchLatestReleases = async () => {
-    try {
-      const response = await fetch("/api/latest-releases");
-      if (!response.ok) throw new Error("Failed to fetch latest releases");
-      const data = await response.json();
-
-      const detailedLatestReleases = await Promise.all(
-        data.map(async (item: any) => {
-          const animeDetails = await fetchAnimeDetails(item._id);
-          if (animeDetails) {
-            return { ...animeDetails, ...item };
-          } else {
-            return null;
-          }
-        })
-      );
-      setLatestReleases(detailedLatestReleases.filter(Boolean) as Anime[]);
-    } catch (error) {
-      console.error("Error fetching latest releases:", error);
-    } finally {
-      setLoadingLatestReleases(false);
-    }
-  };
-
-  const fetchCurrentSeason = async () => {
-    if (seasonalState.current.isLoading || !seasonalState.current.hasMore) return;
-    seasonalState.current.isLoading = true;
-
-    try {
-      const response = await fetch(`/api/seasonal?page=${seasonalState.current.page}`);
-      if (!response.ok) throw new Error("Failed to fetch current season");
-      const newShows = await response.json();
-      if (newShows.length === 0) {
-        seasonalState.current.hasMore = false;
-      } else {
-        const detailedNewShows = await Promise.all(
-          newShows.map(async (item: any) => {
-            const animeDetails = await fetchAnimeDetails(item._id);
-            if (animeDetails) {
-              return { ...animeDetails, ...item };
-            } else {
-              return null;
-            }
-          })
-        );
-        setCurrentSeason(prev => [...prev, ...detailedNewShows.filter(Boolean) as Anime[]]);
-        seasonalState.current.page++;
-      }
-    } catch (error) {
-      console.error("Error fetching current season:", error);
-    } finally {
-      seasonalState.current.isLoading = false;
-      setLoadingCurrentSeason(false);
-    }
-  };
-
-  const handleRemoveContinueWatching = async (showId: string) => {
-    try {
-      setContinueWatchingList(prevList => prevList.filter(anime => anime.id !== showId));
-
-      const response = await fetch("/api/continue-watching/remove", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Profile-ID": "1",
-        },
-        body: JSON.stringify({ showId }),
-      });
-
-      if (!response.ok) {
-        console.error("Failed to remove from backend, reverting UI.");
-        fetchContinueWatching(); 
-      }
-    } catch (error) {
-      console.error("Error removing from continue watching:", error);
-      fetchContinueWatching();
-    } finally {
-      console.log("Remove continue watching operation completed.");
-    }
-  };
-
-  const fetchAnimeDetails = async (showId: string) => {
+  const fetchAnimeDetails = useCallback(async (showId: string) => {
     try {
       const [metaResponse, subEpisodesResponse, dubEpisodesResponse] = await Promise.all([
         fetch(`/api/show-meta/${showId}`),
@@ -149,9 +88,65 @@ const Home: React.FC = () => {
       console.error(`Error fetching details for ${showId}:`, error);
       return null;
     }
-  };
+  }, []);
 
-  const fetchContinueWatching = async () => {
+  const fetchLatestReleases = useCallback(async () => {
+    try {
+      const response = await fetch("/api/latest-releases");
+      if (!response.ok) throw new Error("Failed to fetch latest releases");
+      const data = await response.json();
+
+      const detailedLatestReleases = await Promise.all(
+        data.map(async (item: ShowItem) => {
+          const animeDetails = await fetchAnimeDetails(item._id);
+          if (animeDetails) {
+            return { ...animeDetails, ...item };
+          } else {
+            return null;
+          }
+        })
+      );
+      setLatestReleases(detailedLatestReleases.filter(Boolean) as Anime[]);
+    } catch (error) {
+      console.error("Error fetching latest releases:", error);
+    } finally {
+      setLoadingLatestReleases(false);
+    }
+  }, [fetchAnimeDetails]);
+
+  const fetchCurrentSeason = useCallback(async () => {
+    if (seasonalState.current.isLoading || !seasonalState.current.hasMore) return;
+    seasonalState.current.isLoading = true;
+
+    try {
+      const response = await fetch(`/api/seasonal?page=${seasonalState.current.page}`);
+      if (!response.ok) throw new Error("Failed to fetch current season");
+      const newShows = await response.json();
+      if (newShows.length === 0) {
+        seasonalState.current.hasMore = false;
+      } else {
+        const detailedNewShows = await Promise.all(
+          newShows.map(async (item: ShowItem) => {
+            const animeDetails = await fetchAnimeDetails(item._id);
+            if (animeDetails) {
+              return { ...animeDetails, ...item };
+            } else {
+              return null;
+            }
+          })
+        );
+        setCurrentSeason(prev => [...prev, ...detailedNewShows.filter(Boolean) as Anime[]]);
+        seasonalState.current.page++;
+      }
+    } catch (error) {
+      console.error("Error fetching current season:", error);
+    } finally {
+      seasonalState.current.isLoading = false;
+      setLoadingCurrentSeason(false);
+    }
+  }, [fetchAnimeDetails]);
+
+  const fetchContinueWatching = useCallback(async () => {
     try {
       const response = await fetch("/api/continue-watching", {
         headers: { 'X-Profile-ID': '1' }
@@ -160,7 +155,7 @@ const Home: React.FC = () => {
       const data = await response.json();
 
       const detailedContinueWatchingList = await Promise.all(
-        data.map(async (item: any) => {
+        data.map(async (item: ContinueWatchingItem) => {
           const animeDetails = await fetchAnimeDetails(item.showId);
           if (animeDetails) {
             return {
@@ -180,7 +175,32 @@ const Home: React.FC = () => {
     } finally {
       setLoadingContinueWatching(false);
     }
-  };
+  }, [fetchAnimeDetails]);
+
+  const handleRemoveContinueWatching = useCallback(async (showId: string) => {
+    try {
+      setContinueWatchingList(prevList => prevList.filter(anime => anime.id !== showId));
+
+      const response = await fetch("/api/continue-watching/remove", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Profile-ID": "1",
+        },
+        body: JSON.stringify({ showId }),
+      });
+
+      if (!response.ok) {
+        console.error("Failed to remove from backend, reverting UI.");
+        fetchContinueWatching(); 
+      }
+    } catch (error) {
+      console.error("Error removing from continue watching:", error);
+      fetchContinueWatching();
+    } finally {
+      console.log("Remove continue watching operation completed.");
+    }
+  }, [fetchContinueWatching]);
 
   useEffect(() => {
     fetchLatestReleases();
@@ -199,7 +219,7 @@ const Home: React.FC = () => {
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  }, [fetchLatestReleases, fetchCurrentSeason, fetchContinueWatching]);
 
   return (
     <div>

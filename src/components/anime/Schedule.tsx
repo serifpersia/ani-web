@@ -40,8 +40,8 @@ const Schedule: React.FC = () => {
         if (!response.ok) throw new Error("Failed to fetch episode schedule");
         const data = await response.json();
         setScheduleData(data);
-      } catch (e: any) {
-        setError(e.message);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'An unknown error occurred');
         console.error("Error fetching episode schedule:", e);
       } finally {
         setLoading(false);

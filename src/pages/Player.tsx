@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styles from './Player.module.css';
 import ToggleSwitch from '../components/common/ToggleSwitch';
@@ -39,6 +39,13 @@ interface SkipInterval {
   skip_id: string;
 }
 
+import Hls from 'hls.js';
+
+interface EpisodeData {
+  episodes: string[];
+  description: string;
+}
+
 const Player: React.FC = () => {
   const { id: showId, episodeNumber } = useParams<{ id: string; episodeNumber?: string }>();
   const navigate = useNavigate();
@@ -47,7 +54,7 @@ const Player: React.FC = () => {
   const progressBarRef = useRef<HTMLDivElement>(null);
   const progressBarThumbRef = useRef<HTMLDivElement>(null);
   const volumeSliderRef = useRef<HTMLInputElement>(null);
-  const hlsInstance = useRef<any | null>(null);
+  const hlsInstance = useRef<Hls | null>(null);
   const inactivityTimer = useRef<number | null>(null);
   const wasPlayingBeforeScrub = useRef(false);
   const episodeListRef = useRef<HTMLDivElement>(null);
@@ -201,7 +208,7 @@ const Player: React.FC = () => {
         if (!watchedResponse.ok) throw new Error("Failed to fetch watched status");
 
         const meta = await metaResponse.json();
-        const episodeData = await episodesResponse.json();
+        const episodeData: EpisodeData = await episodesResponse.json();
         const watchlistStatus = await watchlistResponse.json();
         const watchedData = await watchedResponse.json();
 
@@ -215,9 +222,8 @@ const Player: React.FC = () => {
         } else if (episodeNumber) {
           setCurrentEpisode(episodeNumber);
         }
-      } catch (e: any) {
-        setError(e.message);
-        console.error("Error fetching show data:", e);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'An unknown error occurred');
       } finally {
         setLoadingShowData(false);
       }
@@ -281,8 +287,8 @@ const Player: React.FC = () => {
             setSkipIntervals([]);
         }
 
-      } catch (e: any) {
-        setError(e.message);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'An unknown error occurred');
         console.error("Error fetching video sources:", e);
       } finally {
         setLoadingVideo(false);
@@ -379,7 +385,7 @@ const Player: React.FC = () => {
         hlsInstance.current.destroy();
       }
     };
-  }, [selectedSource, selectedLink, isAutoplayEnabled]);
+  }, [selectedSource, selectedLink, isAutoplayEnabled, setPreferredSource]);
 
   useEffect(() => {
     const videoElement = videoRef.current;
@@ -554,7 +560,7 @@ const Player: React.FC = () => {
       videoElement.textTracks.removeEventListener('addtrack', handleAddTrack);
       videoElement.textTracks.removeEventListener('removetrack', handleRemoveTrack);
     };
-  }, [videoRef.current, activeSubtitleTrack]);
+  }, [activeSubtitleTrack]);
 
   const handleSubtitleSelection = (trackId: string | null) => {
     if (!videoRef.current) return;
@@ -756,7 +762,7 @@ const Player: React.FC = () => {
     );
   };
 
-  const setPreferredSource = async (sourceName: string) => {
+  const setPreferredSource = useCallback(async (sourceName: string) => {
     try {
       await fetchWithProfile('/api/settings', {
         method: 'POST',
@@ -765,7 +771,7 @@ const Player: React.FC = () => {
     } catch (error) {
       console.error('Error setting preferred source:', error);
     }
-  };
+  }, []);
 
   const renderMobileControls = () => (
     <div className={styles.mobileControls}>

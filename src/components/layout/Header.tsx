@@ -1,11 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import Logo from '../common/Logo';
-import { useSidebar } from '../../contexts/SidebarContext';
+import { useSidebar } from '../../hooks/useSidebar';
 import styles from './Header.module.css';
 
 const Header: React.FC = () => {
-  const { isSidebarOpen, toggleSidebar } = useSidebar();
+  const { isOpen, toggleSidebar } = useSidebar();
 
   const headerStyle: React.CSSProperties = {
     display: 'flex',
@@ -33,7 +33,7 @@ const Header: React.FC = () => {
     <header style={headerStyle}>
       <div style={leftStyle}>
         <button 
-          className={`${styles.hamburgerBtn} hamburger-button ${isSidebarOpen ? styles.open : ''}`}
+          className={`${styles.hamburgerBtn} hamburger-button ${isOpen ? styles.open : ''}`}
           onClick={toggleSidebar} 
           aria-label="Toggle navigation menu"
         >
