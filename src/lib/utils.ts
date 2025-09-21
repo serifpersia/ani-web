@@ -22,7 +22,6 @@ export const fixThumbnailUrl = (url: string | undefined): string => {
   } else if (url.startsWith('images2')) {
     finalUrl = `https://wp.youtube-anime.com/aln.youtube-anime.com/${url}?w=250`;
   } else {
-    // Default case for any other relative paths
     finalUrl = `https://wp.youtube-anime.com/aln.youtube-anime.com/images/${url}?w=250`;
   }
 

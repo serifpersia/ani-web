@@ -2,10 +2,9 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { fixThumbnailUrl, formatTime } from '../../lib/utils';
 import styles from './AnimeCard.module.css';
-import { FaMicrophone, FaClosedCaptioning } from 'react-icons/fa'; // Import the microphone and CC icons
-import useIsMobile from '../../hooks/useIsMobile'; // Import useIsMobile hook
+import { FaMicrophone, FaClosedCaptioning } from 'react-icons/fa';
+import useIsMobile from '../../hooks/useIsMobile';
 
-// Define the types for the anime prop
 interface Anime {
   _id: string;
   id: string;
@@ -89,44 +88,44 @@ const AnimeCard: React.FC<AnimeCardProps> = ({ anime, continueWatching = false, 
     >
       <div className={styles.posterContainer}>
         {!isMobile && episodeNumberElement}
-        {!isMobile && continueWatching && episodeCountElement} {/* Only for continueWatching overlay */}
+        {!isMobile && continueWatching && episodeCountElement} {}
         {!isMobile && progressElement}
-        {!isMobile && !continueWatching && episodeCountElement} {/* Only for normal card overlay */}
+        {!isMobile && !continueWatching && episodeCountElement} {}
         <img 
           src={fixThumbnailUrl(anime.thumbnail)} 
           alt={anime.name} 
           className={styles.posterImg} 
           loading="lazy"
-          style={{ opacity: 0 }} /* Start hidden */
+          style={{ opacity: 0 }}
           onLoad={(e) => {
-            e.currentTarget.style.opacity = '1'; /* Fade in on load */
+            e.currentTarget.style.opacity = '1';
           }}
           onError={(e) => {
-            e.currentTarget.src = '/placeholder.svg'; /* Fallback to placeholder */
-            e.currentTarget.style.opacity = '1'; /* Ensure placeholder is visible */
+            e.currentTarget.src = '/placeholder.svg';
+            e.currentTarget.style.opacity = '1';
           }}
         />
       </div>
       <div className={styles.info}>
-        {isMobile && removeButtonElement} {/* Mobile remove button */}
+        {isMobile && removeButtonElement} {}
         <div className={styles.title}>{anime.name}</div>
         {isMobile && (
           <div className={styles.mobileDetailsBottom}>
             <div className={styles.mobileDetailsBottomLeft}>
               {showTypeElement} 
-              {continueWatching && episodeNumberElement} {/* Current episode only for continue watching */}
+              {continueWatching && episodeNumberElement} {}
             </div>
             <div className={styles.mobileDetailsBottomRight}>
               {episodeCountElement}
             </div>
           </div>
         )}
-        {isMobile && progressElement} {/* Mobile progress bar */}
-        {!isMobile && continueWatching && isHovered && removeButtonElement} {/* Desktop remove button */}
-        {!isMobile && showTypeElement} {/* Desktop show type */}
+        {isMobile && progressElement} {}
+        {!isMobile && continueWatching && isHovered && removeButtonElement} {}
+        {!isMobile && showTypeElement} {}
         {continueWatching ? null : (
           <div className={styles.details}>
-            {/* availableEpisodesDetail moved to posterContainer */}
+            {}
           </div>
         )}
       </div>

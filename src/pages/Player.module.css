@@ -1,6 +1,6 @@
 :root {
     --dark-watched-color: #034e46;
-    --light-watched-color: #a7d9d0; /* A lighter, desaturated version of the dark watched color */
+    --light-watched-color: #a7d9d0;
 }
 
 
@@ -23,14 +23,14 @@
     display: flex;
     align-items: center;
     gap: 1.5rem;
-    flex-wrap: wrap; /* Allow controls to wrap on smaller screens */
+    flex-wrap: wrap;
 }
 
 .playerActions {
     display: flex;
     align-items: center;
     gap: 1rem;
-    flex-wrap: wrap; /* Allow controls to wrap on smaller screens */
+    flex-wrap: wrap;
 }
 
 .seekBtn {
@@ -98,7 +98,7 @@ body.light .watchlistBtn {
 .videoContainer {
     position: relative;
     width: 100%;
-    padding-top: 56.25%; /* 16:9 Aspect Ratio */
+    padding-top: 56.25%;
     background-color: black;
     margin-bottom: 2rem;
 }
@@ -112,11 +112,11 @@ body.light .watchlistBtn {
     opacity: 1;
     transition: opacity 0.3s ease-in-out;
     z-index: 50;
-    pointer-events: none; /* Allow clicks to pass through */
+    pointer-events: none;
 }
 
 .controlsOverlay > * {
-    pointer-events: auto; /* Make direct children clickable */
+    pointer-events: auto;
 }
 
 .controlsOverlay.hidden {
@@ -141,7 +141,7 @@ body.light .watchlistBtn {
     align-items: center;
     cursor: pointer;
     padding: 0;
-    padding-left: 10px; /* Optical adjustment for play icon */
+    padding-left: 10px;
 }
 
 .centerPlayPause:hover {
@@ -155,7 +155,7 @@ body.light .watchlistBtn {
     right: 0;
     padding: 10px 20px;
     display: flex;
-    flex-direction: column; /* Stack progress bar on top of controls */
+    flex-direction: column;
     gap: 0.5rem;
     background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);
 }
@@ -216,7 +216,7 @@ body.light .watchlistBtn {
 
 .timeBubble {
     position: absolute;
-    bottom: 30px; /* Position above the bar */
+    bottom: 30px;
     transform: translateX(-50%);
     background-color: rgba(0, 0, 0, 0.8);
     color: white;
@@ -280,50 +280,46 @@ body.light .watchlistBtn {
     transition: width 0.3s, opacity 0.3s;
     cursor: pointer;
     margin-left: 0.5rem;
-    /* Custom styles for range input */
-    -webkit-appearance: none; /* Remove default WebKit styles */
+    -webkit-appearance: none;
     appearance: none;
-    background: transparent; /* Hide default track */
+    background: transparent;
 }
 
-/* WebKit (Chrome, Safari) */
 .volumeSlider::-webkit-slider-runnable-track {
     width: 100%;
-    height: 6px; /* Thicker track */
+    height: 6px;
     background: linear-gradient(to right, var(--accent) var(--track-fill-percent, 0%), #ccc var(--track-fill-percent, 0%));
-    border-radius: 3px; /* Adjust border-radius for thicker track */
+    border-radius: 3px;
 }
 
 .volumeSlider::-webkit-slider-thumb {
-    -webkit-appearance: none; /* Remove default WebKit styles */
+    -webkit-appearance: none;
     appearance: none;
-    width: 16px; /* Thicker thumb */
-    height: 16px; /* Thicker thumb */
+    width: 16px;
+    height: 16px;
     background-color: white;
     border-radius: 50%;
     cursor: pointer;
-    margin-top: -5px; /* Adjust to keep thumb vertically centered with thicker track */
+    margin-top: -5px;
     box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
 }
 
-/* Firefox */
 .volumeSlider::-moz-range-track {
     width: 100%;
-    height: 6px; /* Thicker track */
+    height: 6px;
     background: linear-gradient(to right, var(--accent) var(--track-fill-percent, 0%), #ccc var(--track-fill-percent, 0%));
-    border-radius: 3px; /* Adjust border-radius for thicker track */
+    border-radius: 3px;
 }
 
 .volumeSlider::-moz-range-thumb {
-    width: 16px; /* Thicker thumb */
-    height: 16px; /* Thicker thumb */
+    width: 16px;
+    height: 16px;
     background-color: white;
     border-radius: 50%;
     cursor: pointer;
     box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
 }
 
-/* Update track fill percentage dynamically with JS */
 .volumeSlider:not(:active)::-webkit-slider-runnable-track {
     background: linear-gradient(to right, var(--accent) calc(var(--volume-percent) * 100%), #ccc calc(var(--volume-percent) * 100%));
 }
@@ -415,7 +411,7 @@ body.light .qualityItem {
     background-color: var(--dark-bg-secondary);
     padding: 1.5rem;
     border-radius: var(--card-border-radius);
-    margin-bottom: 1.5rem; /* Add space below description */
+    margin-bottom: 1.5rem;
 }
 
 body.light .descriptionBox {
@@ -449,8 +445,8 @@ body.light .descriptionBox {
 .episodeItem:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    background-color: var(--accent); /* Change background to accent on hover */
-    color: white; /* Ensure text is white on accent background */
+    background-color: var(--accent);
+    color: white;
     border-color: var(--accent);
 }
 
@@ -470,13 +466,13 @@ body.light .episodeItem {
 .episodeItem.watched {
     background-color: var(--dark-watched-color);
     border-color: var(--dark-watched-color);
-    color: #fff; /* Ensure text is readable */
+    color: #fff;
 }
 
 body.light .episodeItem.watched {
     background-color: var(--light-watched-color);
     border-color: var(--light-watched-color);
-    color: var(--light-text); /* Adjust text color for light background */
+    color: var(--light-text);
 }
 
 .epJumpControls {
@@ -653,7 +649,6 @@ body.light .epJumpInputGroup input {
     box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
 }
 
-/* Dynamic fill for CC sliders */
 .ccSliderContainer input[type="range"]:not(:active)::-webkit-slider-runnable-track {
     background: linear-gradient(to right, var(--accent) calc(var(--slider-percent) * 100%), #ccc calc(var(--slider-percent) * 100%));
 }
@@ -771,38 +766,38 @@ body.light .sourceButton, body.light .qualityButton {
     }
 
     .bottomControlsRow {
-        flex-wrap: wrap; /* Allow controls to wrap */
-        gap: 0.5rem; /* Add gap between wrapped items */
+        flex-wrap: wrap;
+        gap: 0.5rem;
     }
 
     .leftControls, .rightControls {
-        flex-basis: 100%; /* Make each take full width */
-        justify-content: space-around; /* Distribute items evenly */
+        flex-basis: 100%;
+        justify-content: space-around;
         gap: 0.5rem;
     }
 
     .rightControls {
-        order: -1; /* Move right controls (settings) to the top row */
+        order: -1;
     }
 
     .timeDisplay {
-        flex-basis: auto; /* Allow time to not take full width */
-        order: -1; /* Move time to the beginning of the left controls */
+        flex-basis: auto;
+        order: -1;
         font-size: 0.8rem;
     }
 
     .volumeContainer:hover .volumeSlider {
-        width: 0; /* Keep it hidden on hover for mobile */
+        width: 0;
         opacity: 0;
     }
 
     .volumeContainer.open .volumeSlider {
-        width: 80px; /* Show slider when container has 'open' class */
+        width: 80px;
         opacity: 1;
     }
 
     .controlBtn {
-        font-size: 1.2rem; /* Smaller buttons */
+        font-size: 1.2rem;
     }
 
     .centerPlayPause {
@@ -812,7 +807,7 @@ body.light .sourceButton, body.light .qualityButton {
     }
 
     .settingsMenu {
-        width: 200px; /* Narrower menu */
+        width: 200px;
         padding: 0.8rem;
     }
 
@@ -880,19 +875,19 @@ body.light .sourceButton, body.light .qualityButton {
     top: 0;
     height: 100%;
     opacity: 0.5;
-    z-index: 1; /* Below watchedBar */
+    z-index: 1;
 }
 
 .skipSegment.op, .skipSegment.mixed_op {
-    background-color: #ffc107; /* Yellow for opening */
+    background-color: #ffc107;
 }
 
 .skipSegment.ed, .skipSegment.mixed_ed {
-    background-color: #00bcd4; /* Cyan for ending */
+    background-color: #00bcd4;
 }
 
 .skipSegment.recap, .skipSegment.mixed_recap {
-    background-color: #9c27b0; /* Purple for recap */
+    background-color: #9c27b0;
 }
 
 .middleControls {

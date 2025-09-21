@@ -1,8 +1,6 @@
 
 import React from 'react';
 import AnimeCard from './AnimeCard';
-
-// Define the types for the props
 import AnimeCardSkeleton from './AnimeCardSkeleton';
 
 interface Anime {
@@ -24,8 +22,8 @@ interface AnimeSectionProps {
   title: string;
   animeList: Anime[];
   continueWatching?: boolean;
-  onRemove?: (id: string) => void; // <--- Add this prop
-  loading?: boolean; // New loading prop
+  onRemove?: (id: string) => void;
+  loading?: boolean;
 }
 
 const AnimeSection: React.FC<AnimeSectionProps> = ({ title, animeList, continueWatching = false, onRemove, loading }) => {

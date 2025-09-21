@@ -18,10 +18,10 @@ const dbPath = path.join(__dirname, 'anime.db');
 let db;
 
 axiosRetry(axios, {
-    retries: 3, // Number of retry attempts
-    retryDelay: axiosRetry.exponentialDelay, // Exponential back-off
+    retries: 3,
+    retryDelay: axiosRetry.exponentialDelay,
     retryCondition: (error) => {
-        // Retry on network errors or 5xx HTTP errors
+
         return axiosRetry.isNetworkError(error) || axiosRetry.isRetryableError(error);
     },
 });
@@ -118,7 +118,6 @@ function deobfuscateUrl(obfuscatedUrl) {
         }
     }
 
-    // Ensure all external image URLs go through the proxy
     if (finalUrl.startsWith('http://') || finalUrl.startsWith('https://')) {
         return `http://localhost:3000/api/image-proxy?url=${encodeURIComponent(finalUrl)}`;
     }
@@ -168,7 +167,7 @@ async function fetchAndSendShows(res, variables, cacheKey) {
         if (cacheKey) {
             apiCache.set(cacheKey, transformedShows);
         }
-        res.set('Cache-Control', 'public, max-age=300'); // Cache for 5 minutes
+        res.set('Cache-Control', 'public, max-age=300');
         res.json(transformedShows);
     } catch (error) {
         console.error('Error fetching data:', error.message);
@@ -204,7 +203,7 @@ app.get('/api/popular/:timeframe', async (req, res) => {
             return { ...card, thumbnail: deobfuscateUrl(card.thumbnail || '') };
         });
         apiCache.set(cacheKey, shows);
-        res.set('Cache-Control', 'public, max-age=300'); // Cache for 5 minutes
+        res.set('Cache-Control', 'public, max-age=300');
         res.json(shows);
     } catch (error) {
         console.error('Error fetching popular data:', error.response ? error.response.data : error.message);
@@ -275,7 +274,7 @@ app.get('/api/show-meta/:id', async (req, res) => {
         if (show) {
             const meta = { name: show.name, thumbnail: deobfuscateUrl(show.thumbnail) };
             apiCache.set(cacheKey, meta);
-            res.set('Cache-Control', 'public, max-age=300'); // Cache for 5 minutes
+            res.set('Cache-Control', 'public, max-age=300');
             res.json(meta);
         } else {
             res.status(404).json({ error: 'Show not found' });
@@ -299,7 +298,7 @@ app.get('/api/episodes', async (req, res) => {
         const showData = response.data.data.show;
         const result = { episodes: showData.availableEpisodesDetail[mode] || [], description: showData.description };
         apiCache.set(cacheKey, result);
-        res.set('Cache-Control', 'public, max-age=300'); // Cache for 5 minutes
+        res.set('Cache-Control', 'public, max-age=300');
         res.json(result);
     } catch (error) {
         res.status(500).send('Error fetching episodes from API');
@@ -411,7 +410,7 @@ app.get('/api/image-proxy', async (req, res) => {
             method: 'get',
             url: req.query.url,
             responseType: 'stream',
-            headers: { Referer: apiBaseUrl, 'User-Agent': userAgent }, // Use server's userAgent for external request
+            headers: { Referer: apiBaseUrl, 'User-Agent': userAgent },
             timeout: 10000,
             maxRedirects: 5
         };
@@ -440,7 +439,6 @@ app.get('/api/image-proxy', async (req, res) => {
         res.set('Cache-Control', 'public, max-age=604800, immutable');
         res.set('Content-Type', contentType);
 
-        // Robust streaming
         streamData.pipe(res);
 
         streamData.on('error', (err) => {
@@ -469,16 +467,12 @@ app.get('/api/image-proxy', async (req, res) => {
 
 app.get('/api/proxy', async (req, res) => {
     const requestId = crypto.randomBytes(4).toString('hex');
-    //console.log(`\n--- [${requestId}] /proxy: NEW REQUEST ---`);
-    //console.log(`[${requestId}] /proxy: Request URL: ${req.originalUrl}`);
-    //console.log(`[${requestId}] /proxy: Client Request Headers:`, JSON.stringify(req.headers, null, 2));
-
     const { url, referer: dynamicReferer } = req.query;
+
     try {
         const headers = { 
             'User-Agent': userAgent, 
             'Accept': '*/*',
-            // --- CHANGE: Added keep-alive for connection stability ---
             'Connection': 'keep-alive'
         };
         if (dynamicReferer) headers['Referer'] = dynamicReferer;
@@ -486,9 +480,6 @@ app.get('/api/proxy', async (req, res) => {
         if (req.headers.range) {
             headers['Range'] = req.headers.range;
         }
-
-        //console.log(`[${requestId}] /proxy: Fetching remote URL: ${url}`);
-        //console.log(`[${requestId}] /proxy: Sending Headers to Remote:`, JSON.stringify(headers, null, 2));
 
         if (url.includes('.m3u8')) {
             const response = await axios.get(url, { headers, responseType: 'text', timeout: 15000 });
@@ -502,7 +493,6 @@ app.get('/api/proxy', async (req, res) => {
                     : l
             ).join('\n');
             res.set('Content-Type', 'application/vnd.apple.mpegurl').send(rewritten);
-            //console.log(`[${requestId}] /proxy: Finished processing m3u8.`);
         } else {
             const streamResponse = await axios({ 
                 method: 'get', 
@@ -512,24 +502,19 @@ app.get('/api/proxy', async (req, res) => {
                 timeout: 20000 
             });
 
-            //console.log(`[${requestId}] /proxy: Video chunk remote response status: ${streamResponse.status}`);
-            
             res.status(streamResponse.status);
             res.set(streamResponse.headers);
-            
-            // --- CHANGE: Added listeners to the client connection to handle aborts gracefully ---
+
             req.on('close', () => {
-                //console.log(`[${requestId}] /proxy: Client closed connection. Aborting remote request.`);
                 streamResponse.data.destroy();
             });
 
             streamResponse.data.pipe(res);
-
             streamResponse.data.on('error', (err) => {
-                // Ignore ECONNRESET, as it's the expected error when the client aborts a request.
+
                 if (err.code !== 'ECONNRESET') {
-                    //console.error(`[${requestId}] /proxy: Error on remote stream:`, err);
                 }
+
                 if (!res.headersSent) {
                     res.status(500).send('Error during streaming from remote.');
                 }
@@ -537,26 +522,18 @@ app.get('/api/proxy', async (req, res) => {
             });
 
             streamResponse.data.on('end', () => {
-                //console.log(`[${requestId}] /proxy: Remote stream finished successfully.`);
             });
         }
     } catch (e) {
         if (e.response) {
-            //console.error(`[${requestId}] /proxy: AXIOS ERROR for ${url}: Status ${e.response.status}`);
-            //console.error(`[${requestId}] /proxy: AXIOS ERROR Headers:`, JSON.stringify(e.response.headers, null, 2));
             const errorBody = await streamToString(e.response.data).catch(() => 'Could not read error stream.');
-            //console.error(`[${requestId}] /proxy: AXIOS ERROR Data:`, errorBody);
             if (!res.headersSent) res.status(e.response.status).send(`Proxy error: ${e.message}`);
         } else if (e.request) {
-            //console.error(`[${requestId}] /proxy: AXIOS NETWORK ERROR for ${url}: No response received.`, e.message);
             if (!res.headersSent) res.status(504).send(`Proxy error: Gateway timeout.`);
         } else {
-            //console.error(`[${requestId}] /proxy: UNKNOWN ERROR for ${url}: ${e.message}`);
             if (!res.headersSent) res.status(500).send(`Proxy error: ${e.message}`);
         }
-        
         if (res.writable && !res.headersSent) {
-           // Error response already sent
         } else if (res.writable) {
            res.end();
         }
@@ -635,8 +612,6 @@ app.get('/api/schedule-info/:showId', async (req, res) => {
         return res.json({ status: "Not Found on Schedule" });
 
     } catch (error) {
-        // --- CHANGE: Added .catch() to prevent unhandled promise rejection from logs ---
-        //console.error("Error fetching schedule info:", error.message);
         return res.json({ status: "Error" });
     }
 });
@@ -1023,13 +998,10 @@ app.post('/api/rclone-download', (req, res) => {
         });
     });
 });
-// Serve static files from the React app
+
 app.use(express.static(path.join(__dirname, '../dist')));
 app.use('/profile_pics', express.static(profilePicsDir));
 
-
-// The "catchall" handler: for any request that doesn't
-// match one above, send back React's index.html file.
 app.get(/^(?!(\/api|\/profile_pics)).*$/, (req, res) => {
   res.sendFile(path.join(__dirname, '../dist/index.html'));
 });

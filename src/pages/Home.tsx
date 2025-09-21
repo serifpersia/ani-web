@@ -4,7 +4,6 @@ import Top10List from '../components/anime/Top10List';
 import Schedule from '../components/anime/Schedule';
 import AnimeCardSkeleton from '../components/anime/AnimeCardSkeleton';
 
-// Define the type for the anime item
 interface Anime {
     _id: string;
     id: string;
@@ -33,7 +32,7 @@ const Home: React.FC = () => {
 
   const [loadingLatestReleases, setLoadingLatestReleases] = useState(true);
   const [loadingContinueWatching, setLoadingContinueWatching] = useState(true);
-  const [loadingCurrentSeason, setLoadingCurrentSeason] = useState(true); // New state for initial loading of Current Season
+  const [loadingCurrentSeason, setLoadingCurrentSeason] = useState(true);
 
   const seasonalState = useRef({ page: 1, isLoading: false, hasMore: true });
 
@@ -47,9 +46,9 @@ const Home: React.FC = () => {
         data.map(async (item: any) => {
           const animeDetails = await fetchAnimeDetails(item._id);
           if (animeDetails) {
-            return { ...animeDetails, ...item }; // Merge existing item data with fetched details
+            return { ...animeDetails, ...item };
           } else {
-            return null; // Handle cases where details couldn't be fetched
+            return null;
           }
         })
       );
@@ -76,9 +75,9 @@ const Home: React.FC = () => {
           newShows.map(async (item: any) => {
             const animeDetails = await fetchAnimeDetails(item._id);
             if (animeDetails) {
-              return { ...animeDetails, ...item }; // Merge existing item data with fetched details
+              return { ...animeDetails, ...item };
             } else {
-              return null; // Handle cases where details couldn't be fetched
+              return null;
             }
           })
         );
@@ -95,30 +94,25 @@ const Home: React.FC = () => {
 
   const handleRemoveContinueWatching = async (showId: string) => {
     try {
-      // Optimistically update UI
       setContinueWatchingList(prevList => prevList.filter(anime => anime.id !== showId));
 
-      // Call backend API to remove from continue watching
       const response = await fetch("/api/continue-watching/remove", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Profile-ID": "1", // Placeholder
+          "X-Profile-ID": "1",
         },
         body: JSON.stringify({ showId }),
       });
 
       if (!response.ok) {
-        // If backend call fails, revert UI (optional, but good practice)
         console.error("Failed to remove from backend, reverting UI.");
-        // Re-fetch or add back the item
         fetchContinueWatching(); 
       }
     } catch (error) {
       console.error("Error removing from continue watching:", error);
-      fetchContinueWatching(); // Re-fetch on error
+      fetchContinueWatching();
     } finally {
-      // Optional: Add a loading state setter here if removal had a loading state
       console.log("Remove continue watching operation completed.");
     }
   };
@@ -160,7 +154,7 @@ const Home: React.FC = () => {
   const fetchContinueWatching = async () => {
     try {
       const response = await fetch("/api/continue-watching", {
-        headers: { 'X-Profile-ID': '1' } // Placeholder
+        headers: { 'X-Profile-ID': '1' }
       });
       if (!response.ok) throw new Error("Failed to fetch continue watching");
       const data = await response.json();
@@ -176,7 +170,7 @@ const Home: React.FC = () => {
               duration: item.duration
             };
           } else {
-            return null; // Handle cases where details couldn't be fetched
+            return null;
           }
         })
       );
@@ -195,7 +189,7 @@ const Home: React.FC = () => {
 
     const handleScroll = () => {
       if (
-        window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000 && // Increased trigger offset
+        window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000 &&
         !seasonalState.current.isLoading &&
         seasonalState.current.hasMore
       ) {
