@@ -78,6 +78,11 @@ header { border-color: var(--border); }
 /* Hamburger Menu */
 .hamburger-button span {
   background-color: var(--text);
+  transition: background-color 0.2s;
+}
+
+.hamburger-button:hover span {
+  background-color: var(--accent-purple);
 }
 
 /* Links */
@@ -318,9 +323,13 @@ footer a:hover {
   flex-shrink: 0;
 }
 
+.main-content-blur {
+  filter: blur(5px);
+  transition: filter 0.3s ease-in-out;
+}
+
 @media (min-width: 769px) {
   .sidebar-open main {
-    margin-left: 300px;
     transition: margin-left 0.3s ease-in-out;
   }
 }

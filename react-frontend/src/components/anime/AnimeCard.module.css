@@ -123,13 +123,14 @@
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
-  background-color: rgba(0, 0, 0, 0.7);
-  color: white;
+  background-color: rgba(255, 255, 255, 0.8);
+  color: #111;
   border: none;
   border-radius: 50%;
   width: 24px;
   height: 24px;
   font-size: 14px;
+  font-weight: bold;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -139,7 +140,6 @@
 }
 
 .removeBtn:hover {
-  background-color: rgba(255, 0, 0, 0.8); /* Red background on hover */
   transform: scale(1.1); /* Slightly enlarge on hover */
 }
 

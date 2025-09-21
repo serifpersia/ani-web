@@ -22,18 +22,25 @@ function App() {
       }
     };
 
+    if (isSidebarOpen) {
+      document.body.classList.add('sidebar-open');
+    } else {
+      document.body.classList.remove('sidebar-open');
+    }
+
     window.addEventListener('keydown', handleKeydown);
 
     return () => {
       window.removeEventListener('keydown', handleKeydown);
+      document.body.classList.remove('sidebar-open');
     };
   }, [isSidebarOpen, closeSidebar]);
 
   return (
-    <div className={`app-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+    <div className={`app-container`}>
       <Header />
       <Sidebar />
-      <main>
+      <main className={isSidebarOpen ? 'main-content-blur' : ''}>
         <Suspense fallback={<div>Loading...</div>}> {/* Added Suspense */}
           <Routes>
             <Route path="/" element={<Home />} />

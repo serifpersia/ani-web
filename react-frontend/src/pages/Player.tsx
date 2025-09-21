@@ -48,6 +48,7 @@ const Player: React.FC = () => {
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const progressBarThumbRef = useRef<HTMLDivElement>(null); // New ref for the thumb
+  const volumeSliderRef = useRef<HTMLInputElement>(null); // Ref for volume slider
   const hlsInstance = useRef<any | null>(null); // Changed type to any
   const inactivityTimer = useRef<number | null>(null);
   const wasPlayingBeforeScrub = useRef(false); // To remember if video was playing before scrubbing
@@ -183,6 +184,11 @@ const Player: React.FC = () => {
         videoRef.current.muted = (initialVolume === 0) ? savedMute : false; // Only mute if volume is 0
         setIsMuted(videoRef.current.muted); // Ensure state reflects actual muted status
     }
+
+    // Set initial CSS property for volume track
+    if (volumeSliderRef.current) {
+        volumeSliderRef.current.style.setProperty('--volume-percent', initialVolume.toString());
+    }
   }, [showId, currentEpisode]);
 
   // Effect to fetch show metadata, episode list, and watched status
@@ -302,7 +308,11 @@ const Player: React.FC = () => {
     if (!selectedSource || !selectedLink || !videoRef.current) return;
 
     const videoElement = videoRef.current;
-    const proxiedUrl = `/api/proxy?url=${encodeURIComponent(selectedLink.link)}&referer=${encodeURIComponent(selectedLink.headers?.Referer || 'https://allmanga.to')}`;
+
+    let proxiedUrl = `/api/proxy?url=${encodeURIComponent(selectedLink.link)}`;
+    if (selectedLink.headers?.Referer) {
+        proxiedUrl += `&referer=${encodeURIComponent(selectedLink.headers.Referer)}`;
+    }
 
     if (hlsInstance.current) {
       hlsInstance.current.destroy();
@@ -358,7 +368,7 @@ const Player: React.FC = () => {
       const loadHls = async () => {
         const Hls = (await import('hls.js')).default;
         if (Hls.isSupported()) {
-          const hls = new Hls({ manifestLoadingTimeOut: 20000 });
+          const hls = new Hls();
           hlsInstance.current = hls;
           hls.loadSource(proxiedUrl);
           hls.attachMedia(videoElement);
@@ -872,10 +882,10 @@ const Player: React.FC = () => {
         <p dangerouslySetInnerHTML={{ __html: showMeta.description || 'No description available.' }}></p>
       </div>
 
-      <div ref={playerContainerRef} className={styles.videoContainer}>
+      <div ref={playerContainerRef} className={styles.videoContainer} onDoubleClick={toggleFullscreen}>
         {loadingVideo && <p className="loading">Loading video...</p>}
         
-        {!isMobile && <div className={`${styles.controlsOverlay} ${!showControls ? styles.hidden : ''}`}>
+        {!isMobile && <div className={`${styles.controlsOverlay} ${!showControls ? styles.hidden : ''}`} onDoubleClick={(e) => e.stopPropagation()}>
             {(!isPlaying || autoplayBlocked) && (
                 <button className={styles.centerPlayPause} onClick={togglePlay}>
                     <FaPlay />
@@ -922,6 +932,7 @@ const Player: React.FC = () => {
                         <div className={styles.volumeContainer}>
                             <button className={styles.controlBtn} onClick={toggleMute}>{renderVolumeIcon()}</button>
                             <input 
+                                ref={volumeSliderRef}
                                 type="range" 
                                 min="0" 
                                 max="1" 
@@ -932,21 +943,6 @@ const Player: React.FC = () => {
                             />
                         </div>
                         <span className={styles.timeDisplay}>{formatTime(currentTime)} / {formatTime(duration)}</span>
-                        <button className={styles.controlBtn} onClick={() => seek(-10)}>
-                          <svg width="36" height="36" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" strokeWidth="3" stroke="currentColor" fill="none">
-                            <path strokeLinecap="round" d="m9.57 15.41 2.6 8.64 8.64-2.61m6.12 19.97V23a.09.09 0 0 0-.16-.07s-2.58 3.69-4.17 4.78"/>
-                            <rect x="32.19" y="22.52" width="11.41" height="18.89" rx="5.7"/>
-                            <path d="M12.14 23.94a21.91 21.91 0 1 1-.91 13.25" strokeLinecap="round"/>
-                          </svg>
-                        </button>
-                        <button className={styles.controlBtn} onClick={() => seek(10)}>
-                          <svg width="36" height="36" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" strokeWidth="3" stroke="currentColor" fill="none">
-                            <path d="M23.93 41.41V23a.09.09 0 0 0-.16-.07s-2.58 3.69-4.17 4.78" strokeLinecap="round"/>
-                            <rect x="29.19" y="22.52" width="11.41" height="18.89" rx="5.7"/>
-                            <path strokeLinecap="round" d="m54.43 15.41-2.6 8.64-8.64-2.61"/>
-                            <path d="M51.86 23.94a21.91 21.91 0 1 0 .91 13.25" strokeLinecap="round"/>
-                          </svg>
-                        </button>
                         {currentSkipInterval && !isAutoSkipEnabled && (
                             <button className={styles.controlBtn} onClick={() => {
                                 if (videoRef.current && currentSkipInterval) {
@@ -959,6 +955,24 @@ const Player: React.FC = () => {
                         )}
                     </div>
                     <div className={styles.rightControls}>
+                        <div className={styles.middleControls}>
+                            <button className={styles.controlBtn} onClick={() => seek(-10)}>
+                                <svg width="36" height="36" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" strokeWidth="3" stroke="currentColor" fill="none">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M34 52h18V16H24"/>
+                                    <path strokeLinecap="round" d="M24 16H8"/>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="m11.5 12-4 4 4 4"/>
+                                    <text x="3" y="53" fontSize="28" fill="currentColor" stroke="none">10</text>
+                                </svg>
+                            </button>
+                            <button className={styles.controlBtn} onClick={() => seek(10)}>
+                                <svg width="36" height="36" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" strokeWidth="3" stroke="currentColor" fill="none">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M30 52H12V16h28"/>
+                                    <path strokeLinecap="round" d="M40 16h16"/>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="m52 12 4.5 4-4.5 4"/>
+                                    <text x="29" y="53.5" fontSize="28" fill="currentColor" stroke="none">10</text>
+                                </svg>
+                            </button>
+                        </div>
                         {/* Auto Skip Toggle */}
                         <div className={styles.toggleContainer}>
                             <span>Auto Skip</span>
