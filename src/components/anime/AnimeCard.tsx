@@ -96,7 +96,7 @@ const AnimeCard: React.FC<AnimeCardProps> = ({ anime, continueWatching = false, 
           src={currentImageSrc} 
           alt={anime.name} 
           className={`${styles.posterImg} ${imageLoaded ? styles.loaded : ''}`} 
-          loading="lazy" 
+          loading="lazy"
           onLoad={() => setImageLoaded(true)} /* Set imageLoaded to true on successful load */
           onError={() => {
             setCurrentImageSrc('/placeholder.svg'); /* Update state to placeholder */
