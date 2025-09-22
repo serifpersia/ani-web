@@ -330,6 +330,27 @@ footer a:hover {
 
 @media (min-width: 769px) {
   .sidebar-open main {
-    transition: margin-left 0.3s ease-in-out;
   }
+} 
+
+.genre-button {
+  background-color: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 0.5rem 1rem;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.genre-button.include {
+  background-color: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.genre-button.exclude {
+  background-color: #ff4d4d;
+  color: white;
+  border-color: #ff4d4d;
 }

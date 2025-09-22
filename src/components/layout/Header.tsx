@@ -1,11 +1,26 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import Logo from '../common/Logo';
 import { useSidebar } from '../../hooks/useSidebar';
 import styles from './Header.module.css';
+import { FaSearch, FaFilter } from 'react-icons/fa';
 
 const Header: React.FC = () => {
   const { isOpen, toggleSidebar } = useSidebar();
+  const [query, setQuery] = useState('');
+  const navigate = useNavigate();
+
+  const handleSearch = () => {
+    if (query.trim()) {
+      navigate(`/search?query=${encodeURIComponent(query.trim())}`);
+    }
+  };
+
+  const handleKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      handleSearch();
+    }
+  };
 
   const headerStyle: React.CSSProperties = {
     display: 'flex',
@@ -46,6 +61,22 @@ const Header: React.FC = () => {
         </Link>
       </div>
       <div style={rightStyle}>
+        <div className={styles.searchContainer}>
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="Search..."
+            className={styles.searchInput}
+          />
+          <button onClick={handleSearch} className={styles.searchButton} aria-label="Search">
+            <FaSearch />
+          </button>
+          <button onClick={() => navigate('/search')} className={styles.filterButton} aria-label="Filters">
+            <FaFilter />
+          </button>
+        </div>
       </div>
     </header>
   );
