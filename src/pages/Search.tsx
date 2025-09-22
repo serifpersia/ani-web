@@ -31,6 +31,28 @@ const Search: React.FC = () => {
     const [year, setYear] = useState(searchParams.get('year') || 'ALL');
     const [country, setCountry] = useState(searchParams.get('country') || 'ALL');
     const [translation, setTranslation] = useState(searchParams.get('translation') || 'sub');
+    const [showGenres, setShowGenres] = useState(false);
+    const [genreStates, setGenreStates] = useState<{[key: string]: 'include' | 'exclude'}>({});
+    const [availableGenres, setAvailableGenres] = useState<string[]>([]);
+    const [availableTags, setAvailableTags] = useState<{ value: string, isStudio: boolean }[]>([]);
+    const [selectedTag, setSelectedTag] = useState<string>('ALL');
+
+    useEffect(() => {
+        const fetchGenresAndTags = async () => {
+            try {
+                const response = await fetch('/api/genres-and-tags');
+                if (!response.ok) throw new Error('Failed to fetch genres and tags');
+                const data = await response.json();
+                setAvailableGenres(data.genres || []);
+                const tags = data.tags?.map((tag: string) => ({ value: tag, isStudio: false })) || [];
+                const studios = data.studios?.map((studio: string) => ({ value: studio, isStudio: true })) || [];
+                setAvailableTags([...tags, ...studios]);
+            } catch (err) {
+                console.error('Failed to fetch genres and tags:', err);
+            }
+        };
+        fetchGenresAndTags();
+    }, []);
 
     const performSearch = useCallback(async (isNewSearch: boolean) => {
         if (isLoading && !isNewSearch) return;
@@ -44,6 +66,13 @@ const Search: React.FC = () => {
             hasMore.current = true;
         }
 
+        const genres = Object.entries(genreStates).filter(([, state]) => state === 'include').map(([genre]) => genre);
+        const excludeGenres = Object.entries(genreStates).filter(([, state]) => state === 'exclude').map(([genre]) => genre);
+
+        const selectedTagData = availableTags.find(t => t.value === selectedTag);
+        const tags = selectedTagData && !selectedTagData.isStudio ? selectedTag : undefined;
+        const studios = selectedTagData && selectedTagData.isStudio ? selectedTag : undefined;
+
         const params = new URLSearchParams({
             query: query,
             type: Array.isArray(type) ? type.join(',') : type,
@@ -52,6 +81,10 @@ const Search: React.FC = () => {
             country: country,
             translation: translation,
             page: currentPage.toString(),
+            ...(genres.length > 0 && { genres: genres.join(',') }),
+            ...(excludeGenres.length > 0 && { excludeGenres: excludeGenres.join(',') }),
+            ...(tags && { tags }),
+            ...(studios && { studios }),
         });
 
         try {
@@ -85,7 +118,25 @@ const Search: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [isLoading, query, type, season, year, country, translation]);
+    }, [isLoading, query, type, season, year, country, translation, genreStates, availableTags, selectedTag]);
+
+    useEffect(() => {
+        setQuery(searchParams.get('query') || '');
+        setType(searchParams.get('type') || 'ALL');
+        setSeason(searchParams.get('season') || 'ALL');
+        setYear(searchParams.get('year') || 'ALL');
+        setCountry(searchParams.get('country') || 'ALL');
+        setTranslation(searchParams.get('translation') || 'sub');
+        const genres = searchParams.get('genres')?.split(',') || [];
+        const excludeGenres = searchParams.get('excludeGenres')?.split(',') || [];
+        const newGenreStates: {[key: string]: 'include' | 'exclude'} = {};
+        genres.forEach(genre => newGenreStates[genre] = 'include');
+        excludeGenres.forEach(genre => newGenreStates[genre] = 'exclude');
+        setGenreStates(newGenreStates);
+        setSelectedTag(searchParams.get('tags') || searchParams.get('studios') || 'ALL');
+    }, [searchParams]);
+
+
 
     useEffect(() => {
         const handleScroll = () => {
@@ -98,8 +149,50 @@ const Search: React.FC = () => {
     }, [isLoading, performSearch]);
 
     const handleSearch = () => {
-        setSearchParams({ query, type, season, year, country, translation });
+        const genres = Object.entries(genreStates).filter(([, state]) => state === 'include').map(([genre]) => genre);
+        const excludeGenres = Object.entries(genreStates).filter(([, state]) => state === 'exclude').map(([genre]) => genre);
+        const selectedTagData = availableTags.find(t => t.value === selectedTag);
+        const tags = selectedTagData && !selectedTagData.isStudio ? selectedTag : undefined;
+        const studios = selectedTagData && selectedTagData.isStudio ? selectedTag : undefined;
+
+        const searchParamsObj: Record<string, string> = {
+            query,
+            type,
+            season,
+            year,
+            country,
+            translation,
+        };
+
+        if (genres.length > 0) {
+            searchParamsObj.genres = genres.join(',');
+        }
+        if (excludeGenres.length > 0) {
+            searchParamsObj.excludeGenres = excludeGenres.join(',');
+        }
+        if (tags) {
+            searchParamsObj.tags = tags;
+        }
+        if (studios) {
+            searchParamsObj.studios = studios;
+        }
+
+        setSearchParams(searchParamsObj);
         performSearch(true);
+    };
+
+    const handleGenreClick = (genre: string) => {
+        setGenreStates(prev => {
+            const newState = { ...prev };
+            if (newState[genre] === 'include') {
+                newState[genre] = 'exclude';
+            } else if (newState[genre] === 'exclude') {
+                delete newState[genre];
+            } else {
+                newState[genre] = 'include';
+            }
+            return newState;
+        });
     };
 
     const currentYear = new Date().getFullYear();
@@ -149,8 +242,32 @@ const Search: React.FC = () => {
                     <option value="sub">Sub</option>
                     <option value="dub">Dub</option>
                 </select>
-                <button onClick={handleSearch} className="btn-primary">Search</button>
+                <select value={selectedTag} onChange={e => setSelectedTag(e.target.value)} className="form-input">
+                    <option value="ALL">Tag/Studio: All</option>
+                    {availableTags.map(tag => <option key={tag.value} value={tag.value}>{tag.isStudio ? `${tag.value} (studio)` : tag.value}</option>)}
+                </select>
+                <button onClick={() => setShowGenres(!showGenres)} className="btn-primary">Genres</button>
+                <button onClick={handleSearch} className="btn-primary">Apply Filters</button>
             </div>
+
+            {showGenres && (
+                <div className="genre-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+                    {availableGenres.map(genre => (
+                        <div key={genre} style={{ position: 'relative' }}>
+                            <button
+                                onClick={() => handleGenreClick(genre)}
+                                className={`genre-button ${genreStates[genre]}`}>
+                                {genre}
+                            </button>
+                            {genreStates[genre] && (
+                                <span style={{ position: 'absolute', top: '-0.5rem', right: '-0.5rem', background: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '50%', fontSize: '0.7rem' }}>
+                                    {genreStates[genre] === 'include' ? '+' : '-'}
+                                </span>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {error && <ErrorMessage message={error} />}
             
