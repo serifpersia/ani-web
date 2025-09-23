@@ -1,0 +1,53 @@
+
+.searchableSelect {
+    position: relative;
+    width: 100%;
+    color: var(--text-primary);
+}
+
+.selectHeader {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--bg-primary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    border: 1px solid var(--border-color);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    background-color: var(--bg-primary);
+    z-index: 1000;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.searchInput {
+    width: 100%;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.optionsList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.option {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+}
+
+.option:hover {
+    background-color: var(--bg-secondary);
+}
