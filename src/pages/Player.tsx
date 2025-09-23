@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styles from './Player.module.css';
 import ToggleSwitch from '../components/common/ToggleSwitch';
-import { FaCheck, FaPlus, FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaVolumeDown, FaVolumeOff, FaExpand, FaCompress, FaClosedCaptioning, FaList } from 'react-icons/fa';
+import { FaCheck, FaPlus, FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaVolumeDown, FaVolumeOff, FaExpand, FaCompress, FaClosedCaptioning, FaList, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { formatTime } from '../lib/utils';
 import ResumeModal from '../components/common/ResumeModal';
 import useIsMobile from '../hooks/useIsMobile';
@@ -48,6 +48,14 @@ interface DetailedShowMeta {
     streams: { platform: string; url: string; name: string }[];
   };
   nextEpisodeAirDate?: string;
+}
+
+interface AllMangaDetail {
+  Rating: string;
+  Season: string;
+  Episodes: string;
+  Date: string;
+  "Original Broadcast": string;
 }
 
 interface VideoLink {
@@ -101,6 +109,8 @@ const Player: React.FC = () => {
   const [episodes, setEpisodes] = useState<string[]>([]);
   const [watchedEpisodes, setWatchedEpisodes] = useState<string[]>([]);
   const [currentEpisode, setCurrentEpisode] = useState<string | undefined>(episodeNumber);
+  const [allMangaDetails, setAllMangaDetails] = useState<AllMangaDetail | null>(null);
+  const [showCombinedDetails, setShowCombinedDetails] = useState(false);
     
   const [currentMode, setCurrentMode] = useState('sub');
   const [inWatchlist, setInWatchlist] = useState(false);
@@ -231,12 +241,13 @@ const Player: React.FC = () => {
       setLoadingShowData(true);
       setError(null);
       try {
-        const [metaResponse, detailsResponse, episodesResponse, watchlistResponse, watchedResponse] = await Promise.all([
+        const [metaResponse, detailsResponse, episodesResponse, watchlistResponse, watchedResponse, allmangaDetailsResponse] = await Promise.all([
           fetch(`/api/show-meta/${showId}`),
           fetch(`/api/show-details/${showId}`),
           fetch(`/api/episodes?showId=${showId}&mode=${currentMode}`),
           fetchWithProfile(`/api/watchlist/check/${showId}`),
           fetchWithProfile(`/api/watched-episodes/${showId}`),
+          fetch(`/api/allmanga-details/${showId}`),
         ]);
 
         if (!metaResponse.ok) throw new Error("Failed to fetch show metadata");
@@ -249,6 +260,8 @@ const Player: React.FC = () => {
         const episodeData: EpisodeData = await episodesResponse.json();
         const watchlistStatus = await watchlistResponse.json();
         const watchedData = await watchedResponse.json();
+        const allmangaDetails = allmangaDetailsResponse.ok ? await allmangaDetailsResponse.json() : null;
+        setAllMangaDetails(allmangaDetails);
 
         setShowMeta({ 
           ...meta, 
@@ -923,18 +936,42 @@ const Player: React.FC = () => {
       </div>
 
       <div className={styles.detailsBox}>
-        <div className={styles.detailItem}><strong>Type:</strong> {showMeta.mediaTypes?.[0]?.name}</div>
-        <div className={styles.detailItem}><strong>Status:</strong> {showMeta.status}</div>
-        <div className={styles.detailItem}><strong>Score:</strong> {showMeta.stats ? showMeta.stats.averageScore / 10 : 'N/A'}</div>
-        <div className={styles.detailItem}><strong>Studios:</strong> {showMeta.studios?.map(s => s.name).join(', ')}</div>
-        <div className={styles.detailItem}><strong>English Title:</strong> {showMeta.names?.english}</div>
-        <div className={styles.detailItem}><strong>Native Title:</strong> {showMeta.names?.native}</div>
-        {showMeta.genres && showMeta.genres.length > 0 && (
-          <div className={`${styles.detailItem} ${styles.genresContainer}`}>
-            <strong>Genres:</strong>
-            <div className={styles.genresList}>
-              {showMeta.genres.map(genre => <span key={genre.route} className={styles.genreTag}>{genre.name}</span>)}
-            </div>
+        <button className={styles.detailsToggle} onClick={() => setShowCombinedDetails(!showCombinedDetails)}>
+          <h3>Details</h3>
+          {showCombinedDetails ? <FaChevronUp /> : <FaChevronDown />}
+        </button>
+        {showCombinedDetails && (
+          <div className={styles.detailsGridContainer}>
+            {/* General Information */}
+            <div className={styles.detailItem}><strong>Type:</strong> {showMeta.mediaTypes?.[0]?.name}</div>
+            <div className={styles.detailItem}><strong>Status:</strong> {showMeta.status}</div>
+            <div className={styles.detailItem}><strong>Score:</strong> {showMeta.stats ? showMeta.stats.averageScore / 10 : 'N/A'}</div>
+
+            {/* Production/Origin */}
+            <div className={styles.detailItem}><strong>Studios:</strong> {showMeta.studios?.map(s => s.name).join(', ')}</div>
+            <div className={styles.detailItem}><strong>English Title:</strong> {showMeta.names?.english}</div>
+            <div className={styles.detailItem}><strong>Native Title:</strong> {showMeta.names?.native}</div>
+
+            {/* Categorization */}
+            {showMeta.genres && showMeta.genres.length > 0 && (
+              <div className={`${styles.detailItem} ${styles.genresContainer}`}>
+                <strong>Genres:</strong>
+                <div className={styles.genresList}>
+                  {showMeta.genres.map(genre => <span key={genre.route} className={styles.genreTag}>{genre.name}</span>)}
+                </div>
+              </div>
+            )}
+
+            {/* Manga Details */}
+            {allMangaDetails && (
+              <>
+                <div className={styles.detailItem}><strong>Rating:</strong> {allMangaDetails.Rating}</div>
+                <div className={styles.detailItem}><strong>Season:</strong> {allMangaDetails.Season}</div>
+                <div className={styles.detailItem}><strong>Episodes:</strong> {allMangaDetails.Episodes}</div>
+                <div className={styles.detailItem}><strong>Date:</strong> {allMangaDetails.Date}</div>
+                <div className={styles.detailItem}><strong>Original Broadcast:</strong> {allMangaDetails["Original Broadcast"]}</div>
+              </>
+            )}
           </div>
         )}
       </div>
