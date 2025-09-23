@@ -278,31 +278,7 @@ app.get('/api/schedule/:date', (req, res) => {
     const variables = { search: { dateRangeStart: Math.floor(startOfDay.getTime() / 1000), dateRangeEnd: Math.floor(endOfDay.getTime() / 1000), sortBy: "Latest_Update" }, limit: 50, page: 1, translationType: "sub", countryOrigin: "ALL" };
     fetchAndSendShows(res, variables, cacheKey);
 });
-app.get('/api/show-meta/:id', async (req, res) => {
-    const showId = req.params.id;
-    const cacheKey = `show-meta-${showId}`;
-    if (apiCache.has(cacheKey)) {
-        return res.json(apiCache.get(cacheKey));
-    }
-    try {
-        const response = await axios.get(apiEndpoint, {
-            headers: { 'User-Agent': userAgent, 'Referer': referer },
-            params: { query: `query($showId: String!) { show(_id: $showId) { name, thumbnail } }`, variables: JSON.stringify({ showId }) },
-            timeout: 15000
-        });
-        const show = response.data.data.show;
-        if (show) {
-            const meta = { name: show.name, thumbnail: deobfuscateUrl(show.thumbnail) };
-            apiCache.set(cacheKey, meta);
-            res.set('Cache-Control', 'public, max-age=300');
-            res.json(meta);
-        } else {
-            res.status(404).json({ error: 'Show not found' });
-        }
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch show metadata' });
-    }
-});
+
 app.get('/api/episodes', async (req, res) => {
     const { showId, mode = 'sub' } = req.query;
     const cacheKey = `episodes-${showId}-${mode}`;
@@ -583,9 +559,35 @@ app.get('/api/profiles/:id', (req, res) => {
     });
 });
 
-app.get('/api/schedule-info/:showId', async (req, res) => {
-    const { showId } = req.params;
-    const cacheKey = `schedule-info-${showId}`;
+app.get('/api/show-meta/:id', async (req, res) => {
+    const showId = req.params.id;
+    const cacheKey = `show-meta-${showId}`;
+    if (apiCache.has(cacheKey)) {
+        return res.json(apiCache.get(cacheKey));
+    }
+    try {
+        const response = await axios.get(apiEndpoint, {
+            headers: { 'User-Agent': userAgent, 'Referer': referer },
+            params: { query: `query($showId: String!) { show(_id: $showId) { name, thumbnail } }`, variables: JSON.stringify({ showId }) },
+            timeout: 15000
+        });
+        const show = response.data.data.show;
+        if (show) {
+            const meta = { name: show.name, thumbnail: deobfuscateUrl(show.thumbnail) };
+            apiCache.set(cacheKey, meta);
+            res.set('Cache-Control', 'public, max-age=300');
+            res.json(meta);
+        } else {
+            res.status(404).json({ error: 'Show not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch show metadata' });
+    }
+});
+
+app.get('/api/show-details/:id', async (req, res) => {
+    const showId = req.params.id;
+    const cacheKey = `show-details-${showId}`;
     if (apiCache.has(cacheKey)) {
         return res.json(apiCache.get(cacheKey));
     }
@@ -608,31 +610,27 @@ app.get('/api/schedule-info/:showId', async (req, res) => {
         
         const firstResult = scheduleResponse.data?.anime?.[0];
         
-        if (firstResult && firstResult.route) {
-            const status = firstResult.status || "Unknown";
-            let nextEpisodeAirDate = null;
-
-            if (status === 'Ongoing') {
-                const pageResponse = await axios.get(`https://animeschedule.net/anime/${firstResult.route}`, { timeout: 10000 });
-                const countdownMatch = pageResponse.data.match(/countdown-time" datetime="([^"]*)"/);
-                if (countdownMatch) {
-                    nextEpisodeAirDate = countdownMatch[1];
+        if (firstResult) {
+            if (firstResult.status === 'Ongoing') {
+                try {
+                    const pageResponse = await axios.get(`https://animeschedule.net/anime/${firstResult.route}`, { timeout: 10000 });
+                    const countdownMatch = pageResponse.data.match(/countdown-time\" datetime=\"([^\"]*)\"/);
+                    if (countdownMatch) {
+                        firstResult.nextEpisodeAirDate = countdownMatch[1];
+                    }
+                } catch (e) {
+                    console.error('Failed to scrape for nextEpisodeAirDate', e.message);
                 }
             }
 
-            const result = {
-                nextEpisodeAirDate: nextEpisodeAirDate,
-                status: status.replace(/([A-Z])/g, ' $1').trim()
-            };
-
-            apiCache.set(cacheKey, result, 3600);
-            return res.json(result);
+            apiCache.set(cacheKey, firstResult, 3600);
+            return res.json(firstResult);
         }
 
-        return res.json({ status: "Not Found on Schedule" });
+        return res.status(404).json({ error: "Not Found on Schedule" });
 
     } catch (error) {
-        return res.json({ status: "Error" });
+        return res.status(500).json({ error: "Error fetching show details" });
     }
 });
 
