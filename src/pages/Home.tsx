@@ -148,9 +148,7 @@ const Home: React.FC = () => {
 
   const fetchContinueWatching = useCallback(async () => {
     try {
-      const response = await fetch("/api/continue-watching", {
-        headers: { 'X-Profile-ID': '1' }
-      });
+      const response = await fetch("/api/continue-watching");
       if (!response.ok) throw new Error("Failed to fetch continue watching");
       const data = await response.json();
 
@@ -185,7 +183,7 @@ const Home: React.FC = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Profile-ID": "1",
+
         },
         body: JSON.stringify({ showId }),
       });

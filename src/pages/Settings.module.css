@@ -1,4 +1,4 @@
-.rcloneSyncSection {
+.settings-section {
   background-color: var(--card-background);
   padding: 20px;
   border-radius: 8px;
@@ -6,24 +6,24 @@
   margin-bottom: 20px;
 }
 
-.rcloneSyncSection h3 {
+.settings-section h3 {
   color: var(--text-color-primary);
   margin-top: 0;
   margin-bottom: 10px;
 }
 
-.rcloneSyncSection p {
+.settings-section p {
   color: var(--text-color-secondary);
   margin-bottom: 15px;
 }
 
-.rcloneSyncControls {
+.controls {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.rcloneStatus {
+.status {
   margin-top: 15px;
   color: var(--text-color-secondary);
   font-size: 0.9rem;

@@ -140,9 +140,7 @@ const Player: React.FC = () => {
 
 
   const fetchWithProfile = async (url: string, options: RequestInit = {}) => {
-    const activeProfileId = '1';
     const newOptions: RequestInit = { ...options };
-    newOptions.headers = { ...newOptions.headers, 'X-Profile-ID': activeProfileId };
     if (newOptions.body && typeof newOptions.body === 'string') {
         newOptions.headers = { ...newOptions.headers, 'Content-Type': 'application/json' };
     }
@@ -533,7 +531,11 @@ const Player: React.FC = () => {
     try {
       const endpoint = inWatchlist ? '/api/watchlist/remove' : '/api/watchlist/add';
       const body = { id: showId, name: showMeta.name, thumbnail: showMeta.thumbnail };
-      await fetchWithProfile(endpoint, { method: 'POST', body: JSON.stringify(body) });
+      await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
       setInWatchlist(!inWatchlist);
     } catch (e) {
       console.error("Error toggling watchlist:", e);
