@@ -1,2 +1,2 @@
 #!/bin/bash
-rclone copy gdrive:anime.db .
+rclone copy gdrive:anime.db server/

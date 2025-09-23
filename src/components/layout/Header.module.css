@@ -1,0 +1,81 @@
+
+.hamburgerBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 30px;
+  height: 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0;
+  z-index: 1200;
+}
+
+.hamburgerBtn span {
+  display: block;
+  height: 3px;
+  width: 100%;
+  border-radius: 3px;
+  transition: all 0.3s ease-in-out;
+  background-color: var(--light-text);
+}
+
+
+
+.hamburgerBtn.open span:nth-child(1) {
+  transform: rotate(45deg) translate(7px, 7px);
+}
+
+.hamburgerBtn.open span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburgerBtn.open span:nth-child(3) {
+  transform: rotate(-45deg) translate(7px, -7px);
+}
+
+.searchContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchInput {
+  background-color: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 0.5rem 2.5rem 0.5rem 1rem;
+  color: var(--text-color);
+  width: 250px;
+  transition: all 0.3s ease;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  width: 300px;
+}
+
+.searchButton, .filterButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--icon-color);
+  padding: 0.5rem;
+}
+
+.searchButton {
+  right: 2.2rem;
+}
+
+.filterButton {
+  right: 0;
+}
+
+.searchButton:hover, .filterButton:hover {
+  color: var(--accent-color);
+}

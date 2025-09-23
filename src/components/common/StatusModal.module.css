@@ -1,0 +1,62 @@
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+.modalContent {
+  background-color: var(--card-background);
+  padding: 2rem;
+  border-radius: var(--card-border-radius);
+  text-align: center;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: var(--card-shadow);
+}
+
+.modalContent.success {
+  border: 2px solid var(--success-color);
+}
+
+.modalContent.error {
+  border: 2px solid var(--error-color);
+}
+
+.modalContent.info {
+  border: 2px solid var(--info-color);
+}
+
+.message {
+  margin: 1rem 0 2rem 0;
+  font-size: 1.1rem;
+  color: var(--text-color-primary);
+}
+
+.modalActions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+/* Button styles (assuming btn-primary is defined globally or in a common CSS) */
+.btn-primary {
+  background-color: var(--button-background-primary);
+  color: var(--button-text-primary);
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--button-background-primary-hover);
+}

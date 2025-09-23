@@ -26,5 +26,6 @@ else
 fi
 echo
 
-echo -e "\033[1;33mRunning npm start...\033[0m"
+echo -e "\033[1;33mBuilding and running ani-web...\033[0m"
+npm run build
 npm start
