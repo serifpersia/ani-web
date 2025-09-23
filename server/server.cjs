@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const cors = require('cors');
+const cheerio = require('cheerio');
 
 const app = express();
 const port = 3000;
@@ -609,6 +610,43 @@ app.get('/api/show-details/:id', async (req, res) => {
 
     } catch (error) {
         return res.status(500).json({ error: "Error fetching show details" });
+    }
+});
+
+app.get('/api/allmanga-details/:id', async (req, res) => {
+    const animeId = req.params.id;
+    const url = `https://allmanga.to/bangumi/${animeId}`;
+
+    const headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0",
+        "Referer": "https://allmanga.to"
+    };
+
+    try {
+        const response = await axios.get(url, { headers });
+        const $ = cheerio.load(response.data);
+
+        const details = {
+            "Rating": "N/A",
+            "Season": "N/A",
+            "Episodes": "N/A",
+            "Date": "N/A",
+            "Original Broadcast": "N/A"
+        };
+
+        $('.info-season').each((i, elem) => {
+            const label = $(elem).find('h4').text().trim();
+            const value = $(elem).find('li').text().trim();
+            if (details.hasOwnProperty(label)) {
+                details[label] = value;
+            }
+        });
+        
+        res.json(details);
+
+    } catch (error) {
+        console.error(`Error fetching allmanga details for ${animeId}:`, error.message);
+        res.status(500).json({ error: "Failed to fetch allmanga details" });
     }
 });
 

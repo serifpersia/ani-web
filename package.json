@@ -23,7 +23,8 @@
     "react-icons": "^5.5.0",
     "react-router-dom": "^7.9.1",
     "sqlite3": "5.1.7",
-    "xml2js": "0.6.2"
+    "xml2js": "0.6.2",
+    "cheerio": "^1.0.0-rc.12"
   },
   "devDependencies": {
     "@eslint/js": "9.33.0",
