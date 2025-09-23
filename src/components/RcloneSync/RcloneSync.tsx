@@ -69,10 +69,10 @@ const RcloneSync: React.FC = () => {
       <h3>Rclone Sync</h3>
       <p>Sync your database with your cloud storage using rclone.</p>
       <div className={styles.rcloneSyncControls}>
-        <button onClick={handleRcloneDownload} disabled={loading} className={styles.rcloneBtn}>
+        <button onClick={handleRcloneDownload} disabled={loading} className="btn-primary">
           {loading && modalMessage.startsWith('Downloading') ? 'Downloading...' : 'Download from Cloud'}
         </button>
-        <button onClick={handleRcloneUpload} disabled={loading} className={styles.rcloneBtn}>
+        <button onClick={handleRcloneUpload} disabled={loading} className="btn-primary">
           {loading && modalMessage.startsWith('Uploading') ? 'Uploading...' : 'Upload to Cloud'}
         </button>
       </div>

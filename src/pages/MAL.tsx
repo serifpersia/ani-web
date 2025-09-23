@@ -22,11 +22,9 @@ const MAL: React.FC = () => {
       try {
         const response = await fetch('/api/import/mal-xml', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Profile-ID': localStorage.getItem('activeProfileId') || '',
-          },
-          body: JSON.stringify({
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },          body: JSON.stringify({
             xml: e.target?.result,
             erase: eraseWatchlist,
           }),
@@ -52,7 +50,7 @@ const MAL: React.FC = () => {
 
   return (
     <div className={styles.malPage}>
-      <h2>MAL Import / Export</h2>
+      <h2>MAL Import</h2>
 
       <section className={styles.importSection}>
         <h3>Import from MyAnimeList</h3>

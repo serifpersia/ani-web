@@ -38,17 +38,9 @@ function initializeDatabase() {
       } else {
          console.log('Connected to SQLite database.');
          db.serialize(() => {
-            db.run(`CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, picture_path TEXT)`);
-            db.get(`SELECT COUNT(*) as count FROM profiles`, (err, row) => {
-               if (row && row.count === 0) {
-                  db.run(`INSERT INTO profiles (name) VALUES ('Default')`, (err) => {
-                     if (!err) console.log('Created default profile.');
-                  });
-               }
-            });
-            db.run(`CREATE TABLE IF NOT EXISTS watchlist (profile_id INTEGER NOT NULL, id TEXT NOT NULL, name TEXT, thumbnail TEXT, status TEXT, PRIMARY KEY (profile_id, id))`);
-            db.run(`CREATE TABLE IF NOT EXISTS watched_episodes (profile_id INTEGER NOT NULL, showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, watchedAt DATETIME DEFAULT CURRENT_TIMESTAMP, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, PRIMARY KEY (profile_id, showId, episodeNumber))`);
-            db.run(`CREATE TABLE IF NOT EXISTS settings (profile_id INTEGER NOT NULL, key TEXT NOT NULL, value TEXT, PRIMARY KEY (profile_id, key))`);
+            db.run(`CREATE TABLE IF NOT EXISTS watchlist (id TEXT NOT NULL, name TEXT, thumbnail TEXT, status TEXT, PRIMARY KEY (id))`);
+            db.run(`CREATE TABLE IF NOT EXISTS watched_episodes (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, watchedAt DATETIME DEFAULT CURRENT_TIMESTAMP, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, PRIMARY KEY (showId, episodeNumber))`);
+            db.run(`CREATE TABLE IF NOT EXISTS settings (key TEXT NOT NULL, value TEXT, PRIMARY KEY (key))`);
             db.run(`CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT)`);
          });
       }
@@ -545,20 +537,6 @@ app.get('/api/subtitle-proxy', async (req, res) => {
     }
 });
 
-app.get('/api/profiles', (req, res) => {
-    db.all('SELECT * FROM profiles ORDER BY name', [], (err, rows) => {
-        if (err) return res.status(500).json({ error: 'DB error' });
-        res.json(rows);
-    });
-});
-app.get('/api/profiles/:id', (req, res) => {
-    db.get('SELECT * FROM profiles WHERE id = ?', [req.params.id], (err, row) => {
-        if (err) return res.status(500).json({ error: 'DB error' });
-        if (!row) return res.status(404).json({ error: 'Profile not found' });
-        res.json(row);
-    });
-});
-
 app.get('/api/show-meta/:id', async (req, res) => {
     const showId = req.params.id;
     const cacheKey = `show-meta-${showId}`;
@@ -634,74 +612,14 @@ app.get('/api/show-details/:id', async (req, res) => {
     }
 });
 
-app.post('/api/profiles', (req, res) => {
-    const { name } = req.body;
-    if (!name || name.trim().length === 0) {
-        return res.status(400).json({ error: 'Profile name cannot be empty.' });
-    }
-    db.run('INSERT INTO profiles (name) VALUES (?)', [name.trim()], function(err) {
-        if (err) {
-            return res.status(500).json({ error: 'Failed to create profile. Name might already exist.' });
-        }
-        res.json({ id: this.lastID, name: name.trim() });
-    });
-});
-app.post('/api/profiles/:id/picture', profilePicUpload.single('profilePic'), (req, res) => {
-    const profileId = req.params.id;
-    if (!req.file) {
-        return res.status(400).json({ error: 'No picture uploaded.' });
-    }
-    const picturePath = `/profile_pics/${req.file.filename}`;
-    db.run('UPDATE profiles SET picture_path = ? WHERE id = ?', [picturePath, profileId], function (err) {
-        if (err) return res.status(500).json({ error: 'Failed to update profile picture in DB.' });
-        res.json({ success: true, path: picturePath });
-    });
-});
-app.put('/api/profiles/:id', (req, res) => {
-    const { name } = req.body;
-    const { id } = req.params;
-    if (!name || name.trim().length === 0) {
-        return res.status(400).json({ error: 'Profile name cannot be empty.' });
-    }
-    db.run('UPDATE profiles SET name = ? WHERE id = ?', [name.trim(), id], function(err) {
-        if (err) return res.status(500).json({ error: 'Failed to update profile. Name might already exist.' });
-        if (this.changes === 0) return res.status(404).json({ error: 'Profile not found.' });
-        res.json({ success: true });
-    });
-});
-app.delete('/api/profiles/:id', (req, res) => {
-    const { id } = req.params;
-    db.get('SELECT COUNT(*) as count FROM profiles', (err, row) => {
-        if (row.count <= 1) {
-            return res.status(400).json({ error: 'Cannot delete the last profile.' });
-        }
-        db.serialize(() => {
-            db.run('BEGIN TRANSACTION');
-            db.run('DELETE FROM watchlist WHERE profile_id = ?', [id]);
-            db.run('DELETE FROM watched_episodes WHERE profile_id = ?', [id]);
-            db.run('DELETE FROM settings WHERE profile_id = ?', [id]);
-            db.run('DELETE FROM profiles WHERE id = ?', [id], (err) => {
-                if (err) {
-                    db.run('ROLLBACK');
-                    return res.status(500).json({ error: 'Failed to delete profile.' });
-                }
-                db.run('COMMIT');
-                res.json({ success: true });
-            });
-        });
-    });
-});
-
 app.post('/api/import/mal-xml', async (req, res) => {
-    const profileId = req.headers['x-profile-id'];
-    if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const { xml, erase } = req.body;
     if (!xml) {
         return res.status(400).json({ error: 'XML content is required' });
     }
     if (erase) {
         await new Promise((resolve, reject) => {
-            db.run(`DELETE FROM watchlist WHERE profile_id = ?`, [profileId], (err) => { if (err) reject(new Error('DB error on erase.')); else resolve(); });
+            db.run(`DELETE FROM watchlist`, [], (err) => { if (err) reject(new Error('DB error on erase.')); else resolve(); });
         });
     }
     parseString(xml, async (err, result) => {
@@ -723,8 +641,8 @@ app.post('/api/import/mal-xml', async (req, res) => {
                 const foundShow = searchResponse.data?.data?.shows?.edges[0];
                 if (foundShow) {
                     await new Promise((resolve, reject) => {
-                        db.run(`INSERT OR REPLACE INTO watchlist (profile_id, id, name, thumbnail, status) VALUES (?, ?, ?, ?, ?)`, 
-                            [profileId, foundShow._id, foundShow.name, deobfuscateUrl(foundShow.thumbnail), malStatus],
+                        db.run(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status) VALUES (?, ?, ?, ?)`, 
+                            [foundShow._id, foundShow.name, deobfuscateUrl(foundShow.thumbnail), malStatus],
                             (err) => { if (err) reject(err); else { importedCount++; resolve(); } }
                         );
                     });
@@ -736,35 +654,26 @@ app.post('/api/import/mal-xml', async (req, res) => {
 });
 
 app.post('/api/watchlist/add', (req, res) => {
-    const profileId = req.headers['x-profile-id'];
-    if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const { id, name, thumbnail, status } = req.body;
     const finalThumbnail = deobfuscateUrl(thumbnail || '');
-    db.run(`INSERT OR REPLACE INTO watchlist (profile_id, id, name, thumbnail, status) VALUES (?, ?, ?, ?, ?)`, 
-        [profileId, id, name, finalThumbnail, status || 'Watching'],
+    db.run(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status) VALUES (?, ?, ?, ?)`, 
+        [id, name, finalThumbnail, status || 'Watching'],
         (err) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
     );
 });app.get('/api/watchlist/check/:showId', (req, res) => {
-    const profileId = req.headers['x-profile-id'];
-    if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
-    db.get('SELECT EXISTS(SELECT 1 FROM watchlist WHERE profile_id = ? AND id = ?) as inWatchlist',
-        [profileId, req.params.showId],
+    db.get('SELECT EXISTS(SELECT 1 FROM watchlist WHERE id = ?) as inWatchlist',
+        [req.params.showId],
         (err, row) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ inWatchlist: !!row.inWatchlist })
     );
 });
 app.post('/api/watchlist/status', (req, res) => {
-    const profileId = req.headers['x-profile-id'];
-    if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const { id, status } = req.body;
-    db.run(`UPDATE watchlist SET status = ? WHERE profile_id = ? AND id = ?`,
-        [status, profileId, id],
-        (err) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
+    db.run(`UPDATE watchlist SET status = ? WHERE id = ?`,
+        [status, id],
+        (err, rows) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
     );
 });
 app.get('/api/watchlist', (req, res) => {
-    const profileId = req.headers['x-profile-id'];
-    if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
-
     const sort = req.query.sort || 'last_added';
     let orderByClause;
 
@@ -781,30 +690,26 @@ app.get('/api/watchlist', (req, res) => {
             break;
     }
 
-    db.all(`SELECT * FROM watchlist WHERE profile_id = ? ${orderByClause}`, [profileId],
+    db.all(`SELECT * FROM watchlist ${orderByClause}`, [],
         (err, rows) => err ? res.status(500).json({ error: 'DB error' }) : res.json(rows)
     );
 });
 app.post('/api/watchlist/remove', (req, res) => {
-    const profileId = req.headers['x-profile-id'];
-    if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
-    db.run(`DELETE FROM watchlist WHERE profile_id = ? AND id = ?`,
-        [profileId, req.body.id],
+    db.run(`DELETE FROM watchlist WHERE id = ?`,
+        [req.body.id],
         (err) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
     );
 });
 
 app.post('/api/update-progress', (req, res) => {
-    const profileId = req.headers['x-profile-id'];
-    if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const { showId, episodeNumber, currentTime, duration, showName, showThumbnail } = req.body;
 
     db.serialize(() => {
         db.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail) VALUES (?, ?, ?)',
             [showId, showName, deobfuscateUrl(showThumbnail)]);
 
-        db.run(`INSERT OR REPLACE INTO watched_episodes (profile_id, showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)`, 
-            [profileId, showId, episodeNumber, currentTime, duration],
+        db.run(`INSERT OR REPLACE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)`, 
+            [showId, episodeNumber, currentTime, duration],
             (err) => {
                 if (err) return res.status(500).json({ error: 'DB error on progress update' });
                 res.json({ success: true });
@@ -814,42 +719,35 @@ app.post('/api/update-progress', (req, res) => {
 });
 
 app.get('/api/episode-progress/:showId/:episodeNumber', (req, res) => {
-    const profileId = req.headers['x-profile-id'];
-    if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const { showId, episodeNumber } = req.params;
 
-    db.get('SELECT currentTime, duration FROM watched_episodes WHERE profile_id = ? AND showId = ? AND episodeNumber = ?',
-        [profileId, showId, episodeNumber], (err, row) => {
+    db.get('SELECT currentTime, duration FROM watched_episodes WHERE showId = ? AND episodeNumber = ?',
+        [showId, episodeNumber], (err, row) => {
         if (err) return res.status(500).json({ error: 'DB error' });
         res.json(row || { currentTime: 0, duration: 0 });
     });
 });
 
 app.get('/api/watched-episodes/:showId', (req, res) => {
-    const profileId = req.headers['x-profile-id'];
-    if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
-    db.all(`SELECT episodeNumber FROM watched_episodes WHERE profile_id = ? AND showId = ?`,
-        [profileId, req.params.showId],
+    db.all(`SELECT episodeNumber FROM watched_episodes WHERE showId = ?`,
+        [req.params.showId],
         (err, rows) => err ? res.status(500).json({ error: 'DB error' }) : res.json(rows.map(r => r.episodeNumber))
     );
 });
 
 app.get('/api/continue-watching', (req, res) => {
-    const profileId = req.headers['x-profile-id'];
-    if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const query = `
         SELECT sm.id as showId, sm.name, sm.thumbnail, we.episodeNumber, we.currentTime, we.duration
         FROM shows_meta sm
         JOIN (
            SELECT showId, episodeNumber, currentTime, duration, MAX(watchedAt) as watchedAt
            FROM watched_episodes
-           WHERE profile_id = ?
            GROUP BY showId
         ) we ON sm.id = we.showId
         ORDER BY we.watchedAt DESC
         LIMIT 10;
     `;
-    db.all(query, [profileId], async (err, rows) => {
+    db.all(query, [], async (err, rows) => {
         if (err) return res.status(500).json({ error: 'DB error' });
         try {
             const results = await Promise.all(rows.map(async (show) => {
@@ -928,28 +826,22 @@ app.get('/api/skip-times/:showId/:episodeNumber', async (req, res) => {
 });
 
 app.post('/api/continue-watching/remove', (req, res) => {
-    const profileId = req.headers['x-profile-id'];
-    if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const { showId } = req.body;
-    db.run(`DELETE FROM watched_episodes WHERE profile_id = ? AND showId = ?`,
-        [profileId, showId],
+    db.run(`DELETE FROM watched_episodes WHERE showId = ?`,
+        [showId],
         (err) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
     );
 });
 
 app.get('/api/settings/:key', (req, res) => {
-    const profileId = req.headers['x-profile-id'];
-    if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
-    db.get('SELECT value FROM settings WHERE profile_id = ? AND key = ?', [profileId, req.params.key], (err, row) => {
+    db.get('SELECT value FROM settings WHERE key = ?', [req.params.key], (err, row) => {
         if (err) return res.status(500).json({ error: 'DB error' });
         res.json({ value: row ? row.value : null });
     });
 });
 app.post('/api/settings', (req, res) => {
-    const profileId = req.headers['x-profile-id'];
-    if (!profileId) return res.status(400).json({ error: 'Profile ID is required' });
     const { key, value } = req.body;
-    db.run('INSERT OR REPLACE INTO settings (profile_id, key, value) VALUES (?, ?, ?)', [profileId, key, value], (err) => {
+    db.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value], (err) => {
         if (err) return res.status(500).json({ error: 'DB error' });
         res.json({ success: true });
     });

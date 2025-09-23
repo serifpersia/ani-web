@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import AnimeCard from '../components/anime/AnimeCard';
 import AnimeCardSkeleton from '../components/anime/AnimeCardSkeleton';
 import ErrorMessage from '../components/common/ErrorMessage';
@@ -27,15 +27,6 @@ const Watchlist: React.FC = () => {
   const [sortBy, setSortBy] = useState("last_added");
   const [filterBy, setFilterBy] = useState("All");
 
-  const fetchWithProfile = async (url: string, options: RequestInit = {}) => {
-    const activeProfileId = '1';
-    const newOptions: RequestInit = { ...options };
-    newOptions.headers = { ...newOptions.headers, 'X-Profile-ID': activeProfileId };
-    if (newOptions.body && typeof newOptions.body === 'string') {
-        newOptions.headers = { ...newOptions.headers, 'Content-Type': 'application/json' };
-    }
-    return fetch(url, newOptions);
-  };
 
   const fetchAnimeDetails = React.useCallback(async (showId: string) => {
     try {
@@ -49,7 +40,7 @@ const Watchlist: React.FC = () => {
         if (!subEpisodesResponse.ok) throw new Error("Failed to fetch sub episodes");
         if (!dubEpisodesResponse.ok) throw new Error("Failed to fetch dub episodes");
 
-        const meta = await metaResponse.json();
+        const _meta = await metaResponse.json();
         const subEpisodeData = await subEpisodesResponse.json();
         const dubEpisodeData = await dubEpisodesResponse.json();
 
@@ -66,43 +57,30 @@ const Watchlist: React.FC = () => {
     }
   }, []);
 
+  const fetchWatchlist = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/watchlist?sort=${sortBy}`);
+      if (!response.ok) throw new Error('Failed to fetch watchlist');
+      const data = await response.json();
+      setWatchlist(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+    } finally {
+      setLoading(false);
+    }
+  }, [sortBy]);
+
   useEffect(() => {
-    const fetchWatchlist = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetchWithProfile(`/api/watchlist?sort=${sortBy}`);
-        if (!response.ok) throw new Error("Failed to fetch watchlist");
-        let data = await response.json();
-
-        const detailedData = await Promise.all(
-          data.map(async (item: WatchlistItem) => {
-            const details = await fetchAnimeDetails(item.id);
-            return { ...item, ...details };
-          })
-        );
-
-        if (filterBy !== "All") {
-          data = detailedData.filter((item: WatchlistItem) => item.status === filterBy);
-        } else {
-          data = detailedData;
-        }
-        setWatchlist(data);
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : 'An unknown error occurred');
-        console.error("Error fetching watchlist:", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchWatchlist();
-  }, [sortBy, filterBy, fetchAnimeDetails]);
+  }, [sortBy, filterBy, fetchWatchlist, fetchAnimeDetails]);
 
   const updateStatus = async (id: string, status: string) => {
     try {
-      const response = await fetchWithProfile("/api/watchlist/status", {
+      const response = await fetch('/api/watchlist/status', {
         method: "POST",
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status }),
       });
       if (!response.ok) throw new Error("Failed to update status");
@@ -119,8 +97,9 @@ const Watchlist: React.FC = () => {
       return;
     }
     try {
-      const response = await fetchWithProfile("/api/watchlist/remove", {
+      const response = await fetch('/api/watchlist/remove', {
         method: "POST",
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       });
       if (!response.ok) throw new Error("Failed to remove from watchlist");
@@ -163,7 +142,9 @@ const Watchlist: React.FC = () => {
         <p style={{textAlign: 'center', marginTop: '1rem'}}>Your watchlist is empty.</p>
       ) : (
         <div className="grid-container">
-          {watchlist.map(item => {
+          {watchlist
+            .filter(item => filterBy === 'All' || item.status === filterBy)
+            .map(item => {
             const animeForCard = {
               _id: item.id,
               id: item.id,
