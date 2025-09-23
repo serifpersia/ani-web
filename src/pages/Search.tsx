@@ -3,12 +3,17 @@ import { useSearchParams } from 'react-router-dom';
 import AnimeCard from '../components/anime/AnimeCard';
 import AnimeCardSkeleton from '../components/anime/AnimeCardSkeleton';
 import ErrorMessage from '../components/common/ErrorMessage';
+import SearchableSelect from '../components/common/SearchableSelect';
 
 interface Anime {
     _id: string;
     id: string;
     name: string;
     thumbnail: string;
+    availableEpisodesDetail?: {
+        sub?: string[];
+        dub?: string[];
+    };
 }
 
 const SkeletonGrid = () => (
@@ -54,9 +59,46 @@ const Search: React.FC = () => {
         fetchGenresAndTags();
     }, []);
 
-    const performSearch = useCallback(async (isNewSearch: boolean) => {
-        if (isLoading && !isNewSearch) return;
+    const isLoadingRef = useRef(false);
 
+    const fetchAnimeDetails = useCallback(async (showId: string) => {
+        try {
+            const [metaResponse, subEpisodesResponse, dubEpisodesResponse] = await Promise.all([
+                fetch(`/api/show-meta/${showId}`),
+                fetch(`/api/episodes?showId=${showId}&mode=sub`),
+                fetch(`/api/episodes?showId=${showId}&mode=dub`)
+            ]);
+
+            if (!metaResponse.ok) throw new Error("Failed to fetch show metadata");
+            if (!subEpisodesResponse.ok) throw new Error("Failed to fetch sub episodes");
+            if (!dubEpisodesResponse.ok) throw new Error("Failed to fetch dub episodes");
+
+            const meta = await metaResponse.json();
+            const subEpisodeData = await subEpisodesResponse.json();
+            const dubEpisodeData = await dubEpisodesResponse.json();
+
+            const animeDetails = {
+                _id: showId,
+                id: showId,
+                name: meta.name,
+                thumbnail: meta.thumbnail,
+                type: meta.type,
+                availableEpisodesDetail: {
+                    sub: subEpisodeData.episodes,
+                    dub: dubEpisodeData.episodes,
+                },
+            };
+            return animeDetails;
+        } catch (error) {
+            console.error(`Error fetching details for ${showId}:`, error);
+            return null;
+        }
+    }, []);
+
+    const performSearch = useCallback(async (isNewSearch: boolean) => {
+        if (isLoadingRef.current && !isNewSearch) return;
+
+        isLoadingRef.current = true;
         setIsLoading(true);
         setError(null);
 
@@ -92,13 +134,20 @@ const Search: React.FC = () => {
             if (!response.ok) throw new Error('Search failed');
             const newFetchedResults: Anime[] = await response.json();
 
+            const detailedResults = await Promise.all(
+                newFetchedResults.map(async (anime) => {
+                    const details = await fetchAnimeDetails(anime._id);
+                    return { ...anime, ...details };
+                })
+            );
+
             if (isNewSearch) {
-                const uniqueNewResults = Array.from(new Map(newFetchedResults.map((item: Anime) => [item._id, item])).values());
+                const uniqueNewResults = Array.from(new Map(detailedResults.map((item: Anime) => [item._id, item])).values());
                 setResults(uniqueNewResults);
             } else {
                 setResults(prev => {
                     const existingIds = new Set(prev.map(anime => anime._id));
-                    const uniqueNewResults = newFetchedResults.filter((anime: Anime) => !existingIds.has(anime._id));
+                    const uniqueNewResults = detailedResults.filter((anime: Anime) => !existingIds.has(anime._id));
                     const finalUniqueResults = Array.from(new Map(uniqueNewResults.map((item: Anime) => [item._id, item])).values()); // Ensure uniqueness within new batch
                     return [...prev, ...finalUniqueResults];
                 });
@@ -117,8 +166,15 @@ const Search: React.FC = () => {
             }
         } finally {
             setIsLoading(false);
+            isLoadingRef.current = false;
         }
-    }, [isLoading, query, type, season, year, country, translation, genreStates, availableTags, selectedTag]);
+    }, [query, type, season, year, country, translation, genreStates, availableTags, selectedTag, fetchAnimeDetails]);
+
+    useEffect(() => {
+        if (availableTags.length > 0 && searchParams.toString()) {
+            performSearch(true);
+        }
+    }, [availableTags, searchParams, performSearch]);
 
     useEffect(() => {
         setQuery(searchParams.get('query') || '');
@@ -178,7 +234,6 @@ const Search: React.FC = () => {
         }
 
         setSearchParams(searchParamsObj);
-        performSearch(true);
     };
 
     const handleGenreClick = (genre: string) => {
@@ -242,10 +297,15 @@ const Search: React.FC = () => {
                     <option value="sub">Sub</option>
                     <option value="dub">Dub</option>
                 </select>
-                <select value={selectedTag} onChange={e => setSelectedTag(e.target.value)} className="form-input">
-                    <option value="ALL">Tag/Studio: All</option>
-                    {availableTags.map(tag => <option key={tag.value} value={tag.value}>{tag.isStudio ? `${tag.value} (studio)` : tag.value}</option>)}
-                </select>
+                <SearchableSelect
+                    value={selectedTag}
+                    onChange={setSelectedTag}
+                    options={[
+                        { value: 'ALL', label: 'Tag/Studio: All' },
+                        ...availableTags.map(tag => ({ value: tag.value, label: tag.isStudio ? `${tag.value} (studio)` : tag.value }))
+                    ]}
+                    placeholder="Tag/Studio: All"
+                />
                 <button onClick={() => setShowGenres(!showGenres)} className="btn-primary">Genres</button>
                 <button onClick={handleSearch} className="btn-primary">Apply Filters</button>
             </div>

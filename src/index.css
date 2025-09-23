@@ -334,13 +334,18 @@ footer a:hover {
 } 
 
 .genre-button {
-  background-color: var(--input-bg);
-  border: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 20px;
   padding: 0.5rem 1rem;
-  color: var(--text-color);
+  color: var(--text);
   cursor: pointer;
   transition: all 0.3s ease;
+}
+
+.genre-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .genre-button.include {
@@ -349,8 +354,16 @@ footer a:hover {
   border-color: var(--accent);
 }
 
+.genre-button.include:hover {
+  opacity: 0.8;
+}
+
 .genre-button.exclude {
   background-color: #ff4d4d;
   color: white;
   border-color: #ff4d4d;
+}
+
+.genre-button.exclude:hover {
+  opacity: 0.8;
 }
