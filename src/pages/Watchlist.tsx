@@ -8,6 +8,10 @@ interface WatchlistItem {
   name: string;
   thumbnail: string;
   status: string;
+  availableEpisodesDetail?: {
+    sub?: string[];
+    dub?: string[];
+  };
 }
 
 const SkeletonGrid = () => (
@@ -33,6 +37,35 @@ const Watchlist: React.FC = () => {
     return fetch(url, newOptions);
   };
 
+  const fetchAnimeDetails = React.useCallback(async (showId: string) => {
+    try {
+        const [metaResponse, subEpisodesResponse, dubEpisodesResponse] = await Promise.all([
+            fetch(`/api/show-meta/${showId}`),
+            fetch(`/api/episodes?showId=${showId}&mode=sub`),
+            fetch(`/api/episodes?showId=${showId}&mode=dub`)
+        ]);
+
+        if (!metaResponse.ok) throw new Error("Failed to fetch show metadata");
+        if (!subEpisodesResponse.ok) throw new Error("Failed to fetch sub episodes");
+        if (!dubEpisodesResponse.ok) throw new Error("Failed to fetch dub episodes");
+
+        const meta = await metaResponse.json();
+        const subEpisodeData = await subEpisodesResponse.json();
+        const dubEpisodeData = await dubEpisodesResponse.json();
+
+        const animeDetails = {
+            availableEpisodesDetail: {
+                sub: subEpisodeData.episodes,
+                dub: dubEpisodeData.episodes,
+            },
+        };
+        return animeDetails;
+    } catch (error) {
+        console.error(`Error fetching details for ${showId}:`, error);
+        return null;
+    }
+  }, []);
+
   useEffect(() => {
     const fetchWatchlist = async () => {
       setLoading(true);
@@ -42,8 +75,17 @@ const Watchlist: React.FC = () => {
         if (!response.ok) throw new Error("Failed to fetch watchlist");
         let data = await response.json();
 
+        const detailedData = await Promise.all(
+          data.map(async (item: WatchlistItem) => {
+            const details = await fetchAnimeDetails(item.id);
+            return { ...item, ...details };
+          })
+        );
+
         if (filterBy !== "All") {
-          data = data.filter((item: WatchlistItem) => item.status === filterBy);
+          data = detailedData.filter((item: WatchlistItem) => item.status === filterBy);
+        } else {
+          data = detailedData;
         }
         setWatchlist(data);
       } catch (e: unknown) {
@@ -55,7 +97,7 @@ const Watchlist: React.FC = () => {
     };
 
     fetchWatchlist();
-  }, [sortBy, filterBy]);
+  }, [sortBy, filterBy, fetchAnimeDetails]);
 
   const updateStatus = async (id: string, status: string) => {
     try {
@@ -127,6 +169,7 @@ const Watchlist: React.FC = () => {
               id: item.id,
               name: item.name,
               thumbnail: item.thumbnail,
+              availableEpisodesDetail: item.availableEpisodesDetail,
             };
             return (
               <div key={item.id} className="watchlist-item-wrapper">
