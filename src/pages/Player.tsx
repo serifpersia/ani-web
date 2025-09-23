@@ -7,10 +7,47 @@ import { formatTime } from '../lib/utils';
 import ResumeModal from '../components/common/ResumeModal';
 import useIsMobile from '../hooks/useIsMobile';
 
-interface ShowMeta {
+interface SimpleShowMeta {
   name: string;
   thumbnail: string;
   description?: string;
+}
+
+interface DetailedShowMeta {
+  id: string;
+  route: string;
+  title: string;
+  genres: { name: string; route: string }[];
+  studios: { name: string; route: string }[];
+  sources: { name: string; route: string }[];
+  mediaTypes: { name: string; route: string }[];
+  episodes: number;
+  lengthMin: number;
+  status: string;
+  imageVersionRoute: string;
+  stats: {
+    averageScore: number;
+    ratingCount: number;
+    trackedCount: number;
+    trackedRating: number;
+    colorLightMode: string;
+    colorDarkMode: string;
+  };
+  names: {
+    romaji: string;
+    english: string;
+    native: string;
+  };
+  websites: {
+    official: string;
+    mal: string;
+    aniList: string;
+    kitsu: string;
+    animePlanet: string;
+    anidb: string;
+    streams: { platform: string; url: string; name: string }[];
+  };
+  nextEpisodeAirDate?: string;
 }
 
 interface VideoLink {
@@ -60,7 +97,7 @@ const Player: React.FC = () => {
   const episodeListRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 
-  const [showMeta, setShowMeta] = useState<ShowMeta | null>(null);
+  const [showMeta, setShowMeta] = useState<Partial<SimpleShowMeta & DetailedShowMeta>>({});
   const [episodes, setEpisodes] = useState<string[]>([]);
   const [watchedEpisodes, setWatchedEpisodes] = useState<string[]>([]);
   const [currentEpisode, setCurrentEpisode] = useState<string | undefined>(episodeNumber);
@@ -100,8 +137,7 @@ const Player: React.FC = () => {
   const [loadingShowData, setLoadingShowData] = useState(true);
   const [loadingVideo, setLoadingVideo] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [nextEpisodeAirDate, setNextEpisodeAirDate] = useState<string | null>(null);
-  const [animeStatus, setAnimeStatus] = useState<string | null>(null);
+
 
   const fetchWithProfile = async (url: string, options: RequestInit = {}) => {
     const activeProfileId = '1';
@@ -197,8 +233,9 @@ const Player: React.FC = () => {
       setLoadingShowData(true);
       setError(null);
       try {
-        const [metaResponse, episodesResponse, watchlistResponse, watchedResponse] = await Promise.all([
+        const [metaResponse, detailsResponse, episodesResponse, watchlistResponse, watchedResponse] = await Promise.all([
           fetch(`/api/show-meta/${showId}`),
+          fetch(`/api/show-details/${showId}`),
           fetch(`/api/episodes?showId=${showId}&mode=${currentMode}`),
           fetchWithProfile(`/api/watchlist/check/${showId}`),
           fetchWithProfile(`/api/watched-episodes/${showId}`),
@@ -210,11 +247,16 @@ const Player: React.FC = () => {
         if (!watchedResponse.ok) throw new Error("Failed to fetch watched status");
 
         const meta = await metaResponse.json();
+        const details = detailsResponse.ok ? await detailsResponse.json() : {};
         const episodeData: EpisodeData = await episodesResponse.json();
         const watchlistStatus = await watchlistResponse.json();
         const watchedData = await watchedResponse.json();
 
-        setShowMeta({ ...meta, description: episodeData.description });
+        setShowMeta({ 
+          ...meta, 
+          ...details, 
+          description: episodeData.description 
+        });
         setEpisodes(episodeData.episodes.sort((a: string, b: string) => parseFloat(a) - parseFloat(b)));
         setInWatchlist(watchlistStatus.inWatchlist);
         setWatchedEpisodes(watchedData);
@@ -527,24 +569,7 @@ const Player: React.FC = () => {
     setShowResumeModal(false);
   };
 
-  useEffect(() => {
-    const fetchNextEpisodeInfo = async () => {
-      if (!showId) return;
-      try {
-        const response = await fetch(`/api/schedule-info/${showId}`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        setNextEpisodeAirDate(data.nextEpisodeAirDate || null);
-        setAnimeStatus(data.status || null);
-      } catch (error) {
-        console.error(`[DEBUG] Error fetching next episode info for ${showId}:`, error);
-      }
-    };
 
-    fetchNextEpisodeInfo();
-  }, [showId]);
 
   useEffect(() => {
     const videoElement = videoRef.current;
@@ -859,31 +884,34 @@ const Player: React.FC = () => {
             onResume={handleResume}
             onStartOver={handleStartOver}
         />
-      <div className={styles.header}>
-        <div className={styles.titleContainer}>
-          <h2>{showMeta.name}</h2>
-          {(animeStatus || nextEpisodeAirDate) && (
-            <div className={styles.scheduleInfo}>
-              {animeStatus && <span className={styles.status}>{animeStatus}</span>}
-              {nextEpisodeAirDate && <span className={styles.nextEpisode}>Next: {nextEpisodeAirDate}</span>}
-            </div>
-          )}
-        </div>
-        <div className={styles.controls}>
-            <button className={styles.watchlistBtn} onClick={() => navigate('/settings')}>Settings</button>
-            <button className={`${styles.watchlistBtn} ${inWatchlist ? styles.inList : ''}`} onClick={toggleWatchlist}>
-              {inWatchlist ? <FaCheck /> : <FaPlus />}
-              {inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
-            </button>
-            <div className={styles.toggleContainer}>
-                <span>SUB</span>
-                <ToggleSwitch 
-                    id="dub-toggle"
-                    isChecked={currentMode === 'dub'} 
-                    onChange={() => setCurrentMode(currentMode === 'sub' ? 'dub' : 'sub')} 
-                />
-                <span>DUB</span>
-            </div>
+      <div className={styles.headerContainer}>
+        <img src={showMeta.thumbnail} alt={showMeta.name} className={styles.headerThumbnail} />
+        <div className={styles.header}>
+          <div className={styles.titleContainer}>
+            <h2>{showMeta.name}</h2>
+            {(showMeta.status || showMeta.nextEpisodeAirDate) && (
+              <div className={styles.scheduleInfo}>
+                {showMeta.status && <span className={styles.status}>{showMeta.status}</span>}
+                {showMeta.nextEpisodeAirDate && <span className={styles.nextEpisode}>Next: {showMeta.nextEpisodeAirDate}</span>}
+              </div>
+            )}
+          </div>
+          <div className={styles.controls}>
+              <button className={styles.watchlistBtn} onClick={() => navigate('/settings')}>Settings</button>
+              <button className={`${styles.watchlistBtn} ${inWatchlist ? styles.inList : ''}`} onClick={toggleWatchlist}>
+                {inWatchlist ? <FaCheck /> : <FaPlus />}
+                {inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
+              </button>
+              <div className={styles.toggleContainer}>
+                  <span>SUB</span>
+                  <ToggleSwitch 
+                      id="dub-toggle"
+                      isChecked={currentMode === 'dub'} 
+                      onChange={() => setCurrentMode(currentMode === 'sub' ? 'dub' : 'sub')} 
+                  />
+                  <span>DUB</span>
+              </div>
+          </div>
         </div>
       </div>
 
@@ -891,6 +919,42 @@ const Player: React.FC = () => {
         <h3>Description</h3>
         <p dangerouslySetInnerHTML={{ __html: showMeta.description || 'No description available.' }}></p>
       </div>
+
+      <div className={styles.detailsBox}>
+        <div className={styles.detailItem}><strong>Type:</strong> {showMeta.mediaTypes?.[0]?.name}</div>
+        <div className={styles.detailItem}><strong>Status:</strong> {showMeta.status}</div>
+        <div className={styles.detailItem}><strong>Score:</strong> {showMeta.stats ? showMeta.stats.averageScore / 10 : 'N/A'}</div>
+        <div className={styles.detailItem}><strong>Studios:</strong> {showMeta.studios?.map(s => s.name).join(', ')}</div>
+        <div className={styles.detailItem}><strong>English Title:</strong> {showMeta.names?.english}</div>
+        <div className={styles.detailItem}><strong>Native Title:</strong> {showMeta.names?.native}</div>
+        {showMeta.genres && showMeta.genres.length > 0 && (
+          <div className={`${styles.detailItem} ${styles.genresContainer}`}>
+            <strong>Genres:</strong>
+            <div className={styles.genresList}>
+              {showMeta.genres.map(genre => <span key={genre.route} className={styles.genreTag}>{genre.name}</span>)}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {showMeta.characters && showMeta.characters.length > 0 && (
+        <div className={styles.charactersBox}>
+          <h3>Characters</h3>
+          <div className={styles.charactersList}>
+            {showMeta.characters.map(char => (
+              <div key={char.name.full} className={styles.characterCard}>
+                <img src={`http://localhost:3000/api/image-proxy?url=${encodeURIComponent(char.image.large)}`} alt={char.name.full} />
+                <div className={styles.characterInfo}>
+                  <p className={styles.characterName}>{char.name.full}</p>
+                  <p className={styles.characterRole}>{char.role}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+
 
       <div ref={playerContainerRef} className={styles.videoContainer} onDoubleClick={toggleFullscreen}>
         {loadingVideo && <p className="loading">Loading video...</p>}
