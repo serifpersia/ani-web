@@ -8,6 +8,7 @@ interface WatchlistItem {
   name: string;
   thumbnail: string;
   status: string;
+  type?: string;
   availableEpisodesDetail?: {
     sub?: string[];
     dub?: string[];
@@ -28,32 +29,64 @@ const Watchlist: React.FC = () => {
   const [filterBy, setFilterBy] = useState("All");
 
 
-  const fetchAnimeDetails = React.useCallback(async (showId: string) => {
+  const fetchAnimeDetails = React.useCallback(async (showId: string, showName?: string) => {
     try {
-        const [metaResponse, subEpisodesResponse, dubEpisodesResponse] = await Promise.all([
-            fetch(`/api/show-meta/${showId}`),
-            fetch(`/api/episodes?showId=${showId}&mode=sub`),
-            fetch(`/api/episodes?showId=${showId}&mode=dub`)
-        ]);
+      const searchPromise = showName 
+        ? fetch(`/api/search?query=${encodeURIComponent(showName)}`).then(res => res.ok ? res.json() : Promise.resolve(null))
+        : Promise.resolve(null);
 
-        if (!metaResponse.ok) throw new Error("Failed to fetch show metadata");
-        if (!subEpisodesResponse.ok) throw new Error("Failed to fetch sub episodes");
-        if (!dubEpisodesResponse.ok) throw new Error("Failed to fetch dub episodes");
+      const [searchResult, subEpisodesResponse, dubEpisodesResponse] = await Promise.all([
+        searchPromise,
+        fetch(`/api/episodes?showId=${showId}&mode=sub`),
+        fetch(`/api/episodes?showId=${showId}&mode=dub`)
+      ]);
 
-        const _meta = await metaResponse.json();
-        const subEpisodeData = await subEpisodesResponse.json();
-        const dubEpisodeData = await dubEpisodesResponse.json();
-
-        const animeDetails = {
-            availableEpisodesDetail: {
-                sub: subEpisodeData.episodes,
-                dub: dubEpisodeData.episodes,
-            },
-        };
-        return animeDetails;
-    } catch (error) {
-        console.error(`Error fetching details for ${showId}:`, error);
+      if (!subEpisodesResponse.ok || !dubEpisodesResponse.ok) {
+        console.error(`Failed to fetch episodes for ${showId}`);
         return null;
+      }
+      
+      const subEpisodeData = await subEpisodesResponse.json();
+      const dubEpisodeData = await dubEpisodesResponse.json();
+
+      let animeDetails;
+      if (searchResult && searchResult.length > 0) {
+        const show = searchResult.find(s => s._id === showId) || searchResult[0];
+        animeDetails = {
+          _id: show._id,
+          id: show._id,
+          name: show.name,
+          thumbnail: show.thumbnail,
+          type: show.type,
+          availableEpisodesDetail: {
+            sub: subEpisodeData.episodes,
+            dub: dubEpisodeData.episodes,
+          },
+        };
+      } else {
+        const metaResponse = await fetch(`/api/show-meta/${showId}`);
+        if (!metaResponse.ok) {
+          console.error(`Failed to fetch show metadata for ${showId}`);
+          return null;
+        }
+        const meta = await metaResponse.json();
+        animeDetails = {
+          _id: showId,
+          id: showId,
+          name: meta.name,
+          thumbnail: meta.thumbnail,
+          type: 'TV',
+          availableEpisodesDetail: {
+            sub: subEpisodeData.episodes,
+            dub: dubEpisodeData.episodes,
+          },
+        };
+      }
+      
+      return animeDetails;
+    } catch (error) {
+      console.error(`Error fetching details for ${showId}:`, error);
+      return null;
     }
   }, []);
 
@@ -64,17 +97,28 @@ const Watchlist: React.FC = () => {
       const response = await fetch(`/api/watchlist?sort=${sortBy}`);
       if (!response.ok) throw new Error('Failed to fetch watchlist');
       const data = await response.json();
-      setWatchlist(data);
+
+      const detailedWatchlist = await Promise.all(
+        data.map(async (item: WatchlistItem) => {
+          const animeDetails = await fetchAnimeDetails(item.id, item.name);
+          return {
+            ...item,
+            ...animeDetails,
+          };
+        })
+      );
+
+      setWatchlist(detailedWatchlist);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
       setLoading(false);
     }
-  }, [sortBy]);
+  }, [sortBy, fetchAnimeDetails]);
 
   useEffect(() => {
     fetchWatchlist();
-  }, [sortBy, filterBy, fetchWatchlist, fetchAnimeDetails]);
+  }, [sortBy, filterBy, fetchWatchlist]);
 
   const updateStatus = async (id: string, status: string) => {
     try {
@@ -150,6 +194,7 @@ const Watchlist: React.FC = () => {
               id: item.id,
               name: item.name,
               thumbnail: item.thumbnail,
+              type: item.type,
               availableEpisodesDetail: item.availableEpisodesDetail,
             };
             return (
