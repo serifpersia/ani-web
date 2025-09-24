@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useReducer, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styles from './Player.module.css';
 import ToggleSwitch from '../components/common/ToggleSwitch';
@@ -6,7 +6,9 @@ import { FaCheck, FaPlus, FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaVolumeDow
 import { formatTime, fixThumbnailUrl } from '../lib/utils';
 import ResumeModal from '../components/common/ResumeModal';
 import useIsMobile from '../hooks/useIsMobile';
+import Hls from 'hls.js';
 
+// --- INTERFACES ---
 interface SimpleShowMeta {
   name: string;
   thumbnail: string;
@@ -84,70 +86,139 @@ interface SkipInterval {
   skip_id: string;
 }
 
-import Hls from 'hls.js';
-
-interface EpisodeData {
+// --- STATE & ACTION TYPES ---
+interface PlayerState {
+  showMeta: Partial<SimpleShowMeta & DetailedShowMeta>;
   episodes: string[];
-  description: string;
+  watchedEpisodes: string[];
+  currentEpisode?: string;
+  allMangaDetails: AllMangaDetail | null;
+  showCombinedDetails: boolean;
+  currentMode: 'sub' | 'dub';
+  inWatchlist: boolean;
+  videoSources: VideoSource[];
+  selectedSource: VideoSource | null;
+  selectedLink: VideoLink | null;
+  isAutoplayEnabled: boolean;
+  showResumeModal: boolean;
+  resumeTime: number;
+  isPlaying: boolean;
+  showControls: boolean;
+  showSourceMenu: boolean;
+  autoplayBlocked: boolean;
+  currentTime: number;
+  duration: number;
+  isMuted: boolean;
+  volume: number;
+  isFullscreen: boolean;
+  isScrubbing: boolean;
+  buffered: number;
+  hoverTime: { time: number; position: number | null };
+  skipIntervals: SkipInterval[];
+  isAutoSkipEnabled: boolean;
+  currentSkipInterval: SkipInterval | null;
+  showCCMenu: boolean;
+  subtitleFontSize: number;
+  subtitlePosition: number;
+  availableSubtitles: TextTrack[];
+  activeSubtitleTrack: string | null;
+  loadingShowData: boolean;
+  loadingVideo: boolean;
+  error: string | null;
 }
 
+type Action =
+  | { type: 'SET_STATE'; payload: Partial<PlayerState> }
+  | { type: 'SET_LOADING'; key: 'loadingShowData' | 'loadingVideo'; value: boolean }
+  | { type: 'SET_ERROR'; payload: string }
+  | { type: 'SHOW_DATA_SUCCESS'; payload: Partial<PlayerState> }
+  | { type: 'VIDEO_DATA_SUCCESS'; payload: Partial<PlayerState> }
+  | { type: 'SET_PLAY_STATUS'; payload: boolean }
+  | { type: 'SET_VIDEO_ELEMENT_STATE'; payload: Partial<PlayerState> }
+  | { type: 'SET_SUBTITLE_TRACKS'; payload: TextTrack[] }
+  | { type: 'SET_ACTIVE_SUBTITLE_TRACK'; payload: string | null };
+
+
+// --- INITIAL STATE ---
+const initialState: PlayerState = {
+  showMeta: {},
+  episodes: [],
+  watchedEpisodes: [],
+  currentEpisode: undefined,
+  allMangaDetails: null,
+  showCombinedDetails: false,
+  currentMode: 'sub',
+  inWatchlist: false,
+  videoSources: [],
+  selectedSource: null,
+  selectedLink: null,
+  isAutoplayEnabled: localStorage.getItem('autoplayEnabled') === 'true',
+  showResumeModal: false,
+  resumeTime: 0,
+  isPlaying: false,
+  showControls: true,
+  showSourceMenu: false,
+  autoplayBlocked: false,
+  currentTime: 0,
+  duration: 0,
+  isMuted: false,
+  volume: 1,
+  isFullscreen: false,
+  isScrubbing: false,
+  buffered: 0,
+  hoverTime: { time: 0, position: null },
+  skipIntervals: [],
+  isAutoSkipEnabled: localStorage.getItem('autoSkipEnabled') === 'true',
+  currentSkipInterval: null,
+  showCCMenu: false,
+  subtitleFontSize: parseFloat(localStorage.getItem('subtitleFontSize') || '1.8'),
+  subtitlePosition: parseInt(localStorage.getItem('subtitlePosition') || '-4'),
+  availableSubtitles: [],
+  activeSubtitleTrack: null,
+  loadingShowData: true,
+  loadingVideo: false,
+  error: null,
+};
+
+// --- REDUCER ---
+function playerReducer(state: PlayerState, action: Action): PlayerState {
+  switch (action.type) {
+    case 'SET_STATE':
+      return { ...state, ...action.payload };
+    case 'SET_LOADING':
+      return { ...state, [action.key]: action.value };
+    case 'SET_ERROR':
+      return { ...state, error: action.payload, loadingShowData: false, loadingVideo: false };
+    case 'SHOW_DATA_SUCCESS':
+      return { ...state, ...action.payload, loadingShowData: false, error: null };
+    case 'VIDEO_DATA_SUCCESS':
+      return { ...state, ...action.payload, loadingVideo: false, error: null };
+    case 'SET_PLAY_STATUS':
+      return { ...state, isPlaying: action.payload };
+    case 'SET_VIDEO_ELEMENT_STATE':
+      return { ...state, ...action.payload };
+    case 'SET_SUBTITLE_TRACKS':
+        return { ...state, availableSubtitles: action.payload };
+    case 'SET_ACTIVE_SUBTITLE_TRACK':
+        return { ...state, activeSubtitleTrack: action.payload };
+    default:
+      return state;
+  }
+}
+
+// --- COMPONENT ---
 const Player: React.FC = () => {
   const { id: showId, episodeNumber } = useParams<{ id: string; episodeNumber?: string }>();
   const navigate = useNavigate();
+  const [state, dispatch] = useReducer(playerReducer, initialState);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
-  const progressBarThumbRef = useRef<HTMLDivElement>(null);
-  const volumeSliderRef = useRef<HTMLInputElement>(null);
   const hlsInstance = useRef<Hls | null>(null);
   const inactivityTimer = useRef<number | null>(null);
   const wasPlayingBeforeScrub = useRef(false);
-  const episodeListRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
-
-  const [showMeta, setShowMeta] = useState<Partial<SimpleShowMeta & DetailedShowMeta>>({});
-  const [episodes, setEpisodes] = useState<string[]>([]);
-  const [watchedEpisodes, setWatchedEpisodes] = useState<string[]>([]);
-  const [currentEpisode, setCurrentEpisode] = useState<string | undefined>(episodeNumber);
-  const [allMangaDetails, setAllMangaDetails] = useState<AllMangaDetail | null>(null);
-  const [showCombinedDetails, setShowCombinedDetails] = useState(false);
-    
-  const [currentMode, setCurrentMode] = useState('sub');
-  const [inWatchlist, setInWatchlist] = useState(false);
-
-  const [videoSources, setVideoSources] = useState<VideoSource[]>([]);
-  const [selectedSource, setSelectedSource] = useState<VideoSource | null>(null);
-  const [selectedLink, setSelectedLink] = useState<VideoLink | null>(null);
-
-  const [isAutoplayEnabled, setAutoplayEnabled] = useState(() => localStorage.getItem('autoplayEnabled') === 'true');
-  const [showResumeModal, setShowResumeModal] = useState(false);
-  const [resumeTime, setResumeTime] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [showControls, setShowControls] = useState(true);
-  const [showSourceMenu, setShowSourceMenu] = useState(false);
-  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(1);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isScrubbing, setIsScrubbing] = useState(false);
-  const [buffered, setBuffered] = useState(0);
-  const [hoverTime, setHoverTime] = useState<{ time: number; position: number | null }>({ time: 0, position: null });
-  const [skipIntervals, setSkipIntervals] = useState<SkipInterval[]>([]);
-  const [isAutoSkipEnabled, setIsAutoSkipEnabled] = useState(() => localStorage.getItem('autoSkipEnabled') === 'true');
-  const [currentSkipInterval, setCurrentSkipInterval] = useState<SkipInterval | null>(null);
-
-  const [showCCMenu, setShowCCMenu] = useState(false);
-  const [subtitleFontSize, setSubtitleFontSize] = useState(() => parseFloat(localStorage.getItem('subtitleFontSize') || '1.8'));
-  const [subtitlePosition, setSubtitlePosition] = useState(() => parseInt(localStorage.getItem('subtitlePosition') || '-4'));
-  const [availableSubtitles, setAvailableSubtitles] = useState<TextTrack[]>([]);
-  const [activeSubtitleTrack, setActiveSubtitleTrack] = useState<string | null>(null);
-
-  const [loadingShowData, setLoadingShowData] = useState(true);
-  const [loadingVideo, setLoadingVideo] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
 
   const fetchWithProfile = async (url: string, options: RequestInit = {}) => {
     const newOptions: RequestInit = { ...options };
@@ -157,94 +228,15 @@ const Player: React.FC = () => {
     return fetch(url, newOptions);
   };
 
-  const togglePlay = () => {
-    if (!videoRef.current) return;
-    if (videoRef.current.paused) {
-        videoRef.current.play().then(() => {
-            setAutoplayBlocked(false);
-        }).catch(error => {
-            console.error("Manual play blocked:", error);
-        });
-    } else {
-        videoRef.current.pause();
-    }
-  };
-
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!videoRef.current) return;
-    const newVolume = parseFloat(e.target.value);
-    videoRef.current.volume = newVolume;
-    setVolume(newVolume);
-    videoRef.current.muted = newVolume === 0;
-    setIsMuted(newVolume === 0);
-    localStorage.setItem('playerVolume', newVolume.toString());
-
-    if (e.target) {
-      (e.target as HTMLElement).style.setProperty('--volume-percent', newVolume.toString());
-    }
-  };
-
-  const toggleMute = () => {
-    if (!videoRef.current) return;
-    const newMuted = !videoRef.current.muted;
-    videoRef.current.muted = newMuted;
-    setIsMuted(newMuted);
-    if (!newMuted && volume === 0) {
-        const newVolume = 0.5;
-        videoRef.current.volume = newVolume;
-        setVolume(newVolume);
-    }
-    localStorage.setItem('playerMuted', newMuted.toString());
-  };
-
-  const renderVolumeIcon = () => {
-    if (isMuted) {
-      return <FaVolumeMute />;
-    } else if (volume === 0) {
-      return <FaVolumeOff />;
-    } else if (volume < 0.5) {
-      return <FaVolumeDown />;
-    } else {
-      return <FaVolumeUp />;
-    }
-  };
-
-  const toggleFullscreen = () => {
-    if (!playerContainerRef.current) return;
-    if (!document.fullscreenElement) {
-        playerContainerRef.current.requestFullscreen();
-    } else {
-        document.exitFullscreen();
-    }
-  };
-
-  useEffect(() => {
-    const savedVolume = localStorage.getItem('playerVolume');
-    const savedMute = localStorage.getItem('playerMuted') === 'true';
-    const initialVolume = savedVolume ? parseFloat(savedVolume) : 1;
-    setVolume(initialVolume);
-
-    if (videoRef.current) {
-        videoRef.current.volume = initialVolume;
-        videoRef.current.muted = (initialVolume === 0) ? savedMute : false; 
-        setIsMuted(videoRef.current.muted);
-    }
-
-    if (volumeSliderRef.current) {
-        volumeSliderRef.current.style.setProperty('--volume-percent', initialVolume.toString());
-    }
-  }, [showId, currentEpisode]);
-
   useEffect(() => {
     const fetchShowData = async () => {
       if (!showId) return;
-      setLoadingShowData(true);
-      setError(null);
+      dispatch({ type: 'SET_LOADING', key: 'loadingShowData', value: true });
       try {
         const [metaResponse, detailsResponse, episodesResponse, watchlistResponse, watchedResponse, allmangaDetailsResponse] = await Promise.all([
           fetch(`/api/show-meta/${showId}`),
           fetch(`/api/show-details/${showId}`),
-          fetch(`/api/episodes?showId=${showId}&mode=${currentMode}`),
+          fetch(`/api/episodes?showId=${showId}&mode=${state.currentMode}`),
           fetchWithProfile(`/api/watchlist/check/${showId}`),
           fetchWithProfile(`/api/watched-episodes/${showId}`),
           fetch(`/api/allmanga-details/${showId}`),
@@ -252,576 +244,31 @@ const Player: React.FC = () => {
 
         if (!metaResponse.ok) throw new Error("Failed to fetch show metadata");
         if (!episodesResponse.ok) throw new Error("Failed to fetch episodes");
-        if (!watchlistResponse.ok) throw new Error("Failed to fetch watchlist status");
-        if (!watchedResponse.ok) throw new Error("Failed to fetch watched status");
 
         const meta = await metaResponse.json();
         const details = detailsResponse.ok ? await detailsResponse.json() : {};
-        const episodeData: EpisodeData = await episodesResponse.json();
-        const watchlistStatus = await watchlistResponse.json();
-        const watchedData = await watchedResponse.json();
+        const episodeData = await episodesResponse.json();
+        const watchlistStatus = watchlistResponse.ok ? await watchlistResponse.json() : { inWatchlist: false };
+        const watchedData = watchedResponse.ok ? await watchedResponse.json() : [];
         const allmangaDetails = allmangaDetailsResponse.ok ? await allmangaDetailsResponse.json() : null;
-        setAllMangaDetails(allmangaDetails);
 
-        setShowMeta({ 
-          ...meta, 
-          ...details, 
-          description: episodeData.description 
+        dispatch({
+          type: 'SHOW_DATA_SUCCESS',
+          payload: {
+            showMeta: { ...meta, ...details, description: episodeData.description },
+            episodes: episodeData.episodes.sort((a: string, b: string) => parseFloat(a) - parseFloat(b)),
+            inWatchlist: watchlistStatus.inWatchlist,
+            watchedEpisodes: watchedData,
+            allMangaDetails: allmangaDetails,
+            currentEpisode: episodeNumber || (episodeData.episodes.length > 0 ? episodeData.episodes[0] : undefined),
+          },
         });
-        setEpisodes(episodeData.episodes.sort((a: string, b: string) => parseFloat(a) - parseFloat(b)));
-        setInWatchlist(watchlistStatus.inWatchlist);
-        setWatchedEpisodes(watchedData);
-
-        if (!episodeNumber && episodeData.episodes.length > 0) {
-          setCurrentEpisode(episodeData.episodes[0]);
-        } else if (episodeNumber) {
-          setCurrentEpisode(episodeNumber);
-        }
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : 'An unknown error occurred');
-      } finally {
-        setLoadingShowData(false);
+      } catch (e) {
+        dispatch({ type: 'SET_ERROR', payload: e instanceof Error ? e.message : 'An unknown error occurred' });
       }
     };
     fetchShowData();
-  }, [showId, currentMode, episodeNumber]);
-
-  useEffect(() => {
-    if (!showId || !currentEpisode) return;
-
-    const fetchVideoSources = async () => {
-      setLoadingVideo(true);
-      setError(null);
-      setVideoSources([]);
-      setSelectedSource(null);
-      try {
-        const [sourcesResponse, progressResponse, preferredSourceResponse, skipTimesResponse] = await Promise.all([
-          fetch(`/api/video?showId=${showId}&episodeNumber=${currentEpisode}&mode=${currentMode}`),
-          fetchWithProfile(`/api/episode-progress/${showId}/${currentEpisode}`),
-          fetchWithProfile(`/api/settings/preferredSource`),
-          fetch(`/api/skip-times/${showId}/${currentEpisode}`)
-        ]);
-
-        if (!sourcesResponse.ok) throw new Error("Failed to fetch video sources");
-        if (!preferredSourceResponse.ok) throw new Error("Failed to fetch preferred source setting");
-        const sources: VideoSource[] = await sourcesResponse.json();
-        const { value: preferredSourceName } = await preferredSourceResponse.json();
-        setVideoSources(sources);
-        
-
-        if (sources.length > 0) {
-            let sourceToSelect = sources[0];
-            if (preferredSourceName) {
-                const foundPreferredSource = sources.find(s => s.sourceName === preferredSourceName);
-                if (foundPreferredSource) {
-                    sourceToSelect = foundPreferredSource;
-                }
-            }
-            setSelectedSource(sourceToSelect);
-            if (sourceToSelect.links.length > 0) {
-                setSelectedLink(sourceToSelect.links.sort((a, b) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0))[0]);
-            }
-        }
-
-        if (progressResponse.ok) {
-            const progress = await progressResponse.json();
-            if (progress?.currentTime > 0 && progress.currentTime < progress.duration * 0.95) {
-                setResumeTime(progress.currentTime);
-                setShowResumeModal(true);
-            }
-        }
-
-        if (skipTimesResponse.ok) {
-            const skipData = await skipTimesResponse.json();
-            if (skipData.found && skipData.results) {
-                setSkipIntervals(skipData.results);
-            } else {
-                setSkipIntervals([]);
-            }
-        } else {
-            setSkipIntervals([]);
-        }
-
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : 'An unknown error occurred');
-        console.error("Error fetching video sources:", e);
-      } finally {
-        setLoadingVideo(false);
-      }
-    };
-
-    fetchVideoSources();
-  }, [showId, currentEpisode, currentMode]);
-
-  useEffect(() => {
-    if (!selectedSource || !selectedLink || !videoRef.current) return;
-
-    const videoElement = videoRef.current;
-
-    let proxiedUrl = `/api/proxy?url=${encodeURIComponent(selectedLink.link)}`;
-    if (selectedLink.headers?.Referer) {
-        proxiedUrl += `&referer=${encodeURIComponent(selectedLink.headers.Referer)}`;
-    }
-
-    if (hlsInstance.current) {
-      hlsInstance.current.destroy();
-    }
-    videoElement.src = '';
-
-    while (videoElement.firstChild) {
-      videoElement.removeChild(videoElement.firstChild);
-    }
-    setAvailableSubtitles([]);
-
-    const newAvailableSubtitles: TextTrack[] = [];
-
-    if (selectedSource.subtitles && selectedSource.subtitles.length > 0) {
-      selectedSource.subtitles.forEach(sub => {
-        const track = document.createElement('track');
-        track.kind = 'subtitles';
-        track.label = sub.label;
-        track.srclang = sub.lang;
-        track.src = `/api/subtitle-proxy?url=${encodeURIComponent(sub.src)}`;
-
-        if (sub.lang === 'en' || sub.label === 'English') {
-          track.default = true;
-        }
-        videoElement.appendChild(track);
-
-        if (videoElement.textTracks.length > 0) {
-            newAvailableSubtitles.push(videoElement.textTracks[videoElement.textTracks.length - 1]);
-        }
-      });
-    }
-
-    setAvailableSubtitles(newAvailableSubtitles);
-
-    if (newAvailableSubtitles.length > 0) {
-        const englishTrack = newAvailableSubtitles.find(track => track.language === 'en' || track.label === 'English');
-        if (englishTrack) {
-            setActiveSubtitleTrack(englishTrack.language || englishTrack.label);
-            englishTrack.mode = 'showing';
-        } else {
-            setActiveSubtitleTrack(newAvailableSubtitles[0].language || newAvailableSubtitles[0].label);
-            newAvailableSubtitles[0].mode = 'showing';
-        }
-    } else {
-        setActiveSubtitleTrack(null);
-    }
-
-    if (selectedLink.hls) {
-      const loadHls = async () => {
-        const Hls = (await import('hls.js')).default;
-        if (Hls.isSupported()) {
-          const hls = new Hls();
-          hlsInstance.current = hls;
-          hls.loadSource(proxiedUrl);
-          hls.attachMedia(videoElement);
-        } else {
-          videoElement.src = proxiedUrl;
-        }
-      };
-      loadHls();
-    } else {
-      videoElement.src = proxiedUrl;
-    }
-
-    
-
-        const savePreferredSource = async () => {
-      if (selectedSource) {
-        await setPreferredSource(selectedSource.sourceName);
-      }
-    };
-    savePreferredSource();
-
-    return () => {
-      if (hlsInstance.current) {
-        hlsInstance.current.destroy();
-      }
-    };
-  }, [selectedSource, selectedLink, isAutoplayEnabled]);
-
-  useEffect(() => {
-    const videoElement = videoRef.current;
-    if (!videoElement || !showId || !currentEpisode || !showMeta) return;
-
-    const updateProgress = () => {
-        if (videoElement.paused || videoElement.duration === 0) return;
-        fetchWithProfile('/api/update-progress', {
-            method: 'POST',
-            body: JSON.stringify({
-                showId,
-                episodeNumber: currentEpisode,
-                currentTime: videoElement.currentTime,
-                duration: videoElement.duration,
-                showName: showMeta.name,
-                showThumbnail: fixThumbnailUrl(showMeta.thumbnail),
-            })
-        });
-    };
-
-    const interval = setInterval(updateProgress, 5000);
-
-    return () => {
-        clearInterval(interval);
-    };
-  }, [showId, currentEpisode, showMeta]);
-
-  useEffect(() => {
-    const videoElement = videoRef.current;
-    if (!videoElement) return;
-
-    const handleVideoEnd = () => {
-        if (isAutoplayEnabled) {
-            const currentIndex = episodes.findIndex(ep => ep === currentEpisode);
-            if (currentIndex > -1 && currentIndex < episodes.length - 1) {
-                const nextEpisode = episodes[currentIndex + 1];
-                navigate(`/player/${showId}/${nextEpisode}`);
-            }
-        }
-    };
-
-    videoElement.addEventListener('ended', handleVideoEnd);
-    return () => {
-        videoElement.removeEventListener('ended', handleVideoEnd);
-    };
-  }, [isAutoplayEnabled, episodes, currentEpisode, showId, navigate]);
-
-  useEffect(() => {
-    const container = playerContainerRef.current;
-    if (!container || isMobile) return;
-    const handleMouseMove = () => {
-        setShowControls(true);
-        if (inactivityTimer.current) {
-            window.clearTimeout(inactivityTimer.current);
-        }
-        inactivityTimer.current = window.setTimeout(() => {
-            if (isPlaying) {
-                setShowControls(false);
-            }
-        }, 3000);
-    };
-
-    const handleMouseLeave = () => {
-        if (isPlaying) {
-            setShowControls(false);
-        }
-    };
-
-    container.addEventListener('mousemove', handleMouseMove);
-    container.addEventListener('mouseleave', handleMouseLeave);
-
-    if (!isPlaying) {
-        setShowControls(true);
-        if (inactivityTimer.current) {
-            window.clearTimeout(inactivityTimer.current);
-        }
-    }
-
-    return () => {
-        container.removeEventListener('mousemove', handleMouseMove);
-        container.removeEventListener('mouseleave', handleMouseLeave);
-        if (inactivityTimer.current) {
-            window.clearTimeout(inactivityTimer.current);
-        }
-    };
-  }, [isPlaying, isMobile, showId, currentEpisode]);
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-        setIsFullscreen(!!document.fullscreenElement);
-    };
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
-
-
-  const handleEpisodeClick = (ep: string) => navigate(`/player/${showId}/${ep}`);
-
-  const toggleWatchlist = async () => {
-    if (!showMeta || !showId) return;
-    try {
-      const endpoint = inWatchlist ? '/api/watchlist/remove' : '/api/watchlist/add';
-      const body = { id: showId, name: showMeta.name, thumbnail: showMeta.thumbnail };
-      await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      setInWatchlist(!inWatchlist);
-    } catch (e) {
-      console.error("Error toggling watchlist:", e);
-      alert("Failed to update watchlist.");
-    }
-  };
-
-  const handleAutoplayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const enabled = e.target.checked;
-    setAutoplayEnabled(enabled);
-    localStorage.setItem('autoplayEnabled', enabled.toString());
-  };
-
-  const seek = (seconds: number) => {
-    if (videoRef.current) {
-        videoRef.current.currentTime += seconds;
-    }
-  };
-
-  const handleResume = () => {
-    if (videoRef.current) {
-        videoRef.current.currentTime = resumeTime;
-        videoRef.current.play();
-    }
-    setShowResumeModal(false);
-  };
-
-  const handleStartOver = () => {
-    if (videoRef.current) {
-        videoRef.current.currentTime = 0;
-        videoRef.current.play();
-    }
-    setShowResumeModal(false);
-  };
-
-
-
-  useEffect(() => {
-    const videoElement = videoRef.current;
-    if (!videoElement) return;
-
-    const handleAddTrack = () => {
-      const tracks = Array.from(videoElement.textTracks);
-      setAvailableSubtitles(tracks);
-
-      if (activeSubtitleTrack === null) {
-        const englishTrack = tracks.find(track => track.language === 'en' || track.label === 'English');
-        if (englishTrack) {
-          setActiveSubtitleTrack(englishTrack.language || englishTrack.label);
-          englishTrack.mode = 'showing';
-        } else if (tracks.length > 0) {
-          setActiveSubtitleTrack(tracks[0].language || tracks[0].label);
-          tracks[0].mode = 'showing';
-        } else {
-          setActiveSubtitleTrack('off');
-        }
-      }
-    };
-
-    const handleRemoveTrack = () => {
-      setAvailableSubtitles(Array.from(videoElement.textTracks));
-    };
-
-    videoElement.textTracks.addEventListener('addtrack', handleAddTrack);
-    videoElement.textTracks.addEventListener('removetrack', handleRemoveTrack);
-
-    handleAddTrack();
-
-    return () => {
-      videoElement.textTracks.removeEventListener('addtrack', handleAddTrack);
-      videoElement.textTracks.removeEventListener('removetrack', handleRemoveTrack);
-    };
-  }, [activeSubtitleTrack]);
-
-  const handleSubtitleSelection = (trackId: string | null) => {
-    if (!videoRef.current) return;
-
-    setActiveSubtitleTrack(trackId);
-
-    Array.from(videoRef.current.textTracks).forEach(track => {
-      if (trackId === null) {
-        track.mode = 'hidden';
-      } else if (track.language === trackId || track.label === trackId) {
-        track.mode = 'showing';
-      } else {
-        track.mode = 'hidden';
-      }
-    });
-  };
-
-  const renderSubtitleOptions = () => {
-    const options = [];
-
-    if (availableSubtitles.length > 0) {
-      options.push(
-        <button
-          key="off"
-          className={`${styles.ccItem} ${activeSubtitleTrack === null ? styles.active : ''}`}
-          onClick={() => handleSubtitleSelection(null)}
-        >
-          Off
-        </button>
-      );
-    }
-
-    availableSubtitles.forEach(track => {
-      options.push(
-        <button
-          key={track.language || track.label}
-          className={`${styles.ccItem} ${activeSubtitleTrack === (track.language || track.label) ? styles.active : ''}`}
-          onClick={() => handleSubtitleSelection(track.language || track.label)}
-        >
-          {track.label || track.language}
-        </button>
-      );
-    });
-
-    if (availableSubtitles.length === 0) {
-        return <button className={`${styles.ccItem} ${styles.disabled}`}>Not Available</button>;
-    }
-
-    return <div className={styles.ccOptionsContainer}>{options}</div>;
-  };
-
-  const handleSubtitleFontSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newSize = parseFloat(e.target.value);
-    setSubtitleFontSize(newSize);
-    localStorage.setItem('subtitleFontSize', newSize.toString());
-  };
-
-  const handleSubtitlePositionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newPosition = parseInt(e.target.value, 10);
-    setSubtitlePosition(newPosition);
-    localStorage.setItem('subtitlePosition', newPosition.toString());
-  };
-
-  useEffect(() => {
-    let styleElement = document.getElementById('subtitle-style-override') as HTMLStyleElement;
-    if (!styleElement) {
-      styleElement = document.createElement('style');
-      styleElement.id = 'subtitle-style-override';
-      document.head.appendChild(styleElement);
-    }
-    styleElement.innerHTML = `
-      video::cue {
-        font-size: ${subtitleFontSize}rem !important;
-        bottom: ${Math.abs(subtitlePosition)}% !important; /* Adjust based on position slider */
-      }
-    `;
-  }, [subtitleFontSize, subtitlePosition]);
-
-  const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!videoRef.current || !progressBarRef.current) return;
-    if (isNaN(duration) || duration === 0) return;
-
-    const rect = progressBarRef.current.getBoundingClientRect();
-    const percent = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    videoRef.current.currentTime = percent * duration;
-  };
-
-  const handleProgressBarMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!progressBarRef.current || !duration) return;
-    const rect = progressBarRef.current.getBoundingClientRect();
-    const percent = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    const time = percent * duration;
-    setHoverTime({ time, position: e.clientX - rect.left });
-  };
-
-  const handleProgressBarMouseLeave = () => {
-    setHoverTime({ time: 0, position: null });
-  };
-
-  const handleThumbMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (!videoRef.current) return;
-    setIsScrubbing(true);
-    wasPlayingBeforeScrub.current = !videoRef.current.paused;
-    videoRef.current.pause();
-  };
-
-  useEffect(() => {
-    const handleDocumentMouseMove = (e: MouseEvent) => {
-      if (!isScrubbing || !videoRef.current || !progressBarRef.current || !duration) return;
-
-      const rect = progressBarRef.current.getBoundingClientRect();
-      const percent = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-      const scrubTime = percent * duration;
-
-      videoRef.current.currentTime = scrubTime;
-      setCurrentTime(scrubTime);
-
-      setHoverTime({ time: scrubTime, position: e.clientX - rect.left });
-    };
-
-    const handleDocumentMouseUp = () => {
-      if (isScrubbing) {
-        setIsScrubbing(false);
-        setHoverTime({ time: 0, position: null });
-        if (wasPlayingBeforeScrub.current) {
-          videoRef.current?.play();
-        }
-      }
-    };
-
-    document.addEventListener('mousemove', handleDocumentMouseMove);
-    document.addEventListener('mouseup', handleDocumentMouseUp);
-
-    return () => {
-      document.removeEventListener('mousemove', handleDocumentMouseMove);
-      document.removeEventListener('mouseup', handleDocumentMouseUp);
-    };
-  }, [isScrubbing, duration]);
-
-  const scrollToEpisode = (epNum: string) => {
-    if (episodeListRef.current) {
-      const episodeElement = episodeListRef.current.querySelector(`[data-episode="${epNum}"]`) as HTMLElement;
-      if (episodeElement) {
-        episodeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } else {
-        alert(`Episode ${epNum} not found.`);
-      }
-    }
-  };
-
-  const renderEpisodeJumpControls = () => {
-    if (episodes.length <= 100) return null;
-
-    const sortedNumericEpisodes = episodes.map(Number).sort((a, b) => a - b);
-    const ranges = [];
-    for (let i = 0; i < sortedNumericEpisodes.length; i += 100) {
-      const start = sortedNumericEpisodes[i];
-      const end = sortedNumericEpisodes[Math.min(i + 99, sortedNumericEpisodes.length - 1)];
-      ranges.push(
-        <button key={`range-${start}`} className={styles.epRangeBtn} onClick={() => scrollToEpisode(start.toString())}>
-          Ep {start}-{end}
-        </button>
-      );
-    }
-
-    const handleJumpInput = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter') {
-        const inputElement = e.target as HTMLInputElement;
-        const epNum = inputElement.value;
-        if (episodes.includes(epNum)) {
-          scrollToEpisode(epNum);
-        } else {
-          alert(`Episode ${epNum} not found.`);
-        }
-        inputElement.value = '';
-      }
-    };
-
-    const handleJumpBtnClick = () => {
-      const inputElement = document.getElementById('ep-jump-input') as HTMLInputElement;
-      const epNum = inputElement.value;
-      if (episodes.includes(epNum)) {
-        scrollToEpisode(epNum);
-      } else {
-        alert(`Episode ${epNum} not found.`);
-      }
-      inputElement.value = '';
-    };
-
-    return (
-      <div className={styles.epJumpControls}>
-        <div className={styles.epRangeButtons}>{ranges}</div>
-        <div className={styles.epJumpInputGroup}>
-          <input type="number" id="ep-jump-input" placeholder="Go to Ep #" min="1" onKeyPress={handleJumpInput} />
-          <button id="ep-jump-btn" onClick={handleJumpBtnClick}>Go</button>
-        </div>
-      </div>
-    );
-  };
+  }, [showId, state.currentMode, episodeNumber]);
 
   const setPreferredSource = useCallback(async (sourceName: string) => {
     try {
@@ -834,95 +281,428 @@ const Player: React.FC = () => {
     }
   }, []);
 
-  const renderMobileControls = () => (
-    <div className={styles.mobileControls}>
-        <div className={styles.playerActions}>
-            <button className={styles.seekBtn} onClick={() => seek(-10)}>-10s</button>
-            <button className={styles.seekBtn} onClick={() => seek(10)}>+10s</button>
-            <div className={styles.toggleContainer}>
-                <span>Auto Skip</span>
-                <ToggleSwitch id="auto-skip-toggle-mobile" isChecked={isAutoSkipEnabled} onChange={(e) => {
-                    setIsAutoSkipEnabled(e.target.checked);
-                    localStorage.setItem('autoSkipEnabled', e.target.checked.toString());
-                }} />
-            </div>
-            <div className={styles.toggleContainer}>
-                <span>Autoplay</span>
-                <ToggleSwitch id="autoplay-toggle-mobile" isChecked={isAutoplayEnabled} onChange={handleAutoplayChange} />
-            </div>
-        </div>
+  useEffect(() => {
+    if (!showId || !state.currentEpisode) return;
 
-        <div className={styles.sourceQualityControls}>
-            <div className={styles.sourceSelection}>
-                <h4>Source</h4>
-                <div className={styles.sourceButtons}>
-                    {videoSources.map(source => (
-                        <button
-                            key={source.sourceName}
-                            className={`${styles.sourceButton} ${selectedSource?.sourceName === source.sourceName ? styles.active : ''}`}
-                            onClick={() => setSelectedSource(source)}
-                        >
-                            {source.sourceName}
-                        </button>
-                    ))}
-                </div>
-            </div>
-            {selectedSource && (
-                <div className={styles.qualitySelection}>
-                    <h4>Quality</h4>
-                    <div className={styles.qualityButtons}>
-                        {selectedSource.links.sort((a, b) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)).map(link => (
-                            <button
-                                key={link.resolutionStr}
-                                className={`${styles.qualityButton} ${selectedLink?.resolutionStr === link.resolutionStr ? styles.active : ''}`}
-                                onClick={() => setSelectedLink(link)}
-                            >
-                                {link.resolutionStr}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
-        </div>
-    </div>
-  );
+    const fetchVideoSources = async () => {
+      dispatch({ type: 'SET_LOADING', key: 'loadingVideo', value: true });
+      dispatch({ type: 'SET_STATE', payload: { videoSources: [], selectedSource: null, selectedLink: null, skipIntervals: [] } });
+      try {
+        const [sourcesResponse, progressResponse, preferredSourceResponse, skipTimesResponse] = await Promise.all([
+          fetch(`/api/video?showId=${showId}&episodeNumber=${state.currentEpisode}&mode=${state.currentMode}`),
+          fetchWithProfile(`/api/episode-progress/${showId}/${state.currentEpisode}`),
+          fetchWithProfile(`/api/settings/preferredSource`),
+          fetch(`/api/skip-times/${showId}/${state.currentEpisode}`)
+        ]);
 
-  if (loadingShowData) return <p className="loading">Loading show data...</p>;
-  if (error) return <p className="error-message">Error: {error}</p>;
-  if (!showMeta) return <p>Show not found.</p>;
+        if (!sourcesResponse.ok) throw new Error("Failed to fetch video sources");
+        const sources: VideoSource[] = await sourcesResponse.json();
+        const preferredSourceName = preferredSourceResponse.ok ? (await preferredSourceResponse.json()).value : null;
+
+        let sourceToSelect: VideoSource | null = sources.length > 0 ? sources[0] : null;
+        if (preferredSourceName) {
+            const foundPreferredSource = sources.find(s => s.sourceName === preferredSourceName);
+            if (foundPreferredSource) sourceToSelect = foundPreferredSource;
+        }
+        
+        const selectedLink = sourceToSelect && sourceToSelect.links.length > 0
+            ? sourceToSelect.links.sort((a, b) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0))[0]
+            : null;
+
+        let resumeTime = 0;
+        let showResumeModal = false;
+        if (progressResponse.ok) {
+            const progress = await progressResponse.json();
+            if (progress?.currentTime > 0 && progress.currentTime < progress.duration * 0.95) {
+                resumeTime = progress.currentTime;
+                showResumeModal = true;
+            }
+        }
+
+        const skipIntervals = skipTimesResponse.ok ? (await skipTimesResponse.json()).results || [] : [];
+
+        dispatch({
+          type: 'VIDEO_DATA_SUCCESS',
+          payload: {
+            videoSources: sources,
+            selectedSource: sourceToSelect,
+            selectedLink,
+            resumeTime,
+            showResumeModal,
+            skipIntervals,
+          },
+        });
+
+      } catch (e) {
+        dispatch({ type: 'SET_ERROR', payload: e instanceof Error ? e.message : 'An unknown error occurred' });
+      }
+    };
+
+    fetchVideoSources();
+  }, [showId, state.currentEpisode, state.currentMode]);
+
+  useEffect(() => {
+    if (!state.selectedSource || !state.selectedLink || !videoRef.current) return;
+
+    const videoElement = videoRef.current;
+    let proxiedUrl = `/api/proxy?url=${encodeURIComponent(state.selectedLink.link)}`;
+    if (state.selectedLink.headers?.Referer) {
+        proxiedUrl += `&referer=${encodeURIComponent(state.selectedLink.headers.Referer)}`;
+    }
+
+    if (hlsInstance.current) {
+      hlsInstance.current.destroy();
+    }
+    videoElement.src = '';
+    while (videoElement.firstChild) {
+      videoElement.removeChild(videoElement.firstChild);
+    }
+
+    if (state.selectedSource.subtitles) {
+        state.selectedSource.subtitles.forEach(sub => {
+            const track = document.createElement('track');
+            track.kind = 'subtitles';
+            track.label = sub.label;
+            track.srclang = sub.lang;
+            track.src = `/api/subtitle-proxy?url=${encodeURIComponent(sub.src)}`;
+            if (sub.lang === 'en' || sub.label === 'English') {
+                track.default = true;
+            }
+            videoElement.appendChild(track);
+        });
+    }
+
+    if (state.selectedLink.hls) {
+      if (Hls.isSupported()) {
+        const hls = new Hls();
+        hlsInstance.current = hls;
+        hls.loadSource(proxiedUrl);
+        hls.attachMedia(videoElement);
+      } else {
+        videoElement.src = proxiedUrl;
+      }
+    } else {
+      videoElement.src = proxiedUrl;
+    }
+
+    setPreferredSource(state.selectedSource.sourceName);
+
+    const savedVolume = localStorage.getItem('playerVolume');
+    const savedMuted = localStorage.getItem('playerMuted');
+
+    if (savedVolume !== null) {
+      const newVolume = parseFloat(savedVolume);
+      videoElement.volume = newVolume;
+      dispatch({ type: 'SET_STATE', payload: { volume: newVolume } });
+    }
+    if (savedMuted !== null) {
+      const newMuted = savedMuted === 'true';
+      videoElement.muted = newMuted;
+      dispatch({ type: 'SET_STATE', payload: { isMuted: newMuted } });
+    }
+
+    return () => {
+      if (hlsInstance.current) {
+        hlsInstance.current.destroy();
+      }
+    };
+  }, [state.selectedSource, state.selectedLink, setPreferredSource]);
+
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (!videoElement || !showId || !state.currentEpisode || !state.showMeta) return;
+
+    const updateProgress = () => {
+        if (videoElement.paused || videoElement.duration === 0) return;
+        fetchWithProfile('/api/update-progress', {
+            method: 'POST',
+            body: JSON.stringify({
+                showId,
+                episodeNumber: state.currentEpisode,
+                currentTime: videoElement.currentTime,
+                duration: videoElement.duration,
+                showName: state.showMeta.name,
+                showThumbnail: fixThumbnailUrl(state.showMeta.thumbnail!),
+            })
+        });
+    };
+    const interval = setInterval(updateProgress, 5000);
+    return () => clearInterval(interval);
+  }, [showId, state.currentEpisode, state.showMeta]);
+
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+    const handleVideoEnd = () => {
+        if (state.isAutoplayEnabled) {
+            const currentIndex = state.episodes.findIndex(ep => ep === state.currentEpisode);
+            if (currentIndex > -1 && currentIndex < state.episodes.length - 1) {
+                const nextEpisode = state.episodes[currentIndex + 1];
+                navigate(`/player/${showId}/${nextEpisode}`);
+            }
+        }
+    };
+    videoElement.addEventListener('ended', handleVideoEnd);
+    return () => {
+        if (videoElement) {
+            videoElement.removeEventListener('ended', handleVideoEnd);
+        }
+    };
+  }, [state.isAutoplayEnabled, state.episodes, state.currentEpisode, showId, navigate]);
+
+  useEffect(() => {
+    const container = playerContainerRef.current;
+    if (!container || isMobile) return;
+    const handleMouseMove = () => {
+        dispatch({ type: 'SET_STATE', payload: { showControls: true } });
+        if (inactivityTimer.current) window.clearTimeout(inactivityTimer.current);
+        inactivityTimer.current = window.setTimeout(() => {
+            if (state.isPlaying) {
+                dispatch({ type: 'SET_STATE', payload: { showControls: false } });
+            }
+        }, 3000);
+    };
+    const handleMouseLeave = () => {
+        if (state.isPlaying) {
+            dispatch({ type: 'SET_STATE', payload: { showControls: false } });
+        }
+    };
+    container.addEventListener('mousemove', handleMouseMove);
+    container.addEventListener('mouseleave', handleMouseLeave);
+    if (!state.isPlaying) {
+        dispatch({ type: 'SET_STATE', payload: { showControls: true } });
+        if (inactivityTimer.current) window.clearTimeout(inactivityTimer.current);
+    }
+    return () => {
+        if (container) {
+            container.removeEventListener('mousemove', handleMouseMove);
+            container.removeEventListener('mouseleave', handleMouseLeave);
+        }
+        if (inactivityTimer.current) window.clearTimeout(inactivityTimer.current);
+    };
+  }, [state.isPlaying, isMobile]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => dispatch({ type: 'SET_STATE', payload: { isFullscreen: !!document.fullscreenElement } });
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    let styleElement = document.getElementById('subtitle-style-override') as HTMLStyleElement;
+    if (!styleElement) {
+      styleElement = document.createElement('style');
+      styleElement.id = 'subtitle-style-override';
+      document.head.appendChild(styleElement);
+    }
+    styleElement.innerHTML = `
+      video::cue {
+        font-size: ${state.subtitleFontSize}rem !important;
+        bottom: ${Math.abs(state.subtitlePosition)}% !important;
+      }
+    `;
+  }, [state.subtitleFontSize, state.subtitlePosition]);
+
+  useEffect(() => {
+    const handleDocumentMouseMove = (e: MouseEvent) => {
+      if (!state.isScrubbing || !videoRef.current || !progressBarRef.current || !state.duration) return;
+      const rect = progressBarRef.current.getBoundingClientRect();
+      const percent = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+      const scrubTime = percent * state.duration;
+      videoRef.current.currentTime = scrubTime;
+      dispatch({ type: 'SET_STATE', payload: { currentTime: scrubTime, hoverTime: { time: scrubTime, position: e.clientX - rect.left } } });
+    };
+    const handleDocumentMouseUp = () => {
+      if (state.isScrubbing) {
+        dispatch({ type: 'SET_STATE', payload: { isScrubbing: false, hoverTime: { time: 0, position: null } } });
+        if (wasPlayingBeforeScrub.current) {
+          videoRef.current?.play();
+        }
+      }
+    };
+    document.addEventListener('mousemove', handleDocumentMouseMove);
+    document.addEventListener('mouseup', handleDocumentMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleDocumentMouseMove);
+      document.removeEventListener('mouseup', handleDocumentMouseUp);
+    };
+  }, [state.isScrubbing, state.duration]);
+
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+    const handleTracksChange = () => {
+        const tracks = Array.from(videoElement.textTracks);
+        dispatch({ type: 'SET_SUBTITLE_TRACKS', payload: tracks });
+        if (state.activeSubtitleTrack === null && tracks.length > 0) {
+            const englishTrack = tracks.find(t => t.language === 'en' || t.label === 'English');
+            const trackToActivate = englishTrack || tracks[0];
+            dispatch({ type: 'SET_ACTIVE_SUBTITLE_TRACK', payload: trackToActivate.language || trackToActivate.label });
+            tracks.forEach(t => t.mode = (t === trackToActivate) ? 'showing' : 'hidden');
+        }
+    };
+    videoElement.textTracks.addEventListener('addtrack', handleTracksChange);
+    videoElement.textTracks.addEventListener('removetrack', handleTracksChange);
+    handleTracksChange();
+    return () => {
+        if (videoElement) {
+            videoElement.textTracks.removeEventListener('addtrack', handleTracksChange);
+            videoElement.textTracks.removeEventListener('removetrack', handleTracksChange);
+        }
+    };
+  }, [state.activeSubtitleTrack, state.selectedLink]);
+
+  const togglePlay = () => {
+    if (!videoRef.current) return;
+    if (videoRef.current.paused) {
+        videoRef.current.play().catch(() => dispatch({ type: 'SET_STATE', payload: { autoplayBlocked: true } }));
+    } else {
+        videoRef.current.pause();
+    }
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!videoRef.current) return;
+    const newVolume = parseFloat(e.target.value);
+    videoRef.current.volume = newVolume;
+    videoRef.current.muted = newVolume === 0;
+    dispatch({ type: 'SET_STATE', payload: { volume: newVolume, isMuted: newVolume === 0 } });
+    localStorage.setItem('playerVolume', newVolume.toString());
+  };
+
+  const toggleMute = () => {
+    if (!videoRef.current) return;
+    const newMuted = !videoRef.current.muted;
+    videoRef.current.muted = newMuted;
+    dispatch({ type: 'SET_STATE', payload: { isMuted: newMuted } });
+    if (!newMuted && state.volume === 0) {
+        const newVolume = 0.5;
+        videoRef.current.volume = newVolume;
+        dispatch({ type: 'SET_STATE', payload: { volume: newVolume } });
+    }
+    localStorage.setItem('playerMuted', newMuted.toString());
+  };
+
+  const toggleFullscreen = () => {
+    if (!playerContainerRef.current) return;
+    if (!document.fullscreenElement) {
+        playerContainerRef.current.requestFullscreen();
+    } else {
+        document.exitFullscreen();
+    }
+  };
+
+  const handleEpisodeClick = (ep: string) => navigate(`/player/${showId}/${ep}`);
+
+  const toggleWatchlist = async () => {
+    if (!state.showMeta || !showId) return;
+    try {
+      const endpoint = state.inWatchlist ? '/api/watchlist/remove' : '/api/watchlist/add';
+      await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: showId, name: state.showMeta.name, thumbnail: state.showMeta.thumbnail })
+      });
+      dispatch({ type: 'SET_STATE', payload: { inWatchlist: !state.inWatchlist } });
+    } catch (e) {
+      console.error("Error toggling watchlist:", e);
+    }
+  };
+
+  const seek = (seconds: number) => {
+    if (videoRef.current) videoRef.current.currentTime += seconds;
+  };
+
+  const handleResume = () => {
+    if (videoRef.current) {
+        videoRef.current.currentTime = state.resumeTime;
+        videoRef.current.play();
+    }
+    dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } });
+  };
+
+  const handleStartOver = () => {
+    if (videoRef.current) {
+        videoRef.current.currentTime = 0;
+        videoRef.current.play();
+    }
+    dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } });
+  };
+
+  const handleSubtitleSelection = (trackId: string | null) => {
+    if (!videoRef.current) return;
+    dispatch({ type: 'SET_ACTIVE_SUBTITLE_TRACK', payload: trackId });
+    Array.from(videoRef.current.textTracks).forEach(track => {
+      track.mode = (trackId !== null && (track.language === trackId || track.label === trackId)) ? 'showing' : 'hidden';
+    });
+  };
+
+  const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!videoRef.current || !progressBarRef.current || isNaN(state.duration) || state.duration === 0) return;
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const percent = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    videoRef.current.currentTime = percent * state.duration;
+  };
+
+  const handleProgressBarMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!progressBarRef.current || !state.duration) return;
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const percent = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    const time = percent * state.duration;
+    dispatch({ type: 'SET_STATE', payload: { hoverTime: { time, position: e.clientX - rect.left } } });
+  };
+
+  const handleThumbMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (!videoRef.current) return;
+    dispatch({ type: 'SET_STATE', payload: { isScrubbing: true } });
+    wasPlayingBeforeScrub.current = !videoRef.current.paused;
+    videoRef.current.pause();
+  };
+
+  const renderVolumeIcon = () => {
+    if (state.isMuted) return <FaVolumeMute />;
+    if (state.volume === 0) return <FaVolumeOff />;
+    if (state.volume < 0.5) return <FaVolumeDown />;
+    return <FaVolumeUp />;
+  };
+
+  if (state.loadingShowData) return <p className="loading">Loading show data...</p>;
+  if (state.error) return <p className="error-message">Error: {state.error}</p>;
+  if (!state.showMeta.name) return <p>Show not found.</p>;
 
   return (
     <div className={styles.playerPage}>
         <ResumeModal 
-            show={showResumeModal}
-            resumeTime={formatTime(resumeTime)}
+            show={state.showResumeModal}
+            resumeTime={formatTime(state.resumeTime)}
             onResume={handleResume}
             onStartOver={handleStartOver}
         />
       <div className={styles.headerContainer}>
-        <img src={fixThumbnailUrl(showMeta.thumbnail)} alt={showMeta.name} className={styles.headerThumbnail} />
+        <img src={fixThumbnailUrl(state.showMeta.thumbnail!)} alt={state.showMeta.name} className={styles.headerThumbnail} />
         <div className={styles.header}>
           <div className={styles.titleContainer}>
-            <h2>{showMeta.name}</h2>
-            {(showMeta.status || showMeta.nextEpisodeAirDate) && (
+            <h2>{state.showMeta.name}</h2>
+            {(state.showMeta.status || state.showMeta.nextEpisodeAirDate) && (
               <div className={styles.scheduleInfo}>
-                {showMeta.status && <span className={styles.status}>{showMeta.status}</span>}
-                {showMeta.nextEpisodeAirDate && <span className={styles.nextEpisode}>Next: {showMeta.nextEpisodeAirDate}</span>}
+                {state.showMeta.status && <span className={styles.status}>{state.showMeta.status}</span>}
+                {state.showMeta.nextEpisodeAirDate && <span className={styles.nextEpisode}>Next: {state.showMeta.nextEpisodeAirDate}</span>}
               </div>
             )}
           </div>
           <div className={styles.controls}>
               <button className={styles.watchlistBtn} onClick={() => navigate('/settings')}>Settings</button>
-              <button className={`${styles.watchlistBtn} ${inWatchlist ? styles.inList : ''}`} onClick={toggleWatchlist}>
-                {inWatchlist ? <FaCheck /> : <FaPlus />}
-                {inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
+              <button className={`${styles.watchlistBtn} ${state.inWatchlist ? styles.inList : ''}`} onClick={toggleWatchlist}>
+                {state.inWatchlist ? <FaCheck /> : <FaPlus />}
+                {state.inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
               </button>
               <div className={styles.toggleContainer}>
                   <span>SUB</span>
                   <ToggleSwitch 
                       id="dub-toggle"
-                      isChecked={currentMode === 'dub'} 
-                      onChange={() => setCurrentMode(currentMode === 'sub' ? 'dub' : 'sub')} 
+                      isChecked={state.currentMode === 'dub'} 
+                      onChange={() => dispatch({ type: 'SET_STATE', payload: { currentMode: state.currentMode === 'sub' ? 'dub' : 'sub' } })} 
                   />
                   <span>DUB</span>
               </div>
@@ -932,74 +712,48 @@ const Player: React.FC = () => {
 
       <div className={styles.descriptionBox}>
         <h3>Description</h3>
-        <p dangerouslySetInnerHTML={{ __html: showMeta.description || 'No description available.' }}></p>
+        <p dangerouslySetInnerHTML={{ __html: state.showMeta.description || 'No description available.' }}></p>
       </div>
 
       <div className={styles.detailsBox}>
-        <button className={styles.detailsToggle} onClick={() => setShowCombinedDetails(!showCombinedDetails)}>
+        <button className={styles.detailsToggle} onClick={() => dispatch({ type: 'SET_STATE', payload: { showCombinedDetails: !state.showCombinedDetails } })}>
           <h3>Details</h3>
-          {showCombinedDetails ? <FaChevronUp /> : <FaChevronDown />}
+          {state.showCombinedDetails ? <FaChevronUp /> : <FaChevronDown />}
         </button>
-        {showCombinedDetails && (
+        {state.showCombinedDetails && (
           <div className={styles.detailsGridContainer}>
-            {/* General Information */}
-            <div className={styles.detailItem}><strong>Type:</strong> {showMeta.mediaTypes?.[0]?.name}</div>
-            <div className={styles.detailItem}><strong>Status:</strong> {showMeta.status}</div>
-            <div className={styles.detailItem}><strong>Score:</strong> {showMeta.stats ? showMeta.stats.averageScore / 10 : 'N/A'}</div>
-
-            {/* Production/Origin */}
-            <div className={styles.detailItem}><strong>Studios:</strong> {showMeta.studios?.map(s => s.name).join(', ')}</div>
-            <div className={styles.detailItem}><strong>English Title:</strong> {showMeta.names?.english}</div>
-            <div className={styles.detailItem}><strong>Native Title:</strong> {showMeta.names?.native}</div>
-
-            {/* Categorization */}
-            {showMeta.genres && showMeta.genres.length > 0 && (
+            <div className={styles.detailItem}><strong>Type:</strong> {state.showMeta.mediaTypes?.[0]?.name}</div>
+            <div className={styles.detailItem}><strong>Status:</strong> {state.showMeta.status}</div>
+            <div className={styles.detailItem}><strong>Score:</strong> {state.showMeta.stats ? state.showMeta.stats.averageScore / 10 : 'N/A'}</div>
+            <div className={styles.detailItem}><strong>Studios:</strong> {state.showMeta.studios?.map(s => s.name).join(', ')}</div>
+            <div className={styles.detailItem}><strong>English Title:</strong> {state.showMeta.names?.english}</div>
+            <div className={styles.detailItem}><strong>Native Title:</strong> {state.showMeta.names?.native}</div>
+            {state.showMeta.genres && state.showMeta.genres.length > 0 && (
               <div className={`${styles.detailItem} ${styles.genresContainer}`}>
                 <strong>Genres:</strong>
                 <div className={styles.genresList}>
-                  {showMeta.genres.map(genre => <span key={genre.route} className={styles.genreTag}>{genre.name}</span>)}
+                  {state.showMeta.genres.map(genre => <span key={genre.route} className={styles.genreTag}>{genre.name}</span>)}
                 </div>
               </div>
             )}
-
-            {/* Manga Details */}
-            {allMangaDetails && (
+            {state.allMangaDetails && (
               <>
-                <div className={styles.detailItem}><strong>Rating:</strong> {allMangaDetails.Rating}</div>
-                <div className={styles.detailItem}><strong>Season:</strong> {allMangaDetails.Season}</div>
-                <div className={styles.detailItem}><strong>Episodes:</strong> {allMangaDetails.Episodes}</div>
-                <div className={styles.detailItem}><strong>Date:</strong> {allMangaDetails.Date}</div>
-                <div className={styles.detailItem}><strong>Original Broadcast:</strong> {allMangaDetails["Original Broadcast"]}</div>
+                <div className={styles.detailItem}><strong>Rating:</strong> {state.allMangaDetails.Rating}</div>
+                <div className={styles.detailItem}><strong>Season:</strong> {state.allMangaDetails.Season}</div>
+                <div className={styles.detailItem}><strong>Episodes:</strong> {state.allMangaDetails.Episodes}</div>
+                <div className={styles.detailItem}><strong>Date:</strong> {state.allMangaDetails.Date}</div>
+                <div className={styles.detailItem}><strong>Original Broadcast:</strong> {state.allMangaDetails["Original Broadcast"]}</div>
               </>
             )}
           </div>
         )}
       </div>
 
-      {showMeta.characters && showMeta.characters.length > 0 && (
-        <div className={styles.charactersBox}>
-          <h3>Characters</h3>
-          <div className={styles.charactersList}>
-            {showMeta.characters.map(char => (
-              <div key={char.name.full} className={styles.characterCard}>
-                <img src={`http://localhost:3000/api/image-proxy?url=${encodeURIComponent(char.image.large)}`} alt={char.name.full} />
-                <div className={styles.characterInfo}>
-                  <p className={styles.characterName}>{char.name.full}</p>
-                  <p className={styles.characterRole}>{char.role}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-
-
       <div ref={playerContainerRef} className={styles.videoContainer} onDoubleClick={toggleFullscreen}>
-        {loadingVideo && <p className="loading">Loading video...</p>}
+        {state.loadingVideo && <p className="loading">Loading video...</p>}
         
-        {!isMobile && <div className={`${styles.controlsOverlay} ${!showControls ? styles.hidden : ''}`} onDoubleClick={(e) => e.stopPropagation()}>
-            {(!isPlaying || autoplayBlocked) && (
+        {!isMobile && <div className={`${styles.controlsOverlay} ${!state.showControls ? styles.hidden : ''}`} onDoubleClick={(e) => e.stopPropagation()}>
+            {!state.isPlaying && (
                 <button className={styles.centerPlayPause} onClick={togglePlay}>
                     <FaPlay />
                 </button>
@@ -1010,157 +764,132 @@ const Player: React.FC = () => {
                     ref={progressBarRef}
                     onClick={handleProgressBarClick}
                     onMouseMove={handleProgressBarMouseMove}
-                    onMouseLeave={handleProgressBarMouseLeave}
+                    onMouseLeave={() => dispatch({ type: 'SET_STATE', payload: { hoverTime: { time: 0, position: null } } })}
                 >
-                    {hoverTime.position !== null && (
-                        <div className={styles.timeBubble} style={{ left: hoverTime.position }}>
-                            {formatTime(hoverTime.time)}
+                    {state.hoverTime.position !== null && (
+                        <div className={styles.timeBubble} style={{ left: state.hoverTime.position }}>
+                            {formatTime(state.hoverTime.time)}
                         </div>
                     )}
                     <div className={styles.progressBar}>
-                        {/* Render skip segments */}
-                        {duration > 0 && skipIntervals.map((interval, index) => (
+                        {state.duration > 0 && state.skipIntervals.map((interval, index) => (
                             <div
                                 key={index}
                                 className={`${styles.skipSegment} ${styles[interval.skip_type]}`}
                                 style={{
-                                    left: `${(interval.start_time / duration) * 100}%`,
-                                    width: `${((interval.end_time - interval.start_time) / duration) * 100}%`,
+                                    left: `${(interval.start_time / state.duration) * 100}%`,
+                                    width: `${((interval.end_time - interval.start_time) / state.duration) * 100}%`,
                                 }}
                             ></div>
                         ))}
-                        <div className={styles.bufferedBar} style={{ width: `${(buffered / duration) * 100 || 0}%` }}></div>
-                        <div className={styles.watchedBar} style={{ width: `${(currentTime / duration) * 100 || 0}%` }}></div>
+                        <div className={styles.bufferedBar} style={{ width: `${(state.buffered / state.duration) * 100 || 0}%` }}></div>
+                        <div className={styles.watchedBar} style={{ width: `${(state.currentTime / state.duration) * 100 || 0}%` }}></div>
                         <div
                             className={styles.thumb}
-                            ref={progressBarThumbRef}
-                            style={{ left: `${(currentTime / duration) * 100 || 0}%` }}
+                            style={{ left: `${(state.currentTime / state.duration) * 100 || 0}%` }}
                             onMouseDown={handleThumbMouseDown}
                         ></div>
                     </div>
                 </div>
                 <div className={styles.bottomControlsRow}>
                     <div className={styles.leftControls}>
-                        <button className={styles.controlBtn} onClick={togglePlay}>{isPlaying ? <FaPause /> : <FaPlay />}</button>
+                        <button className={styles.controlBtn} onClick={togglePlay}>{state.isPlaying ? <FaPause /> : <FaPlay />}</button>
                         <div className={styles.volumeContainer}>
                             <button className={styles.controlBtn} onClick={toggleMute}>{renderVolumeIcon()}</button>
                             <input 
-                                ref={volumeSliderRef}
                                 type="range" 
                                 min="0" 
                                 max="1" 
                                 step="0.05" 
-                                value={isMuted ? 0 : volume}
+                                value={state.isMuted ? 0 : state.volume}
                                 onChange={handleVolumeChange}
                                 className={styles.volumeSlider}
                             />
                         </div>
-                        <span className={styles.timeDisplay}>{formatTime(currentTime)} / {formatTime(duration)}</span>
-                        {currentSkipInterval && !isAutoSkipEnabled && (
+                        <span className={styles.timeDisplay}>{formatTime(state.currentTime)} / {formatTime(state.duration)}</span>
+                        {state.currentSkipInterval && !state.isAutoSkipEnabled && (
                             <button className={styles.controlBtn} onClick={() => {
-                                if (videoRef.current && currentSkipInterval) {
-                                    videoRef.current.currentTime = currentSkipInterval.end_time;
-                                    setCurrentSkipInterval(null);
+                                if (videoRef.current && state.currentSkipInterval) {
+                                    videoRef.current.currentTime = state.currentSkipInterval.end_time;
+                                    dispatch({ type: 'SET_STATE', payload: { currentSkipInterval: null } });
                                 }
                             }}>
-                                Skip {currentSkipInterval.skip_type === 'op' ? 'Opening' : 'Ending'}
+                                Skip {state.currentSkipInterval.skip_type === 'op' ? 'Opening' : 'Ending'}
                             </button>
                         )}
                     </div>
                     <div className={styles.rightControls}>
                         <div className={styles.middleControls}>
                             <button className={styles.controlBtn} onClick={() => seek(-10)}>
-                                <svg width="36" height="36" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" strokeWidth="3" stroke="currentColor" fill="none">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M34 52h18V16H24"/>
-                                    <path strokeLinecap="round" d="M24 16H8"/>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="m11.5 12-4 4 4 4"/>
-                                    <text x="3" y="53" fontSize="28" fill="currentColor" stroke="none">10</text>
-                                </svg>
+                                <svg width="36" height="36" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" strokeWidth="3" stroke="currentColor" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M34 52h18V16H24"/><path strokeLinecap="round" d="M24 16H8"/><path strokeLinecap="round" strokeLinejoin="round" d="m11.5 12-4 4 4 4"/><text x="3" y="53" fontSize="28" fill="currentColor" stroke="none">10</text></svg>
                             </button>
                             <button className={styles.controlBtn} onClick={() => seek(10)}>
-                                <svg width="36" height="36" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" strokeWidth="3" stroke="currentColor" fill="none">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M30 52H12V16h28"/>
-                                    <path strokeLinecap="round" d="M40 16h16"/>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="m52 12 4.5 4-4.5 4"/>
-                                    <text x="29" y="53.5" fontSize="28" fill="currentColor" stroke="none">10</text>
-                                </svg>
+                                <svg width="36" height="36" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" strokeWidth="3" stroke="currentColor" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M30 52H12V16h28"/><path strokeLinecap="round" d="M40 16h16"/><path strokeLinecap="round" strokeLinejoin="round" d="m52 12 4.5 4-4.5 4"/><text x="29" y="53.5" fontSize="28" fill="currentColor" stroke="none">10</text></svg>
                             </button>
                         </div>
-                        {/* Auto Skip Toggle */}
                         <div className={styles.toggleContainer}>
                             <span>Auto Skip</span>
-                            <ToggleSwitch id="auto-skip-toggle" isChecked={isAutoSkipEnabled} onChange={(e) => {
-                                setIsAutoSkipEnabled(e.target.checked);
-                                localStorage.setItem('autoSkipEnabled', e.target.checked.toString());
+                            <ToggleSwitch id="auto-skip-toggle" isChecked={state.isAutoSkipEnabled} onChange={(e) => {
+                                const checked = e.target.checked;
+                                dispatch({ type: 'SET_STATE', payload: { isAutoSkipEnabled: checked } });
+                                localStorage.setItem('autoSkipEnabled', checked.toString());
                             }} />
                         </div>
-
-                        {/* Autoplay Toggle */}
                         <div className={styles.toggleContainer}>
                             <span>Autoplay</span>
-                            <ToggleSwitch id="autoplay-toggle" isChecked={isAutoplayEnabled} onChange={handleAutoplayChange} />
+                            <ToggleSwitch id="autoplay-toggle" isChecked={state.isAutoplayEnabled} onChange={(e) => {
+                                const checked = e.target.checked;
+                                dispatch({ type: 'SET_STATE', payload: { isAutoplayEnabled: checked } });
+                                localStorage.setItem('autoplayEnabled', checked.toString());
+                            }} />
                         </div>
-
-                        {/* CC Button and Menu */}
                         <div className={styles.ccMenuContainer}>
-                            <button className={styles.controlBtn} onClick={() => setShowCCMenu(!showCCMenu)}><FaClosedCaptioning /></button>
-                            {showCCMenu && (
+                            <button className={styles.controlBtn} onClick={() => dispatch({ type: 'SET_STATE', payload: { showCCMenu: !state.showCCMenu } })}><FaClosedCaptioning /></button>
+                            {state.showCCMenu && (
                                 <div className={styles.settingsMenu} onClick={e => e.stopPropagation()}>
                                     <h4>Subtitles</h4>
-                                    {renderSubtitleOptions()}
+                                    <div className={styles.ccOptionsContainer}>
+                                        {state.availableSubtitles.length > 0 && <button key="off" className={`${styles.ccItem} ${state.activeSubtitleTrack === null ? styles.active : ''}`} onClick={() => handleSubtitleSelection(null)}>Off</button>}
+                                        {state.availableSubtitles.map(track => (<button key={track.language || track.label} className={`${styles.ccItem} ${state.activeSubtitleTrack === (track.language || track.label) ? styles.active : ''}`} onClick={() => handleSubtitleSelection(track.language || track.label)}>{track.label || track.language}</button>))}
+                                        {state.availableSubtitles.length === 0 && <button className={`${styles.ccItem} ${styles.disabled}`}>Not Available</button>}
+                                    </div>
                                     <div className={styles.ccDivider}></div>
                                     <h4>Subtitle Settings</h4>
                                     <div className={styles.ccSliderContainer}>
                                         <label htmlFor="fontSizeSlider">Font Size</label>
-                                        <input 
-                                            type="range" 
-                                            id="fontSizeSlider" 
-                                            min="1" 
-                                            max="3" 
-                                            step="0.1" 
-                                            value={subtitleFontSize} 
-                                            onChange={handleSubtitleFontSizeChange}
-                                            style={{ '--slider-percent': ((subtitleFontSize - 1) / (3 - 1)).toString() } as React.CSSProperties}
-                                        />
-                                        <span>{subtitleFontSize.toFixed(1)}</span>
+                                        <input type="range" id="fontSizeSlider" min="1" max="3" step="0.1" value={state.subtitleFontSize} onChange={(e) => {
+                                            const value = parseFloat(e.target.value);
+                                            dispatch({ type: 'SET_STATE', payload: { subtitleFontSize: value } });
+                                            localStorage.setItem('subtitleFontSize', value.toString());
+                                        }}/>
+                                        <span>{state.subtitleFontSize.toFixed(1)}</span>
                                     </div>
                                     <div className={styles.ccSliderContainer}>
                                         <label htmlFor="positionSlider">Position</label>
-                                        <input 
-                                            type="range" 
-                                            id="positionSlider" 
-                                            min="-10" 
-                                            max="0" 
-                                            step="1" 
-                                            value={subtitlePosition} 
-                                            onChange={handleSubtitlePositionChange}
-                                            style={{ '--slider-percent': ((subtitlePosition - (-10)) / (0 - (-10))).toString() } as React.CSSProperties}
-                                        />
-                                        <span>{subtitlePosition}</span>
+                                        <input type="range" id="positionSlider" min="-10" max="0" step="1" value={state.subtitlePosition} onChange={(e) => {
+                                            const value = parseInt(e.target.value, 10);
+                                            dispatch({ type: 'SET_STATE', payload: { subtitlePosition: value } });
+                                            localStorage.setItem('subtitlePosition', value.toString());
+                                        }}/>
+                                        <span>{state.subtitlePosition}</span>
                                     </div>
                                 </div>
                             )}
                         </div>
-
-                        {/* Source Selection Button and Menu */}
                         <div className={styles.sourceMenuContainer}>
-                            <button className={styles.controlBtn} onClick={() => setShowSourceMenu(!showSourceMenu)}><FaList /></button>
-                            {showSourceMenu && (
+                            <button className={styles.controlBtn} onClick={() => dispatch({ type: 'SET_STATE', payload: { showSourceMenu: !state.showSourceMenu } })}><FaList /></button>
+                            {state.showSourceMenu && (
                                 <div className={styles.settingsMenu} onClick={e => e.stopPropagation()}>
                                     <h4>Sources & Quality</h4>
-                                    {videoSources.map(source => (
+                                    {state.videoSources.map(source => (
                                         <div key={source.sourceName} className={styles.sourceGroupInMenu}>
                                             <h5>{source.sourceName}</h5>
                                             <div className={styles.qualityListInMenu}>
                                                 {source.links.sort((a, b) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)).map(link => (
                                                     <button
                                                         key={link.resolutionStr}
-                                                        className={`${styles.qualityItemInMenu} ${selectedSource?.sourceName === source.sourceName && selectedLink?.resolutionStr === link.resolutionStr ? styles.active : ''}`}
-                                                        onClick={() => {
-                                                            setSelectedSource(source);
-                                                            setSelectedLink(link);
-                                                            setShowSourceMenu(false);
-                                                        }}
+                                                        className={`${styles.qualityItemInMenu} ${state.selectedSource?.sourceName === source.sourceName && state.selectedLink?.resolutionStr === link.resolutionStr ? styles.active : ''}`}
+                                                        onClick={() => dispatch({ type: 'SET_STATE', payload: { selectedSource: source, selectedLink: link, showSourceMenu: false } })}
                                                     >
                                                         {link.resolutionStr}
                                                     </button>
@@ -1171,9 +900,7 @@ const Player: React.FC = () => {
                                 </div>
                             )}
                         </div>
-
-                        {/* Fullscreen Button */}
-                        <button className={styles.controlBtn} onClick={toggleFullscreen}>{isFullscreen ? <FaCompress /> : <FaExpand />}</button>
+                        <button className={styles.controlBtn} onClick={toggleFullscreen}>{state.isFullscreen ? <FaCompress /> : <FaExpand />}</button>
                     </div>
                 </div>
             </div>
@@ -1182,63 +909,108 @@ const Player: React.FC = () => {
         <video 
             ref={videoRef} 
             controls={isMobile}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
             onClick={!isMobile ? togglePlay : undefined}
+            onPlay={() => dispatch({ type: 'SET_PLAY_STATUS', payload: true })}
+            onPause={() => dispatch({ type: 'SET_PLAY_STATUS', payload: false })}
             onLoadedMetadata={() => {
-                setDuration(videoRef.current?.duration || 0);
-
-                if (isAutoplayEnabled && videoRef.current) {
-                    videoRef.current.play().then(() => {
-                        setAutoplayBlocked(false);
-                    }).catch(error => {
-                        console.error("Autoplay blocked on loaded metadata:", error);
-                        setAutoplayBlocked(true);
-                        videoRef.current?.pause();
-                    });
+                dispatch({ type: 'SET_VIDEO_ELEMENT_STATE', payload: { duration: videoRef.current?.duration || 0 } });
+                if (state.isAutoplayEnabled && videoRef.current) {
+                    videoRef.current.play()
+                        .then(() => dispatch({ type: 'SET_STATE', payload: { autoplayBlocked: false } }))
+                        .catch(() => dispatch({ type: 'SET_STATE', payload: { autoplayBlocked: true } }));
                 }
             }}
             onTimeUpdate={() => {
-                if (!isScrubbing) {
-                    setCurrentTime(videoRef.current?.currentTime || 0);
-                }
                 const currentTime = videoRef.current?.currentTime || 0;
-                const activeSkip = skipIntervals.find(interval =>
-                    currentTime >= interval.start_time && currentTime < interval.end_time
-                );
-                setCurrentSkipInterval(activeSkip || null);
-
-                if (isAutoSkipEnabled && activeSkip && videoRef.current && !videoRef.current.paused) {
+                if (!state.isScrubbing) {
+                    dispatch({ type: 'SET_VIDEO_ELEMENT_STATE', payload: { currentTime } });
+                }
+                const activeSkip = state.skipIntervals.find(interval => currentTime >= interval.start_time && currentTime < interval.end_time);
+                dispatch({ type: 'SET_STATE', payload: { currentSkipInterval: activeSkip || null } });
+                if (state.isAutoSkipEnabled && activeSkip && videoRef.current && !videoRef.current.paused) {
                     videoRef.current.currentTime = activeSkip.end_time;
-                    setCurrentSkipInterval(null);
+                    dispatch({ type: 'SET_STATE', payload: { currentSkipInterval: null } });
                 }
             }}
             onProgress={() => {
                 if (videoRef.current && videoRef.current.buffered.length > 0) {
-                    setBuffered(videoRef.current.buffered.end(videoRef.current.buffered.length - 1));
+                    dispatch({ type: 'SET_VIDEO_ELEMENT_STATE', payload: { buffered: videoRef.current.buffered.end(videoRef.current.buffered.length - 1) } });
                 }
             }}
             onVolumeChange={() => {
                 if (videoRef.current) {
-                    setIsMuted(videoRef.current.muted);
-                    setVolume(videoRef.current.volume);
+                    dispatch({ type: 'SET_VIDEO_ELEMENT_STATE', payload: { isMuted: videoRef.current.muted, volume: videoRef.current.volume } });
                 }
             }}
         />
       </div>
 
-      {isMobile && renderMobileControls()}
+      {isMobile && (
+        <div className={styles.mobileControls}>
+            <div className={styles.playerActions}>
+                <button className={styles.seekBtn} onClick={() => seek(-10)}>-10s</button>
+                <button className={styles.seekBtn} onClick={() => seek(10)}>+10s</button>
+                <div className={styles.toggleContainer}>
+                    <span>Auto Skip</span>
+                    <ToggleSwitch id="auto-skip-toggle-mobile" isChecked={state.isAutoSkipEnabled} onChange={(e) => {
+                        const checked = e.target.checked;
+                        dispatch({ type: 'SET_STATE', payload: { isAutoSkipEnabled: checked } });
+                        localStorage.setItem('autoSkipEnabled', checked.toString());
+                    }} />
+                </div>
+                <div className={styles.toggleContainer}>
+                    <span>Autoplay</span>
+                    <ToggleSwitch id="autoplay-toggle-mobile" isChecked={state.isAutoplayEnabled} onChange={(e) => {
+                        const checked = e.target.checked;
+                        dispatch({ type: 'SET_STATE', payload: { isAutoplayEnabled: checked } });
+                        localStorage.setItem('autoplayEnabled', checked.toString());
+                    }} />
+                </div>
+            </div>
+            <div className={styles.sourceQualityControls}>
+                <div className={styles.sourceSelection}>
+                    <h4>Source</h4>
+                    <div className={styles.sourceButtons}>
+                        {state.videoSources.map(source => (
+                            <button
+                                key={source.sourceName}
+                                className={`${styles.sourceButton} ${state.selectedSource?.sourceName === source.sourceName ? styles.active : ''}`}
+                                onClick={() => dispatch({ type: 'SET_STATE', payload: { selectedSource: source } })}
+                            >
+                                {source.sourceName}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                {state.selectedSource && (
+                    <div className={styles.qualitySelection}>
+                        <h4>Quality</h4>
+                        <div className={styles.qualityButtons}>
+                            {state.selectedSource.links.sort((a, b) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)).map(link => (
+                                <button
+                                    key={link.resolutionStr}
+                                    className={`${styles.qualityButton} ${state.selectedLink?.resolutionStr === link.resolutionStr ? styles.active : ''}`}
+                                    onClick={() => dispatch({ type: 'SET_STATE', payload: { selectedLink: link } })}
+                                >
+                                    {link.resolutionStr}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+      )}
 
       <div className={styles.contentLayout}>
         <div className={styles.episodeListContainer}>
-            <h3>Episodes ({currentMode.toUpperCase()})</h3>
-            {renderEpisodeJumpControls()}
-            <div className={styles.episodeList} ref={episodeListRef}>
-                {episodes.map(ep => (
+            <h3>Episodes ({state.currentMode.toUpperCase()})</h3>
+            <div className={styles.episodeList}>
+                {state.episodes.map(ep => (
                 <button
                     key={ep}
                     data-episode={ep}
-                    className={`${styles.episodeItem} ${watchedEpisodes.includes(ep) ? styles.watched : ''} ${ep === currentEpisode ? styles.active : ''}`}
+                    className={`${styles.episodeItem} ${state.watchedEpisodes.includes(ep) ? styles.watched : ''} ${ep === state.currentEpisode ? styles.active : ''}`}
                     onClick={() => handleEpisodeClick(ep)}
                 >
                     Ep {ep}
