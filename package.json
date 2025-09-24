@@ -11,8 +11,10 @@
     "start": "node server/server.cjs"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.90.2",
     "axios": "1.12.0",
     "axios-retry": "^4.5.0",
+    "cheerio": "^1.0.0-rc.12",
     "cors": "^2.8.5",
     "express": "5.1.0",
     "hls.js": "^1.6.12",
@@ -23,8 +25,7 @@
     "react-icons": "^5.5.0",
     "react-router-dom": "^7.9.1",
     "sqlite3": "5.1.7",
-    "xml2js": "0.6.2",
-    "cheerio": "^1.0.0-rc.12"
+    "xml2js": "0.6.2"
   },
   "devDependencies": {
     "@eslint/js": "9.33.0",

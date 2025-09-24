@@ -26,33 +26,34 @@ interface AnimeSectionProps {
   loading?: boolean;
 }
 
-const AnimeSection: React.FC<AnimeSectionProps> = ({ title, animeList, continueWatching = false, onRemove, loading }) => {
-  const handleRemoveCard = (id: string) => {
-    if (onRemove) {
-      onRemove(id);
-    }
-    console.log("Remove card event dispatched for id:", id);
-  };
+const AnimeSection: React.FC<AnimeSectionProps> = React.memo(
+  ({ title, animeList, continueWatching = false, onRemove, loading }) => {
+    const handleRemoveCard = (id: string) => {
+      if (onRemove) {
+        onRemove(id);
+      }
+      console.log("Remove card event dispatched for id:", id);
+    };
 
-  return (
-    <section>
-      <h2 className="section-title">{title}</h2>
-      <div className="grid-container">
-        {loading ? (
-          Array.from({ length: 10 }).map((_, i) => <AnimeCardSkeleton key={i} />)
-        ) : (
-          animeList.map(anime => (
-            <AnimeCard 
-              key={anime._id} 
-              anime={anime} 
-              continueWatching={continueWatching} 
-              onRemove={handleRemoveCard} 
-            />
-          ))
-        )}
-      </div>
-    </section>
-  );
-};
-
+    return (
+      <section>
+        <h2 className="section-title">{title}</h2>
+        <div className="grid-container">
+          {loading ? (
+            Array.from({ length: 10 }).map((_, i) => <AnimeCardSkeleton key={i} />)
+          ) : (
+            animeList.map(anime => (
+              <AnimeCard 
+                key={anime._id} 
+                anime={anime} 
+                continueWatching={continueWatching} 
+                onRemove={handleRemoveCard} 
+              />
+            ))
+          )}
+        </div>
+      </section>
+    );
+  }
+);
 export default AnimeSection;

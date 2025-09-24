@@ -1,114 +1,20 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AnimeCard from '../components/anime/AnimeCard';
 import AnimeCardSkeleton from '../components/anime/AnimeCardSkeleton';
 import SearchableSelect from '../components/common/SearchableSelect';
 import ErrorMessage from '../components/common/ErrorMessage';
+import type { Anime as _Anime } from '../hooks/useAnimeData';
+import { useSearchAnime } from '../hooks/useAnimeData';
 
-interface Anime {
-    _id: string;
-    id: string;
-    name: string;
-    thumbnail: string;
-    type?: string;
-    availableEpisodesDetail?: {
-        sub?: string[];
-        dub?: string[];
-    };
-}
-
-const SkeletonGrid = () => (
+const SkeletonGrid = React.memo(() => (
     <div className="grid-container">
         {Array.from({ length: 12 }).map((_, i) => <AnimeCardSkeleton key={i} />)}
     </div>
-);
-
-const fetchEpisodeDetails = async (showId: string) => {
-    try {
-        const [subEpisodesResponse, dubEpisodesResponse] = await Promise.all([
-            fetch(`/api/episodes?showId=${showId}&mode=sub`),
-            fetch(`/api/episodes?showId=${showId}&mode=dub`)
-        ]);
-
-        if (!subEpisodesResponse.ok) throw new Error("Failed to fetch sub episodes");
-        if (!dubEpisodesResponse.ok) throw new Error("Failed to fetch dub episodes");
-
-        const subEpisodeData = await subEpisodesResponse.json();
-        const dubEpisodeData = await dubEpisodesResponse.json();
-
-        return {
-            availableEpisodesDetail: {
-                sub: subEpisodeData.episodes,
-                dub: dubEpisodeData.episodes,
-            },
-        };
-    } catch (error) {
-        console.error(`Error fetching episode details for ${showId}:`, error);
-        return null;
-    }
-};
-
-const performSearch = async (searchParams: URLSearchParams, page: React.MutableRefObject<number>, hasMore: React.MutableRefObject<boolean>, setIsLoading: React.Dispatch<React.SetStateAction<boolean>>, setError: React.Dispatch<React.SetStateAction<string | null>>, setResults: React.Dispatch<React.SetStateAction<Anime[]>>, isNewSearch: boolean) => {
-    setIsLoading(true);
-    setError(null);
-
-    let currentPage = page.current;
-    if (isNewSearch) {
-        currentPage = 1;
-        hasMore.current = true;
-    }
-
-    const params = new URLSearchParams(searchParams);
-    params.set('page', currentPage.toString());
-
-    try {
-        const response = await fetch(`/api/search?${params}`);
-        if (!response.ok) throw new Error('Search failed');
-        const newFetchedResults: Anime[] = await response.json();
-
-        const detailedResults = await Promise.all(
-            newFetchedResults.map(async (anime) => {
-                const episodeDetails = await fetchEpisodeDetails(anime._id);
-                return { ...anime, ...episodeDetails };
-            })
-        );
-
-        if (isNewSearch) {
-            const uniqueNewResults = Array.from(new Map(detailedResults.map((item: Anime) => [item._id, item])).values());
-            setResults(uniqueNewResults);
-        } else {
-            setResults(prev => {
-                const existingIds = new Set(prev.map(anime => anime._id));
-                const uniqueNewResults = detailedResults.filter((anime: Anime) => !existingIds.has(anime._id));
-                const finalUniqueResults = Array.from(new Map(uniqueNewResults.map((item: Anime) => [item._id, item])).values()); // Ensure uniqueness within new batch
-                return [...prev, ...finalUniqueResults];
-            });
-        }
-
-        if (newFetchedResults.length === 0) {
-            hasMore.current = false;
-        } else {
-            page.current = currentPage + 1;
-        }
-    } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
-        console.error('Search error:', err);
-        if (isNewSearch) {
-            setResults([]);
-        }
-    } finally {
-        setIsLoading(false);
-    }
-};
+));
 
 const Search: React.FC = () => {
     const [searchParams, setSearchParams] = useSearchParams();
-    const [results, setResults] = useState<Anime[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const page = useRef(1);
-    const hasMore = useRef(true);
-
     const [query, setQuery] = useState(searchParams.get('query') || '');
     const [type, setType] = useState(searchParams.get('type') || 'ALL');
     const [season, setSeason] = useState(searchParams.get('season') || 'ALL');
@@ -120,6 +26,20 @@ const Search: React.FC = () => {
     const [availableGenres, setAvailableGenres] = useState<string[]>([]);
     const [availableTags, setAvailableTags] = useState<{ value: string, isStudio: boolean }[]>([]);
     const [selectedTag, setSelectedTag] = useState<string>('ALL');
+
+    const currentSearchQuery = new URLSearchParams(searchParams).toString();
+
+    const {
+        data,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        isLoading,
+        isError,
+        error,
+    } = useSearchAnime(currentSearchQuery);
+
+    const searchResults = data?.pages ? data.pages.flatMap(page => page.results || []) : [];
 
     useEffect(() => {
         const fetchGenresAndTags = async () => {
@@ -138,25 +58,19 @@ const Search: React.FC = () => {
         fetchGenresAndTags();
     }, []);
 
-    const stablePerformSearch = useCallback(() => {
-        performSearch(searchParams, page, hasMore, setIsLoading, setError, setResults, true);
-    }, [searchParams]);
-
-    useEffect(() => {
-        if (availableTags.length > 0 && searchParams.toString()) {
-            stablePerformSearch();
-        }
-    }, [availableTags, stablePerformSearch]);
-
     useEffect(() => {
         const handleScroll = () => {
-            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000 && !isLoading && hasMore.current) {
-                performSearch(searchParams, page, hasMore, setIsLoading, setError, setResults, false);
+            if (
+                window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000 &&
+                !isFetchingNextPage &&
+                hasNextPage
+            ) {
+                fetchNextPage();
             }
         };
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
-    }, [isLoading, searchParams]);
+    }, [isFetchingNextPage, hasNextPage, fetchNextPage]);
 
     const handleSearch = () => {
         const genres = Object.entries(genreStates).filter(([, state]) => state === 'include').map(([genre]) => genre);
@@ -166,11 +80,11 @@ const Search: React.FC = () => {
         const studios = selectedTagData && selectedTagData.isStudio ? selectedTag : undefined;
 
         const newSearchParams = new URLSearchParams();
-        newSearchParams.set('query', query);
-        newSearchParams.set('type', type);
-        newSearchParams.set('season', season);
-        newSearchParams.set('year', year);
-        newSearchParams.set('country', country);
+        if (query) newSearchParams.set('query', query);
+        if (type !== 'ALL') newSearchParams.set('type', type);
+        if (season !== 'ALL') newSearchParams.set('season', season);
+        if (year !== 'ALL') newSearchParams.set('year', year);
+        if (country !== 'ALL') newSearchParams.set('country', country);
         newSearchParams.set('translation', translation);
         if (genres.length > 0) newSearchParams.set('genres', genres.join(','));
         if (excludeGenres.length > 0) newSearchParams.set('excludeGenres', excludeGenres.join(','));
@@ -273,13 +187,12 @@ const Search: React.FC = () => {
                 </div>
             )}
 
-            {error && <ErrorMessage message={error} />}
+            {isError && <ErrorMessage message={error?.message || 'An unknown error occurred'} />}
             
             <div className="grid-container">
-                {results.map(anime => <AnimeCard key={anime._id} anime={anime} />)}
-                {isLoading && <SkeletonGrid />}
-                {!isLoading && results.length === 0 && !error && <p style={{textAlign: 'center', marginTop: '1rem'}}>No results found.</p>}
-                {!hasMore.current && results.length > 0 && <p style={{textAlign: 'center', marginTop: '1rem'}}>No more results.</p>}
+                {searchResults.map(anime => <AnimeCard key={anime._id} anime={anime} />)}
+                {(isLoading || isFetchingNextPage) && <SkeletonGrid />}
+                {!hasNextPage && searchResults.length > 0 && <p style={{textAlign: 'center', marginTop: '1rem'}}>No more results.</p>}
             </div>
         </div>
     );

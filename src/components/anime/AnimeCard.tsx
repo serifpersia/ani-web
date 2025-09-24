@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { fixThumbnailUrl, formatTime } from '../../lib/utils';
 import styles from './AnimeCard.module.css';
@@ -26,7 +26,7 @@ interface AnimeCardProps {
   onRemove?: (id: string) => void;
 }
 
-const AnimeCard: React.FC<AnimeCardProps> = ({ anime, continueWatching = false, onRemove }) => {
+const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = false, onRemove }) => {
   const [isHovered, setIsHovered] = React.useState(false); // New state for hover
   const isMobile = useIsMobile(); // Call the hook
 
@@ -131,6 +131,6 @@ const AnimeCard: React.FC<AnimeCardProps> = ({ anime, continueWatching = false, 
       </div>
     </Link>
   );
-};
+});
 
 export default AnimeCard;
