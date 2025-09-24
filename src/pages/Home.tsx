@@ -1,250 +1,73 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import AnimeSection from '../components/anime/AnimeSection';
 import Top10List from '../components/anime/Top10List';
 import Schedule from '../components/anime/Schedule';
 import AnimeCardSkeleton from '../components/anime/AnimeCardSkeleton';
+import type { Anime as _Anime } from '../hooks/useAnimeData';
+import { useLatestReleases, useCurrentSeason, useContinueWatching } from '../hooks/useAnimeData';
+import { useQueryClient, useMutation } from '@tanstack/react-query';
 
-interface Anime {
-    _id: string;
-    id: string;
-    name: string;
-    thumbnail: string;
-    type?: string;
-    episodeNumber?: number;
-    currentTime?: number;
-    duration?: number;
-    availableEpisodesDetail?: {
-      sub?: string[];
-      dub?: string[];
-    };
-  }
-
-const SkeletonGrid = () => (
+const SkeletonGrid = React.memo(() => (
     <div className="grid-container">
         {Array.from({ length: 10 }).map((_, i) => <AnimeCardSkeleton key={i} />)}
     </div>
-);
-
-interface ShowItem {
-  _id: string;
-  name?: string;
-  thumbnail?: string;
-  type?: string;
-  availableEpisodesDetail?: {
-    sub?: string[];
-    dub?: string[];
-  };
-}
-
-interface ContinueWatchingItem {
-  showId: string;
-  episodeNumber: string;
-  currentTime: number;
-  duration: number;
-  name?: string;
-  thumbnail?: string;
-}
+));
 
 const Home: React.FC = () => {
-  const [latestReleases, setLatestReleases] = useState<Anime[]>([]);
-  const [currentSeason, setCurrentSeason] = useState<Anime[]>([]);
-  const [continueWatchingList, setContinueWatchingList] = useState<Anime[]>([]);
+  const queryClient = useQueryClient();
 
-  const [loadingLatestReleases, setLoadingLatestReleases] = useState(true);
-  const [loadingContinueWatching, setLoadingContinueWatching] = useState(true);
-  const [loadingCurrentSeason, setLoadingCurrentSeason] = useState(true);
+  const { data: latestReleases, isLoading: loadingLatestReleases } = useLatestReleases();
+  const {
+    data: currentSeasonPages,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: loadingCurrentSeason,
+  } = useCurrentSeason();
 
-  const seasonalState = useRef({ page: 1, isLoading: false, hasMore: true });
+  const currentSeason = currentSeasonPages?.pages.flat() || [];
 
-  const fetchAnimeDetails = useCallback(async (showId: string, showName?: string) => {
-    try {
-      const searchPromise = showName 
-        ? fetch(`/api/search?query=${encodeURIComponent(showName)}`).then(res => res.ok ? res.json() : Promise.resolve(null))
-        : Promise.resolve(null);
+  const { data: continueWatchingList, isLoading: loadingContinueWatching } = useContinueWatching();
 
-      const [searchResult, subEpisodesResponse, dubEpisodesResponse] = await Promise.all([
-        searchPromise,
-        fetch(`/api/episodes?showId=${showId}&mode=sub`),
-        fetch(`/api/episodes?showId=${showId}&mode=dub`)
-      ]);
-
-      if (!subEpisodesResponse.ok || !dubEpisodesResponse.ok) {
-        console.error(`Failed to fetch episodes for ${showId}`);
-        return null;
-      }
-      
-      const subEpisodeData = await subEpisodesResponse.json();
-      const dubEpisodeData = await dubEpisodesResponse.json();
-
-      let animeDetails;
-      if (searchResult && searchResult.length > 0) {
-        const show = searchResult.find(s => s._id === showId) || searchResult[0];
-        animeDetails = {
-          _id: show._id,
-          id: show._id,
-          name: show.name,
-          thumbnail: show.thumbnail,
-          type: show.type,
-          availableEpisodesDetail: {
-            sub: subEpisodeData.episodes,
-            dub: dubEpisodeData.episodes,
-          },
-        };
-      } else {
-        const metaResponse = await fetch(`/api/show-meta/${showId}`);
-        if (!metaResponse.ok) {
-          console.error(`Failed to fetch show metadata for ${showId}`);
-          return null;
-        }
-        const meta = await metaResponse.json();
-        animeDetails = {
-          _id: showId,
-          id: showId,
-          name: meta.name,
-          thumbnail: meta.thumbnail,
-          type: 'TV',
-          availableEpisodesDetail: {
-            sub: subEpisodeData.episodes,
-            dub: dubEpisodeData.episodes,
-          },
-        };
-      }
-      
-      return animeDetails;
-    } catch (error) {
-      console.error(`Error fetching details for ${showId}:`, error);
-      return null;
-    }
-  }, []);
-
-  const fetchLatestReleases = useCallback(async () => {
-    try {
-      const response = await fetch("/api/latest-releases");
-      if (!response.ok) throw new Error("Failed to fetch latest releases");
-      const data = await response.json();
-
-      const detailedLatestReleases = await Promise.all(
-        data.map(async (item: ShowItem) => {
-          const animeDetails = await fetchAnimeDetails(item._id);
-          if (animeDetails) {
-            return { ...animeDetails, ...item };
-          } else {
-            return null;
-          }
-        })
-      );
-      setLatestReleases(detailedLatestReleases.filter(Boolean) as Anime[]);
-    } catch (error) {
-      console.error("Error fetching latest releases:", error);
-    } finally {
-      setLoadingLatestReleases(false);
-    }
-  }, [fetchAnimeDetails]);
-
-  const fetchCurrentSeason = useCallback(async () => {
-    if (seasonalState.current.isLoading || !seasonalState.current.hasMore) return;
-    seasonalState.current.isLoading = true;
-
-    try {
-      const response = await fetch(`/api/seasonal?page=${seasonalState.current.page}`);
-      if (!response.ok) throw new Error("Failed to fetch current season");
-      const newShows = await response.json();
-      if (newShows.length === 0) {
-        seasonalState.current.hasMore = false;
-      } else {
-        const detailedNewShows = await Promise.all(
-          newShows.map(async (item: ShowItem) => {
-            const animeDetails = await fetchAnimeDetails(item._id);
-            if (animeDetails) {
-              return { ...animeDetails, ...item };
-            } else {
-              return null;
-            }
-          })
-        );
-        setCurrentSeason(prev => [...prev, ...detailedNewShows.filter(Boolean) as Anime[]]);
-        seasonalState.current.page++;
-      }
-    } catch (error) {
-      console.error("Error fetching current season:", error);
-    } finally {
-      seasonalState.current.isLoading = false;
-      setLoadingCurrentSeason(false);
-    }
-  }, [fetchAnimeDetails]);
-
-  const fetchContinueWatching = useCallback(async () => {
-    try {
-      const response = await fetch("/api/continue-watching");
-      if (!response.ok) throw new Error("Failed to fetch continue watching");
-      const data = await response.json();
-
-      const detailedContinueWatchingList = await Promise.all(
-        data.map(async (item: ContinueWatchingItem) => {
-          const animeDetails = await fetchAnimeDetails(item.showId, item.name);
-          if (animeDetails) {
-            return {
-              ...animeDetails,
-              episodeNumber: item.episodeNumber,
-              currentTime: item.currentTime,
-              duration: item.duration
-            };
-          } else {
-            return null;
-          }
-        })
-      );
-      setContinueWatchingList(detailedContinueWatchingList.filter(Boolean) as Anime[]);
-    } catch (error) {
-      console.error("Error fetching continue watching:", error);
-    } finally {
-      setLoadingContinueWatching(false);
-    }
-  }, [fetchAnimeDetails]);
-
-  const handleRemoveContinueWatching = useCallback(async (showId: string) => {
-    try {
-      setContinueWatchingList(prevList => prevList.filter(anime => anime.id !== showId));
-
+  const removeContinueWatchingMutation = useMutation({
+    mutationFn: async (showId: string) => {
       const response = await fetch("/api/continue-watching/remove", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-
         },
         body: JSON.stringify({ showId }),
       });
-
       if (!response.ok) {
-        console.error("Failed to remove from backend, reverting UI.");
-        fetchContinueWatching(); 
+        throw new Error("Failed to remove from backend");
       }
-    } catch (error) {
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['continueWatching'] });
+    },
+    onError: (error) => {
       console.error("Error removing from continue watching:", error);
-      fetchContinueWatching();
-    } finally {
-      console.log("Remove continue watching operation completed.");
-    }
-  }, [fetchContinueWatching]);
+    },
+  });
+
+  const handleRemoveContinueWatching = useCallback((showId: string) => {
+    removeContinueWatchingMutation.mutate(showId);
+  }, [removeContinueWatchingMutation]);
 
   useEffect(() => {
-    fetchLatestReleases();
-    fetchCurrentSeason();
-    fetchContinueWatching();
-
     const handleScroll = () => {
       if (
         window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000 &&
-        !seasonalState.current.isLoading &&
-        seasonalState.current.hasMore
+        !isFetchingNextPage &&
+        hasNextPage
       ) {
-        fetchCurrentSeason();
+        fetchNextPage();
       }
     };
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [fetchLatestReleases, fetchCurrentSeason, fetchContinueWatching]);
+  }, [isFetchingNextPage, hasNextPage, fetchNextPage]);
 
   return (
     <div>
@@ -253,16 +76,16 @@ const Home: React.FC = () => {
           <AnimeSection 
             title="Continue Watching" 
             continueWatching={true} 
-            animeList={continueWatchingList} 
+            animeList={continueWatchingList || []} 
             onRemove={handleRemoveContinueWatching} 
             loading={loadingContinueWatching}
           />
 
-          <AnimeSection title="Latest Releases" continueWatching={false} animeList={latestReleases} loading={loadingLatestReleases} />
+          <AnimeSection title="Latest Releases" continueWatching={false} animeList={latestReleases || []} loading={loadingLatestReleases} />
 
-          <AnimeSection title="Current Season" continueWatching={false} animeList={currentSeason} loading={loadingCurrentSeason} />
-          {!loadingCurrentSeason && seasonalState.current.isLoading && <SkeletonGrid />}
-          {!seasonalState.current.hasMore && currentSeason.length > 0 && <p style={{textAlign: 'center', margin: '1rem'}}>No more Current Season anime.</p>}
+          <AnimeSection title="Current Season" continueWatching={false} animeList={currentSeason} loading={loadingCurrentSeason || isFetchingNextPage} />
+          {(loadingCurrentSeason || isFetchingNextPage) && <SkeletonGrid />}
+          {!hasNextPage && currentSeason.length > 0 && <p style={{textAlign: 'center', margin: '1rem'}}>No more Current Season anime.</p>}
         </div>
         <aside className="sidebar">
           <Top10List title="Top 10 Popular" />

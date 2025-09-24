@@ -6,9 +6,22 @@ interface StatusModalProps {
   message: string;
   type: 'success' | 'error' | 'info';
   onClose: () => void;
+  showConfirmButton?: boolean;
+  onConfirm?: () => void;
+  confirmButtonText?: string;
+  cancelButtonText?: string;
 }
 
-const StatusModal: React.FC<StatusModalProps> = ({ show, message, type, onClose }) => {
+const StatusModal: React.FC<StatusModalProps> = ({
+  show,
+  message,
+  type,
+  onClose,
+  showConfirmButton = false,
+  onConfirm,
+  confirmButtonText = 'Confirm',
+  cancelButtonText = 'Cancel',
+}) => {
   if (!show) {
     return null;
   }
@@ -18,7 +31,18 @@ const StatusModal: React.FC<StatusModalProps> = ({ show, message, type, onClose 
       <div className={`${styles.modalContent} ${styles[type]}`}>
         <p className={styles.message}>{message}</p>
         <div className={styles.modalActions}>
-          <button className="btn-primary" onClick={onClose}>OK</button>
+          {showConfirmButton ? (
+            <>
+              <button className="btn-danger" onClick={onConfirm}>
+                {confirmButtonText}
+              </button>
+              <button className="btn-primary" onClick={onClose}>
+                {cancelButtonText}
+              </button>
+            </>
+          ) : (
+            <button className="btn-primary" onClick={onClose}>OK</button>
+          )}
         </div>
       </div>
     </div>
