@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import styles from './Player.module.css';
 import ToggleSwitch from '../components/common/ToggleSwitch';
 import { FaCheck, FaPlus, FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaVolumeDown, FaVolumeOff, FaExpand, FaCompress, FaClosedCaptioning, FaList, FaChevronDown, FaChevronUp } from 'react-icons/fa';
-import { formatTime } from '../lib/utils';
+import { formatTime, fixThumbnailUrl } from '../lib/utils';
 import ResumeModal from '../components/common/ResumeModal';
 import useIsMobile from '../hooks/useIsMobile';
 
@@ -456,7 +456,7 @@ const Player: React.FC = () => {
                 currentTime: videoElement.currentTime,
                 duration: videoElement.duration,
                 showName: showMeta.name,
-                showThumbnail: showMeta.thumbnail,
+                showThumbnail: fixThumbnailUrl(showMeta.thumbnail),
             })
         });
     };
@@ -900,7 +900,7 @@ const Player: React.FC = () => {
             onStartOver={handleStartOver}
         />
       <div className={styles.headerContainer}>
-        <img src={showMeta.thumbnail} alt={showMeta.name} className={styles.headerThumbnail} />
+        <img src={fixThumbnailUrl(showMeta.thumbnail)} alt={showMeta.name} className={styles.headerThumbnail} />
         <div className={styles.header}>
           <div className={styles.titleContainer}>
             <h2>{showMeta.name}</h2>
