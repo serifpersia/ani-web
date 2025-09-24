@@ -124,12 +124,13 @@ interface PlayerState {
   activeSubtitleTrack: string | null;
   loadingShowData: boolean;
   loadingVideo: boolean;
+  loadingDetails: boolean;
   error: string | null;
 }
 
 type Action =
   | { type: 'SET_STATE'; payload: Partial<PlayerState> }
-  | { type: 'SET_LOADING'; key: 'loadingShowData' | 'loadingVideo'; value: boolean }
+  | { type: 'SET_LOADING'; key: 'loadingShowData' | 'loadingVideo' | 'loadingDetails'; value: boolean }
   | { type: 'SET_ERROR'; payload: string }
   | { type: 'SHOW_DATA_SUCCESS'; payload: Partial<PlayerState> }
   | { type: 'VIDEO_DATA_SUCCESS'; payload: Partial<PlayerState> }
@@ -177,6 +178,7 @@ const initialState: PlayerState = {
   activeSubtitleTrack: null,
   loadingShowData: true,
   loadingVideo: false,
+  loadingDetails: false,
   error: null,
 };
 
@@ -229,37 +231,32 @@ const Player: React.FC = () => {
   };
 
   useEffect(() => {
-    const fetchShowData = async () => {
+    const fetchInitialData = async () => {
       if (!showId) return;
       dispatch({ type: 'SET_LOADING', key: 'loadingShowData', value: true });
       try {
-        const [metaResponse, detailsResponse, episodesResponse, watchlistResponse, watchedResponse, allmangaDetailsResponse] = await Promise.all([
+        const [metaResponse, episodesResponse, watchlistResponse, watchedResponse] = await Promise.all([
           fetch(`/api/show-meta/${showId}`),
-          fetch(`/api/show-details/${showId}`),
           fetch(`/api/episodes?showId=${showId}&mode=${state.currentMode}`),
           fetchWithProfile(`/api/watchlist/check/${showId}`),
           fetchWithProfile(`/api/watched-episodes/${showId}`),
-          fetch(`/api/allmanga-details/${showId}`),
         ]);
 
         if (!metaResponse.ok) throw new Error("Failed to fetch show metadata");
         if (!episodesResponse.ok) throw new Error("Failed to fetch episodes");
 
         const meta = await metaResponse.json();
-        const details = detailsResponse.ok ? await detailsResponse.json() : {};
         const episodeData = await episodesResponse.json();
         const watchlistStatus = watchlistResponse.ok ? await watchlistResponse.json() : { inWatchlist: false };
         const watchedData = watchedResponse.ok ? await watchedResponse.json() : [];
-        const allmangaDetails = allmangaDetailsResponse.ok ? await allmangaDetailsResponse.json() : null;
 
         dispatch({
           type: 'SHOW_DATA_SUCCESS',
           payload: {
-            showMeta: { ...meta, ...details, description: episodeData.description },
+            showMeta: { ...meta, description: episodeData.description },
             episodes: episodeData.episodes.sort((a: string, b: string) => parseFloat(a) - parseFloat(b)),
             inWatchlist: watchlistStatus.inWatchlist,
             watchedEpisodes: watchedData,
-            allMangaDetails: allmangaDetails,
             currentEpisode: episodeNumber || (episodeData.episodes.length > 0 ? episodeData.episodes[0] : undefined),
           },
         });
@@ -267,8 +264,43 @@ const Player: React.FC = () => {
         dispatch({ type: 'SET_ERROR', payload: e instanceof Error ? e.message : 'An unknown error occurred' });
       }
     };
-    fetchShowData();
+    fetchInitialData();
   }, [showId, state.currentMode, episodeNumber]);
+
+  const handleToggleDetails = useCallback(async () => {
+    dispatch({ type: 'SET_STATE', payload: { showCombinedDetails: !state.showCombinedDetails } });
+
+    if (state.showCombinedDetails || state.showMeta.genres) {
+      return;
+    }
+
+    try {
+      dispatch({ type: 'SET_LOADING', key: 'loadingDetails', value: true });
+
+      const [detailsResponse, allmangaDetailsResponse] = await Promise.all([
+        fetch(`/api/show-details/${showId}`),
+        fetch(`/api/allmanga-details/${showId}`),
+      ]);
+
+      const details = detailsResponse.ok ? await detailsResponse.json() : {};
+      const allmangaDetails = allmangaDetailsResponse.ok ? await allmangaDetailsResponse.json() : null;
+
+      dispatch({
+        type: 'SET_STATE',
+        payload: {
+          showMeta: { ...state.showMeta, ...details },
+          allMangaDetails: allmangaDetails,
+          loadingDetails: false,
+        },
+      });
+    } catch (e) {
+      dispatch({
+        type: 'SET_ERROR',
+        payload: e instanceof Error ? e.message : 'Failed to load details',
+      });
+      dispatch({ type: 'SET_LOADING', key: 'loadingDetails', value: false });
+    }
+  }, [showId, state.showCombinedDetails, state.showMeta]);
 
   const setPreferredSource = useCallback(async (sourceName: string) => {
     try {
@@ -716,36 +748,42 @@ const Player: React.FC = () => {
       </div>
 
       <div className={styles.detailsBox}>
-        <button className={styles.detailsToggle} onClick={() => dispatch({ type: 'SET_STATE', payload: { showCombinedDetails: !state.showCombinedDetails } })}>
+        <button className={styles.detailsToggle} onClick={handleToggleDetails}>
           <h3>Details</h3>
           {state.showCombinedDetails ? <FaChevronUp /> : <FaChevronDown />}
         </button>
         {state.showCombinedDetails && (
-          <div className={styles.detailsGridContainer}>
-            <div className={styles.detailItem}><strong>Type:</strong> {state.showMeta.mediaTypes?.[0]?.name}</div>
-            <div className={styles.detailItem}><strong>Status:</strong> {state.showMeta.status}</div>
-            <div className={styles.detailItem}><strong>Score:</strong> {state.showMeta.stats ? state.showMeta.stats.averageScore / 10 : 'N/A'}</div>
-            <div className={styles.detailItem}><strong>Studios:</strong> {state.showMeta.studios?.map(s => s.name).join(', ')}</div>
-            <div className={styles.detailItem}><strong>English Title:</strong> {state.showMeta.names?.english}</div>
-            <div className={styles.detailItem}><strong>Native Title:</strong> {state.showMeta.names?.native}</div>
-            {state.showMeta.genres && state.showMeta.genres.length > 0 && (
-              <div className={`${styles.detailItem} ${styles.genresContainer}`}>
-                <strong>Genres:</strong>
-                <div className={styles.genresList}>
-                  {state.showMeta.genres.map(genre => <span key={genre.route} className={styles.genreTag}>{genre.name}</span>)}
-                </div>
+          <>
+            {state.loadingDetails ? (
+              <p className={styles.loadingDetails}>Loading details...</p>
+            ) : (
+              <div className={styles.detailsGridContainer}>
+                <div className={styles.detailItem}><strong>Type:</strong> {state.showMeta.mediaTypes?.[0]?.name}</div>
+                <div className={styles.detailItem}><strong>Status:</strong> {state.showMeta.status}</div>
+                <div className={styles.detailItem}><strong>Score:</strong> {state.showMeta.stats ? state.showMeta.stats.averageScore / 10 : 'N/A'}</div>
+                <div className={styles.detailItem}><strong>Studios:</strong> {state.showMeta.studios?.map(s => s.name).join(', ')}</div>
+                <div className={styles.detailItem}><strong>English Title:</strong> {state.showMeta.names?.english}</div>
+                <div className={styles.detailItem}><strong>Native Title:</strong> {state.showMeta.names?.native}</div>
+                {state.showMeta.genres && state.showMeta.genres.length > 0 && (
+                  <div className={`${styles.detailItem} ${styles.genresContainer}`}>
+                    <strong>Genres:</strong>
+                    <div className={styles.genresList}>
+                      {state.showMeta.genres.map(genre => <span key={genre.route} className={styles.genreTag}>{genre.name}</span>)}
+                    </div>
+                  </div>
+                )}
+                {state.allMangaDetails && (
+                  <>
+                    <div className={styles.detailItem}><strong>Rating:</strong> {state.allMangaDetails.Rating}</div>
+                    <div className={styles.detailItem}><strong>Season:</strong> {state.allMangaDetails.Season}</div>
+                    <div className={styles.detailItem}><strong>Episodes:</strong> {state.allMangaDetails.Episodes}</div>
+                    <div className={styles.detailItem}><strong>Date:</strong> {state.allMangaDetails.Date}</div>
+                    <div className={styles.detailItem}><strong>Original Broadcast:</strong> {state.allMangaDetails["Original Broadcast"]}</div>
+                  </>
+                )}
               </div>
             )}
-            {state.allMangaDetails && (
-              <>
-                <div className={styles.detailItem}><strong>Rating:</strong> {state.allMangaDetails.Rating}</div>
-                <div className={styles.detailItem}><strong>Season:</strong> {state.allMangaDetails.Season}</div>
-                <div className={styles.detailItem}><strong>Episodes:</strong> {state.allMangaDetails.Episodes}</div>
-                <div className={styles.detailItem}><strong>Date:</strong> {state.allMangaDetails.Date}</div>
-                <div className={styles.detailItem}><strong>Original Broadcast:</strong> {state.allMangaDetails["Original Broadcast"]}</div>
-              </>
-            )}
-          </div>
+          </>
         )}
       </div>
 
