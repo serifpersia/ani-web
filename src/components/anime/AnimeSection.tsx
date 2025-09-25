@@ -7,6 +7,8 @@ interface Anime {
   _id: string;
   id: string;
   name: string;
+  nativeName?: string;
+  englishName?: string;
   thumbnail: string;
   type?: string;
   episodeNumber?: number;

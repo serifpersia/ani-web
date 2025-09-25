@@ -4,6 +4,8 @@ export interface Anime {
     _id: string;
     id: string;
     name: string;
+    nativeName?: string;
+    englishName?: string;
     thumbnail: string;
     type?: string;
     episodeNumber?: number;
@@ -15,10 +17,13 @@ export interface Anime {
     };
 }
 
-interface ShowItem {
-  _id: string;
-  name?: string;
-  thumbnail?: string;
+interface WatchlistItem {
+  id: string;
+  name: string;
+  nativeName?: string;
+  englishName?: string;
+  thumbnail: string;
+  status: string;
   type?: string;
   availableEpisodesDetail?: {
     sub?: string[];
@@ -33,6 +38,8 @@ interface ContinueWatchingItem {
   duration: number;
   name?: string;
   thumbnail?: string;
+  nativeName?: string;
+  englishName?: string;
 }
 
 interface SearchResult {
@@ -67,6 +74,8 @@ export const fetchAnimeDetails = async (showId: string, showName?: string) => {
         _id: show._id,
         id: show._id,
         name: show.name,
+        nativeName: show.nativeName,
+        englishName: show.englishName,
         thumbnail: show.thumbnail,
         type: show.type,
         availableEpisodesDetail: {
@@ -85,6 +94,8 @@ export const fetchAnimeDetails = async (showId: string, showName?: string) => {
         _id: showId,
         id: showId,
         name: meta.name,
+        nativeName: meta.names?.native,
+        englishName: meta.names?.english,
         thumbnail: meta.thumbnail,
         type: 'TV',
         availableEpisodesDetail: {
@@ -168,7 +179,9 @@ const fetchContinueWatching = async (): Promise<Anime[]> => {
           ...animeDetails,
           episodeNumber: item.episodeNumber,
           currentTime: item.currentTime,
-          duration: item.duration
+          duration: item.duration,
+          nativeName: item.nativeName,
+          englishName: item.englishName,
         };
       } else {
         return null;
@@ -242,8 +255,11 @@ const fetchWatchlist = async (): Promise<Anime[]> => {
       const animeDetails = await fetchAnimeDetails(item.id, item.name);
       if (animeDetails) {
         return {
-          ...item,
           ...animeDetails,
+          ...item,
+          name: item.name || animeDetails.name,
+          nativeName: item.nativeName || animeDetails.nativeName,
+          englishName: item.englishName || animeDetails.englishName,
         };
       } else {
         return null;

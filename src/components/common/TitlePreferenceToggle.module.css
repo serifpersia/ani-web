@@ -1,0 +1,50 @@
+.title-preference-container {
+  margin-bottom: 20px;
+  padding: 15px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--background-light);
+}
+
+.title-preference-container h4 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: var(--text-color-primary);
+}
+
+.error {
+  color: var(--error-color);
+}
+
+.toggle-button {
+  position: relative;
+  width: 200px;
+  height: 40px;
+  background-color: var(--accent);
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1rem;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+}
+
+.toggle-button:hover {
+  background-color: var(--accent-dark);
+}
+
+.toggle-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.toggle-label {
+  position: absolute;
+  white-space: nowrap;
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}

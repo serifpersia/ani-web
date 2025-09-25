@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import RcloneSync from '../components/RcloneSync/RcloneSync';
+import TitlePreferenceToggle from '../components/common/TitlePreferenceToggle';
 import styles from './Settings.module.css';
 
 const Settings: React.FC = () => {
@@ -65,6 +66,9 @@ const Settings: React.FC = () => {
   return (
     <div className="page-container">
       <h2 className="section-title">Settings</h2>
+      <div className={styles['settings-section']}>
+        <TitlePreferenceToggle />
+      </div>
       <div className={styles['settings-section']}>
         <h3>Database Backup and Restore</h3>
         <div className={styles.controls}>
