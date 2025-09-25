@@ -77,6 +77,7 @@ interface VideoSource {
   sourceName: string;
   links: VideoLink[];
   subtitles?: SubtitleTrack[];
+  type?: 'player' | 'iframe';
 }
 
 interface SkipInterval {
@@ -348,7 +349,7 @@ interface PlayerControlsProps {
     loadingVideo: boolean;
 }
 
-const PlayerControls: React.FC<PlayerControlsProps> = ({ player, isAutoplayEnabled, onAutoplayChange, videoSources, selectedSource, selectedLink, onSourceChange, loadingVideo }) => {
+const PlayerControls: React.FC<PlayerControlsProps> = ({ player, isAutoplayEnabled, onAutoplayChange, selectedSource, selectedLink, onSourceChange, loadingVideo }) => {
     const { refs, state, actions } = player;
 
     const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -547,26 +548,23 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({ player, isAutoplayEnabl
                             <button className={styles.controlBtn} onClick={() => actions.setShowSourceMenu(!state.showSourceMenu)}><FaList /></button>
                             {state.showSourceMenu && (
                                 <div className={styles.settingsMenu} onClick={e => e.stopPropagation()}>
-                                    <h4>Sources & Quality</h4>
-                                    {videoSources.map(source => (
-                                        <div key={source.sourceName} className={styles.sourceGroupInMenu}>
-                                            <h5>{source.sourceName}</h5>
-                                            <div className={styles.qualityListInMenu}>
-                                                {source.links.sort((a, b) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)).map(link => (
-                                                    <button
-                                                        key={link.resolutionStr}
-                                                        className={`${styles.qualityItemInMenu} ${selectedSource?.sourceName === source.sourceName && selectedLink?.resolutionStr === link.resolutionStr ? styles.active : ''}`}
-                                                        onClick={() => {
-                                                            onSourceChange(source, link);
-                                                            actions.setShowSourceMenu(false);
-                                                        }}
-                                                    >
-                                                        {link.resolutionStr}
-                                                    </button>
-                                                ))}
-                                            </div>
+                                    <h4>Quality</h4>
+                                    {selectedSource && selectedSource.links.length > 1 && (
+                                        <div className={styles.qualityListInMenu}>
+                                            {selectedSource.links.sort((a, b) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)).map(link => (
+                                                <button
+                                                    key={link.resolutionStr}
+                                                    className={`${styles.qualityItemInMenu} ${selectedLink?.resolutionStr === link.resolutionStr ? styles.active : ''}`}
+                                                    onClick={() => {
+                                                        onSourceChange(selectedSource, link);
+                                                        actions.setShowSourceMenu(false);
+                                                    }}
+                                                >
+                                                    {link.resolutionStr}
+                                                </button>
+                                            ))}
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -600,6 +598,34 @@ const EpisodeList: React.FC<EpisodeListProps> = ({ episodes, currentEpisode, wat
                         onClick={() => onEpisodeClick(ep)}
                     >
                         Ep {ep}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+
+interface SourceSelectorProps {
+    videoSources: VideoSource[];
+    selectedSource: VideoSource | null;
+    onSourceChange: (source: VideoSource) => void;
+}
+
+const SourceSelector: React.FC<SourceSelectorProps> = ({ videoSources, selectedSource, onSourceChange }) => {
+    if (videoSources.length === 0) return null;
+
+    return (
+        <div className={styles.sourceSelectionContainer}>
+            <h4>Source</h4>
+            <div className={styles.sourceButtons}>
+                {videoSources.map(source => (
+                    <button
+                        key={source.sourceName}
+                        className={`${styles.sourceButton} ${selectedSource?.sourceName === source.sourceName ? styles.active : ''}`}
+                        onClick={() => onSourceChange(source)}
+                    >
+                        {source.sourceName}
                     </button>
                 ))}
             </div>
@@ -771,20 +797,29 @@ const Player: React.FC = () => {
   }, [showId, state.currentEpisode, state.currentMode]);
 
   useEffect(() => {
-    if (!state.selectedSource || !state.selectedLink || !refs.videoRef.current) return;
-
     const videoElement = refs.videoRef.current;
-    let proxiedUrl = `/api/proxy?url=${encodeURIComponent(state.selectedLink.link)}`;
-    if (state.selectedLink.headers?.Referer) {
-        proxiedUrl += `&referer=${encodeURIComponent(state.selectedLink.headers.Referer)}`;
-    }
+    if (!videoElement) return;
 
     if (hlsInstance.current) {
       hlsInstance.current.destroy();
     }
-    videoElement.src = '';
+    videoElement.pause();
+    videoElement.removeAttribute('src');
+    videoElement.load();
+    
     while (videoElement.firstChild) {
       videoElement.removeChild(videoElement.firstChild);
+    }
+
+    if (!state.selectedSource || !state.selectedLink) return;
+
+    if (state.selectedSource.type === 'iframe') {
+        return;
+    }
+
+    let proxiedUrl = `/api/proxy?url=${encodeURIComponent(state.selectedLink.link)}`;
+    if (state.selectedLink.headers?.Referer) {
+        proxiedUrl += `&referer=${encodeURIComponent(state.selectedLink.headers.Referer)}`;
     }
 
     if (state.selectedSource.subtitles) {
@@ -1092,31 +1127,52 @@ const Player: React.FC = () => {
             </div>
         )}
         
-        {!isMobile && <PlayerControls 
-            player={player}
-            isAutoplayEnabled={state.isAutoplayEnabled}
-            onAutoplayChange={handleAutoplayChange}
-            videoSources={state.videoSources}
-            selectedSource={state.selectedSource}
-            selectedLink={state.selectedLink}
-            onSourceChange={(source, link) => dispatch({ type: 'SET_STATE', payload: { selectedSource: source, selectedLink: link }})}
-            loadingVideo={state.loadingVideo}
-        />}
+        {state.selectedSource?.type === 'iframe' ? (
+            <iframe
+                src={state.selectedLink?.link}
+                className={styles.videoIframe}
+                allow="autoplay; fullscreen"
+                allowFullScreen
+                sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-presentation allow-downloads"
+            ></iframe>
+        ) : (
+          <>
+            {!isMobile && <PlayerControls 
+                player={player}
+                isAutoplayEnabled={state.isAutoplayEnabled}
+                onAutoplayChange={handleAutoplayChange}
+                videoSources={state.videoSources}
+                selectedSource={state.selectedSource}
+                selectedLink={state.selectedLink}
+                onSourceChange={(source, link) => dispatch({ type: 'SET_STATE', payload: { selectedSource: source, selectedLink: link }})}
+                loadingVideo={state.loadingVideo}
+            />}
 
-        <video 
-            ref={refs.videoRef} 
-            controls={isMobile}
-            onClick={!isMobile ? actions.togglePlay : undefined}
-            onPlay={actions.onPlay}
-            onPause={actions.onPause}
-            onLoadedMetadata={actions.onLoadedMetadata}
-            onTimeUpdate={actions.onTimeUpdate}
-            onProgress={actions.onProgress}
-            onVolumeChange={actions.onVolumeChange}
-        />
+            <video 
+                ref={refs.videoRef} 
+                controls={isMobile}
+                onClick={!isMobile ? actions.togglePlay : undefined}
+                onPlay={actions.onPlay}
+                onPause={actions.onPause}
+                onLoadedMetadata={actions.onLoadedMetadata}
+                onTimeUpdate={actions.onTimeUpdate}
+                onProgress={actions.onProgress}
+                onVolumeChange={actions.onVolumeChange}
+            />
+          </>
+        )}
       </div>
 
-      {isMobile && (
+      <SourceSelector 
+        videoSources={state.videoSources}
+        selectedSource={state.selectedSource}
+        onSourceChange={(source) => {
+          const bestLink = source.links.sort((a, b) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0))[0];
+          dispatch({ type: 'SET_STATE', payload: { selectedSource: source, selectedLink: bestLink } })
+        }}
+      />
+
+      {isMobile && state.selectedSource?.type !== 'iframe' && (
         <div className={styles.mobileControls}>
             <div className={styles.playerActions}>
                 <button className={styles.seekBtn} onClick={() => actions.seek(-10)}>-10s</button>
@@ -1133,38 +1189,6 @@ const Player: React.FC = () => {
                     <span>Autoplay</span>
                     <ToggleSwitch id="autoplay-toggle-mobile" isChecked={state.isAutoplayEnabled} onChange={(e) => handleAutoplayChange(e.target.checked)} />
                 </div>
-            </div>
-            <div className={styles.sourceQualityControls}>
-                <div className={styles.sourceSelection}>
-                    <h4>Source</h4>
-                    <div className={styles.sourceButtons}>
-                        {state.videoSources.map(source => (
-                            <button
-                                key={source.sourceName}
-                                className={`${styles.sourceButton} ${state.selectedSource?.sourceName === source.sourceName ? styles.active : ''}`}
-                                onClick={() => dispatch({ type: 'SET_STATE', payload: { selectedSource: source } })}
-                            >
-                                {source.sourceName}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-                {state.selectedSource && (
-                    <div className={styles.qualitySelection}>
-                        <h4>Quality</h4>
-                        <div className={styles.qualityButtons}>
-                            {state.selectedSource.links.sort((a, b) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)).map(link => (
-                                <button
-                                    key={link.resolutionStr}
-                                    className={`${styles.qualityButton} ${state.selectedLink?.resolutionStr === link.resolutionStr ? styles.active : ''}`}
-                                    onClick={() => dispatch({ type: 'SET_STATE', payload: { selectedLink: link } })}
-                                >
-                                    {link.resolutionStr}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
       )}
