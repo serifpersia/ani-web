@@ -1098,8 +1098,29 @@ body.light .sourceButton, body.light .qualityButton {
     background-color: #9c27b0;
 }
 
+.sourceSelectionContainer {
+    background-color: var(--dark-bg-secondary);
+    padding: 1.5rem;
+    border-radius: var(--card-border-radius);
+    margin-bottom: 1.5rem;
+}
+
+.sourceSelectionContainer h4 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+}
+
 .middleControls {
     display: flex;
     align-items: center;
     gap: 0.1rem;
+}
+
+.videoIframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
 }
