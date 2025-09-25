@@ -46,6 +46,15 @@ const dbUploadStorage = multer.diskStorage({
 });
 const dbUpload = multer({ storage: dbUploadStorage });
 
+interface TableInfoRow {
+  cid: number;
+  name: string;
+  type: string;
+  notnull: 0 | 1;
+  dflt_value: string | null;
+  pk: 0 | 1;
+}
+
 function initializeDatabase() {
    db = new sqlite3.Database(dbPath, (err) => {
       if (err) {
@@ -57,6 +66,28 @@ function initializeDatabase() {
             db.run(`CREATE TABLE IF NOT EXISTS watched_episodes (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, watchedAt DATETIME DEFAULT CURRENT_TIMESTAMP, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, PRIMARY KEY (showId, episodeNumber))`);
             db.run(`CREATE TABLE IF NOT EXISTS settings (key TEXT NOT NULL, value TEXT, PRIMARY KEY (key))`);
             db.run(`CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT)`);
+
+            db.all("PRAGMA table_info(watchlist)", (err, rows: TableInfoRow[]) => {
+                if (err) { console.error("Error checking watchlist schema:", err); return; }
+                const columns = rows.map(col => col.name);
+                if (!columns.includes("nativeName")) {
+                    db.run(`ALTER TABLE watchlist ADD COLUMN nativeName TEXT`);
+                }
+                if (!columns.includes("englishName")) {
+                    db.run(`ALTER TABLE watchlist ADD COLUMN englishName TEXT`);
+                }
+            });
+
+            db.all("PRAGMA table_info(shows_meta)", (err, rows: TableInfoRow[]) => {
+                if (err) { console.error("Error checking shows_meta schema:", err); return; }
+                const columns = rows.map(col => col.name);
+                if (!columns.includes("nativeName")) {
+                    db.run(`ALTER TABLE shows_meta ADD COLUMN nativeName TEXT`);
+                }
+                if (!columns.includes("englishName")) {
+                    db.run(`ALTER TABLE shows_meta ADD COLUMN englishName TEXT`);
+                }
+            });
          });
       }
    });
@@ -168,6 +199,8 @@ query ($search: SearchInput, $limit: Int, $page: Int, $translationType: VaildTra
     edges {
       _id
       name
+      nativeName
+      englishName
       thumbnail
       description
       type
@@ -521,7 +554,7 @@ app.get('/api/show-details/:id', async (req, res) => {
 
 app.get('/api/continue-watching', (_req, res) => {
     const query = `
-        SELECT sm.id as showId, sm.name, sm.thumbnail, we.episodeNumber, we.currentTime, we.duration
+        SELECT sm.id as showId, sm.name, sm.thumbnail, sm.nativeName, sm.englishName, we.episodeNumber, we.currentTime, we.duration
         FROM shows_meta sm
         JOIN (
            SELECT showId, episodeNumber, currentTime, duration, MAX(watchedAt) as watchedAt
@@ -573,11 +606,11 @@ app.get('/api/continue-watching', (_req, res) => {
 });
 
 app.post('/api/update-progress', (req, res) => {
-    const { showId, episodeNumber, currentTime, duration, showName, showThumbnail } = req.body;
+    const { showId, episodeNumber, currentTime, duration, showName, showThumbnail, nativeName, englishName } = req.body;
 
     db.serialize(() => {
-        db.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail) VALUES (?, ?, ?)',
-            [showId, showName, deobfuscateUrl(showThumbnail)]);
+        db.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName) VALUES (?, ?, ?, ?, ?)',
+            [showId, showName, deobfuscateUrl(showThumbnail), nativeName, englishName]);
 
         db.run(`INSERT OR REPLACE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)`, 
             [showId, episodeNumber, currentTime, duration],
@@ -615,10 +648,10 @@ app.post('/api/continue-watching/remove', (req, res) => {
 });
 
 app.post('/api/watchlist/add', (req, res) => {
-    const { id, name, thumbnail, status } = req.body;
+    const { id, name, thumbnail, status, nativeName, englishName } = req.body;
     const finalThumbnail = deobfuscateUrl(thumbnail || '');
-    db.run(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status) VALUES (?, ?, ?, ?)`, 
-        [id, name, finalThumbnail, status || 'Watching'],
+    db.run(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status, nativeName, englishName) VALUES (?, ?, ?, ?, ?, ?)`, 
+        [id, name, finalThumbnail, status || 'Watching', nativeName, englishName],
         (err: Error | null) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
     );
 });
@@ -655,9 +688,41 @@ app.get('/api/watchlist', (req, res) => {
             break;
     }
 
-    db.all(`SELECT * FROM watchlist ${orderByClause}`, [],
+    db.all(`SELECT id, name, thumbnail, status, nativeName, englishName FROM watchlist ${orderByClause}`, [],
         (err: Error | null, rows: Show[]) => err ? res.status(500).json({ error: 'DB error' }) : res.json(rows)
     );
+});
+
+app.get('/api/watchlist/backfill-names', async (_req, res) => {
+    db.all(`SELECT id, name FROM watchlist`, [], async (err: Error | null, rows: { id: string, name: string }[]) => {
+        if (err) return res.status(500).json({ error: 'DB error' });
+
+        let updatedCount = 0;
+        for (const item of rows) {
+            try {
+                const response = await axios.get(apiEndpoint, {
+                    headers: { 'User-Agent': userAgent, 'Referer': referer },
+                    params: { query: `query($showId: String!) { show(_id: $showId) { nativeName, englishName } }`, variables: JSON.stringify({ showId: item.id }) },
+                    timeout: 10000
+                });
+                const show = response.data?.data?.show;
+                if (show && (show.nativeName || show.englishName)) {
+                    await new Promise<void>((resolve, reject) => {
+                        db.run(`UPDATE watchlist SET nativeName = ?, englishName = ? WHERE id = ?`, 
+                            [show.nativeName || null, show.englishName || null, item.id],
+                            (updateErr: Error | null) => { 
+                                if (updateErr) reject(updateErr); 
+                                else { updatedCount++; resolve(); } 
+                            }
+                        );
+                    });
+                }
+            } catch (apiError) {
+                console.error(`Error backfilling names for watchlist item ${item.id}:`, (apiError as Error).message);
+            }
+        }
+        res.json({ success: true, updatedCount });
+    });
 });
 
 app.post('/api/watchlist/remove', (req, res) => {
@@ -667,8 +732,19 @@ app.post('/api/watchlist/remove', (req, res) => {
     );
 });
 
-app.get('/api/settings/:key', (req, res) => {
-    db.get('SELECT value FROM settings WHERE key = ?', [req.params.key], (err: Error | null, row: { value: string } | undefined) => {
+app.get('/api/settings/preferredSource', (req, res) => {
+    db.get('SELECT value FROM settings WHERE key = ?', ['preferredSource'], (err: Error | null, row: { value: string } | undefined) => {
+        if (err) return res.status(500).json({ error: 'DB error' });
+        res.json({ value: row ? row.value : null });
+    });
+});
+
+app.get('/api/settings', (req, res) => {
+    const key = req.query.key as string;
+    if (!key) {
+        return res.status(400).json({ error: 'Key parameter is required.' });
+    }
+    db.get('SELECT value FROM settings WHERE key = ?', [key], (err: Error | null, row: { value: string } | undefined) => {
         if (err) return res.status(500).json({ error: 'DB error' });
         res.json({ value: row ? row.value : null });
     });
@@ -1047,12 +1123,12 @@ app.get('/api/show-meta/:id', async (req, res) => {
     try {
         const response = await axios.get(apiEndpoint, {
             headers: { 'User-Agent': userAgent, 'Referer': referer },
-            params: { query: `query($showId: String!) { show(_id: $showId) { name, thumbnail } }`, variables: JSON.stringify({ showId }) },
+            params: { query: `query($showId: String!) { show(_id: $showId) { name, thumbnail, nativeName, englishName } }`, variables: JSON.stringify({ showId }) },
             timeout: 15000
         });
         const show = response.data.data.show;
         if (show) {
-            const meta = { name: show.name, thumbnail: deobfuscateUrl(show.thumbnail) };
+            const meta = { name: show.name, thumbnail: deobfuscateUrl(show.thumbnail), nativeName: show.nativeName, englishName: show.englishName };
             apiCache.set(cacheKey, meta);
             res.set('Cache-Control', 'public, max-age=300');
             res.json(meta);

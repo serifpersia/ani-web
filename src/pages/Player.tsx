@@ -7,12 +7,18 @@ import { formatTime, fixThumbnailUrl } from '../lib/utils';
 import ResumeModal from '../components/common/ResumeModal';
 import useIsMobile from '../hooks/useIsMobile';
 import Hls from 'hls.js';
+import { useTitlePreference } from '../contexts/TitlePreferenceContext';
 
 // --- INTERFACES ---
 interface SimpleShowMeta {
   name: string;
   thumbnail: string;
   description?: string;
+  names?: {
+    romaji: string;
+    english: string;
+    native: string;
+  };
 }
 
 interface DetailedShowMeta {
@@ -676,7 +682,7 @@ const Player: React.FC = () => {
         dispatch({
           type: 'SHOW_DATA_SUCCESS',
           payload: {
-            showMeta: { ...meta, description: episodeData.description },
+            showMeta: { ...meta, description: episodeData.description, names: meta.names || { romaji: meta.name, english: meta.englishName, native: meta.nativeName } },
             episodes: episodeData.episodes.sort((a: string, b: string) => parseFloat(a) - parseFloat(b)),
             inWatchlist: watchlistStatus.inWatchlist,
             watchedEpisodes: watchedData,
@@ -890,6 +896,8 @@ const Player: React.FC = () => {
                 duration: videoElement.duration,
                 showName: state.showMeta.name,
                 showThumbnail: fixThumbnailUrl(state.showMeta.thumbnail!),
+                nativeName: state.showMeta.names?.native,
+                englishName: state.showMeta.names?.english,
             })
         });
     };
@@ -999,7 +1007,7 @@ const Player: React.FC = () => {
       await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: showId, name: state.showMeta.name, thumbnail: state.showMeta.thumbnail })
+        body: JSON.stringify({ id: showId, name: state.showMeta.name, thumbnail: state.showMeta.thumbnail, nativeName: state.showMeta.names?.native, englishName: state.showMeta.names?.english })
       });
       dispatch({ type: 'SET_STATE', payload: { inWatchlist: !state.inWatchlist } });
     } catch (e) {
@@ -1028,6 +1036,16 @@ const Player: React.FC = () => {
       localStorage.setItem('autoplayEnabled', checked.toString());
   };
 
+  const { titlePreference } = useTitlePreference();
+
+  const displayTitle = useMemo(() => {
+    if (!state.showMeta) return 'Loading...';
+    if (titlePreference === 'name') return state.showMeta.name;
+    if (titlePreference === 'nativeName') return state.showMeta.names?.native || state.showMeta.name;
+    if (titlePreference === 'englishName') return state.showMeta.names?.english || state.showMeta.name;
+    return state.showMeta.name;
+  }, [state.showMeta, titlePreference]);
+
   if (state.loadingShowData) return <p className="loading">Loading show data...</p>;
   if (state.error) return <p className="error-message">Error: {state.error}</p>;
   if (!state.showMeta.name) return <p>Show not found.</p>;
@@ -1041,10 +1059,10 @@ const Player: React.FC = () => {
             onStartOver={handleStartOver}
         />
       <div className={styles.headerContainer}>
-        <img src={fixThumbnailUrl(state.showMeta.thumbnail!)} alt={state.showMeta.name} className={styles.headerThumbnail} />
+        <img src={fixThumbnailUrl(state.showMeta.thumbnail!)} alt={displayTitle} className={styles.headerThumbnail} />
         <div className={styles.header}>
           <div className={styles.titleContainer}>
-            <h2>{state.showMeta.name}</h2>
+            <h2>{displayTitle}</h2>
             {(state.showMeta.status || state.showMeta.nextEpisodeAirDate) && (
               <div className={styles.scheduleInfo}>
                 {state.showMeta.status && <span className={styles.status}>{state.showMeta.status}</span>}

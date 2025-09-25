@@ -9,6 +9,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 interface _WatchlistItem {
   id: string;
   name: string;
+  nativeName?: string;
+  englishName?: string;
   thumbnail: string;
   status: string;
   type?: string;
@@ -133,6 +135,8 @@ const Watchlist: React.FC = () => {
               _id: item.id,
               id: item.id,
               name: item.name,
+              nativeName: item.nativeName,
+              englishName: item.englishName,
               thumbnail: item.thumbnail,
               type: item.type,
               availableEpisodesDetail: item.availableEpisodesDetail,

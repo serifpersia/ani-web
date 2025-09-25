@@ -4,11 +4,14 @@ import { fixThumbnailUrl, formatTime } from '../../lib/utils';
 import styles from './AnimeCard.module.css';
 import { FaMicrophone, FaClosedCaptioning } from 'react-icons/fa';
 import useIsMobile from '../../hooks/useIsMobile';
+import { useTitlePreference } from '../../contexts/TitlePreferenceContext';
 
 interface Anime {
   _id: string;
   id: string;
   name: string;
+  nativeName?: string;
+  englishName?: string;
   thumbnail: string;
   type?: string;
   episodeNumber?: number;
@@ -29,6 +32,9 @@ interface AnimeCardProps {
 const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = false, onRemove }) => {
   const [isHovered, setIsHovered] = React.useState(false); // New state for hover
   const isMobile = useIsMobile(); // Call the hook
+  const { titlePreference } = useTitlePreference();
+
+  const displayTitle = anime[titlePreference] || anime.name;
 
   const progressPercent = continueWatching && anime.currentTime && anime.duration
     ? (anime.currentTime / anime.duration) * 100
@@ -108,7 +114,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
       </div>
       <div className={styles.info}>
         {isMobile && removeButtonElement} {}
-        <div className={styles.title}>{anime.name}</div>
+        <div className={styles.title} title={displayTitle}>{displayTitle}</div>
         {isMobile && (
           <div className={styles.mobileDetailsBottom}>
             <div className={styles.mobileDetailsBottomLeft}>

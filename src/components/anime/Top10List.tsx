@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { fixThumbnailUrl } from '../../lib/utils';
 import ErrorMessage from '../common/ErrorMessage';
+import { useTitlePreference } from '../../contexts/TitlePreferenceContext';
 
 interface AnimeItem {
   _id: string;
   name: string;
+  nativeName?: string;
+  englishName?: string;
   thumbnail: string;
   availableEpisodes: {
     sub?: number;
@@ -22,6 +25,7 @@ const Top10List: React.FC<Top10ListProps> = ({ title }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState('all');
+  const { titlePreference } = useTitlePreference();
 
   useEffect(() => {
     const fetchTop10List = async () => {
@@ -58,6 +62,13 @@ const Top10List: React.FC<Top10ListProps> = ({ title }) => {
     </div>
   );
 
+  const getDisplayTitle = (item: AnimeItem) => {
+    if (titlePreference === 'name') return item.name;
+    if (titlePreference === 'nativeName') return item.nativeName || item.name;
+    if (titlePreference === 'englishName') return item.englishName || item.name;
+    return item.name;
+  };
+
   return (
     <div className="top-10-list content-card">
       <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
@@ -83,14 +94,14 @@ const Top10List: React.FC<Top10ListProps> = ({ title }) => {
                 alt={item.name} 
                 className="poster-img" 
                 loading="lazy" 
-                onError={(e) => { 
+                onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.src = '/placeholder.png'; 
                   target.className = 'poster-img loaded';
                 }}
               />
               <div className="item-info">
-                <div className="title">{item.name}</div>
+                <div className="title">{getDisplayTitle(item)}</div>
                 <div className="details">
                   {item.availableEpisodes.sub && (
                     <span>SUB: {item.availableEpisodes.sub}</span>
