@@ -188,31 +188,11 @@ export async function syncDownOnBoot(dbPath: string, remoteDir: string) {
 
     if (remoteVersion > localVersion) {
         log(`Remote DB (v${remoteVersion}) is newer than local (v${localVersion}). Downloading...`);
-        const oldDbPath = `${dbPath}.old`;
         try {
-            if (localDbExists) {
-                log(`Backing up current database to ${oldDbPath}`);
-                await fs.rename(dbPath, oldDbPath);
-            }
-
             await executeRclone(['copyto', `${RCLONE_REMOTE_NAME}:${remoteDir}/anime.db`, dbPath]);
             log('Download complete. Database is now up to date.');
-
-            if (localDbExists) {
-                await fs.unlink(oldDbPath);
-                log(`Removed old database backup.`);
-            }
         } catch (err) {
             error('CRITICAL: Failed to download newer database.', err);
-            if (localDbExists) {
-                log(`Restoring old database from backup...`);
-                try {
-                    await fs.rename(oldDbPath, dbPath);
-                    log('Successfully restored old database.');
-                } catch (renameErr) {
-                    error('FATAL: Could not restore old database after failed download.', renameErr);
-                }
-            }
         }
     } else {
         log('Local database is up to date.');
