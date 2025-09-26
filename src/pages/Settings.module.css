@@ -17,4 +17,14 @@
   margin-bottom: 15px;
 }
 
+.controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 
+.status {
+  margin-top: 15px;
+  color: var(--text-color-secondary);
+  font-size: 0.9rem;
+}

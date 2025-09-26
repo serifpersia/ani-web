@@ -810,6 +810,37 @@ app.post('/api/settings', async (req, res) => {
     }
 });
 
+app.get('/api/backup-db', (_req, res) => {
+   res.download(dbPath, 'ani-web-backup.db', (err: Error | null) => {
+      if (err) {
+         console.error("Error sending database file:", err);
+         res.status(500).send("Could not backup database.");
+      }
+   });
+});
+
+app.post('/api/restore-db', dbUpload.single('dbfile'), (req, res) => {
+   if (!req.file) {
+      return res.status(400).json({ error: 'No database file uploaded.' });
+   }
+   const tempPath = path.join(__dirname, 'anime.db.temp');
+   db.close((err: Error | null) => {
+      if (err) {
+         console.error('Failed to close database for restore:', err.message);
+         return res.status(500).json({ error: 'Failed to close current database.' });
+      }
+      fs.rename(tempPath, dbPath, (err: NodeJS.ErrnoException | null) => {
+         if (err) {
+            console.error('Failed to replace database file:', err.message);
+            initializeDatabase();
+            return res.status(500).json({ error: 'Failed to replace database file.' });
+         }
+         initializeDatabase();
+         res.json({ success: true, message: 'Database restored successfully. The application will now refresh.' });
+      });
+   });
+});
+
 
 
 
