@@ -1,1 +1,0 @@
-rclone copy server/anime.db gdrive:

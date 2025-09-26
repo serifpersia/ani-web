@@ -12,6 +12,8 @@ import cheerio from 'cheerio';
 import { parseString } from 'xml2js';
 import sqlite3 from 'sqlite3';
 import multer from 'multer';
+import { syncDownOnBoot, syncUp, performWriteTransaction, verifyRclone } from './sync';
+import chokidar from 'chokidar';
 
 interface Show {
     _id: string;
@@ -66,6 +68,9 @@ function initializeDatabase() {
             db.run(`CREATE TABLE IF NOT EXISTS watched_episodes (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, watchedAt DATETIME DEFAULT CURRENT_TIMESTAMP, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, PRIMARY KEY (showId, episodeNumber))`);
             db.run(`CREATE TABLE IF NOT EXISTS settings (key TEXT NOT NULL, value TEXT, PRIMARY KEY (key))`);
             db.run(`CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT)`);
+
+            db.run(`CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`);
+            db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`);
 
             db.all("PRAGMA table_info(watchlist)", (err, rows: TableInfoRow[]) => {
                 if (err) { console.error("Error checking watchlist schema:", err); return; }
@@ -429,18 +434,16 @@ app.post('/api/import/mal-xml', async (req, res) => {
     if (!xml) {
         return res.status(400).json({ error: 'XML content is required' });
     }
-    if (erase) {
-        await new Promise<void>((resolve, reject) => {
-            db.run(`DELETE FROM watchlist`, [], (err: Error | null) => { if (err) reject(new Error('DB error on erase.')); else resolve(); });
-        });
-    }
+
     parseString(xml, async (err: Error | null, result: { myanimelist: { anime: MalAnimeItem[] } }) => {
         if (err || !result || !result.myanimelist || !result.myanimelist.anime) {
             return res.status(400).json({ error: 'Invalid or empty MyAnimeList XML file.' });
         }
+        
         const animeList = result.myanimelist.anime;
-        let importedCount = 0;
         let skippedCount = 0;
+        const showsToInsert: any[] = [];
+
         for (const item of animeList) {
             try {
                 const title = item.series_title[0];
@@ -452,16 +455,40 @@ app.post('/api/import/mal-xml', async (req, res) => {
                 });
                 const foundShow = searchResponse.data?.data?.shows?.edges[0];
                 if (foundShow) {
-                    await new Promise<void>((resolve, reject) => {
-                        db.run(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status) VALUES (?, ?, ?, ?)`, 
-                            [foundShow._id, foundShow.name, deobfuscateUrl(foundShow.thumbnail), malStatus],
-                            (err: Error | null) => { if (err) reject(err); else { importedCount++; resolve(); } }
-                        );
+                    showsToInsert.push({
+                        id: foundShow._id,
+                        name: foundShow.name,
+                        thumbnail: deobfuscateUrl(foundShow.thumbnail),
+                        status: malStatus
                     });
-                } else { skippedCount++; }
-            } catch (_searchError) { skippedCount++; }
+                } else {
+                    skippedCount++;
+                }
+            } catch (_searchError) {
+                skippedCount++;
+            }
         }
-        res.json({ imported: importedCount, skipped: skippedCount });
+
+        try {
+            if (erase || showsToInsert.length > 0) {
+                await performWriteTransaction(db, (tx) => {
+                    if (erase) {
+                        tx.run(`DELETE FROM watchlist`);
+                    }
+                    if (showsToInsert.length > 0) {
+                        const stmt = tx.prepare(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status) VALUES (?, ?, ?, ?)`);
+                        for (const show of showsToInsert) {
+                            stmt.run(show.id, show.name, show.thumbnail, show.status);
+                        }
+                        stmt.finalize();
+                    }
+                });
+            }
+            res.json({ imported: showsToInsert.length, skipped: skippedCount });
+        } catch (dbError) {
+            console.error('DB error on MAL import:', dbError);
+            res.status(500).json({ error: 'DB error on MAL import' });
+        }
     });
 });
 
@@ -605,23 +632,23 @@ app.get('/api/continue-watching', (_req, res) => {
     });
 });
 
-app.post('/api/update-progress', (req, res) => {
+app.post('/api/update-progress', async (req, res) => {
     const { showId, episodeNumber, currentTime, duration, showName, showThumbnail, nativeName, englishName } = req.body;
 
-    db.serialize(() => {
-        db.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName) VALUES (?, ?, ?, ?, ?)',
-            [showId, showName, deobfuscateUrl(showThumbnail), nativeName, englishName]);
+    try {
+        await performWriteTransaction(db, (tx) => {
+            tx.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName) VALUES (?, ?, ?, ?, ?)',
+                [showId, showName, deobfuscateUrl(showThumbnail), nativeName, englishName]);
 
-        db.run(`INSERT OR REPLACE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)`, 
-            [showId, episodeNumber, currentTime, duration],
-            (err: Error | null) => {
-                if (err) return res.status(500).json({ error: 'DB error on progress update' });
-                res.json({ success: true });
-            }
-        );
-    });
+            tx.run(`INSERT OR REPLACE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)`,
+                [showId, episodeNumber, currentTime, duration]);
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('DB error on progress update:', error);
+        res.status(500).json({ error: 'DB error on progress update' });
+    }
 });
-
 app.get('/api/episode-progress/:showId/:episodeNumber', (req, res) => {
     const { showId, episodeNumber } = req.params;
 
@@ -639,21 +666,32 @@ app.get('/api/watched-episodes/:showId', (req, res) => {
     );
 });
 
-app.post('/api/continue-watching/remove', (req, res) => {
+app.post('/api/continue-watching/remove', async (req, res) => {
     const { showId } = req.body;
-    db.run(`DELETE FROM watched_episodes WHERE showId = ?`,
-        [showId],
-        (err: Error | null) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
-    );
+    try {
+        await performWriteTransaction(db, (tx) => {
+            tx.run(`DELETE FROM watched_episodes WHERE showId = ?`, [showId]);
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('DB error on continue-watching remove:', error);
+        res.status(500).json({ error: 'DB error' });
+    }
 });
 
-app.post('/api/watchlist/add', (req, res) => {
+app.post('/api/watchlist/add', async (req, res) => {
     const { id, name, thumbnail, status, nativeName, englishName } = req.body;
     const finalThumbnail = deobfuscateUrl(thumbnail || '');
-    db.run(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status, nativeName, englishName) VALUES (?, ?, ?, ?, ?, ?)`, 
-        [id, name, finalThumbnail, status || 'Watching', nativeName, englishName],
-        (err: Error | null) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
-    );
+    try {
+        await performWriteTransaction(db, (tx) => {
+            tx.run(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status, nativeName, englishName) VALUES (?, ?, ?, ?, ?, ?)`, 
+                [id, name, finalThumbnail, status || 'Watching', nativeName, englishName]);
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('DB error on watchlist add:', error);
+        res.status(500).json({ error: 'DB error' });
+    }
 });
 
 app.get('/api/watchlist/check/:showId', (req, res) => {
@@ -663,12 +701,17 @@ app.get('/api/watchlist/check/:showId', (req, res) => {
     );
 });
 
-app.post('/api/watchlist/status', (req, res) => {
+app.post('/api/watchlist/status', async (req, res) => {
     const { id, status } = req.body;
-    db.run(`UPDATE watchlist SET status = ? WHERE id = ?`,
-        [status, id],
-        (err: Error | null) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
-    );
+    try {
+        await performWriteTransaction(db, (tx) => {
+            tx.run(`UPDATE watchlist SET status = ? WHERE id = ?`, [status, id]);
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('DB error on watchlist status update:', error);
+        res.status(500).json({ error: 'DB error' });
+    }
 });
 
 app.get('/api/watchlist', (req, res) => {
@@ -725,11 +768,17 @@ app.get('/api/watchlist/backfill-names', async (_req, res) => {
     });
 });
 
-app.post('/api/watchlist/remove', (req, res) => {
-    db.run(`DELETE FROM watchlist WHERE id = ?`,
-        [req.body.id],
-        (err: Error | null) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ success: true })
-    );
+app.post('/api/watchlist/remove', async (req, res) => {
+    const { id } = req.body;
+    try {
+        await performWriteTransaction(db, (tx) => {
+            tx.run(`DELETE FROM watchlist WHERE id = ?`, [id]);
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('DB error on watchlist remove:', error);
+        res.status(500).json({ error: 'DB error' });
+    }
 });
 
 app.get('/api/settings/preferredSource', (req, res) => {
@@ -750,77 +799,22 @@ app.get('/api/settings', (req, res) => {
     });
 });
 
-app.post('/api/settings', (req, res) => {
+app.post('/api/settings', async (req, res) => {
     const { key, value } = req.body;
-    db.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value], (err: Error | null) => {
-        if (err) return res.status(500).json({ error: 'DB error' });
-        res.json({ success: true });
-    });
-});
-
-app.get('/api/backup-db', (_req, res) => {
-   res.download(dbPath, 'ani-web-backup.db', (err: Error | null) => {
-      if (err) {
-         console.error("Error sending database file:", err);
-         res.status(500).send("Could not backup database.");
-      }
-   });
-});
-
-app.post('/api/restore-db', dbUpload.single('dbfile'), (req, res) => {
-   if (!req.file) {
-      return res.status(400).json({ error: 'No database file uploaded.' });
-   }
-   const tempPath = path.join(__dirname, 'anime.db.temp');
-   db.close((err: Error | null) => {
-      if (err) {
-         console.error('Failed to close database for restore:', err.message);
-         return res.status(500).json({ error: 'Failed to close current database.' });
-      }
-      fs.rename(tempPath, dbPath, (err: NodeJS.ErrnoException | null) => {
-         if (err) {
-            console.error('Failed to replace database file:', err.message);
-            initializeDatabase();
-            return res.status(500).json({ error: 'Failed to replace database file.' });
-         }
-         initializeDatabase();
-         res.json({ success: true, message: 'Database restored successfully. The application will now refresh.' });
-      });
-   });
-});
-
-app.post('/api/rclone-upload', (_req, res) => {
-    const script = process.platform === 'win32' ? 'upload_db.bat' : './upload_db.sh';
-    exec(script, (error, stdout, stderr) => {
-        if (error) {
-            console.error(`exec error: ${error}`);
-            return res.status(500).json({ error: `Script Error: ${stderr}` });
-        }
-        res.json({ message: `Upload successful: ${stdout}` });
-    });
-});
-
-app.post('/api/rclone-download', (_req, res) => {
-    db.close((err: Error | null) => {
-        if (err) {
-            console.error('Failed to close database before rclone download:', err.message);
-            initializeDatabase(); 
-            return res.status(500).json({ error: 'Failed to close current database for update.' });
-        }
-
-        const script = process.platform === 'win32' ? 'download_db.bat' : './download_db.sh';
-        exec(script, (error, stdout, stderr) => {
-            initializeDatabase();
-
-            if (error) {
-                console.error(`exec error: ${error}`);
-                return res.status(500).json({ error: `Script Error: ${stderr}` });
-            }
-            
-            res.json({ message: `Download successful: ${stdout}` });
+    try {
+        await performWriteTransaction(db, (tx) => {
+            tx.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
         });
-    });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('DB error on settings update:', error);
+        res.status(500).json({ error: 'DB error' });
+    }
 });
+
+
+
+
 
 app.get('/api/subtitle-proxy', async (req, res) => {
     try {
@@ -1150,6 +1144,50 @@ app.get('/api/genres-and-tags', async (_req, res) => {
     res.json({ genres, tags, studios });
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+// --- CONFIGURATION ---
+const RCLONE_REMOTE_DIR = 'aniweb_db'; // The remote directory on Google Drive
+
+async function main() {
+    const isSyncEnabled = await verifyRclone();
+
+    if (isSyncEnabled) {
+        await syncDownOnBoot(dbPath, RCLONE_REMOTE_DIR);
+    }
+
+    initializeDatabase();
+    console.log('Database initialized.');
+
+    if (isSyncEnabled) {
+        const watcher = chokidar.watch(dbPath, { persistent: true, ignoreInitial: true });
+        let debounceTimer: NodeJS.Timeout;
+        watcher.on('change', () => {
+            console.log(`[Sync] ${new Date().toISOString()} - Change detected in ${dbPath}. Resetting debounce timer (15s).`);
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                console.log(`[Sync] ${new Date().toISOString()} - Debounce timer elapsed. Initiating sync...`);
+                syncUp(db, dbPath, RCLONE_REMOTE_DIR);
+            }, 15000);
+        });
+        console.log(`[Sync] Watching ${dbPath} for changes...`);
+
+        process.on('SIGINT', async () => {
+            console.log('\n[Sync] Shutdown detected. Performing final sync...');
+            clearTimeout(debounceTimer);
+            await syncUp(db, dbPath, RCLONE_REMOTE_DIR);
+            db.close((err) => {
+                if (err) console.error('[Sync] Error closing database:', err.message);
+                console.log('[Sync] Database connection closed. Exiting.');
+                process.exit(0);
+            });
+        });
+    }
+
+    app.listen(port, () => {
+        console.log(`Server is running on http://localhost:${port}`);
+    });
+}
+
+main().catch(err => {
+    console.error("Failed to start server:", err);
+    process.exit(1);
 });

@@ -1071,7 +1071,7 @@ const Player: React.FC = () => {
             )}
           </div>
           <div className={styles.controls}>
-              <button className={styles.watchlistBtn} onClick={() => navigate('/settings')}>Settings</button>
+
               <button className={`${styles.watchlistBtn} ${state.inWatchlist ? styles.inList : ''}`} onClick={toggleWatchlist}>
                 {state.inWatchlist ? <FaCheck /> : <FaPlus />}
                 {state.inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
