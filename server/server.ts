@@ -97,8 +97,6 @@ function initializeDatabase() {
       }
    });
 }
-initializeDatabase();
-
 axiosRetry(axios, {
     retries: 3,
     retryDelay: axiosRetry.exponentialDelay,

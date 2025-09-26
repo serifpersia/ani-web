@@ -5,6 +5,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { Database } from 'sqlite3';
 import sqlite3 from 'sqlite3';
+import { initialize as initializeSyncConfig, getRemoteString } from './sync-config';
 
 // --- CONFIGURATION ---
 const RCLONE_REMOTE_NAME = 'gdrive';
@@ -89,13 +90,14 @@ export async function verifyRclone(): Promise<boolean> {
     }
 
     log('Rclone setup verified successfully.');
+    await initializeSyncConfig();
     return true;
 }
 
 export async function getRemoteVersion(remoteDir: string): Promise<number> {
     log('Fetching remote manifest...');
     try {
-        await executeRclone(['copyto', `${RCLONE_REMOTE_NAME}:${remoteDir}/sync_manifest.json`, TEMP_MANIFEST_PATH]);
+        await executeRclone(['copyto', `${getRemoteString(remoteDir)}/sync_manifest.json`, TEMP_MANIFEST_PATH]);
         const manifestContent = await fs.readFile(TEMP_MANIFEST_PATH, 'utf-8');
         await fs.unlink(TEMP_MANIFEST_PATH);
         const manifest = JSON.parse(manifestContent);
@@ -146,13 +148,13 @@ export async function syncUp(db: Database, dbPath: string, remoteDir: string) {
         log(`Local DB (v${localVersion}) is newer than remote (v${remoteVersion}). Uploading...`);
         try {
             log('--> Uploading database file...');
-            await executeRclone(['copyto', dbPath, `${RCLONE_REMOTE_NAME}:${remoteDir}/anime.db`]);
+            await executeRclone(['copyto', dbPath, `${getRemoteString(remoteDir)}/anime.db`]);
             log('<-- Database file uploaded successfully.');
 
             log('--> Uploading manifest file...');
             const newManifest = JSON.stringify({ version: localVersion });
             await fs.writeFile(TEMP_MANIFEST_PATH, newManifest);
-            await executeRclone(['copyto', TEMP_MANIFEST_PATH, `${RCLONE_REMOTE_NAME}:${remoteDir}/sync_manifest.json`]);
+            await executeRclone(['copyto', TEMP_MANIFEST_PATH, `${getRemoteString(remoteDir)}/sync_manifest.json`]);
             await fs.unlink(TEMP_MANIFEST_PATH);
             log(`<-- Manifest updated to v${localVersion}. Upload complete.`);
         } catch (err) {
@@ -189,7 +191,7 @@ export async function syncDownOnBoot(dbPath: string, remoteDir: string) {
     if (remoteVersion > localVersion) {
         log(`Remote DB (v${remoteVersion}) is newer than local (v${localVersion}). Downloading...`);
         try {
-            await executeRclone(['copyto', `${RCLONE_REMOTE_NAME}:${remoteDir}/anime.db`, dbPath]);
+            await executeRclone(['copyto', `${getRemoteString(remoteDir)}/anime.db`, dbPath]);
             log('Download complete. Database is now up to date.');
         } catch (err) {
             error('CRITICAL: Failed to download newer database.', err);
