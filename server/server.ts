@@ -440,7 +440,7 @@ app.post('/api/import/mal-xml', async (req, res) => {
         
         const animeList = result.myanimelist.anime;
         let skippedCount = 0;
-        const showsToInsert: any[] = [];
+        const showsToInsert: { id: string; name: string; thumbnail: string; status: string; }[] = [];
 
         for (const item of animeList) {
             try {
