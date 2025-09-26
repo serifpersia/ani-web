@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 
 const log = (message: string) => console.log(`[Sync Config] ${new Date().toISOString()} - ${message}`);
-const error = (message: string, err?: any) => console.error(`[Sync Config] ${new Date().toISOString()} - ${message}`, err);
+const error = (message: string, err?: unknown) => console.error(`[Sync Config] ${new Date().toISOString()} - ${message}`, err);
 
 const CONFIG_FILE_PATH = path.join(__dirname, 'sync.config.json');
 

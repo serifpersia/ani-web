@@ -12,7 +12,7 @@ const RCLONE_REMOTE_NAME = 'gdrive';
 const TEMP_MANIFEST_PATH = path.join(__dirname, 'sync_manifest.temp.json');
 
 const log = (message: string) => console.log(`[Sync] ${new Date().toISOString()} - ${message}`);
-const error = (message: string, err?: any) => console.error(`[Sync] ${new Date().toISOString()} - ${message}`, err);
+const error = (message: string, err?: unknown) => console.error(`[Sync] ${new Date().toISOString()} - ${message}`, err);
 
 // Used for verification checks where we need to capture output
 function executeCommand(command: string): Promise<string> {
@@ -61,8 +61,9 @@ export async function verifyRclone(): Promise<boolean> {
     log('Verifying rclone setup...');
     try {
         await executeCommand('rclone version');
-    } catch (err: any) {
-        if (err.message.includes('ENOENT') || err.message.includes('not found')) {
+    } catch (err: unknown) {
+        const errorMessage = (err as Error).message;
+        if (errorMessage.includes('ENOENT') || errorMessage.includes('not found')) {
             console.error('\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
             console.error('!! [Sync Error] rclone is not installed or not in your system\'s PATH.');
             console.error('!! Please install rclone from https://rclone.org/downloads/ and ensure it is accessible.');
