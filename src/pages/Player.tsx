@@ -84,6 +84,7 @@ interface VideoSource {
   links: VideoLink[];
   subtitles?: SubtitleTrack[];
   type?: 'player' | 'iframe';
+  sandbox?: string;
 }
 
 interface SkipInterval {
@@ -1146,16 +1147,16 @@ const Player: React.FC = () => {
         )}
         
         {state.selectedSource?.type === 'iframe' ? (
-            <iframe
+            !state.loadingVideo && <iframe
                 src={state.selectedLink?.link}
                 className={styles.videoIframe}
-                allow="autoplay; fullscreen"
+                allow="autoplay; fullscreen; picture-in-picture"
                 allowFullScreen
-                sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-presentation allow-downloads"
+                sandbox={state.selectedSource.sandbox ? `${state.selectedSource.sandbox} allow-fullscreen allow-popups allow-popups-to-escape-sandbox` : undefined}
             ></iframe>
         ) : (
           <>
-            {!isMobile && <PlayerControls 
+            {!state.loadingVideo && !isMobile && <PlayerControls 
                 player={player}
                 isAutoplayEnabled={state.isAutoplayEnabled}
                 onAutoplayChange={handleAutoplayChange}
@@ -1166,7 +1167,7 @@ const Player: React.FC = () => {
                 loadingVideo={state.loadingVideo}
             />}
 
-            <video 
+            {!state.loadingVideo && <video 
                 ref={refs.videoRef} 
                 controls={isMobile}
                 onClick={!isMobile ? actions.togglePlay : undefined}
@@ -1176,7 +1177,7 @@ const Player: React.FC = () => {
                 onTimeUpdate={actions.onTimeUpdate}
                 onProgress={actions.onProgress}
                 onVolumeChange={actions.onVolumeChange}
-            />
+            />}
           </>
         )}
       </div>
