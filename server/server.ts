@@ -943,7 +943,6 @@ app.get('/api/video', async (req, res) => {
         });
 
         const sourceUrls = data.data.episode.sourceUrls;
-
         if (!Array.isArray(sourceUrls)) {
             console.error('[ERROR] sourceUrls is not an array. Aborting.');
             return res.status(404).send('No video sources found.');
@@ -1017,18 +1016,32 @@ app.get('/api/video', async (req, res) => {
                         return null;
                     }
                     
-                    case 'Fm-Hls': { 
+                    case 'Fm-Hls': {
                         const fmUrl = source.sourceUrl;
-                        const { data: fmHtml } = await axios.get(fmUrl, { headers: { 'Referer': fmUrl, 'User-Agent': userAgent } });
-                        const packedJsMatch = fmHtml.match(/eval\(function\(p,a,c,k,e,d\){.+?}/s);
-                        if (packedJsMatch) {
-                            const unpackedJs = unpackPackedJs(packedJsMatch[0]);
-                            const m3u8UrlMatch = unpackedJs.match(/file:"(.*?m3u8.*?)"/);
-                            if (m3u8UrlMatch && m3u8UrlMatch[1]) {
-                                const videoLinks = [{ link: m3u8UrlMatch[1], resolutionStr: 'auto', hls: true, headers: { Referer: fmUrl } }];
-                                return { sourceName: source.sourceName, links: videoLinks, subtitles: [], type: 'player' };
+                        try {
+                            const { data: fmHtml } = await axios.get(fmUrl, { headers: { 'Referer': fmUrl, 'User-Agent': userAgent }, timeout: 5000 });
+                            const packedJsMatch = fmHtml.match(/eval\(function\(p,a,c,k,e,d\){.+?}/s);
+                            if (packedJsMatch) {
+                                const unpackedJs = unpackPackedJs(packedJsMatch[0]);
+                                const m3u8UrlMatch = unpackedJs.match(/file:"(.*?m3u8.*?)"/);
+                                if (m3u8UrlMatch && m3u8UrlMatch[1]) {
+                                    const videoLinks = [{ link: m3u8UrlMatch[1], resolutionStr: 'auto', hls: true, headers: { Referer: fmUrl } }];
+                                    return { sourceName: source.sourceName, links: videoLinks, subtitles: [], type: 'player' };
+                                }
                             }
+                        } catch (e) {
+                            console.log(`Could not scrape Fm-Hls source, falling back to iframe if available. Reason: ${(e as Error).message}`);
                         }
+
+                        if (source.type === 'iframe') {
+                            const videoLinks = [{
+                                resolutionStr: 'iframe',
+                                link: source.sourceUrl,
+                                hls: false
+                            }];
+                            return { ...source, links: videoLinks, type: 'iframe' };
+                        }
+                        
                         return null;
                     }
 
@@ -1042,7 +1055,7 @@ app.get('/api/video', async (req, res) => {
                                 link: source.sourceUrl,
                                 hls: false
                             }];
-                            return { sourceName: source.sourceName, links: videoLinks, subtitles: [], type: 'iframe' };
+                            return { ...source, links: videoLinks, type: 'iframe' };
                         }
                         return null;
                     }
