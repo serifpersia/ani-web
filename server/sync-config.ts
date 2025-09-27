@@ -7,18 +7,28 @@ const error = (message: string, err?: unknown) => console.error(`[Sync Config] $
 
 const CONFIG_FILE_PATH = path.join(__dirname, 'sync.config.json');
 
+let activeRemote: 'mega' | 'gdrive' | undefined;
+
 interface SyncConfig {
     rootFolderId?: string;
 }
 
 let rootFolderId: string | undefined;
 
+export function setActiveRemote(remote: 'mega' | 'gdrive') {
+    log(`Setting active sync remote to: ${remote}`);
+    activeRemote = remote;
+}
+
+export function getActiveRemote(): 'mega' | 'gdrive' | undefined {
+    return activeRemote;
+}
+
 async function readConfig(): Promise<SyncConfig> {
     try {
         const content = await fs.readFile(CONFIG_FILE_PATH, 'utf-8');
         return JSON.parse(content);
     } catch (e) {
-        // File probably doesn't exist, which is fine on first run.
         return {};
     }
 }
@@ -50,6 +60,12 @@ function fetchAndSaveRootFolderId(): Promise<string | undefined> {
 }
 
 export async function initialize(): Promise<void> {
+
+    if (activeRemote !== 'gdrive') {
+        log('Active remote is not gdrive, skipping gdrive-specific initialization.');
+        return;
+    }
+
     if (rootFolderId) {
         return;
     }
@@ -65,13 +81,20 @@ export async function initialize(): Promise<void> {
 }
 
 export function getRemoteString(remoteDir: string): string {
-    const RCLONE_REMOTE_NAME = 'gdrive';
-    if (rootFolderId && remoteDir === 'aniweb_db') {
-        return `${RCLONE_REMOTE_NAME}:{${rootFolderId}}`;
+    if (!activeRemote) {
+        throw new Error('Cannot get remote string: active remote is not set.');
     }
-    if (rootFolderId && remoteDir.startsWith('aniweb_db/')) {
-        const subPath = remoteDir.substring('aniweb_db'.length);
-        return `${RCLONE_REMOTE_NAME}:{${rootFolderId}}${subPath}`;
+
+    if (activeRemote === 'gdrive') {
+        if (rootFolderId && remoteDir === 'aniweb_db') {
+            return `gdrive:{${rootFolderId}}`;
+        }
+        if (rootFolderId && remoteDir.startsWith('aniweb_db/')) {
+            const subPath = remoteDir.substring('aniweb_db'.length);
+            return `gdrive:{${rootFolderId}}${subPath}`;
+        }
+        return `gdrive:${remoteDir}`;
     }
-    return `${RCLONE_REMOTE_NAME}:${remoteDir}`;
+
+    return `${activeRemote}:${remoteDir}`;
 }
