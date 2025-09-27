@@ -5,10 +5,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { Database } from 'sqlite3';
 import sqlite3 from 'sqlite3';
-import { initialize as initializeSyncConfig, getRemoteString } from './sync-config';
+import { initialize as initializeSyncConfig, getRemoteString, setActiveRemote } from './sync-config';
 
 // --- CONFIGURATION ---
-const RCLONE_REMOTE_NAME = 'gdrive';
 const TEMP_MANIFEST_PATH = path.join(__dirname, 'sync_manifest.temp.json');
 
 const log = (message: string) => console.log(`[Sync] ${new Date().toISOString()} - ${message}`);
@@ -77,14 +76,22 @@ export async function verifyRclone(): Promise<boolean> {
 
     try {
         const remotes = await executeCommand('rclone listremotes');
-        if (!remotes.includes(`${RCLONE_REMOTE_NAME}:`)) {
+        
+        if (remotes.includes('mega:')) {
+            log('Found "mega" remote.');
+            setActiveRemote('mega');
+        } else if (remotes.includes('gdrive:')) {
+            log('Found "gdrive" remote. Using as fallback.');
+            setActiveRemote('gdrive');
+        } else {
             console.error('\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
-            console.error(`!! [Sync Error] Your rclone is installed, but the remote named '${RCLONE_REMOTE_NAME}' is not configured.`);
-            console.error('!! Please run `rclone config` to set up your Google Drive remote.');
+            console.error(`!! [Sync Error] Neither 'mega' nor 'gdrive' remote is configured.`);
+            console.error('!! Please run `rclone config` to set up at least one of them.');
             console.error('!! The automatic sync system will be disabled.');
             console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n');
             return false;
         }
+
     } catch (err) {
         error('An unexpected error occurred while listing rclone remotes.', err);
         return false;
