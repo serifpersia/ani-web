@@ -882,12 +882,16 @@ const Player: React.FC = () => {
     };
   }, [state.selectedSource, state.selectedLink, setPreferredSource, refs.videoRef]);
 
+
+
   useEffect(() => {
     const videoElement = refs.videoRef.current;
-    if (!videoElement || !showId || !state.currentEpisode || !state.showMeta) return;
+    if (!videoElement || !showId || !state.currentEpisode || !state.showMeta.name) return;
+
+    let interval: NodeJS.Timeout;
 
     const updateProgress = () => {
-        if (videoElement.paused || videoElement.duration === 0) return;
+        if (isNaN(videoElement.duration) || videoElement.duration === 0) return;
         fetchWithProfile('/api/update-progress', {
             method: 'POST',
             body: JSON.stringify({
@@ -902,9 +906,17 @@ const Player: React.FC = () => {
             })
         });
     };
-    const interval = setInterval(updateProgress, 5000);
-    return () => clearInterval(interval);
-  }, [showId, state.currentEpisode, state.showMeta, refs.videoRef]);
+
+    if (player.state.isPlaying) {
+        interval = setInterval(updateProgress, 5000);
+    }
+
+    return () => {
+        if (interval) {
+            clearInterval(interval);
+        }
+    };
+  }, [showId, state.currentEpisode, state.showMeta, refs.videoRef, player.state.isPlaying]);
 
   useEffect(() => {
     const videoElement = refs.videoRef.current;
