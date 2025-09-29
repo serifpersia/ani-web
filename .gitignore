@@ -130,4 +130,3 @@ out
 *.db
 /public/profile_pics
 /dist
-server/sync.config.json

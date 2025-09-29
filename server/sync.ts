@@ -1,5 +1,3 @@
-// server/sync.ts
-
 import { spawn, exec } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -13,7 +11,6 @@ const TEMP_MANIFEST_PATH = path.join(__dirname, 'sync_manifest.temp.json');
 const log = (message: string) => console.log(`[Sync] ${new Date().toISOString()} - ${message}`);
 const error = (message: string, err?: unknown) => console.error(`[Sync] ${new Date().toISOString()} - ${message}`, err);
 
-// Used for verification checks where we need to capture output
 function executeCommand(command: string): Promise<string> {
     return new Promise((resolve, reject) => {
         exec(command, (err, stdout, stderr) => {
@@ -147,34 +144,8 @@ export async function performWriteTransaction(db: Database, runnable: (tx: Datab
     });
 }
 
-export async function syncUp(db: Database, dbPath: string, remoteDir: string) {
-    log('Starting sync-up process...');
-    const localVersion = await getLocalVersion(db);
-    const remoteVersion = await getRemoteVersion(remoteDir);
-
-    if (localVersion > remoteVersion) {
-        log(`Local DB (v${localVersion}) is newer than remote (v${remoteVersion}). Uploading...`);
-        try {
-            log('--> Uploading database file...');
-            await executeRclone(['copyto', dbPath, `${getRemoteString(remoteDir)}/anime.db`]);
-            log('<-- Database file uploaded successfully.');
-
-            log('--> Uploading manifest file...');
-            const newManifest = JSON.stringify({ version: localVersion });
-            await fs.writeFile(TEMP_MANIFEST_PATH, newManifest);
-            await executeRclone(['copyto', TEMP_MANIFEST_PATH, `${getRemoteString(remoteDir)}/sync_manifest.json`]);
-            await fs.unlink(TEMP_MANIFEST_PATH);
-            log(`<-- Manifest updated to v${localVersion}. Upload complete.`);
-        } catch (err) {
-            error('Upload failed:', err);
-        }
-    } else {
-        log('Local database is not newer than remote. No upload needed.');
-    }
-}
-
-export async function syncDownOnBoot(dbPath: string, remoteDir: string) {
-    log('Checking for remote updates on boot...');
+async function syncDown(dbPath: string, remoteDir: string): Promise<boolean> {
+    log('Checking for remote updates...');
     let localVersion = 0;
     const localDbExists = await fs.access(dbPath).then(() => true).catch(() => false);
 
@@ -201,10 +172,47 @@ export async function syncDownOnBoot(dbPath: string, remoteDir: string) {
         try {
             await executeRclone(['copyto', `${getRemoteString(remoteDir)}/anime.db`, dbPath]);
             log('Download complete. Database is now up to date.');
+            return true; // Indicates a change was made
         } catch (err) {
             error('CRITICAL: Failed to download newer database.', err);
+            return false;
         }
     } else {
         log('Local database is up to date.');
+        return false;
     }
+}
+
+export async function syncUp(db: Database, dbPath: string, remoteDir: string) {
+    log('Starting sync-up process...');
+    
+    await syncDown(dbPath, remoteDir);
+
+    const localVersion = await getLocalVersion(db);
+    const remoteVersion = await getRemoteVersion(remoteDir);
+
+    if (localVersion > remoteVersion) {
+        log(`Local DB (v${localVersion}) is newer than remote (v${remoteVersion}). Uploading...`);
+        try {
+            log('--> Uploading database file...');
+            await executeRclone(['copyto', dbPath, `${getRemoteString(remoteDir)}/anime.db`]);
+            log('<-- Database file uploaded successfully.');
+
+            log('--> Uploading manifest file...');
+            const newManifest = JSON.stringify({ version: localVersion });
+            await fs.writeFile(TEMP_MANIFEST_PATH, newManifest);
+            await executeRclone(['copyto', TEMP_MANIFEST_PATH, `${getRemoteString(remoteDir)}/sync_manifest.json`]);
+            await fs.unlink(TEMP_MANIFEST_PATH);
+            log(`<-- Manifest updated to v${localVersion}. Upload complete.`);
+        } catch (err) {
+            error('Upload failed:', err);
+        }
+    } else {
+        log('Local database is not newer than remote. No upload needed.');
+    }
+}
+
+export async function syncDownOnBoot(dbPath: string, remoteDir: string) {
+    log('Checking for remote updates on boot...');
+    await syncDown(dbPath, remoteDir);
 }

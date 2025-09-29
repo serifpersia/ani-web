@@ -34,7 +34,6 @@ const AnimeSection: React.FC<AnimeSectionProps> = React.memo(
       if (onRemove) {
         onRemove(id);
       }
-      console.log("Remove card event dispatched for id:", id);
     };
 
     return (
