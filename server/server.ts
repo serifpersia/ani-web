@@ -14,6 +14,7 @@ import sqlite3 from 'sqlite3';
 import multer from 'multer';
 import { syncDownOnBoot, syncUp, performWriteTransaction, verifyRclone } from './sync';
 import chokidar from 'chokidar';
+import logger from './logger';
 
 interface Show {
     _id: string;
@@ -60,7 +61,7 @@ interface TableInfoRow {
 function initializeDatabase() {
    db = new sqlite3.Database(dbPath, (err) => {
       if (err) {
-         console.error('Database opening error: ', err.message);
+         logger.error({ err }, 'Database opening error');
       } else {
 
          db.serialize(() => {
@@ -73,7 +74,7 @@ function initializeDatabase() {
             db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`);
 
             db.all("PRAGMA table_info(watchlist)", (err, rows: TableInfoRow[]) => {
-                if (err) { console.error("Error checking watchlist schema:", err); return; }
+                if (err) { logger.error({ err }, "Error checking watchlist schema"); return; }
                 const columns = rows.map(col => col.name);
                 if (!columns.includes("nativeName")) {
                     db.run(`ALTER TABLE watchlist ADD COLUMN nativeName TEXT`);
@@ -84,7 +85,7 @@ function initializeDatabase() {
             });
 
             db.all("PRAGMA table_info(shows_meta)", (err, rows: TableInfoRow[]) => {
-                if (err) { console.error("Error checking shows_meta schema:", err); return; }
+                if (err) { logger.error({ err }, "Error checking shows_meta schema"); return; }
                 const columns = rows.map(col => col.name);
                 if (!columns.includes("nativeName")) {
                     db.run(`ALTER TABLE shows_meta ADD COLUMN nativeName TEXT`);
@@ -188,7 +189,7 @@ function unpackPackedJs(packedJs: string): string {
         
         return unpacked;
     } catch (e) {
-        console.error('Failed to unpack JS:', e);
+        logger.error({ err: e }, 'Failed to unpack JS');
         return '';
     }
 }
@@ -240,8 +241,7 @@ async function fetchAndSendShows(res: express.Response, variables: Record<string
         res.set('Cache-Control', 'public, max-age=300');
         res.json(transformedShows);
     } catch (error) {
-        const err = error as { message: string };
-        console.error('Error fetching data:', err.message);
+        logger.error({ err: error }, 'Error fetching data');
         res.status(500).send('Error fetching data');
     }
 }
@@ -289,8 +289,7 @@ app.get('/api/popular/:timeframe', async (req, res) => {
         res.set('Cache-Control', 'public, max-age=300');
         res.json(shows);
     } catch (error) {
-        const err = error as { response?: { data: unknown }, message: string };
-        console.error('Error fetching popular data:', err.response ? err.response.data : err.message);
+        logger.error({ err: error }, 'Error fetching popular data');
         res.status(500).send('Error fetching popular data');
     }
 });
@@ -359,9 +358,10 @@ app.get('/api/proxy', async (req, res) => {
 
             streamResponse.data.pipe(res);
             streamResponse.data.on('error', (err: Error & { code?: string }) => {
-
-                if (err.code !== 'ECONNRESET') {
-                    // Other stream errors are not specifically handled, but we will still close the response.
+                if (err.code === 'ECONNRESET') {
+                    logger.warn({ err }, 'Proxy stream connection reset by client');
+                } else {
+                    logger.error({ err }, 'Proxy stream error');
                 }
 
                 if (!res.headersSent) {
@@ -484,7 +484,7 @@ app.post('/api/import/mal-xml', async (req, res) => {
             }
             res.json({ imported: showsToInsert.length, skipped: skippedCount });
         } catch (dbError) {
-            console.error('DB error on MAL import:', dbError);
+            logger.error({ err: dbError }, 'DB error on MAL import');
             res.status(500).json({ error: 'DB error on MAL import' });
         }
     });
@@ -522,8 +522,7 @@ app.get('/api/allmanga-details/:id', async (req, res) => {
         res.json(details);
 
     } catch (error) {
-        const err = error as { message: string };
-        console.error(`Error fetching allmanga details for ${animeId}:`, err.message);
+        logger.error({ err: error, animeId }, `Error fetching allmanga details for ${animeId}`);
         res.status(500).json({ error: "Failed to fetch allmanga details" });
     }
 });
@@ -562,7 +561,7 @@ app.get('/api/show-details/:id', async (req, res) => {
                         firstResult.nextEpisodeAirDate = countdownMatch[1];
                     }
                 } catch (_e) {
-                    console.error('Failed to scrape for nextEpisodeAirDate', (_e as Error).message);
+                    logger.warn({ err: _e }, 'Failed to scrape for nextEpisodeAirDate');
                 }
             }
 
@@ -623,8 +622,7 @@ app.get('/api/continue-watching', (_req, res) => {
             }));
             res.json(results.filter(Boolean));
         } catch (apiError) {
-            const err = apiError as { message: string };
-            console.error("API Error in /continue-watching", err);
+            logger.error({ err: apiError }, "API Error in /continue-watching");
             res.status(500).json({ error: 'API error while resolving next episodes' });
         }
     });
@@ -643,7 +641,7 @@ app.post('/api/update-progress', async (req, res) => {
         });
         res.json({ success: true });
     } catch (error) {
-        console.error('DB error on progress update:', error);
+        logger.error({ err: error }, 'DB error on progress update');
         res.status(500).json({ error: 'DB error on progress update' });
     }
 });
@@ -669,10 +667,11 @@ app.post('/api/continue-watching/remove', async (req, res) => {
     try {
         await performWriteTransaction(db, (tx) => {
             tx.run(`DELETE FROM watched_episodes WHERE showId = ?`, [showId]);
+            tx.run(`DELETE FROM shows_meta WHERE id = ?`, [showId]);
         });
         res.json({ success: true });
     } catch (error) {
-        console.error('DB error on continue-watching remove:', error);
+        logger.error({ err: error }, 'DB error on continue-watching remove');
         res.status(500).json({ error: 'DB error' });
     }
 });
@@ -687,7 +686,7 @@ app.post('/api/watchlist/add', async (req, res) => {
         });
         res.json({ success: true });
     } catch (error) {
-        console.error('DB error on watchlist add:', error);
+        logger.error({ err: error }, 'DB error on watchlist add');
         res.status(500).json({ error: 'DB error' });
     }
 });
@@ -707,7 +706,7 @@ app.post('/api/watchlist/status', async (req, res) => {
         });
         res.json({ success: true });
     } catch (error) {
-        console.error('DB error on watchlist status update:', error);
+        logger.error({ err: error }, 'DB error on watchlist status update');
         res.status(500).json({ error: 'DB error' });
     }
 });
@@ -759,7 +758,7 @@ app.get('/api/watchlist/backfill-names', async (_req, res) => {
                     });
                 }
             } catch (apiError) {
-                console.error(`Error backfilling names for watchlist item ${item.id}:`, (apiError as Error).message);
+                logger.error({ err: apiError, item: item.id }, `Error backfilling names for watchlist item`);
             }
         }
         res.json({ success: true, updatedCount });
@@ -774,7 +773,7 @@ app.post('/api/watchlist/remove', async (req, res) => {
         });
         res.json({ success: true });
     } catch (error) {
-        console.error('DB error on watchlist remove:', error);
+        logger.error({ err: error }, 'DB error on watchlist remove');
         res.status(500).json({ error: 'DB error' });
     }
 });
@@ -805,7 +804,7 @@ app.post('/api/settings', async (req, res) => {
         });
         res.json({ success: true });
     } catch (error) {
-        console.error('DB error on settings update:', error);
+        logger.error({ err: error }, 'DB error on settings update');
         res.status(500).json({ error: 'DB error' });
     }
 });
@@ -813,7 +812,7 @@ app.post('/api/settings', async (req, res) => {
 app.get('/api/backup-db', (_req, res) => {
    res.download(dbPath, 'ani-web-backup.db', (err: Error | null) => {
       if (err) {
-         console.error("Error sending database file:", err);
+         logger.error({ err }, "Error sending database file");
          res.status(500).send("Could not backup database.");
       }
    });
@@ -826,12 +825,12 @@ app.post('/api/restore-db', dbUpload.single('dbfile'), (req, res) => {
    const tempPath = path.join(__dirname, 'anime.db.temp');
    db.close((err: Error | null) => {
       if (err) {
-         console.error('Failed to close database for restore:', err.message);
+         logger.error({ err }, 'Failed to close database for restore');
          return res.status(500).json({ error: 'Failed to close current database.' });
       }
       fs.rename(tempPath, dbPath, (err: NodeJS.ErrnoException | null) => {
          if (err) {
-            console.error('Failed to replace database file:', err.message);
+            logger.error({ err }, 'Failed to replace database file');
             initializeDatabase();
             return res.status(500).json({ error: 'Failed to replace database file.' });
          }
@@ -893,8 +892,12 @@ app.get('/api/image-proxy', async (req, res) => {
 
         streamData.pipe(res);
 
-        streamData.on('error', (err: Error) => {
-            console.error('Image proxy stream error (source):', err.message);
+        streamData.on('error', (err: Error & { code?: string }) => {
+            if (err.code === 'ECONNRESET') {
+                logger.warn({ err }, 'Image proxy stream connection reset by client');
+            } else {
+                logger.error({ err }, 'Image proxy stream error (source)');
+            }
             if (!res.headersSent) {
                 res.status(500).send('Error streaming image.');
             } else {
@@ -907,13 +910,12 @@ app.get('/api/image-proxy', async (req, res) => {
         });
 
         res.on('error', (err: Error) => {
-            console.error('Image proxy stream error (response):', err.message);
+            logger.error({ err }, 'Image proxy stream error (response)');
             streamData.destroy();
         });
 
     } catch (e) {
-        const err = e as { message: string };
-        console.error('Image proxy error:', err.message);
+        logger.error({ err: e }, 'Image proxy error');
         res.status(200).sendFile(path.join(__dirname, '..','public/placeholder.svg'));
     }
 });
@@ -944,7 +946,7 @@ app.get('/api/video', async (req, res) => {
 
         const sourceUrls = data.data.episode.sourceUrls;
         if (!Array.isArray(sourceUrls)) {
-            console.error('[ERROR] sourceUrls is not an array. Aborting.');
+            logger.error('[ERROR] sourceUrls is not an array. Aborting.');
             return res.status(404).send('No video sources found.');
         }
         
@@ -1030,7 +1032,7 @@ app.get('/api/video', async (req, res) => {
                                 }
                             }
                         } catch (e) {
-                            console.log(`Could not scrape Fm-Hls source, falling back to iframe if available. Reason: ${(e as Error).message}`);
+                            logger.warn({ err: e }, `Could not scrape Fm-Hls source, falling back to iframe if available.`);
                         }
 
                         if (source.type === 'iframe') {
@@ -1064,8 +1066,7 @@ app.get('/api/video', async (req, res) => {
                         return null;
                 }
             } catch (e) {
-                const err = e as { message: string };
-                console.error(`[ERROR] Failed to process source: '${source.sourceName}'. Reason: ${err.message}`);
+                logger.error({ err: e, sourceName: source.sourceName }, `[ERROR] Failed to process source`);
                 return null;
             }
         });
@@ -1082,9 +1083,8 @@ app.get('/api/video', async (req, res) => {
             res.status(404).send('No playable video URLs found.');
         }
     } catch (e) {
-        const err = e as { message: string };
-        console.error(`[FATAL ERROR] An error occurred while fetching video data for showId: ${showId}. Error: ${err.message}`);
-        res.status(500).send(`Error fetching video data: ${err.message}`);
+        logger.error({ err: e, showId }, `[FATAL ERROR] An error occurred while fetching video data`);
+        res.status(500).send(`Error fetching video data: ${(e as Error).message}`);
     }
 });
 
@@ -1197,39 +1197,39 @@ async function main() {
     }
 
     initializeDatabase();
-    console.log('Database initialized.');
+    logger.info('Database initialized.');
 
     if (isSyncEnabled) {
         const watcher = chokidar.watch(dbPath, { persistent: true, ignoreInitial: true });
         let debounceTimer: NodeJS.Timeout;
         watcher.on('change', () => {
-            console.log(`[Sync] ${new Date().toISOString()} - Change detected in ${dbPath}. Resetting debounce timer (15s).`);
+            logger.info(`Change detected in ${dbPath}. Resetting debounce timer (15s).`);
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
-                console.log(`[Sync] ${new Date().toISOString()} - Debounce timer elapsed. Initiating sync...`);
+                logger.info(`Debounce timer elapsed. Initiating sync...`);
                 syncUp(db, dbPath, RCLONE_REMOTE_DIR);
             }, 15000);
         });
-        console.log(`[Sync] Watching ${dbPath} for changes...`);
+        logger.info(`Watching ${dbPath} for changes...`);
 
         process.on('SIGINT', async () => {
-            console.log('\n[Sync] Shutdown detected. Performing final sync...');
+            logger.info('\nShutdown detected. Performing final sync...');
             clearTimeout(debounceTimer);
             await syncUp(db, dbPath, RCLONE_REMOTE_DIR);
             db.close((err) => {
-                if (err) console.error('[Sync] Error closing database:', err.message);
-                console.log('[Sync] Database connection closed. Exiting.');
+                if (err) logger.error({ err }, 'Error closing database');
+                logger.info('Database connection closed. Exiting.');
                 process.exit(0);
             });
         });
     }
 
     app.listen(port, () => {
-        console.log(`Server is running on http://localhost:${port}`);
+        logger.info(`Server is running on http://localhost:${port}`);
     });
 }
 
 main().catch(err => {
-    console.error("Failed to start server:", err);
+    logger.error({ err }, "Failed to start server");
     process.exit(1);
 });
