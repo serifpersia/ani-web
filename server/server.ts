@@ -576,7 +576,11 @@ app.get('/api/show-details/:id', async (req, res) => {
     }
 });
 
-app.get('/api/continue-watching', (_req, res) => {
+app.get('/api/continue-watching', (req, res) => {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = (page - 1) * limit;
+
     const query = `
         SELECT sm.id as showId, sm.name, sm.thumbnail, sm.nativeName, sm.englishName, we.episodeNumber, we.currentTime, we.duration
         FROM shows_meta sm
@@ -586,9 +590,9 @@ app.get('/api/continue-watching', (_req, res) => {
            GROUP BY showId
         ) we ON sm.id = we.showId
         ORDER BY we.watchedAt DESC
-        LIMIT 10;
+        LIMIT ? OFFSET ?;
     `;
-    db.all(query, [], async (err: Error | null, rows: { showId: string, name: string, thumbnail: string, episodeNumber: string, currentTime: number, duration: number }[]) => {
+    db.all(query, [limit, offset], async (err: Error | null, rows: { showId: string, name: string, thumbnail: string, episodeNumber: string, currentTime: number, duration: number }[]) => {
         if (err) return res.status(500).json({ error: 'DB error' });
         try {
             const results = await Promise.all(rows.map(async (show) => {

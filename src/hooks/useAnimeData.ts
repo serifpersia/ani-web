@@ -166,8 +166,9 @@ export const useCurrentSeason = () => {
   });
 };
 
-const fetchContinueWatching = async (): Promise<Anime[]> => {
-  const response = await fetch("/api/continue-watching");
+
+const fetchContinueWatchingPage = async ({ pageParam = 1 }): Promise<Anime[]> => {
+  const response = await fetch(`/api/continue-watching?page=${pageParam}&limit=10`);
   if (!response.ok) throw new Error("Failed to fetch continue watching");
   const data: ContinueWatchingItem[] = await response.json();
 
@@ -191,10 +192,14 @@ const fetchContinueWatching = async (): Promise<Anime[]> => {
   return detailedContinueWatchingList.filter(Boolean) as Anime[];
 };
 
-export const useContinueWatching = () => {
-  return useQuery<Anime[]>({ 
+export const useInfiniteContinueWatching = () => {
+  return useInfiniteQuery<Anime[], Error, Anime[], string[], number>({
     queryKey: ['continueWatching'],
-    queryFn: fetchContinueWatching,
+    queryFn: fetchContinueWatchingPage,
+    getNextPageParam: (lastPage, allPages) => {
+      if (lastPage.length === 0) return undefined;
+      return allPages.length + 1;
+    },
   });
 };
 
