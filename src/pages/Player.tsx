@@ -115,6 +115,7 @@ interface PlayerState {
   loadingVideo: boolean;
   loadingDetails: boolean;
   error: string | null;
+  detailsError: string | null;
 }
 
 type Action =
@@ -146,6 +147,7 @@ const initialState: PlayerState = {
   loadingVideo: false,
   loadingDetails: false,
   error: null,
+  detailsError: null,
 };
 
 // --- REDUCER ---
@@ -668,20 +670,17 @@ const Player: React.FC = () => {
       if (!showId) return;
       dispatch({ type: 'SET_LOADING', key: 'loadingShowData', value: true });
       try {
-        const [metaResponse, detailsResponse, episodesResponse, watchlistResponse, watchedResponse] = await Promise.all([
+        const [metaResponse, episodesResponse, watchlistResponse, watchedResponse] = await Promise.all([
           fetch(`/api/show-meta/${showId}`),
-          fetch(`/api/show-details/${showId}`),
           fetch(`/api/episodes?showId=${showId}&mode=${state.currentMode}`),
           fetchWithProfile(`/api/watchlist/check/${showId}`),
           fetchWithProfile(`/api/watched-episodes/${showId}`),
         ]);
 
         if (!metaResponse.ok) throw new Error("Failed to fetch show metadata");
-        if (!detailsResponse.ok) throw new Error("Failed to fetch show details");
         if (!episodesResponse.ok) throw new Error("Failed to fetch episodes");
 
         const meta = await metaResponse.json();
-        const details = await detailsResponse.json();
         const episodeData = await episodesResponse.json();
         const watchlistStatus = watchlistResponse.ok ? await watchlistResponse.json() : { inWatchlist: false };
         const watchedData = watchedResponse.ok ? await watchedResponse.json() : [];
@@ -689,7 +688,7 @@ const Player: React.FC = () => {
         dispatch({
           type: 'SHOW_DATA_SUCCESS',
           payload: {
-            showMeta: { ...meta, ...details, description: episodeData.description, names: meta.names || { romaji: meta.name, english: meta.englishName, native: meta.nativeName } },
+            showMeta: { ...meta, description: episodeData.description, names: meta.names || { romaji: meta.name, english: meta.englishName, native: meta.nativeName } },
             episodes: episodeData.episodes.sort((a: string, b: string) => parseFloat(a) - parseFloat(b)),
             inWatchlist: watchlistStatus.inWatchlist,
             watchedEpisodes: watchedData,
@@ -706,32 +705,42 @@ const Player: React.FC = () => {
   const handleToggleDetails = useCallback(async () => {
     dispatch({ type: 'SET_STATE', payload: { showCombinedDetails: !state.showCombinedDetails } });
 
-    if (state.showCombinedDetails || state.allMangaDetails) {
+    if (state.showCombinedDetails || state.showMeta.status) {
       return;
     }
 
     try {
       dispatch({ type: 'SET_LOADING', key: 'loadingDetails', value: true });
+      dispatch({ type: 'SET_STATE', payload: { detailsError: null } });
 
-      const allmangaDetailsResponse = await fetch(`/api/allmanga-details/${showId}`);
+      const [detailsResponse, allmangaDetailsResponse] = await Promise.all([
+        fetch(`/api/show-details/${showId}`),
+        fetch(`/api/allmanga-details/${showId}`),
+      ]);
 
+      if (!detailsResponse.ok) throw new Error("Failed to fetch show details");
+
+      const details = await detailsResponse.json();
       const allmangaDetails = allmangaDetailsResponse.ok ? await allmangaDetailsResponse.json() : null;
 
       dispatch({
         type: 'SET_STATE',
         payload: {
+          showMeta: { ...state.showMeta, ...details },
           allMangaDetails: allmangaDetails,
           loadingDetails: false,
         },
       });
     } catch (e) {
       dispatch({
-        type: 'SET_ERROR',
-        payload: e instanceof Error ? e.message : 'Failed to load details',
+        type: 'SET_STATE',
+        payload: {
+          detailsError: e instanceof Error ? e.message : 'Failed to load details',
+          loadingDetails: false
+        }
       });
-      dispatch({ type: 'SET_LOADING', key: 'loadingDetails', value: false });
     }
-  }, [showId, state.showCombinedDetails, state.allMangaDetails]);
+  }, [showId, state.showCombinedDetails, state.showMeta]);
 
   const setPreferredSource = useCallback(async (sourceName: string) => {
     try {
@@ -1117,6 +1126,8 @@ const Player: React.FC = () => {
           <>
             {state.loadingDetails ? (
               <p className={styles.loadingDetails}>Loading details...</p>
+            ) : state.detailsError ? (
+              <p className="error-message">{state.detailsError}</p>
             ) : (
               <div className={styles.detailsGridContainer}>
                 <div className={styles.detailItem}><strong>Type:</strong> {state.showMeta.mediaTypes?.[0]?.name}</div>
