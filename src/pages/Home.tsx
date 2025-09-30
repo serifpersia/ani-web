@@ -5,7 +5,7 @@ import Top10List from '../components/anime/Top10List';
 import Schedule from '../components/anime/Schedule';
 import AnimeCardSkeleton from '../components/anime/AnimeCardSkeleton';
 import type { Anime as _Anime } from '../hooks/useAnimeData';
-import { useLatestReleases, useCurrentSeason, useContinueWatching } from '../hooks/useAnimeData';
+import { useLatestReleases, useCurrentSeason, useInfiniteContinueWatching } from '../hooks/useAnimeData';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 
 const SkeletonGrid = React.memo(() => (
@@ -28,7 +28,9 @@ const Home: React.FC = () => {
 
   const currentSeason = useMemo(() => currentSeasonPages?.pages.flat() || [], [currentSeasonPages]);
 
-  const { data: continueWatchingList, isLoading: loadingContinueWatching } = useContinueWatching();
+  const { data: continueWatchingPages, isLoading: loadingContinueWatching } = useInfiniteContinueWatching();
+
+  const continueWatchingList = useMemo(() => continueWatchingPages?.pages.flat().slice(0, 6) || [], [continueWatchingPages]);
 
   const removeContinueWatchingMutation = useMutation({
     mutationFn: async (showId: string) => {
@@ -80,6 +82,7 @@ const Home: React.FC = () => {
             animeList={continueWatchingList || []} 
             onRemove={handleRemoveContinueWatching} 
             loading={loadingContinueWatching}
+            showSeeMore={true}
           />
 
           <AnimeSection title="Latest Releases" continueWatching={false} animeList={latestReleases || []} loading={loadingLatestReleases} />

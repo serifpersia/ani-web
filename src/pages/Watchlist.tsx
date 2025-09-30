@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import AnimeCard from '../components/anime/AnimeCard';
 import AnimeCardSkeleton from '../components/anime/AnimeCardSkeleton';
 import ErrorMessage from '../components/common/ErrorMessage';
-import { useWatchlist, useRemoveFromWatchlist } from '../hooks/useAnimeData';
+import { useWatchlist, useRemoveFromWatchlist, useInfiniteContinueWatching } from '../hooks/useAnimeData';
 import RemoveConfirmationModal from '../components/common/RemoveConfirmationModal';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
@@ -28,13 +29,70 @@ const SkeletonGrid = React.memo(() => (
 
 const Watchlist: React.FC = () => {
   const queryClient = useQueryClient();
+  const location = useLocation();
   const [sortBy, setSortBy] = useState("last_added");
-  const [filterBy, setFilterBy] = useState("All");
+  const [filterBy, setFilterBy] = useState(location.state?.filter || "All");
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [animeToRemoveId, setAnimeToRemoveId] = useState<string | null>(null);
   const [animeToRemoveName, setAnimeToRemoveName] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (location.state?.filter) {
+      setFilterBy(location.state.filter);
+    }
+  }, [location.state]);
+
   const { data: watchlist, isLoading, isError, error } = useWatchlist();
+  const {
+    data: continueWatchingPages,
+    fetchNextPage: fetchNextContinueWatchingPage,
+    hasNextPage: hasNextContinueWatchingPage,
+    isFetchingNextPage: isFetchingNextContinueWatchingPage,
+    isLoading: loadingContinueWatching,
+  } = useInfiniteContinueWatching();
+
+  const continueWatchingList = useMemo(() => continueWatchingPages?.pages.flat() || [], [continueWatchingPages]);
+
+  const removeContinueWatchingMutation = useMutation({
+    mutationFn: async (showId: string) => {
+      const response = await fetch("/api/continue-watching/remove", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ showId }),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to remove from backend");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['continueWatching'] });
+    },
+    onError: (error) => {
+      console.error("Error removing from continue watching:", error);
+    },
+  });
+
+  const handleRemoveContinueWatching = useCallback((showId: string) => {
+    removeContinueWatchingMutation.mutate(showId);
+  }, [removeContinueWatchingMutation]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (
+        filterBy === 'Continue Watching' &&
+        window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000 &&
+        !isFetchingNextContinueWatchingPage &&
+        hasNextContinueWatchingPage
+      ) {
+        fetchNextContinueWatchingPage();
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [filterBy, isFetchingNextContinueWatchingPage, hasNextContinueWatchingPage, fetchNextContinueWatchingPage]);
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -83,8 +141,11 @@ const Watchlist: React.FC = () => {
   }, []);
 
   const filteredWatchlist = useMemo(() => {
+    if (filterBy === 'Continue Watching') {
+      return continueWatchingList;
+    }
     return watchlist?.filter(item => filterBy === 'All' || item.status === filterBy) || [];
-  }, [watchlist, filterBy]);
+  }, [watchlist, filterBy, continueWatchingList]);
 
   const sortedWatchlist = useMemo(() => {
     return [...filteredWatchlist].sort((a, b) => {
@@ -104,7 +165,7 @@ const Watchlist: React.FC = () => {
 
       <div className="watchlist-controls-container" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
         <div className="filter-buttons">
-          {['All', 'Watching', 'Completed', 'On-Hold', 'Dropped', 'Planned'].map(status => (
+          {['All', 'Continue Watching', 'Watching', 'Completed', 'On-Hold', 'Dropped', 'Planned'].map(status => (
             <button 
               key={status} 
               className={`status-btn ${filterBy === status ? 'active' : ''}`} 
@@ -122,7 +183,22 @@ const Watchlist: React.FC = () => {
         </select>
       </div>
 
-      {isLoading ? (
+      {filterBy === 'Continue Watching' ? (
+        <section>
+          <div className="grid-container">
+            {continueWatchingList.map(anime => (
+              <AnimeCard 
+                key={anime._id} 
+                anime={anime} 
+                continueWatching={true} 
+                onRemove={handleRemoveContinueWatching} 
+              />
+            ))}
+            {(loadingContinueWatching || isFetchingNextContinueWatchingPage) && <SkeletonGrid />}
+          </div>
+          {!hasNextContinueWatchingPage && continueWatchingList.length > 0 && <p style={{textAlign: 'center', margin: '1rem'}}>No more anime to continue watching.</p>}
+        </section>
+      ) : isLoading ? (
         <SkeletonGrid />
       ) : isError ? (
         <ErrorMessage message={error?.message || 'An unknown error occurred'} />
