@@ -5,6 +5,7 @@ import styles from './AnimeCard.module.css';
 import { FaMicrophone, FaClosedCaptioning } from 'react-icons/fa';
 import useIsMobile from '../../hooks/useIsMobile';
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext';
+import { useAnimeDetails } from '../../hooks/useAnimeData';
 
 interface Anime {
   _id: string;
@@ -33,6 +34,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
   const [isHovered, setIsHovered] = React.useState(false); // New state for hover
   const isMobile = useIsMobile(); // Call the hook
   const { titlePreference } = useTitlePreference();
+  const { data: animeDetails, isLoading } = useAnimeDetails(anime);
 
   const displayTitle = anime[titlePreference] || anime.name;
 
@@ -55,13 +57,19 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
     <div className={isMobile ? styles.episodeNumberInline : styles.episodeNumberOverlay}>EP {anime.episodeNumber}</div>
   );
 
-  const episodeCountElement = anime.availableEpisodesDetail && (
+  const episodeCountElement = (
     <div className={isMobile ? styles.episodeCountInline : (continueWatching ? styles.episodeCountOverlay : `${styles.episodeCountOverlay} ${styles.normalCardEpisodeCount}`)}>
-      {anime.availableEpisodesDetail.sub && anime.availableEpisodesDetail.sub.length > 0 && (
-        <div className={`${styles.episodeCountItem} ${styles.subCount}`}><FaClosedCaptioning /> {anime.availableEpisodesDetail.sub.length}</div>
-      )}
-      {anime.availableEpisodesDetail.dub && anime.availableEpisodesDetail.dub.length > 0 && (
-        <div className={`${styles.episodeCountItem} ${styles.dubCount}`}><FaMicrophone /> {anime.availableEpisodesDetail.dub.length}</div>
+      {isLoading ? (
+        <div className={`${styles.episodeCountItem} ${styles.subCount}`}><FaClosedCaptioning /> ?</div>
+      ) : (
+        <>
+          {animeDetails?.availableEpisodesDetail?.sub && animeDetails.availableEpisodesDetail.sub.length > 0 && (
+            <div className={`${styles.episodeCountItem} ${styles.subCount}`}><FaClosedCaptioning /> {animeDetails.availableEpisodesDetail.sub.length}</div>
+          )}
+          {animeDetails?.availableEpisodesDetail?.dub && animeDetails.availableEpisodesDetail.dub.length > 0 && (
+            <div className={`${styles.episodeCountItem} ${styles.dubCount}`}><FaMicrophone /> {animeDetails.availableEpisodesDetail.dub.length}</div>
+          )}
+        </>
       )}
     </div>
   );
@@ -82,7 +90,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
   );
 
   const showTypeElement = (
-    <div className={isMobile ? styles.showTypeInline : styles.showType}>{anime.type || 'TV'}</div>
+    <div className={isMobile ? styles.showTypeInline : styles.showType}>{isLoading ? '?' : animeDetails?.type || 'TV'}</div>
   );
 
   return (
