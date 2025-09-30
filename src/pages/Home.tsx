@@ -1,4 +1,5 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useMemo } from 'react';
+import AnimeCard from '../components/anime/AnimeCard';
 import AnimeSection from '../components/anime/AnimeSection';
 import Top10List from '../components/anime/Top10List';
 import Schedule from '../components/anime/Schedule';
@@ -8,9 +9,9 @@ import { useLatestReleases, useCurrentSeason, useContinueWatching } from '../hoo
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 
 const SkeletonGrid = React.memo(() => (
-    <div className="grid-container">
+    <>
         {Array.from({ length: 10 }).map((_, i) => <AnimeCardSkeleton key={i} />)}
-    </div>
+    </>
 ));
 
 const Home: React.FC = () => {
@@ -25,7 +26,7 @@ const Home: React.FC = () => {
     isLoading: loadingCurrentSeason,
   } = useCurrentSeason();
 
-  const currentSeason = currentSeasonPages?.pages.flat() || [];
+  const currentSeason = useMemo(() => currentSeasonPages?.pages.flat() || [], [currentSeasonPages]);
 
   const { data: continueWatchingList, isLoading: loadingContinueWatching } = useContinueWatching();
 
@@ -83,9 +84,19 @@ const Home: React.FC = () => {
 
           <AnimeSection title="Latest Releases" continueWatching={false} animeList={latestReleases || []} loading={loadingLatestReleases} />
 
-          <AnimeSection title="Current Season" continueWatching={false} animeList={currentSeason} loading={loadingCurrentSeason || isFetchingNextPage} />
-          {(loadingCurrentSeason || isFetchingNextPage) && <SkeletonGrid />}
-          {!hasNextPage && currentSeason.length > 0 && <p style={{textAlign: 'center', margin: '1rem'}}>No more Current Season anime.</p>}
+          <section>
+            <h2 className="section-title">Current Season</h2>
+            <div className="grid-container">
+              {currentSeason.map(anime => (
+                <AnimeCard 
+                  key={anime._id} 
+                  anime={anime} 
+                />
+              ))}
+              {(loadingCurrentSeason || isFetchingNextPage) && <SkeletonGrid />}
+            </div>
+            {!hasNextPage && currentSeason.length > 0 && <p style={{textAlign: 'center', margin: '1rem'}}>No more Current Season anime.</p>}
+          </section>
         </div>
         <aside className="sidebar">
           <Top10List title="Top 10 Popular" />
