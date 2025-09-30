@@ -115,7 +115,12 @@
   align-items: center;
   justify-content: center;
   z-index: 10;
-  transition: background-color 0.3s ease, transform 0.3s ease;
+  transition: background-color 0.3s ease, transform 0.3s ease, opacity 0.3s ease;
+  opacity: 0;
+}
+
+.card:hover .removeBtn {
+  opacity: 1;
 }
 
 .removeBtn:hover {

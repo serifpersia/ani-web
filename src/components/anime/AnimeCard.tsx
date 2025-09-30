@@ -31,8 +31,7 @@ interface AnimeCardProps {
 }
 
 const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = false, onRemove }) => {
-  const [isHovered, setIsHovered] = React.useState(false); // New state for hover
-  const isMobile = useIsMobile(); // Call the hook
+  const isMobile = useIsMobile();
   const { titlePreference } = useTitlePreference();
   const { data: animeDetails, isLoading } = useAnimeDetails(anime);
 
@@ -85,7 +84,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
     </div>
   );
 
-  const removeButtonElement = continueWatching && isHovered && (
+  const removeButtonElement = continueWatching && (
     <button className={isMobile ? styles.removeBtnInline : styles.removeBtn} onClick={handleRemove}>x</button>
   );
 
@@ -97,8 +96,6 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
     <Link 
       to={continueWatching ? `/player/${anime._id}/${anime.episodeNumber}` : `/player/${anime._id}`}
       className={styles.card}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
       <div className={styles.posterContainer}>
         {!isMobile && episodeNumberElement}
@@ -135,7 +132,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
           </div>
         )}
         {isMobile && progressElement} {}
-        {!isMobile && continueWatching && isHovered && removeButtonElement} {}
+        {!isMobile && continueWatching && removeButtonElement} {}
         {!isMobile && showTypeElement} {}
         {continueWatching ? null : (
           <div className={styles.details}>
