@@ -365,6 +365,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({ player, isAutoplayEnabl
         refs.videoRef.current.volume = newVolume;
         refs.videoRef.current.muted = newVolume === 0;
         localStorage.setItem('playerVolume', newVolume.toString());
+        e.target.style.setProperty('--volume-percent', `${newVolume * 100}%`);
     };
 
     const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -536,6 +537,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({ player, isAutoplayEnabl
                                             const value = parseFloat(e.target.value);
                                             actions.setSubtitleFontSize(value);
                                             localStorage.setItem('subtitleFontSize', value.toString());
+                                            e.target.style.setProperty('--slider-percent', `${((value - 1) / 2) * 100}%`);
                                         }}/>
                                         <span>{state.subtitleFontSize.toFixed(1)}</span>
                                     </div>
@@ -545,6 +547,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({ player, isAutoplayEnabl
                                             const value = parseInt(e.target.value, 10);
                                             actions.setSubtitlePosition(value);
                                             localStorage.setItem('subtitlePosition', value.toString());
+                                            e.target.style.setProperty('--slider-percent', `${((value + 10) / 10) * 100}%`);
                                         }}/>
                                         <span>{state.subtitlePosition}</span>
                                     </div>
@@ -665,17 +668,20 @@ const Player: React.FC = () => {
       if (!showId) return;
       dispatch({ type: 'SET_LOADING', key: 'loadingShowData', value: true });
       try {
-        const [metaResponse, episodesResponse, watchlistResponse, watchedResponse] = await Promise.all([
+        const [metaResponse, detailsResponse, episodesResponse, watchlistResponse, watchedResponse] = await Promise.all([
           fetch(`/api/show-meta/${showId}`),
+          fetch(`/api/show-details/${showId}`),
           fetch(`/api/episodes?showId=${showId}&mode=${state.currentMode}`),
           fetchWithProfile(`/api/watchlist/check/${showId}`),
           fetchWithProfile(`/api/watched-episodes/${showId}`),
         ]);
 
         if (!metaResponse.ok) throw new Error("Failed to fetch show metadata");
+        if (!detailsResponse.ok) throw new Error("Failed to fetch show details");
         if (!episodesResponse.ok) throw new Error("Failed to fetch episodes");
 
         const meta = await metaResponse.json();
+        const details = await detailsResponse.json();
         const episodeData = await episodesResponse.json();
         const watchlistStatus = watchlistResponse.ok ? await watchlistResponse.json() : { inWatchlist: false };
         const watchedData = watchedResponse.ok ? await watchedResponse.json() : [];
@@ -683,7 +689,7 @@ const Player: React.FC = () => {
         dispatch({
           type: 'SHOW_DATA_SUCCESS',
           payload: {
-            showMeta: { ...meta, description: episodeData.description, names: meta.names || { romaji: meta.name, english: meta.englishName, native: meta.nativeName } },
+            showMeta: { ...meta, ...details, description: episodeData.description, names: meta.names || { romaji: meta.name, english: meta.englishName, native: meta.nativeName } },
             episodes: episodeData.episodes.sort((a: string, b: string) => parseFloat(a) - parseFloat(b)),
             inWatchlist: watchlistStatus.inWatchlist,
             watchedEpisodes: watchedData,
@@ -700,25 +706,20 @@ const Player: React.FC = () => {
   const handleToggleDetails = useCallback(async () => {
     dispatch({ type: 'SET_STATE', payload: { showCombinedDetails: !state.showCombinedDetails } });
 
-    if (state.showCombinedDetails || state.showMeta.genres) {
+    if (state.showCombinedDetails || state.allMangaDetails) {
       return;
     }
 
     try {
       dispatch({ type: 'SET_LOADING', key: 'loadingDetails', value: true });
 
-      const [detailsResponse, allmangaDetailsResponse] = await Promise.all([
-        fetch(`/api/show-details/${showId}`),
-        fetch(`/api/allmanga-details/${showId}`),
-      ]);
+      const allmangaDetailsResponse = await fetch(`/api/allmanga-details/${showId}`);
 
-      const details = detailsResponse.ok ? await detailsResponse.json() : {};
       const allmangaDetails = allmangaDetailsResponse.ok ? await allmangaDetailsResponse.json() : null;
 
       dispatch({
         type: 'SET_STATE',
         payload: {
-          showMeta: { ...state.showMeta, ...details },
           allMangaDetails: allmangaDetails,
           loadingDetails: false,
         },
@@ -730,7 +731,7 @@ const Player: React.FC = () => {
       });
       dispatch({ type: 'SET_LOADING', key: 'loadingDetails', value: false });
     }
-  }, [showId, state.showCombinedDetails, state.showMeta]);
+  }, [showId, state.showCombinedDetails, state.allMangaDetails]);
 
   const setPreferredSource = useCallback(async (sourceName: string) => {
     try {

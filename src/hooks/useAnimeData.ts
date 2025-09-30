@@ -222,15 +222,8 @@ export const useSearchAnime = (searchQueryString: string) => {
         console.warn("API /api/search returned an unexpected data structure:", apiResponse);
       }
 
-      const detailedResults = await Promise.all(
-        results.map(async (anime: Anime) => {
-          const animeDetails = await fetchAnimeDetails(anime._id);
-          return { ...anime, ...animeDetails };
-        })
-      );
-
       return {
-        results: detailedResults.filter(Boolean) as Anime[],
+        results: results.filter(Boolean) as Anime[],
         totalPages: totalPages,
         currentPage: pageParam,
       };
@@ -270,12 +263,19 @@ const fetchWatchlist = async (): Promise<Anime[]> => {
 };
 
 export const useWatchlist = () => {
-  return useQuery<Anime[]>({ 
+  return useQuery<Anime[]>({
     queryKey: ['watchlist'],
     queryFn: fetchWatchlist,
   });
 };
 
+export const useAnimeDetails = (anime: Anime) => {
+  return useQuery<Anime>({ 
+    queryKey: ['animeDetails', anime._id],
+    queryFn: () => fetchAnimeDetails(anime._id, anime.name),
+    enabled: !!anime,
+  });
+};
 export const useRemoveFromWatchlist = () => {
   const queryClient = useQueryClient();
   return useMutation({
