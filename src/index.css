@@ -325,10 +325,7 @@ footer a:hover {
   flex-shrink: 0;
 }
 
-.main-content-blur {
-  filter: blur(5px);
-  transition: filter 0.3s ease-in-out;
-}
+
 
 @media (min-width: 769px) {
   .sidebar-open main {

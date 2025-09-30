@@ -41,7 +41,7 @@ function App() {
     <div className={`app-container`}>
       <Header />
       <Sidebar />
-      <main className={isOpen ? 'main-content-blur' : ''}>
+      <main>
         <Suspense fallback={<div>Loading...</div>}>
           <Routes>
             <Route path="/" element={<Home />} />
