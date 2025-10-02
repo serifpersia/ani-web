@@ -130,3 +130,4 @@ out
 *.db
 /public/profile_pics
 /dist
+device_id.json

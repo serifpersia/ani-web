@@ -12,8 +12,15 @@ import cheerio from 'cheerio';
 import { parseString } from 'xml2js';
 import sqlite3 from 'sqlite3';
 import multer from 'multer';
-import { syncDownOnBoot, syncUp, performWriteTransaction, verifyRclone } from './sync';
-import chokidar from 'chokidar';
+import {
+    verifyRclone,
+    syncDownOnBoot,
+    createSnapshotIfNeeded,
+    synchronizeChanges
+} from './sync';
+import { performTrackedWriteTransaction } from './tracked-write';
+import { getDeviceId } from './device-id';
+import { RCLONE_REMOTE_DIR } from './sync-config';
 import logger from './logger';
 
 interface Show {
@@ -58,11 +65,13 @@ interface TableInfoRow {
   pk: 0 | 1;
 }
 
-function initializeDatabase() {
-   db = new sqlite3.Database(dbPath, (err) => {
-      if (err) {
-         logger.error({ err }, 'Database opening error');
-      } else {
+function initializeDatabase(): Promise<void> {
+   return new Promise((resolve, reject) => {
+      db = new sqlite3.Database(dbPath, (err) => {
+         if (err) {
+            logger.error({ err }, 'Database opening error');
+            return reject(err);
+         }
 
          db.serialize(() => {
             db.run(`CREATE TABLE IF NOT EXISTS watchlist (id TEXT NOT NULL, name TEXT, thumbnail TEXT, status TEXT, PRIMARY KEY (id))`);
@@ -70,8 +79,19 @@ function initializeDatabase() {
             db.run(`CREATE TABLE IF NOT EXISTS settings (key TEXT NOT NULL, value TEXT, PRIMARY KEY (key))`);
             db.run(`CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT)`);
 
-            db.run(`CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`);
-            db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`);
+            db.run(`
+                CREATE TABLE IF NOT EXISTS change_log (
+                    id TEXT PRIMARY KEY,
+                    device_id TEXT NOT NULL,
+                    table_name TEXT NOT NULL,
+                    row_id TEXT NOT NULL,
+                    operation TEXT NOT NULL,
+                    data TEXT,
+                    timestamp DATETIME NOT NULL,
+                    synced INTEGER DEFAULT 0
+                )
+            `);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_change_log_synced ON change_log(synced)`);
 
             db.all("PRAGMA table_info(watchlist)", (err, rows: TableInfoRow[]) => {
                 if (err) { logger.error({ err }, "Error checking watchlist schema"); return; }
@@ -91,13 +111,18 @@ function initializeDatabase() {
                     db.run(`ALTER TABLE shows_meta ADD COLUMN nativeName TEXT`);
                 }
                 if (!columns.includes("englishName")) {
-                    db.run(`ALTER TABLE shows_meta ADD COLUMN englishName TEXT`);
+                    db.run(`ALTER TABLE shows_meta ADD COLUMN englishName TEXT`, () => {
+                        resolve();
+                    });
+                } else {
+                    resolve();
                 }
             });
          });
-      }
+      });
    });
 }
+
 axiosRetry(axios, {
     retries: 3,
     retryDelay: axiosRetry.exponentialDelay,
@@ -371,7 +396,6 @@ app.get('/api/proxy', async (req, res) => {
             });
 
             streamResponse.data.on('end', () => {
-                // No action needed on stream end, but the handler is present for potential future use.
             });
         }
     } catch (e) {
@@ -468,21 +492,21 @@ app.post('/api/import/mal-xml', async (req, res) => {
         }
 
         try {
-            if (erase || showsToInsert.length > 0) {
-                await performWriteTransaction(db, (tx) => {
-                    if (erase) {
-                        tx.run(`DELETE FROM watchlist`);
+            db.serialize(() => {
+                db.run('BEGIN TRANSACTION');
+                if (erase) {
+                    db.run(`DELETE FROM watchlist`);
+                }
+                if (showsToInsert.length > 0) {
+                    const stmt = db.prepare(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status) VALUES (?, ?, ?, ?)`);
+                    for (const show of showsToInsert) {
+                        stmt.run(show.id, show.name, show.thumbnail, show.status);
                     }
-                    if (showsToInsert.length > 0) {
-                        const stmt = tx.prepare(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status) VALUES (?, ?, ?, ?)`);
-                        for (const show of showsToInsert) {
-                            stmt.run(show.id, show.name, show.thumbnail, show.status);
-                        }
-                        stmt.finalize();
-                    }
-                });
-            }
-            res.json({ imported: showsToInsert.length, skipped: skippedCount });
+                    stmt.finalize();
+                }
+                db.run('COMMIT');
+                res.json({ imported: showsToInsert.length, skipped: skippedCount });
+            });
         } catch (dbError) {
             logger.error({ err: dbError }, 'DB error on MAL import');
             res.status(500).json({ error: 'DB error on MAL import' });
@@ -636,19 +660,31 @@ app.post('/api/update-progress', async (req, res) => {
     const { showId, episodeNumber, currentTime, duration, showName, showThumbnail, nativeName, englishName } = req.body;
 
     try {
-        await performWriteTransaction(db, (tx) => {
-            tx.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName) VALUES (?, ?, ?, ?, ?)',
-                [showId, showName, deobfuscateUrl(showThumbnail), nativeName, englishName]);
+        const metaData = { id: showId, name: showName, thumbnail: deobfuscateUrl(showThumbnail), nativeName, englishName };
+        await performTrackedWriteTransaction(db,
+            { table_name: 'shows_meta', row_id: showId, operation: 'UPDATE', data: JSON.stringify(metaData) },
+            (tx) => {
+                tx.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName) VALUES (?, ?, ?, ?, ?)',
+                    [metaData.id, metaData.name, metaData.thumbnail, metaData.nativeName, metaData.englishName]);
+            }
+        );
 
-            tx.run(`INSERT OR REPLACE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)`,
-                [showId, episodeNumber, currentTime, duration]);
-        });
+        const progressData = { showId, episodeNumber, currentTime, duration };
+        await performTrackedWriteTransaction(db,
+            { table_name: 'watched_episodes', row_id: `${showId}-${episodeNumber}`, operation: 'UPDATE', data: JSON.stringify(progressData) },
+            (tx) => {
+                tx.run(`INSERT OR REPLACE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)`,
+                    [showId, episodeNumber, currentTime, duration]);
+            }
+        );
+
         res.json({ success: true });
     } catch (error) {
         logger.error({ err: error }, 'DB error on progress update');
         res.status(500).json({ error: 'DB error on progress update' });
     }
 });
+
 app.get('/api/episode-progress/:showId/:episodeNumber', (req, res) => {
     const { showId, episodeNumber } = req.params;
 
@@ -669,10 +705,18 @@ app.get('/api/watched-episodes/:showId', (req, res) => {
 app.post('/api/continue-watching/remove', async (req, res) => {
     const { showId } = req.body;
     try {
-        await performWriteTransaction(db, (tx) => {
-            tx.run(`DELETE FROM watched_episodes WHERE showId = ?`, [showId]);
-            tx.run(`DELETE FROM shows_meta WHERE id = ?`, [showId]);
-        });
+        await performTrackedWriteTransaction(db,
+            { table_name: 'watched_episodes', row_id: showId, operation: 'DELETE', data: null },
+            (tx) => {
+                tx.run(`DELETE FROM watched_episodes WHERE showId = ?`, [showId]);
+            }
+        );
+        await performTrackedWriteTransaction(db,
+            { table_name: 'shows_meta', row_id: showId, operation: 'DELETE', data: null },
+            (tx) => {
+                tx.run(`DELETE FROM shows_meta WHERE id = ?`, [showId]);
+            }
+        );
         res.json({ success: true });
     } catch (error) {
         logger.error({ err: error }, 'DB error on continue-watching remove');
@@ -683,11 +727,16 @@ app.post('/api/continue-watching/remove', async (req, res) => {
 app.post('/api/watchlist/add', async (req, res) => {
     const { id, name, thumbnail, status, nativeName, englishName } = req.body;
     const finalThumbnail = deobfuscateUrl(thumbnail || '');
+    const data = { id, name, thumbnail: finalThumbnail, status: status || 'Watching', nativeName, englishName };
+
     try {
-        await performWriteTransaction(db, (tx) => {
-            tx.run(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status, nativeName, englishName) VALUES (?, ?, ?, ?, ?, ?)`, 
-                [id, name, finalThumbnail, status || 'Watching', nativeName, englishName]);
-        });
+        await performTrackedWriteTransaction(db,
+            { table_name: 'watchlist', row_id: id, operation: 'INSERT', data: JSON.stringify(data) },
+            (tx) => {
+                tx.run(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status, nativeName, englishName) VALUES (?, ?, ?, ?, ?, ?)`,
+                    [data.id, data.name, data.thumbnail, data.status, data.nativeName, data.englishName]);
+            }
+        );
         res.json({ success: true });
     } catch (error) {
         logger.error({ err: error }, 'DB error on watchlist add');
@@ -704,10 +753,14 @@ app.get('/api/watchlist/check/:showId', (req, res) => {
 
 app.post('/api/watchlist/status', async (req, res) => {
     const { id, status } = req.body;
+    const data = { status };
     try {
-        await performWriteTransaction(db, (tx) => {
-            tx.run(`UPDATE watchlist SET status = ? WHERE id = ?`, [status, id]);
-        });
+        await performTrackedWriteTransaction(db,
+            { table_name: 'watchlist', row_id: id, operation: 'UPDATE', data: JSON.stringify(data) },
+            (tx) => {
+                tx.run(`UPDATE watchlist SET status = ? WHERE id = ?`, [status, id]);
+            }
+        );
         res.json({ success: true });
     } catch (error) {
         logger.error({ err: error }, 'DB error on watchlist status update');
@@ -772,9 +825,12 @@ app.get('/api/watchlist/backfill-names', async (_req, res) => {
 app.post('/api/watchlist/remove', async (req, res) => {
     const { id } = req.body;
     try {
-        await performWriteTransaction(db, (tx) => {
-            tx.run(`DELETE FROM watchlist WHERE id = ?`, [id]);
-        });
+        await performTrackedWriteTransaction(db,
+            { table_name: 'watchlist', row_id: id, operation: 'DELETE', data: null },
+            (tx) => {
+                tx.run(`DELETE FROM watchlist WHERE id = ?`, [id]);
+            }
+        );
         res.json({ success: true });
     } catch (error) {
         logger.error({ err: error }, 'DB error on watchlist remove');
@@ -802,10 +858,14 @@ app.get('/api/settings', (req, res) => {
 
 app.post('/api/settings', async (req, res) => {
     const { key, value } = req.body;
+    const data = { key, value };
     try {
-        await performWriteTransaction(db, (tx) => {
-            tx.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
-        });
+        await performTrackedWriteTransaction(db,
+            { table_name: 'settings', row_id: key, operation: 'UPDATE', data: JSON.stringify(data) },
+            (tx) => {
+                tx.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
+            }
+        );
         res.json({ success: true });
     } catch (error) {
         logger.error({ err: error }, 'DB error on settings update');
@@ -843,10 +903,6 @@ app.post('/api/restore-db', dbUpload.single('dbfile'), (req, res) => {
       });
    });
 });
-
-
-
-
 
 app.get('/api/subtitle-proxy', async (req, res) => {
     try {
@@ -1190,46 +1246,45 @@ app.get('/api/genres-and-tags', async (_req, res) => {
     res.json({ genres, tags, studios });
 });
 
-// --- CONFIGURATION ---
-const RCLONE_REMOTE_DIR = 'aniweb_db'; // The remote directory on Google Drive
-
 async function main() {
+    await getDeviceId();
     const isSyncEnabled = await verifyRclone();
 
     if (isSyncEnabled) {
-        await syncDownOnBoot(dbPath, RCLONE_REMOTE_DIR);
+        await syncDownOnBoot(dbPath);
     }
 
-    initializeDatabase();
+    await initializeDatabase();
     logger.info('Database initialized.');
 
     if (isSyncEnabled) {
-        const watcher = chokidar.watch(dbPath, { persistent: true, ignoreInitial: true });
-        let debounceTimer: NodeJS.Timeout;
-        watcher.on('change', () => {
-            logger.info(`Change detected in ${dbPath}. Resetting debounce timer (15s).`);
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-                logger.info(`Debounce timer elapsed. Initiating sync...`);
-                syncUp(db, dbPath, RCLONE_REMOTE_DIR);
-            }, 15000);
-        });
-        logger.info(`Watching ${dbPath} for changes...`);
+        setTimeout(() => {
+            logger.info('Performing one-time snapshot check on boot...');
+            createSnapshotIfNeeded(db, dbPath);
+        }, 5000);
 
-        process.on('SIGINT', async () => {
-            logger.info('\nShutdown detected. Performing final sync...');
-            clearTimeout(debounceTimer);
-            await syncUp(db, dbPath, RCLONE_REMOTE_DIR);
-            db.close((err) => {
-                if (err) logger.error({ err }, 'Error closing database');
-                logger.info('Database connection closed. Exiting.');
-                process.exit(0);
-            });
-        });
+        const changesInterval = 60 * 1000; // 1 minute
+        setInterval(() => {
+            synchronizeChanges(db);
+        }, changesInterval);
+        logger.info(`Delta synchronization scheduled for every ${changesInterval / 1000} seconds.`);
     }
 
     app.listen(port, () => {
         logger.info(`Server is running on http://localhost:${port}`);
+    });
+
+    process.on('SIGINT', async () => {
+        logger.info('\nShutdown detected. Performing final sync and cleanup...');
+        if (isSyncEnabled) {
+            await synchronizeChanges(db);
+            await createSnapshotIfNeeded(db, dbPath);
+        }
+        db.close((err) => {
+            if (err) logger.error({ err }, 'Error closing database');
+            logger.info('Database connection closed. Exiting.');
+            process.exit(0);
+        });
     });
 }
 
