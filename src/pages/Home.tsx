@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useMemo } from 'react';
+import React, { useEffect, useCallback, useMemo, useRef } from 'react';
 import AnimeCard from '../components/anime/AnimeCard';
 import AnimeSection from '../components/anime/AnimeSection';
 import Top10List from '../components/anime/Top10List';
@@ -16,6 +16,15 @@ const SkeletonGrid = React.memo(() => (
 
 const Home: React.FC = () => {
   const queryClient = useQueryClient();
+
+  const invalidationRef = useRef(false);
+
+  useEffect(() => {
+    if (!invalidationRef.current) {
+      queryClient.invalidateQueries({ queryKey: ['continueWatching'] });
+      invalidationRef.current = true;
+    }
+  }, [queryClient]);
 
   const { data: latestReleases, isLoading: loadingLatestReleases } = useLatestReleases();
   const {
