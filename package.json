@@ -52,6 +52,7 @@
     "vite": "7.1.6"
   },
   "overrides": {
+    "node-gyp": "^10.0.0",
     "@rollup/rollup-android-arm64": "4.45.1"
   }
 }
