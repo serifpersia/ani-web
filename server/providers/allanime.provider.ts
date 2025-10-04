@@ -25,7 +25,7 @@ const DEOBFUSCATION_MAP: { [key: string]: string } = {
 export class AllAnimeProvider implements Provider {
     name = 'AllAnime';
 
-    private deobfuscateUrl(obfuscatedUrl: string): string {
+    public deobfuscateUrl(obfuscatedUrl: string): string {
         if (!obfuscatedUrl) return '';
         let finalUrl = obfuscatedUrl;
 
@@ -46,7 +46,7 @@ export class AllAnimeProvider implements Provider {
         }
 
         if (finalUrl.startsWith('http://') || finalUrl.startsWith('https://')) {
-            return `http://localhost:3000/api/image-proxy?url=${encodeURIComponent(finalUrl)}`;
+            return finalUrl;
         }
         return finalUrl;
     }
