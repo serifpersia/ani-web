@@ -131,3 +131,4 @@ out
 /public/profile_pics
 /dist
 device_id.json
+/sync_temp

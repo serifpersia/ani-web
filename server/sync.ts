@@ -7,6 +7,7 @@ import logger from './logger';
 import { getDeviceId } from './device-id';
 import { v4 as uuidv4 } from 'uuid';
 import { performTrackedWriteTransaction as originalPerformTrackedWriteTransaction } from './tracked-write';
+import { rimraf } from 'rimraf';
 
 const log = logger.child({ module: 'Sync' });
 
@@ -175,10 +176,8 @@ async function pushLocalChanges(db: Database) {
             });
         });
         log.info('Marked pushed changes as synced.');
-    } catch (error) {
-        log.error({ err: error }, 'Failed to push local changes.');
     } finally {
-        await fs.rm(TEMP_SYNC_DIR, { recursive: true, force: true });
+        await rimraf(TEMP_SYNC_DIR);
     }
 }
 
@@ -223,7 +222,7 @@ async function pullAndApplyRemoteChanges(db: Database) {
     } catch (error) {
         log.error({ err: error }, 'Failed to pull and apply remote changes.');
     } finally {
-        await fs.rm(TEMP_SYNC_DIR, { recursive: true, force: true });
+        await rimraf(TEMP_SYNC_DIR);
     }
 }
 
