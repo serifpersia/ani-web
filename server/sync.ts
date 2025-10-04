@@ -161,7 +161,7 @@ export async function syncDownOnBoot(db: Database, dbPath: string, remoteDir: st
             await fs.copyFile(dbPath, backupPath);
             log.info('Backup complete.');
 
-            await executeRclone(['copyto', `${getRemoteString(remoteDir)}/anime.db`, dbPath]);
+            await executeRclone(['copyto', `${getRemoteString(remoteDir)}/anime.db`, dbPath, '--ignore-times']);
             log.info('Download complete. Database is now up to date.');
             
             await fs.unlink(backupPath);
@@ -197,10 +197,22 @@ export async function syncUp(db: Database, dbPath: string, remoteDir: string): P
     const performUpload = async () => {
         log.info(`Local DB (v${localVersion}) is newer than remote (v${remoteVersion}). Uploading...`);
         try {
-            await executeRclone(['copyto', dbPath, `${getRemoteString(remoteDir)}/anime.db`, '--ignore-times']);
+            try {
+                await executeRclone(['deletefile', `${getRemoteString(remoteDir)}/anime.db`]);
+            } catch (e) {
+                log.warn('Could not delete remote DB before upload (it may not have existed).');
+            }
+            await executeRclone(['copyto', dbPath, `${getRemoteString(remoteDir)}/anime.db`]);
+            
             const newManifest = JSON.stringify({ version: localVersion });
             await fs.writeFile(TEMP_MANIFEST_PATH, newManifest);
-            await executeRclone(['copyto', TEMP_MANIFEST_PATH, `${getRemoteString(remoteDir)}/sync_manifest.json`, '--ignore-times']);
+
+            try {
+                await executeRclone(['deletefile', `${getRemoteString(remoteDir)}/sync_manifest.json`]);
+            } catch (e) {
+                log.warn('Could not delete remote manifest before upload (it may not have existed).');
+            }
+            await executeRclone(['copyto', TEMP_MANIFEST_PATH, `${getRemoteString(remoteDir)}/sync_manifest.json`]);
             await fs.unlink(TEMP_MANIFEST_PATH);
             
             await new Promise<void>((resolve, reject) => {
