@@ -13,7 +13,7 @@ echo
 
 if [ ! -d "node_modules" ]; then
     echo -e "\033[1;33mServer dependencies not found. Installing with npm install...\033[0m"
-    npm install
+    npm install --omit=dev
     if [ $? -ne 0 ]; then
         echo -e "\033[1;31mError: npm install failed!\033[0m"
         read -p "Press Enter to exit..."
@@ -27,5 +27,4 @@ fi
 echo
 
 echo -e "\033[1;33mBuilding and running ani-web...\033[0m"
-npm run build
 npm start

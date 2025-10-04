@@ -132,3 +132,4 @@ out
 /dist
 device_id.json
 /sync_temp
+/server/dist

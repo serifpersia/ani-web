@@ -20,6 +20,5 @@ if not exist "node_modules" (
     call npm install --omit=dev
 )
 echo Building and running ani-web....
-call npm run build
 call npm start
 pause

@@ -456,8 +456,8 @@ app.get('/api/show-meta/:id', async (req, res) => {
     }
 });
 
-app.use(express.static(path.join(__dirname, '../dist')));
-app.get(/^(?!\/api).*$/, (_req, res) => res.sendFile(path.join(__dirname, '../dist/index.html')));
+app.use(express.static(path.join(__dirname, '../../dist')));
+app.get(/^(?!\/api).*$/, (_req, res) => res.sendFile(path.join(__dirname, '../../dist/index.html')));
 app.get('/api/genres-and-tags', (_req, res) => res.json({ genres, tags, studios }));
 
 async function main() {
