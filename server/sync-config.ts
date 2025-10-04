@@ -2,8 +2,6 @@ const log = (message: string) => console.log(`[Sync Config] ${new Date().toISOSt
 
 let activeRemote: 'mega' | 'gdrive' | undefined;
 
-export const RCLONE_REMOTE_DIR = 'aniweb_db';
-
 export function setActiveRemote(remote: 'mega' | 'gdrive') {
     log(`Setting active sync remote to: ${remote}`);
     activeRemote = remote;

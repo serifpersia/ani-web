@@ -12,16 +12,17 @@ import cheerio from 'cheerio';
 import { parseString } from 'xml2js';
 import sqlite3 from 'sqlite3';
 import multer from 'multer';
-import {
-    verifyRclone,
-    syncDownOnBoot,
-    createSnapshotIfNeeded,
-    synchronizeChanges
-} from './sync';
-import { performTrackedWriteTransaction } from './tracked-write';
-import { getDeviceId } from './device-id';
-import { RCLONE_REMOTE_DIR } from './sync-config';
+import { initializeDatabase, syncDownOnBoot, syncUp, performWriteTransaction, verifyRclone } from './sync';
+import chokidar from 'chokidar';
 import logger from './logger';
+
+declare global {
+    namespace Express {
+        interface Request {
+            db: sqlite3.Database;
+        }
+    }
+}
 
 interface Show {
     _id: string;
@@ -44,84 +45,12 @@ const app = express();
 const apiCache = new NodeCache({ stdTTL: 3600 });
 
 let db: sqlite3.Database;
-const dbPath = path.join(__dirname, 'anime.db');
 
-const dbUploadStorage = multer.diskStorage({
-   destination: function (_req: Express.Request, _file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) {
-      cb(null, __dirname);
-   },
-   filename: function (_req: Express.Request, _file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) {
-      cb(null, 'anime.db.temp');
-   }
+app.use((req, res, next) => {
+    req.db = db;
+    next();
 });
-const dbUpload = multer({ storage: dbUploadStorage });
 
-interface TableInfoRow {
-  cid: number;
-  name: string;
-  type: string;
-  notnull: 0 | 1;
-  dflt_value: string | null;
-  pk: 0 | 1;
-}
-
-function initializeDatabase(): Promise<void> {
-   return new Promise((resolve, reject) => {
-      db = new sqlite3.Database(dbPath, (err) => {
-         if (err) {
-            logger.error({ err }, 'Database opening error');
-            return reject(err);
-         }
-
-         db.serialize(() => {
-            db.run(`CREATE TABLE IF NOT EXISTS watchlist (id TEXT NOT NULL, name TEXT, thumbnail TEXT, status TEXT, PRIMARY KEY (id))`);
-            db.run(`CREATE TABLE IF NOT EXISTS watched_episodes (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, watchedAt DATETIME DEFAULT CURRENT_TIMESTAMP, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, PRIMARY KEY (showId, episodeNumber))`);
-            db.run(`CREATE TABLE IF NOT EXISTS settings (key TEXT NOT NULL, value TEXT, PRIMARY KEY (key))`);
-            db.run(`CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT)`);
-
-            db.run(`
-                CREATE TABLE IF NOT EXISTS change_log (
-                    id TEXT PRIMARY KEY,
-                    device_id TEXT NOT NULL,
-                    table_name TEXT NOT NULL,
-                    row_id TEXT NOT NULL,
-                    operation TEXT NOT NULL,
-                    data TEXT,
-                    timestamp DATETIME NOT NULL,
-                    synced INTEGER DEFAULT 0
-                )
-            `);
-            db.run(`CREATE INDEX IF NOT EXISTS idx_change_log_synced ON change_log(synced)`);
-
-            db.all("PRAGMA table_info(watchlist)", (err, rows: TableInfoRow[]) => {
-                if (err) { logger.error({ err }, "Error checking watchlist schema"); return; }
-                const columns = rows.map(col => col.name);
-                if (!columns.includes("nativeName")) {
-                    db.run(`ALTER TABLE watchlist ADD COLUMN nativeName TEXT`);
-                }
-                if (!columns.includes("englishName")) {
-                    db.run(`ALTER TABLE watchlist ADD COLUMN englishName TEXT`);
-                }
-            });
-
-            db.all("PRAGMA table_info(shows_meta)", (err, rows: TableInfoRow[]) => {
-                if (err) { logger.error({ err }, "Error checking shows_meta schema"); return; }
-                const columns = rows.map(col => col.name);
-                if (!columns.includes("nativeName")) {
-                    db.run(`ALTER TABLE shows_meta ADD COLUMN nativeName TEXT`);
-                }
-                if (!columns.includes("englishName")) {
-                    db.run(`ALTER TABLE shows_meta ADD COLUMN englishName TEXT`, () => {
-                        resolve();
-                    });
-                } else {
-                    resolve();
-                }
-            });
-         });
-      });
-   });
-}
 
 axiosRetry(axios, {
     retries: 3,
@@ -492,21 +421,21 @@ app.post('/api/import/mal-xml', async (req, res) => {
         }
 
         try {
-            db.serialize(() => {
-                db.run('BEGIN TRANSACTION');
-                if (erase) {
-                    db.run(`DELETE FROM watchlist`);
-                }
-                if (showsToInsert.length > 0) {
-                    const stmt = db.prepare(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status) VALUES (?, ?, ?, ?)`);
-                    for (const show of showsToInsert) {
-                        stmt.run(show.id, show.name, show.thumbnail, show.status);
+            if (erase || showsToInsert.length > 0) {
+                await performWriteTransaction(db, (tx) => {
+                    if (erase) {
+                        tx.run(`DELETE FROM watchlist`);
                     }
-                    stmt.finalize();
-                }
-                db.run('COMMIT');
-                res.json({ imported: showsToInsert.length, skipped: skippedCount });
-            });
+                    if (showsToInsert.length > 0) {
+                        const stmt = tx.prepare(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status) VALUES (?, ?, ?, ?)`);
+                        for (const show of showsToInsert) {
+                            stmt.run(show.id, show.name, show.thumbnail, show.status);
+                        }
+                        stmt.finalize();
+                    }
+                });
+            }
+            res.json({ imported: showsToInsert.length, skipped: skippedCount });
         } catch (dbError) {
             logger.error({ err: dbError }, 'DB error on MAL import');
             res.status(500).json({ error: 'DB error on MAL import' });
@@ -600,11 +529,7 @@ app.get('/api/show-details/:id', async (req, res) => {
     }
 });
 
-app.get('/api/continue-watching', (req, res) => {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
-    const offset = (page - 1) * limit;
-
+app.get('/api/continue-watching', (_req, res) => {
     const query = `
         SELECT sm.id as showId, sm.name, sm.thumbnail, sm.nativeName, sm.englishName, we.episodeNumber, we.currentTime, we.duration
         FROM shows_meta sm
@@ -614,9 +539,9 @@ app.get('/api/continue-watching', (req, res) => {
            GROUP BY showId
         ) we ON sm.id = we.showId
         ORDER BY we.watchedAt DESC
-        LIMIT ? OFFSET ?;
+        LIMIT 10;
     `;
-    db.all(query, [limit, offset], async (err: Error | null, rows: { showId: string, name: string, thumbnail: string, episodeNumber: string, currentTime: number, duration: number }[]) => {
+    _req.db.all(query, [], async (err: Error | null, rows: { showId: string, name: string, thumbnail: string, episodeNumber: string, currentTime: number, duration: number }[]) => {
         if (err) return res.status(500).json({ error: 'DB error' });
         try {
             const results = await Promise.all(rows.map(async (show) => {
@@ -660,35 +585,23 @@ app.post('/api/update-progress', async (req, res) => {
     const { showId, episodeNumber, currentTime, duration, showName, showThumbnail, nativeName, englishName } = req.body;
 
     try {
-        const metaData = { id: showId, name: showName, thumbnail: deobfuscateUrl(showThumbnail), nativeName, englishName };
-        await performTrackedWriteTransaction(db,
-            { table_name: 'shows_meta', row_id: showId, operation: 'UPDATE', data: JSON.stringify(metaData) },
-            (tx) => {
-                tx.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName) VALUES (?, ?, ?, ?, ?)',
-                    [metaData.id, metaData.name, metaData.thumbnail, metaData.nativeName, metaData.englishName]);
-            }
-        );
+        await performWriteTransaction(req.db, (tx) => {
+            tx.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName) VALUES (?, ?, ?, ?, ?)',
+                [showId, showName, deobfuscateUrl(showThumbnail), nativeName, englishName]);
 
-        const progressData = { showId, episodeNumber, currentTime, duration };
-        await performTrackedWriteTransaction(db,
-            { table_name: 'watched_episodes', row_id: `${showId}-${episodeNumber}`, operation: 'UPDATE', data: JSON.stringify(progressData) },
-            (tx) => {
-                tx.run(`INSERT OR REPLACE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)`,
-                    [showId, episodeNumber, currentTime, duration]);
-            }
-        );
-
+            tx.run(`INSERT OR REPLACE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)`,
+                [showId, episodeNumber, currentTime, duration]);
+        });
         res.json({ success: true });
     } catch (error) {
         logger.error({ err: error }, 'DB error on progress update');
         res.status(500).json({ error: 'DB error on progress update' });
     }
 });
-
 app.get('/api/episode-progress/:showId/:episodeNumber', (req, res) => {
     const { showId, episodeNumber } = req.params;
 
-    db.get('SELECT currentTime, duration FROM watched_episodes WHERE showId = ? AND episodeNumber = ?',
+    req.db.get('SELECT currentTime, duration FROM watched_episodes WHERE showId = ? AND episodeNumber = ?',
         [showId, episodeNumber], (err: Error | null, row: { currentTime: number, duration: number }) => {
         if (err) return res.status(500).json({ error: 'DB error' });
         res.json(row || { currentTime: 0, duration: 0 });
@@ -696,7 +609,7 @@ app.get('/api/episode-progress/:showId/:episodeNumber', (req, res) => {
 });
 
 app.get('/api/watched-episodes/:showId', (req, res) => {
-    db.all(`SELECT episodeNumber FROM watched_episodes WHERE showId = ?`,
+    req.db.all(`SELECT episodeNumber FROM watched_episodes WHERE showId = ?`,
         [req.params.showId], 
         (err: Error | null, rows: { episodeNumber: string }[]) => err ? res.status(500).json({ error: 'DB error' }) : res.json(rows.map(r => r.episodeNumber))
     );
@@ -705,18 +618,10 @@ app.get('/api/watched-episodes/:showId', (req, res) => {
 app.post('/api/continue-watching/remove', async (req, res) => {
     const { showId } = req.body;
     try {
-        await performTrackedWriteTransaction(db,
-            { table_name: 'watched_episodes', row_id: showId, operation: 'DELETE', data: null },
-            (tx) => {
-                tx.run(`DELETE FROM watched_episodes WHERE showId = ?`, [showId]);
-            }
-        );
-        await performTrackedWriteTransaction(db,
-            { table_name: 'shows_meta', row_id: showId, operation: 'DELETE', data: null },
-            (tx) => {
-                tx.run(`DELETE FROM shows_meta WHERE id = ?`, [showId]);
-            }
-        );
+        await performWriteTransaction(req.db, (tx) => {
+            tx.run(`DELETE FROM watched_episodes WHERE showId = ?`, [showId]);
+            tx.run(`DELETE FROM shows_meta WHERE id = ?`, [showId]);
+        });
         res.json({ success: true });
     } catch (error) {
         logger.error({ err: error }, 'DB error on continue-watching remove');
@@ -727,16 +632,11 @@ app.post('/api/continue-watching/remove', async (req, res) => {
 app.post('/api/watchlist/add', async (req, res) => {
     const { id, name, thumbnail, status, nativeName, englishName } = req.body;
     const finalThumbnail = deobfuscateUrl(thumbnail || '');
-    const data = { id, name, thumbnail: finalThumbnail, status: status || 'Watching', nativeName, englishName };
-
     try {
-        await performTrackedWriteTransaction(db,
-            { table_name: 'watchlist', row_id: id, operation: 'INSERT', data: JSON.stringify(data) },
-            (tx) => {
-                tx.run(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status, nativeName, englishName) VALUES (?, ?, ?, ?, ?, ?)`,
-                    [data.id, data.name, data.thumbnail, data.status, data.nativeName, data.englishName]);
-            }
-        );
+        await performWriteTransaction(req.db, (tx) => {
+            tx.run(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status, nativeName, englishName) VALUES (?, ?, ?, ?, ?, ?)`, 
+                [id, name, finalThumbnail, status || 'Watching', nativeName, englishName]);
+        });
         res.json({ success: true });
     } catch (error) {
         logger.error({ err: error }, 'DB error on watchlist add');
@@ -745,7 +645,7 @@ app.post('/api/watchlist/add', async (req, res) => {
 });
 
 app.get('/api/watchlist/check/:showId', (req, res) => {
-    db.get('SELECT EXISTS(SELECT 1 FROM watchlist WHERE id = ?) as inWatchlist',
+    req.db.get('SELECT EXISTS(SELECT 1 FROM watchlist WHERE id = ?) as inWatchlist',
         [req.params.showId],
         (err: Error | null, row: { inWatchlist: number }) => err ? res.status(500).json({ error: 'DB error' }) : res.json({ inWatchlist: !!row.inWatchlist })
     );
@@ -753,14 +653,10 @@ app.get('/api/watchlist/check/:showId', (req, res) => {
 
 app.post('/api/watchlist/status', async (req, res) => {
     const { id, status } = req.body;
-    const data = { status };
     try {
-        await performTrackedWriteTransaction(db,
-            { table_name: 'watchlist', row_id: id, operation: 'UPDATE', data: JSON.stringify(data) },
-            (tx) => {
-                tx.run(`UPDATE watchlist SET status = ? WHERE id = ?`, [status, id]);
-            }
-        );
+        await performWriteTransaction(req.db, (tx) => {
+            tx.run(`UPDATE watchlist SET status = ? WHERE id = ?`, [status, id]);
+        });
         res.json({ success: true });
     } catch (error) {
         logger.error({ err: error }, 'DB error on watchlist status update');
@@ -785,13 +681,13 @@ app.get('/api/watchlist', (req, res) => {
             break;
     }
 
-    db.all(`SELECT id, name, thumbnail, status, nativeName, englishName FROM watchlist ${orderByClause}`, [],
+    req.db.all(`SELECT id, name, thumbnail, status, nativeName, englishName FROM watchlist ${orderByClause}`, [],
         (err: Error | null, rows: Show[]) => err ? res.status(500).json({ error: 'DB error' }) : res.json(rows)
     );
 });
 
 app.get('/api/watchlist/backfill-names', async (_req, res) => {
-    db.all(`SELECT id, name FROM watchlist`, [], async (err: Error | null, rows: { id: string, name: string }[]) => {
+    _req.db.all(`SELECT id, name FROM watchlist`, [], async (err: Error | null, rows: { id: string, name: string }[]) => {
         if (err) return res.status(500).json({ error: 'DB error' });
 
         let updatedCount = 0;
@@ -805,7 +701,7 @@ app.get('/api/watchlist/backfill-names', async (_req, res) => {
                 const show = response.data?.data?.show;
                 if (show && (show.nativeName || show.englishName)) {
                     await new Promise<void>((resolve, reject) => {
-                        db.run(`UPDATE watchlist SET nativeName = ?, englishName = ? WHERE id = ?`, 
+                        _req.db.run(`UPDATE watchlist SET nativeName = ?, englishName = ? WHERE id = ?`, 
                             [show.nativeName || null, show.englishName || null, item.id],
                             (updateErr: Error | null) => { 
                                 if (updateErr) reject(updateErr); 
@@ -825,12 +721,9 @@ app.get('/api/watchlist/backfill-names', async (_req, res) => {
 app.post('/api/watchlist/remove', async (req, res) => {
     const { id } = req.body;
     try {
-        await performTrackedWriteTransaction(db,
-            { table_name: 'watchlist', row_id: id, operation: 'DELETE', data: null },
-            (tx) => {
-                tx.run(`DELETE FROM watchlist WHERE id = ?`, [id]);
-            }
-        );
+        await performWriteTransaction(req.db, (tx) => {
+            tx.run(`DELETE FROM watchlist WHERE id = ?`, [id]);
+        });
         res.json({ success: true });
     } catch (error) {
         logger.error({ err: error }, 'DB error on watchlist remove');
@@ -839,7 +732,7 @@ app.post('/api/watchlist/remove', async (req, res) => {
 });
 
 app.get('/api/settings/preferredSource', (req, res) => {
-    db.get('SELECT value FROM settings WHERE key = ?', ['preferredSource'], (err: Error | null, row: { value: string } | undefined) => {
+    req.db.get('SELECT value FROM settings WHERE key = ?', ['preferredSource'], (err: Error | null, row: { value: string } | undefined) => {
         if (err) return res.status(500).json({ error: 'DB error' });
         res.json({ value: row ? row.value : null });
     });
@@ -850,7 +743,7 @@ app.get('/api/settings', (req, res) => {
     if (!key) {
         return res.status(400).json({ error: 'Key parameter is required.' });
     }
-    db.get('SELECT value FROM settings WHERE key = ?', [key], (err: Error | null, row: { value: string } | undefined) => {
+    req.db.get('SELECT value FROM settings WHERE key = ?', [key], (err: Error | null, row: { value: string } | undefined) => {
         if (err) return res.status(500).json({ error: 'DB error' });
         res.json({ value: row ? row.value : null });
     });
@@ -858,14 +751,10 @@ app.get('/api/settings', (req, res) => {
 
 app.post('/api/settings', async (req, res) => {
     const { key, value } = req.body;
-    const data = { key, value };
     try {
-        await performTrackedWriteTransaction(db,
-            { table_name: 'settings', row_id: key, operation: 'UPDATE', data: JSON.stringify(data) },
-            (tx) => {
-                tx.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
-            }
-        );
+        await performWriteTransaction(req.db, (tx) => {
+            tx.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
+        });
         res.json({ success: true });
     } catch (error) {
         logger.error({ err: error }, 'DB error on settings update');
@@ -874,34 +763,53 @@ app.post('/api/settings', async (req, res) => {
 });
 
 app.get('/api/backup-db', (_req, res) => {
-   res.download(dbPath, 'ani-web-backup.db', (err: Error | null) => {
-      if (err) {
-         logger.error({ err }, "Error sending database file");
-         res.status(500).send("Could not backup database.");
-      }
+   const dbPath = path.join(__dirname, 'anime.db');
+   _req.db.close((err: Error | null) => {
+        if (err) {
+            logger.error({ err }, 'Failed to close database for backup');
+            return res.status(500).json({ error: 'Failed to close current database.' });
+        }
+        res.download(dbPath, 'ani-web-backup.db', (err: Error | null) => {
+            if (err) {
+                logger.error({ err }, "Error sending database file");
+            }
+            initializeDatabase(dbPath).then(newDb => db = newDb);
+        });
    });
 });
 
-app.post('/api/restore-db', dbUpload.single('dbfile'), (req, res) => {
-   if (!req.file) {
-      return res.status(400).json({ error: 'No database file uploaded.' });
-   }
-   const tempPath = path.join(__dirname, 'anime.db.temp');
-   db.close((err: Error | null) => {
-      if (err) {
-         logger.error({ err }, 'Failed to close database for restore');
-         return res.status(500).json({ error: 'Failed to close current database.' });
-      }
-      fs.rename(tempPath, dbPath, (err: NodeJS.ErrnoException | null) => {
-         if (err) {
-            logger.error({ err }, 'Failed to replace database file');
-            initializeDatabase();
-            return res.status(500).json({ error: 'Failed to replace database file.' });
-         }
-         initializeDatabase();
-         res.json({ success: true, message: 'Database restored successfully. The application will now refresh.' });
-      });
-   });
+app.post('/api/restore-db', (req, res) => {
+    const dbUpload = multer({ storage: multer.diskStorage({ 
+        destination: (_req, _file, cb) => cb(null, __dirname), 
+        filename: (_req, _file, cb) => cb(null, 'anime.db.temp') 
+    }) }).single('dbfile');
+
+    dbUpload(req, res, (err) => {
+        if (err) {
+            return res.status(500).json({ error: 'File upload error.' });
+        }
+        if (!req.file) {
+            return res.status(400).json({ error: 'No database file uploaded.' });
+        }
+        const tempPath = path.join(__dirname, 'anime.db.temp');
+        const dbPath = path.join(__dirname, 'anime.db');
+
+        req.db.close((err: Error | null) => {
+            if (err) {
+                logger.error({ err }, 'Failed to close database for restore');
+                return res.status(500).json({ error: 'Failed to close current database.' });
+            }
+            fs.rename(tempPath, dbPath, (err: NodeJS.ErrnoException | null) => {
+                if (err) {
+                    logger.error({ err }, 'Failed to replace database file');
+                    initializeDatabase(dbPath).then(newDb => db = newDb);
+                    return res.status(500).json({ error: 'Failed to replace database file.' });
+                }
+                initializeDatabase(dbPath).then(newDb => db = newDb);
+                res.json({ success: true, message: 'Database restored successfully. The application will now refresh.' });
+            });
+        });
+    });
 });
 
 app.get('/api/subtitle-proxy', async (req, res) => {
@@ -1246,45 +1154,62 @@ app.get('/api/genres-and-tags', async (_req, res) => {
     res.json({ genres, tags, studios });
 });
 
+const RCLONE_REMOTE_DIR = 'aniweb_db';
+
 async function main() {
-    await getDeviceId();
+    const dbPath = path.join(__dirname, 'anime.db');
     const isSyncEnabled = await verifyRclone();
 
-    if (isSyncEnabled) {
-        await syncDownOnBoot(dbPath);
-    }
-
-    await initializeDatabase();
+    db = await initializeDatabase(dbPath);
     logger.info('Database initialized.');
 
     if (isSyncEnabled) {
-        setTimeout(() => {
-            logger.info('Performing one-time snapshot check on boot...');
-            createSnapshotIfNeeded(db, dbPath);
-        }, 5000);
+        const closeMainDb = () => new Promise<void>((resolve, reject) => {
+            db.close((err) => {
+                if (err) {
+                    logger.error({ err }, 'Failed to close database for sync-down.');
+                    return reject(err);
+                }
+                logger.info('Database closed for sync-down.');
+                resolve();
+            });
+        });
 
-        const changesInterval = 60 * 1000; // 1 minute
-        setInterval(() => {
-            synchronizeChanges(db);
-        }, changesInterval);
-        logger.info(`Delta synchronization scheduled for every ${changesInterval / 1000} seconds.`);
+        const didSyncDown = await syncDownOnBoot(db, dbPath, RCLONE_REMOTE_DIR, closeMainDb);
+        
+        if (didSyncDown) {
+            db = await initializeDatabase(dbPath);
+            logger.info('Database re-initialized after sync-down.');
+        }
+    }
+
+    if (isSyncEnabled) {
+        const watcher = chokidar.watch(dbPath, { persistent: true, ignoreInitial: true });
+        let debounceTimer: NodeJS.Timeout;
+        watcher.on('change', () => {
+            logger.info(`Change detected in ${dbPath}. Resetting debounce timer (15s).`);
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                logger.info(`Debounce timer elapsed. Initiating sync...`);
+                syncUp(db, dbPath, RCLONE_REMOTE_DIR);
+            }, 15000);
+        });
+        logger.info(`Watching ${dbPath} for changes...`);
+
+        process.on('SIGINT', async () => {
+            logger.info('\nShutdown detected. Performing final sync...');
+            clearTimeout(debounceTimer);
+            await syncUp(db, dbPath, RCLONE_REMOTE_DIR);
+            db.close((err) => {
+                if (err) logger.error({ err }, 'Error closing database');
+                logger.info('Database connection closed. Exiting.');
+                process.exit(0);
+            });
+        });
     }
 
     app.listen(port, () => {
         logger.info(`Server is running on http://localhost:${port}`);
-    });
-
-    process.on('SIGINT', async () => {
-        logger.info('\nShutdown detected. Performing final sync and cleanup...');
-        if (isSyncEnabled) {
-            await synchronizeChanges(db);
-            await createSnapshotIfNeeded(db, dbPath);
-        }
-        db.close((err) => {
-            if (err) logger.error({ err }, 'Error closing database');
-            logger.info('Database connection closed. Exiting.');
-            process.exit(0);
-        });
     });
 }
 
