@@ -196,29 +196,48 @@ app.get('/api/continue-watching', (req, res) => {
        ORDER BY we.watchedAt DESC
        LIMIT 10;
    `;
-   req.db.all(query, [], (err, rows: any[]) => {
-       if (err) return res.status(500).json({ error: 'DB error' });
-       const results = rows.map(show => {
-           const isComplete = show.duration > 0 && show.currentTime / show.duration >= 0.95;
-           if (!isComplete && show.currentTime > 0) return { ...show, episodeToPlay: show.episodeNumber };
-           
-           const lastWatchedNum = parseFloat(show.episodeNumber);
-           if (show.episodeCount && lastWatchedNum < show.episodeCount) {
-               return { ...show, episodeToPlay: (lastWatchedNum + 1).toString(), currentTime: 0, duration: 0 };
-           }
-           return null;
-       });
-       res.json(results.filter(Boolean));
-   });
+    req.db.all(query, [], async (err: Error | null, rows: { showId: string, name: string, thumbnail: string, episodeNumber: string, currentTime: number, duration: number }[]) => {
+        if (err) return res.status(500).json({ error: 'DB error' });
+        try {
+            const results = await Promise.all(rows.map(async (show) => {
+                const isComplete = show.duration > 0 && show.currentTime / show.duration >= 0.95;
+                if (!isComplete && show.currentTime > 0) {
+                    return {
+                        ...show,
+                        thumbnail: provider.deobfuscateUrl(show.thumbnail),
+                        episodeToPlay: show.episodeNumber
+                    };
+                } else {
+                     const epDetails = await provider.getEpisodes(show.showId, 'sub');
+                    const allEps = epDetails?.episodes?.sort((a: string, b: string) => parseFloat(a) - parseFloat(b)) || [];
+                    const lastWatchedIndex = allEps.indexOf(show.episodeNumber);
+
+                    if (lastWatchedIndex > -1 && lastWatchedIndex < allEps.length) {
+                        return {
+                            ...show,
+                            episodeToPlay: allEps[lastWatchedIndex],
+                            currentTime: 0,
+                            duration: 0
+                        };
+                    }
+                    return null;
+                }
+            }));
+            res.json(results.filter(Boolean));
+        } catch (apiError) {
+            logger.error({ err: apiError }, "API Error in /continue-watching");
+            res.status(500).json({ error: 'API error while resolving next episodes' });
+        }
+
+    });
 });
 
 app.post('/api/update-progress', async (req, res) => {
     const { showId, episodeNumber, currentTime, duration, showName, showThumbnail, nativeName, englishName, episodeCount } = req.body;
     try {
         await performWriteTransaction(req.db, (tx) => {
-            tx.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName, episodeCount) VALUES (?, ?, ?, ?, ?, ?)',
-                [showId, showName, showThumbnail, nativeName, englishName, episodeCount]);
-            tx.run('UPDATE shows_meta SET episodeCount = ? WHERE id = ? AND episodeCount IS NULL', [episodeCount, showId]);
+            tx.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName) VALUES (?, ?, ?, ?, ?)',
+                [showId, showName, provider.deobfuscateUrl(showThumbnail), nativeName, englishName]);
             tx.run(`INSERT OR REPLACE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)`,
                 [showId, episodeNumber, currentTime, duration]);
         });
@@ -259,7 +278,7 @@ app.post('/api/watchlist/add', async (req, res) => {
     try {
         await performWriteTransaction(req.db, (tx) => {
             tx.run(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status, nativeName, englishName) VALUES (?, ?, ?, ?, ?, ?)`, 
-                [id, name, thumbnail, status || 'Watching', nativeName, englishName]);
+                [id, name, provider.deobfuscateUrl(thumbnail), status || 'Watching', nativeName, englishName]);
         });
         res.json({ success: true });
     } catch (error) {
