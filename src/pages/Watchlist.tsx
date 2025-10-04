@@ -7,20 +7,6 @@ import { useInfiniteWatchlist, useRemoveFromWatchlist, useInfiniteContinueWatchi
 import RemoveConfirmationModal from '../components/common/RemoveConfirmationModal';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-interface _WatchlistItem {
-  id: string;
-  name: string;
-  nativeName?: string;
-  englishName?: string;
-  thumbnail: string;
-  status: string;
-  type?: string;
-  availableEpisodesDetail?: {
-    sub?: string[];
-    dub?: string[];
-  };
-}
-
 const SkeletonGrid = React.memo(() => (
     <div className="grid-container">
         {Array.from({ length: 10 }).map((_, i) => <AnimeCardSkeleton key={i} />)}
@@ -44,12 +30,12 @@ const Watchlist: React.FC = () => {
 
   const { data: watchlistPages, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, error } = useInfiniteWatchlist();
   const watchlist = useMemo(() => watchlistPages?.pages.flat() || [], [watchlistPages]);
+  
   const {
     data: continueWatchingPages,
-    fetchNextPage: fetchNextContinueWatchingPage,
-    hasNextPage: hasNextContinueWatchingPage,
     isFetchingNextPage: isFetchingNextContinueWatchingPage,
     isLoading: loadingContinueWatching,
+    hasNextPage: hasNextContinueWatchingPage,
   } = useInfiniteContinueWatching();
 
   const continueWatchingList = useMemo(() => continueWatchingPages?.pages.flat() || [], [continueWatchingPages]);
@@ -58,20 +44,13 @@ const Watchlist: React.FC = () => {
     mutationFn: async (showId: string) => {
       const response = await fetch("/api/continue-watching/remove", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ showId }),
       });
-      if (!response.ok) {
-        throw new Error("Failed to remove from backend");
-      }
+      if (!response.ok) throw new Error("Failed to remove from backend");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['continueWatching'] });
-    },
-    onError: (error) => {
-      console.error("Error removing from continue watching:", error);
     },
   });
 
@@ -95,8 +74,6 @@ const Watchlist: React.FC = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [fetchNextPage, hasNextPage, isFetchingNextPage, filterBy]);
 
-
-
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const response = await fetch('/api/watchlist/status', {
@@ -109,10 +86,6 @@ const Watchlist: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['watchlist'] });
-    },
-    onError: (e: unknown) => {
-      console.error("Error updating status:", e);
-      alert(`Failed to update status: ${e instanceof Error ? e.message : 'An unknown error occurred'}`);
     },
   });
 
@@ -143,24 +116,24 @@ const Watchlist: React.FC = () => {
     setShowRemoveModal(false);
   }, []);
 
-  const filteredWatchlist = useMemo(() => {
+  const filteredList = useMemo(() => {
     if (filterBy === 'Continue Watching') {
       return continueWatchingList;
     }
     return watchlist?.filter(item => filterBy === 'All' || item.status === filterBy) || [];
   }, [watchlist, filterBy, continueWatchingList]);
 
-  const sortedWatchlist = useMemo(() => {
-    return [...filteredWatchlist].sort((a, b) => {
-      if (sortBy === "name_asc") {
-        return a.name.localeCompare(b.name);
-      }
-      if (sortBy === "name_desc") {
-        return b.name.localeCompare(a.name);
-      }
+  const sortedList = useMemo(() => {
+    return [...filteredList].sort((a, b) => {
+      if (sortBy === "name_asc") return a.name.localeCompare(b.name);
+      if (sortBy === "name_desc") return b.name.localeCompare(a.name);
       return 0;
     });
-  }, [filteredWatchlist, sortBy]);
+  }, [filteredList, sortBy]);
+
+  const isLoadingList = filterBy === 'Continue Watching' ? loadingContinueWatching : isLoading;
+  const isFetchingNext = filterBy === 'Continue Watching' ? isFetchingNextContinueWatchingPage : isFetchingNextPage;
+  const hasNext = filterBy === 'Continue Watching' ? hasNextContinueWatchingPage : hasNextPage;
 
   return (
     <div className="page-container" style={{padding: '1rem'}}>
@@ -169,11 +142,7 @@ const Watchlist: React.FC = () => {
       <div className="watchlist-controls-container" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
         <div className="filter-buttons">
           {['All', 'Continue Watching', 'Watching', 'Completed', 'On-Hold', 'Dropped', 'Planned'].map(status => (
-            <button 
-              key={status} 
-              className={`status-btn ${filterBy === status ? 'active' : ''}`} 
-              onClick={() => setFilterBy(status)}
-            >
+            <button key={status} className={`status-btn ${filterBy === status ? 'active' : ''}`} onClick={() => setFilterBy(status)}>
               {status}
             </button>
           ))}
@@ -186,66 +155,58 @@ const Watchlist: React.FC = () => {
         </select>
       </div>
 
-      {filterBy === 'Continue Watching' ? (
-        <section>
-          <div className="grid-container">
-            {continueWatchingList.map(anime => (
-              <AnimeCard 
-                key={anime._id} 
-                anime={anime} 
-                continueWatching={true} 
-                onRemove={handleRemoveContinueWatching} 
-              />
-            ))}
-            {(loadingContinueWatching || isFetchingNextContinueWatchingPage) && <SkeletonGrid />}
-          </div>
-          {!hasNextContinueWatchingPage && continueWatchingList.length > 0 && <p style={{textAlign: 'center', margin: '1rem'}}>No more anime to continue watching.</p>}
-        </section>
-      ) : isLoading ? (
+      {isLoadingList ? (
         <SkeletonGrid />
       ) : isError ? (
         <ErrorMessage message={error?.message || 'An unknown error occurred'} />
-      ) : sortedWatchlist.length === 0 ? (
-        <p style={{textAlign: 'center', marginTop: '1rem'}}>Your watchlist is empty.</p>
+      ) : sortedList.length === 0 ? (
+        <p style={{textAlign: 'center', marginTop: '1rem'}}>Your list is empty.</p>
       ) : (
-        <div className="grid-container">
-          {sortedWatchlist.map(item => {
-            const animeForCard = {
-              _id: item.id,
-              id: item.id,
-              name: item.name,
-              nativeName: item.nativeName,
-              englishName: item.englishName,
-              thumbnail: item.thumbnail,
-              type: item.type,
-              availableEpisodesDetail: item.availableEpisodesDetail,
-            };
-            return (
-              <div key={item.id} className="watchlist-item-wrapper">
-                <AnimeCard anime={animeForCard} />
-                <div className="watchlist-controls" style={{marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-                  <select
-                    className="form-input"
-                    value={item.status}
-                    onChange={(e) => updateStatus(item.id, e.target.value)}
-                  >
-                    <option value="Watching">Watching</option>
-                    <option value="Completed">Completed</option>
-                    <option value="On-Hold">On-Hold</option>
-                    <option value="Dropped">Dropped</option>
-                    <option value="Planned">Planned</option>
-                  </select>
-                  <button className="btn-danger" onClick={() => handleRemoveClick(item.id, item.name)}>
-                    Remove
-                  </button>
+        <>
+          <div className="grid-container">
+            {sortedList.map(item => (
+              filterBy === 'Continue Watching' ? (
+                <AnimeCard 
+                  key={item.id || item._id}
+                  anime={item} 
+                  continueWatching={true} 
+                  onRemove={handleRemoveContinueWatching}
+                />
+              ) : (
+                <div key={item.id || item._id} className="watchlist-item-wrapper">
+                  <AnimeCard 
+                    anime={item} 
+                    continueWatching={false} 
+                  />
+                  <div className="watchlist-controls" style={{marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+                    <select
+                      className="form-input"
+                      value={item.status}
+                      onChange={(e) => updateStatus(item.id, e.target.value)}
+                      disabled={updateStatusMutation.isPending}
+                    >
+                      <option value="Watching">Watching</option>
+                      <option value="Completed">Completed</option>
+                      <option value="On-Hold">On-Hold</option>
+                      <option value="Dropped">Dropped</option>
+                      <option value="Planned">Planned</option>
+                    </select>
+                    <button 
+                      className="btn-danger" 
+                      onClick={() => handleRemoveClick(item.id, item.name)}
+                      disabled={removeMutation.isPending}
+                    >
+                      {removeMutation.isPending ? 'Removing...' : 'Remove'}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              )
+            ))}
+            {isFetchingNext && <SkeletonGrid />}
+          </div>
+          {!hasNext && sortedList.length > 0 && <p style={{textAlign: 'center', margin: '1rem'}}>No more results.</p>}
+        </>
       )}
-
-
 
       <RemoveConfirmationModal
         show={showRemoveModal}

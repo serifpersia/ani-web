@@ -529,65 +529,58 @@ app.get('/api/show-details/:id', async (req, res) => {
     }
 });
 
-app.get('/api/continue-watching', (_req, res) => {
-    const query = `
-        SELECT sm.id as showId, sm.name, sm.thumbnail, sm.nativeName, sm.englishName, we.episodeNumber, we.currentTime, we.duration
-        FROM shows_meta sm
-        JOIN (
-           SELECT showId, episodeNumber, currentTime, duration, MAX(watchedAt) as watchedAt
+app.get('/api/continue-watching', (req, res) => {
+     const query = `
+        SELECT sm.id as _id, sm.id as id, sm.name, sm.thumbnail, sm.nativeName, sm.englishName, sm.episodeCount, we.episodeNumber, we.currentTime, we.duration
+         FROM shows_meta sm
+         JOIN (
+            SELECT showId, episodeNumber, currentTime, duration, MAX(watchedAt) as watchedAt
            FROM watched_episodes
            GROUP BY showId
         ) we ON sm.id = we.showId
         ORDER BY we.watchedAt DESC
         LIMIT 10;
     `;
-    _req.db.all(query, [], async (err: Error | null, rows: { showId: string, name: string, thumbnail: string, episodeNumber: string, currentTime: number, duration: number }[]) => {
+    req.db.all(query, [], (err: Error | null, rows: any[]) => {
         if (err) return res.status(500).json({ error: 'DB error' });
-        try {
-            const results = await Promise.all(rows.map(async (show) => {
-                const isComplete = show.duration > 0 && show.currentTime / show.duration >= 0.95;
-                if (!isComplete && show.currentTime > 0) {
+
+        const results = rows.map(show => {
+            const isComplete = show.duration > 0 && show.currentTime / show.duration >= 0.95;
+            if (!isComplete && show.currentTime > 0) {
+                return {
+                    ...show,
+                    thumbnail: deobfuscateUrl(show.thumbnail),
+                    episodeToPlay: show.episodeNumber
+                };
+            } else {
+                const lastWatchedNum = parseFloat(show.episodeNumber);
+                if (show.episodeCount && lastWatchedNum < show.episodeCount) {
+                    const nextEpisode = (lastWatchedNum + 1).toString();
                     return {
                         ...show,
                         thumbnail: deobfuscateUrl(show.thumbnail),
-                        episodeToPlay: show.episodeNumber
+                        episodeToPlay: nextEpisode,
+                        currentTime: 0,
+                        duration: 0
                     };
-                } else {
-                     const epResponse = await axios.get(apiEndpoint, {
-                        headers: { 'User-Agent': userAgent, 'Referer': referer },
-                        params: { query: `query($showId: String!) { show(_id: $showId) { availableEpisodesDetail } }`, variables: JSON.stringify({ showId: show.showId }) },
-                        timeout: 10000
-                    });
-                    const allEps = epResponse.data.data.show.availableEpisodesDetail.sub?.sort((a: string, b: string) => parseFloat(a) - parseFloat(b)) || [];
-                    const lastWatchedIndex = allEps.indexOf(show.episodeNumber);
-
-                    if (lastWatchedIndex > -1 && lastWatchedIndex < allEps.length) {
-                        return {
-                            ...show,
-                            thumbnail: deobfuscateUrl(show.thumbnail),
-                            episodeToPlay: allEps[lastWatchedIndex],
-                            currentTime: 0,
-                            duration: 0
-                        };
-                    }
-                    return null;
                 }
-            }));
-            res.json(results.filter(Boolean));
-        } catch (apiError) {
-            logger.error({ err: apiError }, "API Error in /continue-watching");
-            res.status(500).json({ error: 'API error while resolving next episodes' });
-        }
+                return null;
+            }
+        });
+        res.json(results.filter(Boolean));
     });
 });
 
+
 app.post('/api/update-progress', async (req, res) => {
-    const { showId, episodeNumber, currentTime, duration, showName, showThumbnail, nativeName, englishName } = req.body;
+    const { showId, episodeNumber, currentTime, duration, showName, showThumbnail, nativeName, englishName, episodeCount } = req.body;
 
     try {
         await performWriteTransaction(req.db, (tx) => {
-            tx.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName) VALUES (?, ?, ?, ?, ?)',
-                [showId, showName, deobfuscateUrl(showThumbnail), nativeName, englishName]);
+            tx.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName, episodeCount) VALUES (?, ?, ?, ?, ?, ?)',
+                [showId, showName, deobfuscateUrl(showThumbnail), nativeName, englishName, episodeCount]);
+            
+            tx.run('UPDATE shows_meta SET episodeCount = ? WHERE id = ? AND episodeCount IS NULL', [episodeCount, showId]);
 
             tx.run(`INSERT OR REPLACE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)`,
                 [showId, episodeNumber, currentTime, duration]);
@@ -691,7 +684,7 @@ app.get('/api/watchlist', (req, res) => {
         }
         res.setHeader('X-Total-Count', row.count.toString());
 
-        const dataQuery = `SELECT id, name, thumbnail, status, nativeName, englishName FROM watchlist ${orderByClause} LIMIT ? OFFSET ?`;
+        const dataQuery = `SELECT id as _id, id, name, thumbnail, status, nativeName, englishName FROM watchlist ${orderByClause} LIMIT ? OFFSET ?`;
         req.db.all(dataQuery, [limit, offset],
             (err: Error | null, rows: Show[]) => err ? res.status(500).json({ error: 'DB error on data' }) : res.json(rows)
         );
@@ -1139,12 +1132,18 @@ app.get('/api/show-meta/:id', async (req, res) => {
     try {
         const response = await axios.get(apiEndpoint, {
             headers: { 'User-Agent': userAgent, 'Referer': referer },
-            params: { query: `query($showId: String!) { show(_id: $showId) { name, thumbnail, nativeName, englishName } }`, variables: JSON.stringify({ showId }) },
+            params: { query: `query($showId: String!) { show(_id: $showId) { name, thumbnail, nativeName, englishName, availableEpisodesDetail } }`, variables: JSON.stringify({ showId }) },
             timeout: 15000
         });
         const show = response.data.data.show;
         if (show) {
-            const meta = { name: show.name, thumbnail: deobfuscateUrl(show.thumbnail), nativeName: show.nativeName, englishName: show.englishName };
+            const meta = { 
+                name: show.name, 
+                thumbnail: deobfuscateUrl(show.thumbnail), 
+                nativeName: show.nativeName, 
+                englishName: show.englishName,
+                availableEpisodesDetail: show.availableEpisodesDetail
+            };
             apiCache.set(cacheKey, meta);
             res.set('Cache-Control', 'public, max-age=300');
             res.json(meta);
