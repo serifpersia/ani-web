@@ -30,7 +30,7 @@ Follow these steps to get ani-web running locally:
 
 3.  **Install Dependencies:**
     ```bash
-	npm run install
+	npm install
     npm run build
     ```
 
