@@ -666,8 +666,11 @@ app.post('/api/watchlist/status', async (req, res) => {
 
 app.get('/api/watchlist', (req, res) => {
     const sort = req.query.sort || 'last_added';
-    let orderByClause;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 14;
+    const offset = (page - 1) * limit;
 
+    let orderByClause;
     switch (sort) {
         case 'name_asc':
             orderByClause = 'ORDER BY name ASC';
@@ -681,9 +684,18 @@ app.get('/api/watchlist', (req, res) => {
             break;
     }
 
-    req.db.all(`SELECT id, name, thumbnail, status, nativeName, englishName FROM watchlist ${orderByClause}`, [],
-        (err: Error | null, rows: Show[]) => err ? res.status(500).json({ error: 'DB error' }) : res.json(rows)
-    );
+    const countQuery = 'SELECT COUNT(*) as count FROM watchlist';
+    req.db.get(countQuery, [], (err: Error | null, row: { count: number }) => {
+        if (err) {
+            return res.status(500).json({ error: 'DB error on count' });
+        }
+        res.setHeader('X-Total-Count', row.count.toString());
+
+        const dataQuery = `SELECT id, name, thumbnail, status, nativeName, englishName FROM watchlist ${orderByClause} LIMIT ? OFFSET ?`;
+        req.db.all(dataQuery, [limit, offset],
+            (err: Error | null, rows: Show[]) => err ? res.status(500).json({ error: 'DB error on data' }) : res.json(rows)
+        );
+    });
 });
 
 app.get('/api/watchlist/backfill-names', async (_req, res) => {

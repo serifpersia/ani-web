@@ -168,7 +168,7 @@ export const useCurrentSeason = () => {
 
 
 const fetchContinueWatchingPage = async ({ pageParam = 1 }): Promise<Anime[]> => {
-  const response = await fetch(`/api/continue-watching?page=${pageParam}&limit=10`);
+  const response = await fetch(`/api/continue-watching?page=${pageParam}&limit=14`);
   if (!response.ok) throw new Error("Failed to fetch continue watching");
   const data: ContinueWatchingItem[] = await response.json();
 
@@ -243,8 +243,8 @@ export const useSearchAnime = (searchQueryString: string) => {
   });
 };
 
-const fetchWatchlist = async (): Promise<Anime[]> => {
-  const response = await fetch("/api/watchlist");
+const fetchWatchlistPage = async ({ pageParam = 1 }): Promise<Anime[]> => {
+  const response = await fetch(`/api/watchlist?page=${pageParam}&limit=14`);
   if (!response.ok) throw new Error("Failed to fetch watchlist");
   const data: WatchlistItem[] = await response.json();
 
@@ -267,10 +267,14 @@ const fetchWatchlist = async (): Promise<Anime[]> => {
   return detailedWatchlist.filter(Boolean) as Anime[];
 };
 
-export const useWatchlist = () => {
-  return useQuery<Anime[]>({
+export const useInfiniteWatchlist = () => {
+  return useInfiniteQuery<Anime[], Error, Anime[], string[], number>({
     queryKey: ['watchlist'],
-    queryFn: fetchWatchlist,
+    queryFn: fetchWatchlistPage,
+    getNextPageParam: (lastPage, allPages) => {
+      if (lastPage.length === 0) return undefined;
+      return allPages.length + 1;
+    },
   });
 };
 

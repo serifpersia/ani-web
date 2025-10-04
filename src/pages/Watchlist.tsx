@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import AnimeCard from '../components/anime/AnimeCard';
 import AnimeCardSkeleton from '../components/anime/AnimeCardSkeleton';
 import ErrorMessage from '../components/common/ErrorMessage';
-import { useWatchlist, useRemoveFromWatchlist, useInfiniteContinueWatching } from '../hooks/useAnimeData';
+import { useInfiniteWatchlist, useRemoveFromWatchlist, useInfiniteContinueWatching } from '../hooks/useAnimeData';
 import RemoveConfirmationModal from '../components/common/RemoveConfirmationModal';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
@@ -42,7 +42,8 @@ const Watchlist: React.FC = () => {
     }
   }, [location.state]);
 
-  const { data: watchlist, isLoading, isError, error } = useWatchlist();
+  const { data: watchlistPages, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, error } = useInfiniteWatchlist();
+  const watchlist = useMemo(() => watchlistPages?.pages.flat() || [], [watchlistPages]);
   const {
     data: continueWatchingPages,
     fetchNextPage: fetchNextContinueWatchingPage,
@@ -81,18 +82,20 @@ const Watchlist: React.FC = () => {
   useEffect(() => {
     const handleScroll = () => {
       if (
-        filterBy === 'Continue Watching' &&
         window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000 &&
-        !isFetchingNextContinueWatchingPage &&
-        hasNextContinueWatchingPage
+        !isFetchingNextPage &&
+        hasNextPage &&
+        filterBy !== 'Continue Watching'
       ) {
-        fetchNextContinueWatchingPage();
+        fetchNextPage();
       }
     };
 
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [filterBy, isFetchingNextContinueWatchingPage, hasNextContinueWatchingPage, fetchNextContinueWatchingPage]);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, filterBy]);
+
+
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -241,6 +244,8 @@ const Watchlist: React.FC = () => {
           })}
         </div>
       )}
+
+
 
       <RemoveConfirmationModal
         show={showRemoveModal}
