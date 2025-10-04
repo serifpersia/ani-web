@@ -2,6 +2,7 @@ const thumbnailCache = new Map<string, string>();
 
 export const fixThumbnailUrl = (url: string | undefined): string => {
   if (!url || url.trim() === '') return '/placeholder.png';
+  if (url.includes('/api/image-proxy')) return url;
   if (thumbnailCache.has(url)) return thumbnailCache.get(url)!;
 
   let finalUrl: string;

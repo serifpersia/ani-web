@@ -1,0 +1,60 @@
+import React from 'react';
+import styles from '../../pages/Player.module.css';
+import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
+
+interface ShowDetailsProps {
+    showMeta: any;
+    allMangaDetails: any;
+    loading: boolean;
+    error: string | null;
+    isOpen: boolean;
+    onToggle: () => void;
+}
+
+const ShowDetails: React.FC<ShowDetailsProps> = ({ showMeta, allMangaDetails, loading, error, isOpen, onToggle }) => {
+    return (
+        <div className={styles.detailsBox}>
+            <button className={styles.detailsToggle} onClick={onToggle}>
+                <h3>Details</h3>
+                {isOpen ? <FaChevronUp /> : <FaChevronDown />}
+            </button>
+            {isOpen && (
+                <>
+                    {loading ? (
+                        <p className={styles.loadingDetails}>Loading details...</p>
+                    ) : error ? (
+                        <p className="error-message">{error}</p>
+                    ) : (
+                        <div className={styles.detailsGridContainer}>
+                            <div className={styles.detailItem}><strong>Type:</strong> {showMeta.mediaTypes?.[0]?.name}</div>
+                            <div className={styles.detailItem}><strong>Status:</strong> {showMeta.status}</div>
+                            <div className={styles.detailItem}><strong>Score:</strong> {showMeta.stats ? showMeta.stats.averageScore / 10 : 'N/A'}</div>
+                            <div className={styles.detailItem}><strong>Studios:</strong> {showMeta.studios?.map((s: any) => s.name).join(', ')}</div>
+                            <div className={styles.detailItem}><strong>English Title:</strong> {showMeta.names?.english}</div>
+                            <div className={styles.detailItem}><strong>Native Title:</strong> {showMeta.names?.native}</div>
+                            {showMeta.genres && showMeta.genres.length > 0 && (
+                                <div className={`${styles.detailItem} ${styles.genresContainer}`}>
+                                    <strong>Genres:</strong>
+                                    <div className={styles.genresList}>
+                                        {showMeta.genres.map((genre: any) => <span key={genre.route} className={styles.genreTag}>{genre.name}</span>)}
+                                    </div>
+                                </div>
+                            )}
+                            {allMangaDetails && (
+                                <>
+                                    <div className={styles.detailItem}><strong>Rating:</strong> {allMangaDetails.Rating}</div>
+                                    <div className={styles.detailItem}><strong>Season:</strong> {allMangaDetails.Season}</div>
+                                    <div className={styles.detailItem}><strong>Episodes:</strong> {allMangaDetails.Episodes}</div>
+                                    <div className={styles.detailItem}><strong>Date:</strong> {allMangaDetails.Date}</div>
+                                    <div className={styles.detailItem}><strong>Original Broadcast:</strong> {allMangaDetails["Original Broadcast"]}</div>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </>
+            )}
+        </div>
+    );
+};
+
+export default ShowDetails;
