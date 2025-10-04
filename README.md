@@ -16,37 +16,55 @@
 
 *   **Node.js**: Version 16 or higher ([Download](https://nodejs.org/)).
 
-## Installation
+## Quick Start
 
-Follow these steps to get ani-web running locally:
+This is the recommended method for most users. It will automatically download the latest pre-built version of ani-web and start the application.
 
-1.  **Clone or Download the Repository:**
+### For Linux & macOS
 
+Open a terminal and run this single command:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/serifpersia/ani-web/main/setup.sh | bash
+```
+
+*(Prerequisites: Node.js, npm, curl, and unzip)*
+
+### For Windows
+
+Open a **PowerShell** terminal and run this single command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -Command "iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/serifpersia/ani-web/main/setup.ps1'))"
+```
+
+*(Prerequisites: Node.js, npm, and PowerShell)*
+
+After the setup is complete, the script will start the application, and you can access it at `http://localhost:3000`.
+
+## Manual Installation (for Developers)
+
+If you want to work with the source code, you can clone the repository and build the project manually.
+
+1.  **Clone the Repository:**
     ```bash
-	Clone this repository or download the ZIP file. 
     git clone https://github.com/serifpersia/ani-web.git
     cd ani-web
     ```
 
-3.  **Install Dependencies:**
+2.  **Install, Build, and Run:**
+    The `run.sh` and `run.bat` scripts provide a menu to choose between a development or production setup. To run a development environment (which will install all dependencies and build the source code), simply run the script and choose "Development".
+
+    **On Linux/macOS:**
     ```bash
-	npm install
-    npm run build
+    chmod +x run.sh
+    ./run.sh
     ```
 
-## Usage
-
-1.  **Start the Application:**
-
-    ```bash
-    npm run start
+    **On Windows:**
+    ```bat
+    run.bat
     ```
-	Use run.bat/.sh to start automatic install/build/start process.
-- Use chmod +x run.sh to be able to run it on linux
-
-3.  **Access the Web Interface:**
-    *   Open your web browser and navigate to the URL provided in the terminal (`http://localhost:3000`).
-
 
 ## License
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
