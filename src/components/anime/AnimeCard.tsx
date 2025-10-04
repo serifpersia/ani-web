@@ -5,7 +5,6 @@ import styles from './AnimeCard.module.css';
 import { FaMicrophone, FaClosedCaptioning } from 'react-icons/fa';
 import useIsMobile from '../../hooks/useIsMobile';
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext';
-import { useAnimeDetails } from '../../hooks/useAnimeData';
 
 interface Anime {
   _id: string;
@@ -33,7 +32,6 @@ interface AnimeCardProps {
 const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = false, onRemove }) => {
   const isMobile = useIsMobile();
   const { titlePreference } = useTitlePreference();
-  const { data: animeDetails, isLoading } = useAnimeDetails(anime);
 
   const displayTitle = anime[titlePreference] || anime.name;
 
@@ -58,17 +56,11 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
 
   const episodeCountElement = (
     <div className={isMobile ? styles.episodeCountInline : (continueWatching ? styles.episodeCountOverlay : `${styles.episodeCountOverlay} ${styles.normalCardEpisodeCount}`)}>
-      {isLoading ? (
-        <div className={`${styles.episodeCountItem} ${styles.subCount}`}><FaClosedCaptioning /> ?</div>
-      ) : (
-        <>
-          {animeDetails?.availableEpisodesDetail?.sub && animeDetails.availableEpisodesDetail.sub.length > 0 && (
-            <div className={`${styles.episodeCountItem} ${styles.subCount}`}><FaClosedCaptioning /> {animeDetails.availableEpisodesDetail.sub.length}</div>
-          )}
-          {animeDetails?.availableEpisodesDetail?.dub && animeDetails.availableEpisodesDetail.dub.length > 0 && (
-            <div className={`${styles.episodeCountItem} ${styles.dubCount}`}><FaMicrophone /> {animeDetails.availableEpisodesDetail.dub.length}</div>
-          )}
-        </>
+      {anime.availableEpisodesDetail?.sub && anime.availableEpisodesDetail.sub.length > 0 && (
+        <div className={`${styles.episodeCountItem} ${styles.subCount}`}><FaClosedCaptioning /> {anime.availableEpisodesDetail.sub.length}</div>
+      )}
+      {anime.availableEpisodesDetail?.dub && anime.availableEpisodesDetail.dub.length > 0 && (
+        <div className={`${styles.episodeCountItem} ${styles.dubCount}`}><FaMicrophone /> {anime.availableEpisodesDetail.dub.length}</div>
       )}
     </div>
   );
@@ -89,7 +81,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
   );
 
   const showTypeElement = (
-    <div className={isMobile ? styles.showTypeInline : styles.showType}>{isLoading ? '?' : animeDetails?.type || 'TV'}</div>
+    <div className={isMobile ? styles.showTypeInline : styles.showType}>{anime.type || 'TV'}</div>
   );
 
   return (
@@ -99,14 +91,16 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
     >
       <div className={styles.posterContainer}>
         {!isMobile && episodeNumberElement}
-        {!isMobile && continueWatching && episodeCountElement} {}
+        {!isMobile && continueWatching && episodeCountElement}
         {!isMobile && progressElement}
-        {!isMobile && !continueWatching && episodeCountElement} {}
+        {!isMobile && !continueWatching && episodeCountElement}
         <img 
           src={fixThumbnailUrl(anime.thumbnail)} 
           alt={anime.name} 
           className={styles.posterImg} 
           loading="lazy"
+          width="200"
+          height="300"
           style={{ opacity: 0 }}
           onLoad={(e) => {
             e.currentTarget.style.opacity = '1';
@@ -118,25 +112,24 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
         />
       </div>
       <div className={styles.info}>
-        {isMobile && removeButtonElement} {}
+        {isMobile && removeButtonElement}
         <div className={styles.title} title={displayTitle}>{displayTitle}</div>
         {isMobile && (
           <div className={styles.mobileDetailsBottom}>
             <div className={styles.mobileDetailsBottomLeft}>
               {showTypeElement} 
-              {continueWatching && episodeNumberElement} {}
+              {continueWatching && episodeNumberElement}
             </div>
             <div className={styles.mobileDetailsBottomRight}>
               {episodeCountElement}
             </div>
           </div>
         )}
-        {isMobile && progressElement} {}
-        {!isMobile && continueWatching && removeButtonElement} {}
-        {!isMobile && showTypeElement} {}
+        {isMobile && progressElement}
+        {!isMobile && continueWatching && removeButtonElement}
+        {!isMobile && showTypeElement}
         {continueWatching ? null : (
           <div className={styles.details}>
-            {}
           </div>
         )}
       </div>

@@ -166,7 +166,7 @@ export async function syncDownOnBoot(db: Database, dbPath: string, remoteDir: st
             
             await fs.unlink(backupPath);
             log.info('Cleaned up backup file.');
-            return true; // Indicates a sync-down happened
+            return true;
         } catch (err) {
             log.error({ err }, 'CRITICAL: Failed to download newer database. Restoring from backup.');
             try {
@@ -175,7 +175,7 @@ export async function syncDownOnBoot(db: Database, dbPath: string, remoteDir: st
             } catch (restoreErr) {
                 log.error({ restoreErr }, 'FATAL: Failed to restore database from backup. Manual intervention may be required.');
             }
-            return true; // Re-initialize even on failure
+            return true;
         }
     } else {
         log.info('Local database is up to date. No download needed on boot.');
@@ -299,6 +299,9 @@ export function initializeDatabase(dbPath: string): Promise<Database> {
                 }
                 if (!columns.includes("englishName")) {
                     db.run(`ALTER TABLE shows_meta ADD COLUMN englishName TEXT`);
+                }
+                if (!columns.includes("episodeCount")) {
+                    db.run(`ALTER TABLE shows_meta ADD COLUMN episodeCount INTEGER`);
                 }
             });
 
