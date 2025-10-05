@@ -1114,3 +1114,39 @@ body.light .sourceButton, body.light .qualityButton {
     border: none;
     z-index: 1;
 }
+
+.websitesContainer {
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.websitesList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+}
+
+.websiteLink {
+    background-color: var(--dark-bg-primary);
+    color: var(--dark-text-secondary);
+    padding: 0.4rem 0.9rem;
+    border-radius: 15px;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: all 0.2s;
+    border: 1px solid var(--dark-border);
+}
+
+.websiteLink:hover {
+    background-color: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+body.light .websiteLink {
+    background-color: var(--light-bg-primary);
+    color: var(--light-text-secondary);
+    border-color: var(--light-border);
+}

@@ -196,7 +196,7 @@ app.get('/api/continue-watching', (req, res) => {
        ORDER BY we.watchedAt DESC
        LIMIT 10;
    `;
-    req.db.all(query, [], async (err: Error | null, rows: { showId: string, name: string, thumbnail: string, episodeNumber: string, currentTime: number, duration: number }[]) => {
+    req.db.all(query, [], async (err: Error | null, rows: { id: string, name: string, thumbnail: string, episodeNumber: string, currentTime: number, duration: number }[]) => {
         if (err) return res.status(500).json({ error: 'DB error' });
         try {
             const results = await Promise.all(rows.map(async (show) => {
@@ -208,7 +208,7 @@ app.get('/api/continue-watching', (req, res) => {
                         episodeToPlay: show.episodeNumber
                     };
                 } else {
-                     const epDetails = await provider.getEpisodes(show.showId, 'sub');
+                     const epDetails = await provider.getEpisodes(show.id, 'sub');
                     const allEps = epDetails?.episodes?.sort((a: string, b: string) => parseFloat(a) - parseFloat(b)) || [];
                     const lastWatchedIndex = allEps.indexOf(show.episodeNumber);
 
@@ -472,6 +472,38 @@ app.get('/api/show-meta/:id', async (req, res) => {
         }
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch show metadata' });
+    }
+});
+
+app.get('/api/show-details/:id', async (req, res) => {
+    const { id } = req.params;
+    const cacheKey = `show-details-${id}`;
+    if (apiCache.has(cacheKey)) {
+        return res.json(apiCache.get(cacheKey));
+    }
+    try {
+        const data = await provider.getShowDetails(id);
+        logger.info({ showDetails: data }, 'Show details from API');
+        if (data) {
+            apiCache.set(cacheKey, data, 3600);
+            res.json(data);
+        } else {
+            res.status(404).json({ error: "Not Found on Schedule" });
+        }
+    } catch (error) {
+        res.status(500).json({ error: "Error fetching show details" });
+    }
+});
+
+app.get('/api/allmanga-details/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const data = await provider.getAllmangaDetails(id);
+        logger.info({ allmangaDetails: data }, 'Allmanga details from API');
+        res.json(data);
+    } catch (error) {
+        logger.error({ err: error, animeId: id }, `Error fetching allmanga details for ${id}`);
+        res.status(500).json({ error: "Failed to fetch allmanga details" });
     }
 });
 

@@ -1,6 +1,7 @@
 import axios from 'axios';
 import logger from '../logger';
 import { Provider, Show, VideoSource, EpisodeDetails, SkipIntervals, VideoLink, SubtitleTrack } from './provider.interface';
+import * as cheerio from 'cheerio';
 
 const API_BASE_URL = 'https://allanime.day';
 const API_ENDPOINT = `https://api.allanime.day/api`;
@@ -313,5 +314,70 @@ export class AllAnimeProvider implements Provider {
 
         const results = await Promise.allSettled(sourcePromises);
         return results.map(result => result.status === 'fulfilled' ? result.value : null).filter(Boolean) as VideoSource[];
+    }
+
+    async getShowDetails(showId: string): Promise<any> {
+        const metaQuery = `query($showId: String!) { show(_id: $showId) { name } }`;
+        const metaResponse = await axios.get(API_ENDPOINT, {
+            headers: { 'User-Agent': USER_AGENT, 'Referer': REFERER },
+            params: { query: metaQuery, variables: JSON.stringify({ showId }) },
+            timeout: 10000
+        });
+        const showName = metaResponse.data?.data?.show?.name;
+
+        if (!showName) {
+            throw new Error('Show not found');
+        }
+
+        const scheduleSearchUrl = `https://animeschedule.net/api/v3/anime?q=${encodeURIComponent(showName)}`;
+        const scheduleResponse = await axios.get(scheduleSearchUrl, { timeout: 10000 });
+        
+        const firstResult = scheduleResponse.data?.anime?.[0];
+        
+        if (firstResult) {
+            if (firstResult.status === 'Ongoing') {
+                try {
+                    const pageResponse = await axios.get(`https://animeschedule.net/anime/${firstResult.route}`, { timeout: 10000 });
+                    const countdownMatch = pageResponse.data.match(/countdown-time" datetime=\"([^"]*)\"/);
+                    if (countdownMatch) {
+                        firstResult.nextEpisodeAirDate = countdownMatch[1];
+                    }
+                } catch (_e) {
+                    logger.warn({ err: _e }, 'Failed to scrape for nextEpisodeAirDate');
+                }
+            }
+            return firstResult;
+        }
+        
+        throw new Error('Not Found on Schedule');
+    }
+
+    async getAllmangaDetails(showId: string): Promise<any> {
+        const url = `https://allmanga.to/bangumi/${showId}`;
+        const headers = {
+            "User-Agent": USER_AGENT,
+            "Referer": REFERER
+        };
+
+        const response = await axios.get(url, { headers });
+        const $ = cheerio.load(response.data);
+
+        const details: { [key: string]: string } = {
+            "Rating": "N/A",
+            "Season": "N/A",
+            "Episodes": "N/A",
+            "Date": "N/A",
+            "Original Broadcast": "N/A"
+        };
+
+        $('.info-season').each((_i, elem) => {
+            const label = $(elem).find('h4').text().trim();
+            const value = $(elem).find('li').text().trim();
+            if (Object.prototype.hasOwnProperty.call(details, label)) {
+                details[label] = value;
+            }
+        });
+        
+        return details;
     }
 }

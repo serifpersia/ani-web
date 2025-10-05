@@ -56,4 +56,6 @@ export interface Provider {
     getEpisodes(showId: string, mode: 'sub' | 'dub'): Promise<EpisodeDetails | null>;
     getStreamUrls(showId: string, episodeNumber: string, mode: 'sub' | 'dub'): Promise<VideoSource[] | null>;
     getSkipTimes(showId: string, episodeNumber: string): Promise<SkipIntervals>;
+    getShowDetails(showId: string): Promise<any>;
+    getAllmangaDetails(showId: string): Promise<any>;
 }
