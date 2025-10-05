@@ -1150,3 +1150,42 @@ body.light .websiteLink {
     color: var(--light-text-secondary);
     border-color: var(--light-border);
 }
+
+.detailsError {
+    color: #ff4d4d;
+    font-weight: 500;
+}
+
+.spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--accent);
+    border-bottom-color: transparent;
+    border-radius: 50%;
+    display: inline-block;
+    box-sizing: border-box;
+    animation: rotation 1s linear infinite;
+}
+
+@keyframes rotation {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.sourceLoader {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    background-color: var(--dark-bg-secondary);
+    border-radius: var(--card-border-radius);
+    margin-bottom: 1.5rem;
+}
+
+body.light .sourceLoader {
+    background-color: var(--light-bg-secondary);
+}

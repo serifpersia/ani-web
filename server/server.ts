@@ -483,7 +483,6 @@ app.get('/api/show-details/:id', async (req, res) => {
     }
     try {
         const data = await provider.getShowDetails(id);
-        logger.info({ showDetails: data }, 'Show details from API');
         if (data) {
             apiCache.set(cacheKey, data, 3600);
             res.json(data);
@@ -499,7 +498,6 @@ app.get('/api/allmanga-details/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const data = await provider.getAllmangaDetails(id);
-        logger.info({ allmangaDetails: data }, 'Allmanga details from API');
         res.json(data);
     } catch (error) {
         logger.error({ err: error, animeId: id }, `Error fetching allmanga details for ${id}`);
