@@ -35,6 +35,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
     const [availableSubtitles, setAvailableSubtitles] = useState<TextTrack[]>([]);
     const [activeSubtitleTrack, setActiveSubtitleTrack] = useState<string | null>(null);
     const [showSourceMenu, setShowSourceMenu] = useState(false);
+    const [isBuffering, setIsBuffering] = useState(false);
 
     const sendProgressUpdate = useCallback((isFinalUpdate = false) => {
         const video = videoRef.current;
@@ -168,7 +169,16 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [togglePlay, toggleFullscreen, toggleMute, seek]);
 
-    const onPlay = useCallback(() => setIsPlaying(true), []);
+    const onPlay = useCallback(() => {
+        setIsPlaying(true);
+        setIsBuffering(false);
+    }, []);
+    const onPlaying = useCallback(() => {
+        setIsBuffering(false);
+    }, []);
+    const onWaiting = useCallback(() => {
+        setIsBuffering(true);
+    }, []);
     const onPause = useCallback(() => setIsPlaying(false), []);
     const onLoadedMetadata = useCallback(() => setDuration(videoRef.current?.duration || 0), []);
     const onVolumeChange = useCallback(() => {
@@ -247,10 +257,10 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
         onVolumeChange, onProgress, onTimeUpdate, onEnded, setShowControls, setIsScrubbing, setHoverTime,
         setIsAutoSkipEnabled, setCurrentSkipInterval, setShowCCMenu, setSubtitleFontSize,
         setSubtitlePosition, setAvailableSubtitles, setActiveSubtitleTrack, setShowSourceMenu,
-        wasPlayingBeforeScrub, inactivityTimer, setIsFullscreen
+        wasPlayingBeforeScrub, inactivityTimer, setIsFullscreen, onWaiting, onPlaying
     }), [
         togglePlay, seek, toggleMute, toggleFullscreen, onPlay, onPause, onLoadedMetadata,
-        onVolumeChange, onProgress, onTimeUpdate, onEnded, setIsFullscreen
+        onVolumeChange, onProgress, onTimeUpdate, onEnded, setIsFullscreen, onWaiting, onPlaying
     ]);
 
     return {
@@ -258,7 +268,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
         state: {
             isPlaying, isMuted, volume, isFullscreen, currentTime, duration, buffered, showControls,
             isScrubbing, hoverTime, isAutoSkipEnabled, currentSkipInterval, showCCMenu, subtitleFontSize,
-            subtitlePosition, availableSubtitles, activeSubtitleTrack, showSourceMenu
+            subtitlePosition, availableSubtitles, activeSubtitleTrack, showSourceMenu, isBuffering
         },
         actions: actions
     };

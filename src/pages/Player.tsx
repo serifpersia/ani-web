@@ -652,6 +652,12 @@ const Player: React.FC = () => {
                 </div>
             </div>
         )}
+
+        {player.state.isBuffering && !state.loadingVideo && (
+            <div className={styles.bufferingOverlay}>
+                <div className={styles.bufferingSpinner}></div>
+            </div>
+        )}
         
         {state.selectedSource?.type === 'iframe' ? (
             !state.loadingVideo && <iframe
@@ -684,6 +690,8 @@ const Player: React.FC = () => {
                 onTimeUpdate={actions.onTimeUpdate}
                 onProgress={actions.onProgress}
                 onVolumeChange={actions.onVolumeChange}
+                onWaiting={actions.onWaiting}
+                onPlaying={actions.onPlaying}
             />}
           </>
         )}
