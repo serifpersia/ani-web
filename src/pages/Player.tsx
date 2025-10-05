@@ -484,6 +484,12 @@ const Player: React.FC = () => {
   }, [state.isAutoplayEnabled, state.episodes, state.currentEpisode, showId, navigate, refs.videoRef]);
 
   useEffect(() => {
+    if (state.showResumeModal && refs.videoRef.current) {
+        refs.videoRef.current.pause();
+    }
+  }, [state.showResumeModal, refs.videoRef]);
+
+  useEffect(() => {
     const container = player.refs.playerContainerRef.current;
     if (!container || isMobile) return;
     const handleMouseMove = () => {
