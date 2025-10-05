@@ -192,10 +192,10 @@ const Player: React.FC = () => {
       dispatch({ type: 'SET_LOADING', key: 'loadingShowData', value: true });
       try {
         const [metaResponse, episodesResponse, watchlistResponse, watchedResponse] = await Promise.all([
-          fetch(`/api/show-meta/${showId}`),
-          fetch(`/api/episodes?showId=${showId}&mode=${state.currentMode}`),
-          fetchWithProfile(`/api/watchlist/check/${showId}`),
-          fetchWithProfile(`/api/watched-episodes/${showId}`),
+            fetch(`/api/show-meta/${showId}`),
+            fetch(`/api/episodes?showId=${showId}&mode=${state.currentMode}`),
+            fetchWithProfile(`/api/watchlist/check/${showId}`),
+            fetchWithProfile(`/api/watched-episodes/${showId}`),
         ]);
 
         if (!metaResponse.ok) throw new Error("Failed to fetch show metadata");
@@ -207,14 +207,14 @@ const Player: React.FC = () => {
         const watchedData = watchedResponse.ok ? await watchedResponse.json() : [];
 
         dispatch({
-          type: 'SHOW_DATA_SUCCESS',
-          payload: {
-            showMeta: { ...meta, description: episodeData.description, names: meta.names || { romaji: meta.name, english: meta.englishName, native: meta.nativeName } },
-            episodes: episodeData.episodes.sort((a: string, b: string) => parseFloat(a) - parseFloat(b)),
-            inWatchlist: watchlistStatus.inWatchlist,
-            watchedEpisodes: watchedData,
-            currentEpisode: episodeNumber || (episodeData.episodes.length > 0 ? episodeData.episodes[0] : undefined),
-          },
+            type: 'SHOW_DATA_SUCCESS',
+            payload: {
+                showMeta: { ...meta, description: episodeData.description, names: meta.names || { romaji: meta.name, english: meta.englishName, native: meta.nativeName } },
+                episodes: episodeData.episodes.sort((a: string, b: string) => parseFloat(a) - parseFloat(b)),
+                inWatchlist: watchlistStatus.inWatchlist,
+                watchedEpisodes: watchedData,
+                currentEpisode: episodeNumber || (episodeData.episodes.length > 0 ? episodeData.episodes[0] : undefined),
+            },
         });
       } catch (e) {
         dispatch({ type: 'SET_ERROR', payload: e instanceof Error ? e.message : 'An unknown error occurred' });
@@ -223,10 +223,30 @@ const Player: React.FC = () => {
     fetchInitialData();
   }, [showId, state.currentMode, episodeNumber]);
 
+  useEffect(() => {
+    const fetchDetails = async () => {
+        if (!showId || state.loadingShowData) return;
+        dispatch({ type: 'SET_LOADING', key: 'loadingDetails', value: true });
+        dispatch({ type: 'SET_STATE', payload: { detailsError: null } });
+        try {
+            const detailsResponse = await fetch(`/api/show-details/${showId}`);
+            if (detailsResponse.ok) {
+                const details = await detailsResponse.json();
+                dispatch({ type: 'SET_STATE', payload: { showMeta: { ...state.showMeta, ...details }, loadingDetails: false } });
+            } else {
+                throw new Error('Failed to fetch show details');
+            }
+        } catch (e) {
+            dispatch({ type: 'SET_STATE', payload: { detailsError: e instanceof Error ? e.message : 'Failed to load details', loadingDetails: false } });
+        }
+    };
+    fetchDetails();
+  }, [showId, state.loadingShowData]);
+
   const handleToggleDetails = useCallback(async () => {
     dispatch({ type: 'SET_STATE', payload: { showCombinedDetails: !state.showCombinedDetails } });
 
-    if (state.showCombinedDetails || state.showMeta.status) {
+    if (state.showCombinedDetails || state.allMangaDetails) {
       return;
     }
 
@@ -234,20 +254,12 @@ const Player: React.FC = () => {
       dispatch({ type: 'SET_LOADING', key: 'loadingDetails', value: true });
       dispatch({ type: 'SET_STATE', payload: { detailsError: null } });
 
-      const [detailsResponse, allmangaDetailsResponse] = await Promise.all([
-        fetch(`/api/show-details/${showId}`),
-        fetch(`/api/allmanga-details/${showId}`),
-      ]);
-
-      if (!detailsResponse.ok) throw new Error("Failed to fetch show details");
-
-      const details = await detailsResponse.json();
+      const allmangaDetailsResponse = await fetch(`/api/allmanga-details/${showId}`);
       const allmangaDetails = allmangaDetailsResponse.ok ? await allmangaDetailsResponse.json() : null;
 
       dispatch({
         type: 'SET_STATE',
         payload: {
-          showMeta: { ...state.showMeta, ...details },
           allMangaDetails: allmangaDetails,
           loadingDetails: false,
         },
@@ -261,7 +273,7 @@ const Player: React.FC = () => {
         }
       });
     }
-  }, [showId, state.showCombinedDetails, state.showMeta]);
+  }, [showId, state.showCombinedDetails, state.allMangaDetails]);
 
   const setPreferredSource = useCallback(async (sourceName: string) => {
     try {
@@ -609,12 +621,18 @@ const Player: React.FC = () => {
         <div className={styles.header}>
           <div className={styles.titleContainer}>
             <h2>{displayTitle}</h2>
-            {(state.showMeta.status || state.showMeta.nextEpisodeAirDate) && (
-              <div className={styles.scheduleInfo}>
-                {state.showMeta.status && <span className={styles.status}>{state.showMeta.status}</span>}
-                {state.showMeta.nextEpisodeAirDate && <span className={styles.nextEpisode}>Next: {state.showMeta.nextEpisodeAirDate}</span>}
-              </div>
-            )}
+            <div className={styles.scheduleInfo}>
+              {state.loadingDetails ? (
+                <div className={styles.spinner}></div>
+              ) : state.detailsError ? (
+                <span className={styles.detailsError}>{state.detailsError}</span>
+              ) : (
+                <>
+                  {state.showMeta.status && <span className={styles.status}>{state.showMeta.status}</span>}
+                  {state.showMeta.nextEpisodeAirDate && <span className={styles.nextEpisode}>Next: {state.showMeta.nextEpisodeAirDate}</span>}
+                </>
+              )}
+            </div>
           </div>
           <div className={styles.controls}>
 
@@ -696,14 +714,20 @@ const Player: React.FC = () => {
         )}
       </div>
 
-      <SourceSelector 
-        videoSources={state.videoSources}
-        selectedSource={state.selectedSource}
-        onSourceChange={(source) => {
-          const bestLink = source.links.sort((a, b) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0))[0];
-          dispatch({ type: 'SET_STATE', payload: { selectedSource: source, selectedLink: bestLink } })
-        }}
-      />
+      {state.loadingVideo ? (
+        <div className={styles.sourceLoader}>
+            <div className={styles.spinner}></div>
+        </div>
+      ) : (
+        <SourceSelector 
+            videoSources={state.videoSources}
+            selectedSource={state.selectedSource}
+            onSourceChange={(source) => {
+              const bestLink = source.links.sort((a, b) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0))[0];
+              dispatch({ type: 'SET_STATE', payload: { selectedSource: source, selectedLink: bestLink } })
+            }}
+        />
+      )}
 
       {isMobile && state.selectedSource?.type !== 'iframe' && (
         <div className={styles.mobileControls}>
