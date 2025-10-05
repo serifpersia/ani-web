@@ -2,7 +2,7 @@ import React, { useEffect, useReducer, useRef, useCallback, useState, useMemo } 
 import { useParams, useNavigate } from 'react-router-dom';
 import styles from './Player.module.css';
 import ToggleSwitch from '../components/common/ToggleSwitch';
-import { FaCheck, FaPlus, FaChevronDown, FaChevronUp } from 'react-icons/fa';
+import { FaCheck, FaPlus } from 'react-icons/fa';
 import { fixThumbnailUrl } from '../lib/utils';
 import ResumeModal from '../components/common/ResumeModal';
 import useIsMobile from '../hooks/useIsMobile';
@@ -172,7 +172,13 @@ const Player: React.FC = () => {
   const { id: showId, episodeNumber } = useParams<{ id: string; episodeNumber?: string }>();
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(playerReducer, initialState);
-  const player = useVideoPlayer(state.skipIntervals);
+  
+  const player = useVideoPlayer({
+      skipIntervals: state.skipIntervals,
+      showId: showId,
+      episodeNumber: state.currentEpisode,
+      showMeta: state.showMeta
+  });
   const { refs, actions } = player;
 
   const hlsInstance = useRef<Hls | null>(null);
@@ -425,48 +431,11 @@ const Player: React.FC = () => {
     };
   }, [state.selectedSource, state.selectedLink, setPreferredSource, refs.videoRef, actions]);
 
-
-
-  useEffect(() => {
-    const videoElement = refs.videoRef.current;
-    if (!videoElement || !showId || !state.currentEpisode || !state.showMeta.name) return;
-
-    let interval: NodeJS.Timeout;
-
-    const updateProgress = () => {
-        if (isNaN(videoElement.duration) || videoElement.duration === 0) return;
-        const episodeCount = state.showMeta.episodes || 0;
-        fetchWithProfile('/api/update-progress', {
-            method: 'POST',
-            body: JSON.stringify({
-                showId,
-                episodeNumber: state.currentEpisode,
-                currentTime: videoElement.currentTime,
-                duration: videoElement.duration,
-                showName: state.showMeta.name,
-                showThumbnail: fixThumbnailUrl(state.showMeta.thumbnail!),
-                nativeName: state.showMeta.names?.native,
-                englishName: state.showMeta.names?.english,
-                episodeCount: episodeCount
-            })
-        });
-    };
-
-    if (player.state.isPlaying) {
-        interval = setInterval(updateProgress, 5000);
-    }
-
-    return () => {
-        if (interval) {
-            clearInterval(interval);
-        }
-    };
-  }, [showId, state.currentEpisode, state.showMeta, refs.videoRef, player.state.isPlaying]);
-
   useEffect(() => {
     const videoElement = refs.videoRef.current;
     if (!videoElement) return;
     const handleVideoEnd = () => {
+        actions.onEnded();
         if (state.isAutoplayEnabled) {
             const currentIndex = state.episodes.findIndex(ep => ep === state.currentEpisode);
             if (currentIndex > -1 && currentIndex < state.episodes.length - 1) {
@@ -481,7 +450,7 @@ const Player: React.FC = () => {
             videoElement.removeEventListener('ended', handleVideoEnd);
         }
     };
-  }, [state.isAutoplayEnabled, state.episodes, state.currentEpisode, showId, navigate, refs.videoRef]);
+  }, [state.isAutoplayEnabled, state.episodes, state.currentEpisode, showId, navigate, refs.videoRef, actions]);
 
   useEffect(() => {
     if (state.showResumeModal && refs.videoRef.current) {

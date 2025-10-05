@@ -1,12 +1,21 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import type { SkipInterval } from '../pages/Player';
 
-const useVideoPlayer = (skipIntervals: SkipInterval[]) => {
+interface VideoPlayerProps {
+    skipIntervals: SkipInterval[];
+    showId?: string;
+    episodeNumber?: string;
+    showMeta?: { name?: string; thumbnail?: string; names?: { native?: string; english?: string } };
+}
+
+const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: VideoPlayerProps) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const playerContainerRef = useRef<HTMLDivElement>(null);
     const progressBarRef = useRef<HTMLDivElement>(null);
     const inactivityTimer = useRef<number | null>(null);
     const wasPlayingBeforeScrub = useRef(false);
+    const debouncedUpdateTimer = useRef<NodeJS.Timeout | null>(null);
+    const lastThrottledUpdateTime = useRef(0);
 
     const [isPlaying, setIsPlaying] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
@@ -27,6 +36,46 @@ const useVideoPlayer = (skipIntervals: SkipInterval[]) => {
     const [activeSubtitleTrack, setActiveSubtitleTrack] = useState<string | null>(null);
     const [showSourceMenu, setShowSourceMenu] = useState(false);
 
+    const sendProgressUpdate = useCallback((isFinalUpdate = false) => {
+        const video = videoRef.current;
+        if (!video || !showId || !episodeNumber || !showMeta?.name || isNaN(video.duration) || video.duration === 0) {
+            return;
+        }
+
+        const isFinished = video.currentTime >= video.duration * 0.95;
+        let timeToReport = video.currentTime;
+
+        if (isFinalUpdate && isFinished) {
+            timeToReport = video.duration;
+        }
+
+        if (timeToReport === 0 && !isFinished) return;
+
+        fetch('/api/update-progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                showId,
+                episodeNumber,
+                currentTime: timeToReport,
+                duration: video.duration,
+                showName: showMeta.name,
+                showThumbnail: showMeta.thumbnail,
+                nativeName: showMeta.names?.native,
+                englishName: showMeta.names?.english,
+            })
+        }).catch(err => console.error("Failed to update progress:", err));
+    }, [showId, episodeNumber, showMeta]);
+
+    useEffect(() => {
+        const handleBeforeUnload = () => sendProgressUpdate(true);
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            sendProgressUpdate(true);
+        };
+    }, [sendProgressUpdate]);
+
     const formatTime = (timeInSeconds: number): string => {
         if (isNaN(timeInSeconds) || timeInSeconds <= 0) return '00:00';
         const result = new Date(timeInSeconds * 1000).toISOString().slice(11, 19);
@@ -46,8 +95,12 @@ const useVideoPlayer = (skipIntervals: SkipInterval[]) => {
     const seek = useCallback((seconds: number) => {
         if (videoRef.current) {
             videoRef.current.currentTime += seconds;
+            if (debouncedUpdateTimer.current) clearTimeout(debouncedUpdateTimer.current);
+            debouncedUpdateTimer.current = setTimeout(() => {
+                sendProgressUpdate();
+            }, 1500);
         }
-    }, []);
+    }, [sendProgressUpdate]);
 
     const toggleMute = useCallback(() => {
         if (!videoRef.current) return;
@@ -130,17 +183,49 @@ const useVideoPlayer = (skipIntervals: SkipInterval[]) => {
         }
     }, []);
     const onTimeUpdate = useCallback(() => {
-        const time = videoRef.current?.currentTime || 0;
+        const video = videoRef.current;
+        if (!video) return;
+        const time = video.currentTime || 0;
         if (!isScrubbing) {
             setCurrentTime(time);
         }
+        
+        const now = Date.now();
+        if (now - lastThrottledUpdateTime.current > 5000) {
+            lastThrottledUpdateTime.current = now;
+            sendProgressUpdate();
+        }
+
         const activeSkip = skipIntervals.find(interval => time >= interval.start_time && time < interval.end_time);
         setCurrentSkipInterval(activeSkip || null);
-        if (isAutoSkipEnabled && activeSkip && videoRef.current && !videoRef.current.paused) {
-            videoRef.current.currentTime = activeSkip.end_time;
+        if (isAutoSkipEnabled && activeSkip && !video.paused) {
+            video.currentTime = activeSkip.end_time;
             setCurrentSkipInterval(null);
         }
-    }, [isScrubbing, skipIntervals, isAutoSkipEnabled]);
+    }, [isScrubbing, skipIntervals, isAutoSkipEnabled, sendProgressUpdate]);
+
+    const onEnded = useCallback(() => {
+        sendProgressUpdate(true);
+    }, [sendProgressUpdate]);
+
+    useEffect(() => {
+        const handleDocumentMouseUp = () => {
+            if (isScrubbing) {
+                setIsScrubbing(false);
+                setHoverTime({ time: 0, position: null });
+                if (wasPlayingBeforeScrub.current) {
+                    videoRef.current?.play();
+                }
+                sendProgressUpdate();
+            }
+        };
+        if (isScrubbing) {
+            document.addEventListener('mouseup', handleDocumentMouseUp);
+        }
+        return () => {
+            document.removeEventListener('mouseup', handleDocumentMouseUp);
+        };
+    }, [isScrubbing, sendProgressUpdate]);
 
     useEffect(() => {
         let styleElement = document.getElementById('subtitle-style-override') as HTMLStyleElement;
@@ -159,13 +244,13 @@ const useVideoPlayer = (skipIntervals: SkipInterval[]) => {
 
     const actions = useMemo(() => ({
         togglePlay, seek, toggleMute, toggleFullscreen, onPlay, onPause, onLoadedMetadata, formatTime,
-        onVolumeChange, onProgress, onTimeUpdate, setShowControls, setIsScrubbing, setHoverTime,
+        onVolumeChange, onProgress, onTimeUpdate, onEnded, setShowControls, setIsScrubbing, setHoverTime,
         setIsAutoSkipEnabled, setCurrentSkipInterval, setShowCCMenu, setSubtitleFontSize,
         setSubtitlePosition, setAvailableSubtitles, setActiveSubtitleTrack, setShowSourceMenu,
         wasPlayingBeforeScrub, inactivityTimer, setIsFullscreen
     }), [
         togglePlay, seek, toggleMute, toggleFullscreen, onPlay, onPause, onLoadedMetadata,
-        onVolumeChange, onProgress, onTimeUpdate, setIsFullscreen
+        onVolumeChange, onProgress, onTimeUpdate, onEnded, setIsFullscreen
     ]);
 
     return {
