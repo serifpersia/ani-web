@@ -284,7 +284,7 @@ const Player: React.FC = () => {
         const [sourcesResponse, progressResponse, preferredSourceResponse, skipTimesResponse] = await Promise.all([
           fetch(`/api/video?showId=${showId}&episodeNumber=${state.currentEpisode}&mode=${state.currentMode}`),
           fetchWithProfile(`/api/episode-progress/${showId}/${state.currentEpisode}`),
-          fetchWithProfile(`/api/settings/preferredSource`),
+          fetchWithProfile(`/api/settings?key=preferredSource`),
           fetch(`/api/skip-times/${showId}/${state.currentEpisode}`)
         ]);
 
