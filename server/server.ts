@@ -215,9 +215,7 @@ app.get('/api/continue-watching', (req, res) => {
                     if (lastWatchedIndex > -1 && lastWatchedIndex < allEps.length) {
                         return {
                             ...show,
-                            episodeToPlay: allEps[lastWatchedIndex],
-                            currentTime: 0,
-                            duration: 0
+                            episodeToPlay: allEps[lastWatchedIndex]
                         };
                     }
                     return null;

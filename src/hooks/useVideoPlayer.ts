@@ -36,8 +36,11 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
     const [activeSubtitleTrack, setActiveSubtitleTrack] = useState<string | null>(null);
     const [showSourceMenu, setShowSourceMenu] = useState(false);
     const [isBuffering, setIsBuffering] = useState(false);
+    const hasEnded = useRef(false);
 
     const sendProgressUpdate = useCallback((isFinalUpdate = false) => {
+        if (hasEnded.current) return;
+
         const video = videoRef.current;
         if (!video || !showId || !episodeNumber || !showMeta?.name || isNaN(video.duration) || video.duration === 0) {
             return;
@@ -69,11 +72,17 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
     }, [showId, episodeNumber, showMeta]);
 
     useEffect(() => {
-        const handleBeforeUnload = () => sendProgressUpdate(true);
+        const handleBeforeUnload = () => {
+            if (!hasEnded.current) {
+                sendProgressUpdate(true);
+            }
+        };
         window.addEventListener('beforeunload', handleBeforeUnload);
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
-            sendProgressUpdate(true);
+            if (!hasEnded.current) {
+                sendProgressUpdate(true);
+            }
         };
     }, [sendProgressUpdate]);
 
@@ -214,9 +223,32 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
         }
     }, [isScrubbing, skipIntervals, isAutoSkipEnabled, sendProgressUpdate]);
 
+    const reportFinalProgress = useCallback(() => {
+        const video = videoRef.current;
+        if (!video || !showId || !episodeNumber || !showMeta?.name || isNaN(video.duration) || video.duration === 0) {
+            return;
+        }
+
+        fetch('/api/update-progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                showId,
+                episodeNumber,
+                currentTime: video.duration,
+                duration: video.duration,
+                showName: showMeta.name,
+                showThumbnail: showMeta.thumbnail,
+                nativeName: showMeta.names?.native,
+                englishName: showMeta.names?.english,
+            })
+        }).catch(err => console.error("Failed to send final progress:", err));
+    }, [showId, episodeNumber, showMeta]);
+
     const onEnded = useCallback(() => {
-        sendProgressUpdate(true);
-    }, [sendProgressUpdate]);
+        hasEnded.current = true;
+        reportFinalProgress();
+    }, [reportFinalProgress]);
 
     useEffect(() => {
         const handleDocumentMouseUp = () => {
