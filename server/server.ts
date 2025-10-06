@@ -185,7 +185,7 @@ app.post('/api/import/mal-xml', multer().single('xmlfile'), async (req, res) => 
 });
 
 async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeProvider, limit?: number, page?: number): Promise<any[]> {
-    // List 1: In-Progress
+
     const inProgressQuery = `
         SELECT
             sm.id as _id, sm.id, sm.name, sm.thumbnail, sm.nativeName, sm.englishName,
@@ -206,7 +206,6 @@ async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeP
         });
     });
 
-    // List 2: Up Next/Binge
     const watchingShowsQuery = `
         SELECT
             w.id, w.name, w.thumbnail, w.nativeName, w.englishName,
@@ -227,7 +226,7 @@ async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeP
     for (const show of watchingShows) {
         try {
             const [epDetails, watchedEpisodesResult] = await Promise.all([
-                provider.getEpisodes(show.id, 'sub'), // Assuming 'sub' is default for episode list
+                provider.getEpisodes(show.id, 'sub'),
                 new Promise<any[]>((resolve, reject) => {
                     db.all('SELECT * FROM watched_episodes WHERE showId = ?', [show.id], (err, rows) => {
                         if (err) reject(err);
@@ -275,11 +274,9 @@ async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeP
         }
     }
 
-    // Combine & Prioritize
     const combinedList = [];
     const seenShowIds = new Set();
 
-    // Add up-next shows first
     for (const show of upNextShows) {
         if (!seenShowIds.has(show.id)) {
             combinedList.push({
@@ -290,7 +287,6 @@ async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeP
         }
     }
 
-    // Add in-progress shows
     for (const show of inProgressShows) {
         if (!seenShowIds.has(show.id)) {
             combinedList.push({
@@ -301,7 +297,6 @@ async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeP
         }
     }
 
-    // Add fully-watched shows
     for (const show of fullyWatchedShows) {
         if (!seenShowIds.has(show.id)) {
             combinedList.push({

@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import NProgress from 'nprogress';
 import 'nprogress/nprogress.css';
 
-// Configure NProgress
 NProgress.configure({ showSpinner: false });
 
 const TopProgressBar: React.FC = () => {
