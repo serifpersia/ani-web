@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import AnimeCard from '../components/anime/AnimeCard';
 import AnimeCardSkeleton from '../components/anime/AnimeCardSkeleton';
 import ErrorMessage from '../components/common/ErrorMessage';
 import { useInfiniteWatchlist, useRemoveFromWatchlist, useAllContinueWatching } from '../hooks/useAnimeData';
+import { useSetting, useUpdateSetting } from '../hooks/useSettings';
 import RemoveConfirmationModal from '../components/common/RemoveConfirmationModal';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
@@ -15,29 +16,29 @@ const SkeletonGrid = React.memo(() => (
 
 const Watchlist: React.FC = () => {
   const queryClient = useQueryClient();
-  const location = useLocation();
+  const navigate = useNavigate();
+  const { filter: filterBy = 'All' } = useParams<{ filter: string }>();
   const [sortBy, setSortBy] = useState("last_added");
-  const [filterBy, setFilterBy] = useState(location.state?.filter || "All");
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [animeToRemoveId, setAnimeToRemoveId] = useState<string | null>(null);
   const [animeToRemoveName, setAnimeToRemoveName] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (location.state?.filter) {
-      setFilterBy(location.state.filter);
-    }
-  }, [location.state]);
 
-  const { data: watchlistPages, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, error } = useInfiniteWatchlist();
+
+  const { data: watchlistPages, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, error } = useInfiniteWatchlist(filterBy);
   const watchlist = useMemo(() => watchlistPages?.pages.flat() || [], [watchlistPages]);
   
   const {
-    data: allContinueWatchingList,
+    data: continueWatchingPages,
+    fetchNextPage: fetchNextContinueWatching,
+    hasNextPage: hasNextContinueWatching,
+    isFetchingNextPage: isFetchingNextContinueWatching,
     isLoading: loadingAllContinueWatching,
     isError: isErrorAllContinueWatching,
-    error: errorAllContinueWatching,
-    refetch
+    error: errorAllContinueWatching
   } = useAllContinueWatching();
+
+  const allContinueWatchingList = useMemo(() => continueWatchingPages?.pages.flat() || [], [continueWatchingPages]);
 
   const removeContinueWatchingMutation = useMutation({
     mutationFn: async (showId: string) => {
@@ -58,26 +59,26 @@ const Watchlist: React.FC = () => {
   }, [removeContinueWatchingMutation]);
 
   useEffect(() => {
-    if (filterBy === 'Continue Watching') {
-      refetch();
-    }
-  }, [filterBy, refetch]);
-
-  useEffect(() => {
     const handleScroll = () => {
-      if (
-        window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000 &&
-        !isFetchingNextPage &&
-        hasNextPage &&
-        filterBy !== 'Continue Watching'
-      ) {
-        fetchNextPage();
+      const isAtBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000;
+      if (filterBy === 'Continue Watching') {
+        if (isAtBottom && !isFetchingNextContinueWatching && hasNextContinueWatching) {
+          fetchNextContinueWatching();
+        }
+      } else {
+        if (isAtBottom && !isFetchingNextPage && hasNextPage) {
+          fetchNextPage();
+        }
       }
     };
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage, filterBy]);
+  }, [
+      fetchNextPage, hasNextPage, isFetchingNextPage,
+      filterBy,
+      fetchNextContinueWatching, hasNextContinueWatching, isFetchingNextContinueWatching
+    ]);
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -94,6 +95,10 @@ const Watchlist: React.FC = () => {
     },
   });
 
+  const { data: skipRemoveConfirmationSetting } = useSetting('skipRemoveConfirmation');
+  const skipRemoveConfirmation = skipRemoveConfirmationSetting == true;
+  const updateSettingMutation = useUpdateSetting();
+
   const removeMutation = useRemoveFromWatchlist();
 
   const updateStatus = useCallback((id: string, status: string) => {
@@ -101,19 +106,26 @@ const Watchlist: React.FC = () => {
   }, [updateStatusMutation]);
 
   const handleRemoveClick = useCallback((id: string, name: string) => {
-    setAnimeToRemoveId(id);
-    setAnimeToRemoveName(name);
-    setShowRemoveModal(true);
-  }, []);
+    if (skipRemoveConfirmation) {
+      removeMutation.mutate(id);
+    } else {
+      setAnimeToRemoveId(id);
+      setAnimeToRemoveName(name);
+      setShowRemoveModal(true);
+    }
+  }, [skipRemoveConfirmation, removeMutation]);
 
-  const handleConfirmRemove = useCallback(() => {
+  const handleConfirmRemove = useCallback((options: { rememberPreference?: boolean }) => {
     if (animeToRemoveId) {
       removeMutation.mutate(animeToRemoveId);
+      if (options.rememberPreference) {
+        updateSettingMutation.mutate({ key: 'skipRemoveConfirmation', value: true });
+      }
       setAnimeToRemoveId(null);
       setAnimeToRemoveName(null);
       setShowRemoveModal(false);
     }
-  }, [animeToRemoveId, removeMutation]);
+  }, [animeToRemoveId, removeMutation, updateSettingMutation]);
 
   const handleCancelRemove = useCallback(() => {
     setAnimeToRemoveId(null);
@@ -121,26 +133,26 @@ const Watchlist: React.FC = () => {
     setShowRemoveModal(false);
   }, []);
 
-  const filteredList = useMemo(() => {
+  const listToDisplay = useMemo(() => {
     if (filterBy === 'Continue Watching') {
       return allContinueWatchingList || [];
     }
-    return watchlist?.filter(item => filterBy === 'All' || item.status === filterBy) || [];
+    return watchlist || [];
   }, [watchlist, filterBy, allContinueWatchingList]);
 
   const sortedList = useMemo(() => {
-    return [...filteredList].sort((a, b) => {
+    return [...listToDisplay].sort((a, b) => {
       if (sortBy === "name_asc") return a.name.localeCompare(b.name);
       if (sortBy === "name_desc") return b.name.localeCompare(a.name);
       return 0;
     });
-  }, [filteredList, sortBy]);
+  }, [listToDisplay, sortBy]);
 
   const isLoadingList = filterBy === 'Continue Watching' ? loadingAllContinueWatching : isLoading;
   const isErrorList = filterBy === 'Continue Watching' ? isErrorAllContinueWatching : isError;
   const errorList = filterBy === 'Continue Watching' ? errorAllContinueWatching : error;
-  const isFetchingNext = filterBy === 'Continue Watching' ? false : isFetchingNextPage;
-  const hasNext = filterBy === 'Continue Watching' ? false : hasNextPage;
+  const isFetchingNext = filterBy === 'Continue Watching' ? isFetchingNextContinueWatching : isFetchingNextPage;
+  const hasNext = filterBy === 'Continue Watching' ? hasNextContinueWatching : hasNextPage;
 
   return (
     <div className="page-container" style={{padding: '1rem'}}>
@@ -149,7 +161,7 @@ const Watchlist: React.FC = () => {
       <div className="watchlist-controls-container" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
         <div className="filter-buttons">
           {['All', 'Continue Watching', 'Watching', 'Completed', 'On-Hold', 'Dropped', 'Planned'].map(status => (
-            <button key={status} className={`status-btn ${filterBy === status ? 'active' : ''}`} onClick={() => setFilterBy(status)}>
+            <button key={status} className={`status-btn ${filterBy === status ? 'active' : ''}`} onClick={() => navigate(`/watchlist/${status}`)}>
               {status}
             </button>
           ))}
@@ -216,10 +228,11 @@ const Watchlist: React.FC = () => {
       )}
 
       <RemoveConfirmationModal
-        show={showRemoveModal}
-        message={`Are you sure you want to remove ${animeToRemoveName} from your watchlist?`}
+        isOpen={showRemoveModal}
+        onClose={handleCancelRemove}
         onConfirm={handleConfirmRemove}
-        onCancel={handleCancelRemove}
+        animeName={animeToRemoveName || ''}
+        scenario="watchlist"
       />
     </div>
   );
