@@ -506,20 +506,39 @@ app.get('/api/subtitle-proxy', async (req, res) => {
     }
 });
 
+import sharp from 'sharp';
+
 app.get('/api/image-proxy', async (req, res) => {
+    const { url, w, h } = req.query;
+    const width = w ? parseInt(w as string) : undefined;
+    const height = h ? parseInt(h as string) : undefined;
+
+    if (!url) {
+        return res.status(400).send('URL is required');
+    }
+
     try {
-        const { data: streamData, headers: originalHeaders } = await axios({
-            method: 'get', url: req.query.url as string, responseType: 'stream',
-            headers: { Referer: 'https://allanime.day', 'User-Agent': 'Mozilla/5.0' }, timeout: 10000, maxRedirects: 5
+        const imageResponse = await axios({
+            method: 'get',
+            url: url as string,
+            responseType: 'arraybuffer',
+            headers: { Referer: 'https://allanime.day', 'User-Agent': 'Mozilla/5.0' },
         });
-        res.set('Cache-Control', 'public, max-age=604800, immutable').set('Content-Type', originalHeaders['content-type'] || 'image/webp');
-        streamData.pipe(res);
-        streamData.on('error', (err: any) => {
-            if (err.code !== 'ECONNRESET') logger.error({ err }, 'Image proxy stream error');
-            if (!res.headersSent) res.status(500).send('Error streaming image.');
-            else res.end();
-        });
-        res.on('close', () => streamData.destroy());
+
+        let transformer = sharp(imageResponse.data);
+
+        if (width || height) {
+            transformer = transformer.resize(width, height, { fit: 'cover' });
+        }
+
+        transformer = transformer.webp({ quality: 80 });
+
+        res.set('Content-Type', 'image/webp');
+        res.set('Cache-Control', 'public, max-age=604800, immutable');
+
+        const resizedImageBuffer = await transformer.toBuffer();
+        res.send(resizedImageBuffer);
+
     } catch (e) {
         logger.error({ err: e }, 'Image proxy error');
         res.status(200).sendFile(path.join(__dirname, '..','public/placeholder.svg'));

@@ -29,10 +29,24 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  background-color: #ccc;
+  background: linear-gradient(-45deg, #232526, #2a2d2e, #232526, #2a2d2e);
+  background-size: 400% 400%;
+  animation: gradient 8s ease infinite;
   transition: transform 0.5s ease, opacity 0.3s ease;
   position: relative;
   z-index: 2;
+}
+
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 .info {
