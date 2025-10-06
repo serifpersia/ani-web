@@ -26,10 +26,7 @@
     border-radius: 26px;
 }
 
-body.light .slider {
-    background-color: var(--light-bg-secondary);
-    border: 1px solid var(--light-border);
-}
+
 
 .slider:before {
     position: absolute;

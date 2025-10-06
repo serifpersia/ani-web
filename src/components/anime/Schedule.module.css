@@ -25,10 +25,7 @@
     line-height: 1.2;
 }
 
-body.light .dayBtn {
-    border-color: var(--light-border);
-    color: var(--light-text-secondary);
-}
+
 
 .dayBtn:hover {
     background-color: var(--accent);

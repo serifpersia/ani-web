@@ -184,50 +184,161 @@ app.post('/api/import/mal-xml', multer().single('xmlfile'), async (req, res) => 
     });
 });
 
-app.get('/api/continue-watching', (req, res) => {
-    const query = `
-       SELECT sm.id as _id, sm.id as id, sm.name, sm.thumbnail, sm.nativeName, sm.englishName, sm.episodeCount, we.episodeNumber, we.currentTime, we.duration
+async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeProvider, limit?: number, page?: number): Promise<any[]> {
+
+    const inProgressQuery = `
+        SELECT
+            sm.id as _id, sm.id, sm.name, sm.thumbnail, sm.nativeName, sm.englishName,
+            we.episodeNumber, we.currentTime, we.duration
         FROM shows_meta sm
         JOIN (
-           SELECT showId, episodeNumber, currentTime, duration, MAX(watchedAt) as watchedAt
-          FROM watched_episodes
-          GROUP BY showId
-       ) we ON sm.id = we.showId
-       ORDER BY we.watchedAt DESC
-       LIMIT 10;
-   `;
-    req.db.all(query, [], async (err: Error | null, rows: { id: string, name: string, thumbnail: string, episodeNumber: string, currentTime: number, duration: number }[]) => {
-        if (err) return res.status(500).json({ error: 'DB error' });
-        try {
-            const results = await Promise.all(rows.map(async (show) => {
-                const isComplete = show.duration > 0 && show.currentTime / show.duration >= 0.95;
-                if (!isComplete && show.currentTime > 0) {
-                    return {
-                        ...show,
-                        thumbnail: provider.deobfuscateUrl(show.thumbnail),
-                        episodeToPlay: show.episodeNumber
-                    };
-                } else {
-                     const epDetails = await provider.getEpisodes(show.id, 'sub');
-                    const allEps = epDetails?.episodes?.sort((a: string, b: string) => parseFloat(a) - parseFloat(b)) || [];
-                    const lastWatchedIndex = allEps.indexOf(show.episodeNumber);
-
-                    if (lastWatchedIndex > -1 && lastWatchedIndex < allEps.length) {
-                        return {
-                            ...show,
-                            episodeToPlay: allEps[lastWatchedIndex]
-                        };
-                    }
-                    return null;
-                }
-            }));
-            res.json(results.filter(Boolean));
-        } catch (apiError) {
-            logger.error({ err: apiError }, "API Error in /continue-watching");
-            res.status(500).json({ error: 'API error while resolving next episodes' });
-        }
-
+            SELECT *, ROW_NUMBER() OVER(PARTITION BY showId ORDER BY watchedAt DESC) as rn
+            FROM watched_episodes
+            WHERE (currentTime / duration) BETWEEN 0.05 AND 0.95
+        ) we ON sm.id = we.showId
+        WHERE we.rn = 1
+        ORDER BY we.watchedAt DESC;
+    `;
+    const inProgressShows: any[] = await new Promise((resolve, reject) => {
+        db.all(inProgressQuery, [], (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows);
+        });
     });
+
+    const watchingShowsQuery = `
+        SELECT
+            w.id, w.name, w.thumbnail, w.nativeName, w.englishName,
+            (SELECT MAX(we.watchedAt) FROM watched_episodes we WHERE we.showId = w.id) as lastWatchedAt
+        FROM watchlist w
+        WHERE w.status = 'Watching'
+        ORDER BY lastWatchedAt DESC;
+    `;
+    const watchingShows: any[] = await new Promise((resolve, reject) => {
+        db.all(watchingShowsQuery, [], (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows);
+        });
+    });
+
+    const upNextShows = [];
+    const fullyWatchedShows = [];
+    for (const show of watchingShows) {
+        try {
+            const [epDetails, watchedEpisodesResult] = await Promise.all([
+                provider.getEpisodes(show.id, 'sub'),
+                new Promise<any[]>((resolve, reject) => {
+                    db.all('SELECT * FROM watched_episodes WHERE showId = ?', [show.id], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve(rows);
+                    });
+                })
+            ]);
+
+            const allEps = epDetails?.episodes?.sort((a, b) => parseFloat(a) - parseFloat(b)) || [];
+            const watchedEpsMap = new Map(watchedEpisodesResult.map(r => [r.episodeNumber.toString(), r]));
+
+            const unwatchedEps = allEps.filter(ep => !watchedEpsMap.has(ep));
+
+            if (unwatchedEps.length > 0) {
+                upNextShows.push({
+                    _id: show.id,
+                    id: show.id,
+                    name: show.name,
+                    thumbnail: show.thumbnail,
+                    nativeName: show.nativeName,
+                    englishName: show.englishName,
+                    nextEpisodeToWatch: unwatchedEps[0],
+                    newEpisodesCount: unwatchedEps.length,
+                });
+            } else if (watchedEpsMap.size > 0) {
+                const lastWatchedEpisodeNumber = Math.max(...Array.from(watchedEpsMap.keys()).map(e => parseFloat(e as string)));
+                const lastWatchedEpisodeDetails = watchedEpsMap.get(lastWatchedEpisodeNumber.toString());
+
+                if (lastWatchedEpisodeDetails) {
+                    fullyWatchedShows.push({
+                        _id: show.id,
+                        id: show.id,
+                        name: show.name,
+                        thumbnail: show.thumbnail,
+                        nativeName: show.nativeName,
+                        englishName: show.englishName,
+                        episodeNumber: lastWatchedEpisodeNumber,
+                        currentTime: lastWatchedEpisodeDetails.currentTime,
+                        duration: lastWatchedEpisodeDetails.duration,
+                    });
+                }
+            }
+        } catch (e) {
+            logger.error({ err: e, showId: show.id }, 'Error processing show for Up Next list');
+        }
+    }
+
+    const combinedList = [];
+    const seenShowIds = new Set();
+
+    for (const show of upNextShows) {
+        if (!seenShowIds.has(show.id)) {
+            combinedList.push({
+                ...show,
+                thumbnail: provider.deobfuscateUrl(show.thumbnail)
+            });
+            seenShowIds.add(show.id);
+        }
+    }
+
+    for (const show of inProgressShows) {
+        if (!seenShowIds.has(show.id)) {
+            combinedList.push({
+                ...show,
+                thumbnail: provider.deobfuscateUrl(show.thumbnail)
+            });
+            seenShowIds.add(show.id);
+        }
+    }
+
+    for (const show of fullyWatchedShows) {
+        if (!seenShowIds.has(show.id)) {
+            combinedList.push({
+                ...show,
+                thumbnail: provider.deobfuscateUrl(show.thumbnail)
+            });
+            seenShowIds.add(show.id);
+        }
+    }
+
+    if (page && limit) {
+        const offset = (page - 1) * limit;
+        return combinedList.slice(offset, offset + limit);
+    }
+
+    if (limit) {
+        return combinedList.slice(0, limit);
+    }
+
+    return combinedList;
+}
+
+app.get('/api/continue-watching/all', async (req, res) => {
+    try {
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 10;
+        const data = await getContinueWatchingData(req.db, provider, limit, page);
+        res.json(data);
+    } catch (error) {
+        logger.error({ err: error }, 'DB error on /api/continue-watching/all');
+        res.status(500).json({ error: 'DB error' });
+    }
+});
+
+app.get('/api/continue-watching', async (req, res) => {
+    try {
+        const data = await getContinueWatchingData(req.db, provider, 6);
+        res.json(data);
+    } catch (error) {
+        logger.error({ err: error }, 'DB error on /api/continue-watching');
+        res.status(500).json({ error: 'DB error' });
+    }
 });
 
 app.post('/api/update-progress', async (req, res) => {
@@ -308,11 +419,25 @@ app.get('/api/watchlist', (req, res) => {
     const offset = (page - 1) * limit;
     const orderByClause = sort === 'name_asc' ? 'ORDER BY name ASC' : sort === 'name_desc' ? 'ORDER BY name DESC' : 'ORDER BY ROWID DESC';
 
-    req.db.get('SELECT COUNT(*) as count FROM watchlist', [], (err, row: any) => {
+    const status = req.query.status as string;
+    let whereClause = '';
+    const params: any[] = [];
+
+    if (status && status !== 'All') {
+        whereClause = 'WHERE status = ?';
+        params.push(status);
+    }
+
+    const countQuery = `SELECT COUNT(*) as count FROM watchlist ${whereClause}`;
+    req.db.get(countQuery, params, (err, row: any) => {
         if (err) return res.status(500).json({ error: 'DB error on count' });
         res.setHeader('X-Total-Count', row.count.toString());
-        req.db.all(`SELECT id as _id, id, name, thumbnail, status, nativeName, englishName FROM watchlist ${orderByClause} LIMIT ? OFFSET ?`, [limit, offset],
-            (err, rows) => res.status(err ? 500 : 200).json(err ? { error: 'DB error on data' } : rows));
+
+        const dataQuery = `SELECT id as _id, id, name, thumbnail, status, nativeName, englishName FROM watchlist ${whereClause} ${orderByClause} LIMIT ? OFFSET ?`;
+        const dataParams = [...params, limit, offset];
+        req.db.all(dataQuery, dataParams, (err, rows) => {
+            res.status(err ? 500 : 200).json(err ? { error: 'DB error on data' } : rows);
+        });
     });
 });
 
@@ -376,20 +501,39 @@ app.get('/api/subtitle-proxy', async (req, res) => {
     }
 });
 
+import sharp from 'sharp';
+
 app.get('/api/image-proxy', async (req, res) => {
+    const { url, w, h } = req.query;
+    const width = w ? parseInt(w as string) : undefined;
+    const height = h ? parseInt(h as string) : undefined;
+
+    if (!url) {
+        return res.status(400).send('URL is required');
+    }
+
     try {
-        const { data: streamData, headers: originalHeaders } = await axios({
-            method: 'get', url: req.query.url as string, responseType: 'stream',
-            headers: { Referer: 'https://allanime.day', 'User-Agent': 'Mozilla/5.0' }, timeout: 10000, maxRedirects: 5
+        const imageResponse = await axios({
+            method: 'get',
+            url: url as string,
+            responseType: 'arraybuffer',
+            headers: { Referer: 'https://allanime.day', 'User-Agent': 'Mozilla/5.0' },
         });
-        res.set('Cache-Control', 'public, max-age=604800, immutable').set('Content-Type', originalHeaders['content-type'] || 'image/webp');
-        streamData.pipe(res);
-        streamData.on('error', (err: any) => {
-            if (err.code !== 'ECONNRESET') logger.error({ err }, 'Image proxy stream error');
-            if (!res.headersSent) res.status(500).send('Error streaming image.');
-            else res.end();
-        });
-        res.on('close', () => streamData.destroy());
+
+        let transformer = sharp(imageResponse.data);
+
+        if (width || height) {
+            transformer = transformer.resize(width, height, { fit: 'cover' });
+        }
+
+        transformer = transformer.webp({ quality: 80 });
+
+        res.set('Content-Type', 'image/webp');
+        res.set('Cache-Control', 'public, max-age=604800, immutable');
+
+        const resizedImageBuffer = await transformer.toBuffer();
+        res.send(resizedImageBuffer);
+
     } catch (e) {
         logger.error({ err: e }, 'Image proxy error');
         res.status(200).sendFile(path.join(__dirname, '..','public/placeholder.svg'));

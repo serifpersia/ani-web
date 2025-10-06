@@ -44,7 +44,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = React.memo(
         <div className={styles['section-header']}>
           <h2 className="section-title">{title}</h2>
           {showSeeMore && (
-            <Link to="/watchlist" state={{ filter: "Continue Watching" }} className={styles['see-more-button']}>
+            <Link to="/watchlist/Continue Watching" className={styles['see-more-button']}>
               See More
             </Link>
           )}
