@@ -47,7 +47,7 @@ const TitlePreferenceToggle: React.FC = () => {
         labelRef.current.style.opacity = '0';
 
         void labelRef.current.offsetWidth;
-        labelRef.current.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out'; // Re-enable transition
+        labelRef.current.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
         labelRef.current.style.transform = 'translateX(0)';
         labelRef.current.style.opacity = '1';
       }

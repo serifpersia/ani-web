@@ -31,7 +31,7 @@ const WatchlistSettings: React.FC = () => {
     setIsUpdating(true);
 
     const newValue = !skipConfirmation;
-    setSkipConfirmation(newValue); // Optimistic update of local state
+    setSkipConfirmation(newValue);
 
     try {
       await fetch('/api/settings', {
@@ -41,7 +41,7 @@ const WatchlistSettings: React.FC = () => {
       });
     } catch (err) {
       console.error('Error saving setting:', err);
-      setSkipConfirmation(!newValue); // Rollback on error
+      setSkipConfirmation(!newValue);
     } finally {
       setIsUpdating(false);
     }

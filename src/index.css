@@ -3,17 +3,14 @@
 :root {
   --font-family: 'Poppins', sans-serif;
 
-  /* Accent Colors */
   --accent-purple: #8A4FFF;
   --accent-blue: #00B0FF;
   --accent-purple-dark: #6B3CC9;
   --danger-color: #e53e3e;
 
-  /* Theme-aware Accent */
   --accent: var(--accent-purple);
   --accent-dark: var(--accent-purple-dark);
 
-  /* Dark Theme */
   --bg: #18191A;
   --bg-secondary: #333333;
   --text: #E4E6EB;
@@ -65,19 +62,15 @@ button:focus, button:focus-visible {
     margin-bottom: 2rem;
 }
 
-/* Cards & Sidebars */
 .card, .top-10-list, .sidebar { background-color: var(--bg-secondary); }
 
 .sidebar .closeBtn, .sidebar .navLink { color: var(--text); }
 
-/* Header */
 header { border-color: var(--border); }
 
-/* Logo */
 .ani-text { fill: var(--accent); }
 .web-text { fill: var(--text); }
 
-/* Hamburger Menu */
 .hamburger-button span {
   background-color: var(--text);
   transition: background-color 0.2s;
@@ -87,7 +80,6 @@ header { border-color: var(--border); }
   background-color: var(--accent-purple);
 }
 
-/* Links */
 a { color: var(--accent); }
 a:hover { text-decoration: underline; }
 .logo-link:hover { text-decoration: none; }
@@ -178,7 +170,6 @@ a:hover { text-decoration: underline; }
   opacity: 0.8;
 }
 
-/* Sidebar Nav */
 aside nav a {
   text-decoration: none !important;
 }
@@ -187,7 +178,6 @@ aside nav a:hover {
   background-color: var(--accent);
 }
 
-/* Day Selector Buttons */
 .day-btn { color: var(--text-secondary); border-color: var(--border); }
 .day-btn:hover, .day-btn.active {
   background-color: var(--accent);
@@ -195,11 +185,9 @@ aside nav a:hover {
   color: #fff;
 }
 
-/* Progress Bar */
 .progress-bar { background-color: var(--border); }
 .progress { background-color: var(--accent); }
 
-/* Top 10 List */
 .top-10-list .list-item {
     display: flex;
     align-items: center;
@@ -308,7 +296,6 @@ footer a:hover {
   }
 }
 
-/* Home Page Layout */
 .home-container {
   display: flex;
   gap: 2rem;
@@ -367,7 +354,6 @@ footer a:hover {
   opacity: 0.8;
 }
 
-/* NProgress Customization */
 #nprogress .bar {
   background: var(--accent) !important;
   height: 3px !important;
