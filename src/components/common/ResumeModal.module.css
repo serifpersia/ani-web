@@ -21,9 +21,7 @@
     width: 90%;
 }
 
-body.light .modalContent {
-    background-color: var(--light-bg-secondary);
-}
+
 
 .modalContent h3 {
     margin-top: 0;
