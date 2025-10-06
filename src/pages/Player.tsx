@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import styles from './Player.module.css';
 import ToggleSwitch from '../components/common/ToggleSwitch';
 import { FaCheck, FaPlus } from 'react-icons/fa';
+import toast from 'react-hot-toast';
 import { fixThumbnailUrl } from '../lib/utils';
 import ResumeModal from '../components/common/ResumeModal';
 import useIsMobile from '../hooks/useIsMobile';
@@ -535,15 +536,25 @@ const Player: React.FC = () => {
 
   const toggleWatchlist = async () => {
     if (!state.showMeta || !showId) return;
+    const wasInWatchlist = state.inWatchlist;
+    dispatch({ type: 'SET_STATE', payload: { inWatchlist: !wasInWatchlist } });
+
     try {
-      const endpoint = state.inWatchlist ? '/api/watchlist/remove' : '/api/watchlist/add';
-      await fetch(endpoint, {
+      const endpoint = wasInWatchlist ? '/api/watchlist/remove' : '/api/watchlist/add';
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: showId, name: state.showMeta.name, thumbnail: state.showMeta.thumbnail, nativeName: state.showMeta.names?.native, englishName: state.showMeta.names?.english })
       });
-      dispatch({ type: 'SET_STATE', payload: { inWatchlist: !state.inWatchlist } });
+
+      if (!response.ok) {
+        throw new Error('Server responded with an error');
+      }
+
+      toast.success(wasInWatchlist ? 'Removed from watchlist' : 'Added to watchlist');
     } catch (e) {
+      dispatch({ type: 'SET_STATE', payload: { inWatchlist: wasInWatchlist } });
+      toast.error(e instanceof Error ? e.message : 'An unknown error occurred');
       console.error("Error toggling watchlist:", e);
     }
   };
@@ -620,7 +631,11 @@ const Player: React.FC = () => {
                   <ToggleSwitch 
                       id="dub-toggle"
                       isChecked={state.currentMode === 'dub'} 
-                      onChange={() => dispatch({ type: 'SET_STATE', payload: { currentMode: state.currentMode === 'sub' ? 'dub' : 'sub' } })} 
+                      onChange={() => {
+                        const newMode = state.currentMode === 'sub' ? 'dub' : 'sub';
+                        dispatch({ type: 'SET_STATE', payload: { currentMode: newMode } });
+                        toast.success(`Switched to ${newMode.toUpperCase()}`);
+                      }} 
                   />
                   <span>DUB</span>
               </div>

@@ -1,4 +1,6 @@
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
+import RemoveConfirmationModal from '../common/RemoveConfirmationModal';
+import { useRemoveFromWatchlist } from '../../hooks/useAnimeData';
 import { Link } from 'react-router-dom';
 import { fixThumbnailUrl, formatTime } from '../../lib/utils';
 import styles from './AnimeCard.module.css';
@@ -17,6 +19,8 @@ interface Anime {
   episodeNumber?: number;
   currentTime?: number;
   duration?: number;
+  nextEpisodeToWatch?: string;
+  newEpisodesCount?: number;
   availableEpisodesDetail?: {
     sub?: string[];
     dub?: string[];
@@ -32,30 +36,55 @@ interface AnimeCardProps {
 const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = false, onRemove }) => {
   const isMobile = useIsMobile();
   const { titlePreference } = useTitlePreference();
+  const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const removeWatchlistMutation = useRemoveFromWatchlist();
+
+  const isUpNext = anime.newEpisodesCount !== undefined && anime.newEpisodesCount > 0;
+  const isInProgress = continueWatching && !isUpNext;
 
   const displayTitle = anime[titlePreference] || anime.name;
 
-  const progressPercent = continueWatching && anime.currentTime && anime.duration
+  const linkTarget = isUpNext
+    ? `/player/${anime._id}/${anime.nextEpisodeToWatch}`
+    : isInProgress
+        ? `/player/${anime._id}/${anime.episodeNumber}`
+        : `/player/${anime._id}`;
+
+  const progressPercent = isInProgress && anime.currentTime && anime.duration
     ? (anime.currentTime / anime.duration) * 100
     : 0;
 
   const formattedCurrentTime = anime.currentTime ? formatTime(anime.currentTime) : '00:00';
   const formattedDuration = anime.duration ? formatTime(anime.duration) : '00:00';
 
-  const handleRemove = (event: React.MouseEvent) => {
+  const handleRemoveClick = (event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    if (onRemove) {
-      onRemove(anime.id);
-    }
+    setShowRemoveModal(true);
   };
 
-  const episodeNumberElement = continueWatching && anime.episodeNumber && (
-    <div className={isMobile ? styles.episodeNumberInline : styles.episodeNumberOverlay}>EP {anime.episodeNumber}</div>
+  const handleConfirmRemove = (options: { removeFromWatchlist?: boolean }) => {
+    if (onRemove) {
+      onRemove(anime.id); // This removes from continue watching
+    }
+    if (options.removeFromWatchlist) {
+      removeWatchlistMutation.mutate(anime.id);
+    }
+    setShowRemoveModal(false);
+  };
+
+  const handleCancelRemove = () => {
+    setShowRemoveModal(false);
+  };
+
+  const episodeInfoElement = (isUpNext || isInProgress) && (
+    <div className={isMobile ? styles.episodeNumberInline : styles.episodeNumberOverlay}>
+      {isUpNext ? `Next: EP ${anime.nextEpisodeToWatch}` : `EP ${anime.episodeNumber}`}
+    </div>
   );
 
   const episodeCountElement = (
-    <div className={isMobile ? styles.episodeCountInline : (continueWatching ? styles.episodeCountOverlay : `${styles.episodeCountOverlay} ${styles.normalCardEpisodeCount}`)}>
+    <div className={isMobile ? styles.episodeCountInline : (isInProgress ? styles.episodeCountOverlay : `${styles.episodeCountOverlay} ${styles.normalCardEpisodeCount}`)}>
       {anime.availableEpisodesDetail?.sub && anime.availableEpisodesDetail.sub.length > 0 && (
         <div className={`${styles.episodeCountItem} ${styles.subCount}`}><FaClosedCaptioning /> {anime.availableEpisodesDetail.sub.length}</div>
       )}
@@ -65,7 +94,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
     </div>
   );
 
-  const progressElement = continueWatching && (
+  const progressElement = isInProgress && (
     <div className={isMobile ? styles.progressInline : styles.progressOverlay}>
       <div className={styles.progressBar}>
         <div className={styles.progress} style={{ width: `${progressPercent}%` }}></div>
@@ -77,7 +106,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
   );
 
   const removeButtonElement = continueWatching && (
-    <button className={isMobile ? styles.removeBtnInline : styles.removeBtn} onClick={handleRemove}>x</button>
+    <button className={isMobile ? styles.removeBtnInline : styles.removeBtn} onClick={handleRemoveClick}>x</button>
   );
 
   const showTypeElement = (
@@ -85,55 +114,64 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
   );
 
   return (
-    <Link 
-      to={continueWatching ? `/player/${anime._id}/${anime.episodeNumber}` : `/player/${anime._id}`}
-      className={styles.card}
-    >
-      <div className={styles.posterContainer}>
-        {!isMobile && episodeNumberElement}
-        {!isMobile && continueWatching && episodeCountElement}
-        {!isMobile && progressElement}
-        {!isMobile && !continueWatching && episodeCountElement}
-        <img 
-          src={fixThumbnailUrl(anime.thumbnail)} 
-          alt={anime.name} 
-          className={styles.posterImg} 
-          loading="lazy"
-          width="200"
-          height="300"
-          style={{ opacity: 0 }}
-          onLoad={(e) => {
-            e.currentTarget.style.opacity = '1';
-          }}
-          onError={(e) => {
-            e.currentTarget.src = '/placeholder.svg';
-            e.currentTarget.style.opacity = '1';
-          }}
-        />
-      </div>
-      <div className={styles.info}>
-        {isMobile && removeButtonElement}
-        <div className={styles.title} title={displayTitle}>{displayTitle}</div>
-        {isMobile && (
-          <div className={styles.mobileDetailsBottom}>
-            <div className={styles.mobileDetailsBottomLeft}>
-              {showTypeElement} 
-              {continueWatching && episodeNumberElement}
+    <>
+      <Link 
+        to={linkTarget}
+        className={styles.card}
+      >
+        <div className={styles.posterContainer}>
+          {isUpNext && <div className={styles.newEpisodesBadge}>+{anime.newEpisodesCount} NEW</div>}
+          {!isMobile && episodeInfoElement}
+          {!isMobile && episodeCountElement}
+          {!isMobile && progressElement}
+          <img 
+            src={fixThumbnailUrl(anime.thumbnail)} 
+            alt={anime.name} 
+            className={styles.posterImg} 
+            loading="lazy"
+            width="200"
+            height="300"
+            style={{ opacity: 0 }}
+            onLoad={(e) => {
+              e.currentTarget.style.opacity = '1';
+            }}
+            onError={(e) => {
+              e.currentTarget.src = '/placeholder.svg';
+              e.currentTarget.style.opacity = '1';
+            }}
+          />
+        </div>
+        <div className={styles.info}>
+          {isMobile && removeButtonElement}
+          <div className={styles.title} title={displayTitle}>{displayTitle}</div>
+          {isMobile && (
+            <div className={styles.mobileDetailsBottom}>
+              <div className={styles.mobileDetailsBottomLeft}>
+                {showTypeElement} 
+                {episodeInfoElement}
+              </div>
+              <div className={styles.mobileDetailsBottomRight}>
+                {episodeCountElement}
+              </div>
             </div>
-            <div className={styles.mobileDetailsBottomRight}>
-              {episodeCountElement}
+          )}
+          {isMobile && progressElement}
+          {!isMobile && removeButtonElement}
+          {!isMobile && showTypeElement}
+          {continueWatching ? null : (
+            <div className={styles.details}>
             </div>
-          </div>
-        )}
-        {isMobile && progressElement}
-        {!isMobile && continueWatching && removeButtonElement}
-        {!isMobile && showTypeElement}
-        {continueWatching ? null : (
-          <div className={styles.details}>
-          </div>
-        )}
-      </div>
-    </Link>
+          )}
+        </div>
+      </Link>
+      <RemoveConfirmationModal
+        isOpen={showRemoveModal}
+        onClose={handleCancelRemove}
+        onConfirm={handleConfirmRemove}
+        animeName={displayTitle}
+        scenario="continueWatching"
+      />
+    </>
   );
 });
 

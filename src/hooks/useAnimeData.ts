@@ -1,4 +1,5 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 
 export interface Anime {
     _id: string;
@@ -12,6 +13,8 @@ export interface Anime {
     episodeNumber?: number;
     currentTime?: number;
     duration?: number;
+    nextEpisodeToWatch?: string;
+    newEpisodesCount?: number;
     availableEpisodesDetail?: {
       sub?: string[];
       dub?: string[];
@@ -44,12 +47,19 @@ export const useCurrentSeason = () => {
     });
 };
 
-export const useInfiniteContinueWatching = () => {
-    return useInfiniteQuery({
+export const useContinueWatching = () => {
+    return useQuery<Anime[]>({
         queryKey: ['continueWatching'],
-        queryFn: ({ pageParam = 1 }) => fetchApi(`/api/continue-watching?page=${pageParam}&limit=14`),
+        queryFn: () => fetchApi(`/api/continue-watching`),
+    });
+};
+
+export const useAllContinueWatching = () => {
+    return useInfiniteQuery<Anime[]>({
+        queryKey: ['allContinueWatching'],
+        queryFn: ({ pageParam = 1 }) => fetchApi(`/api/continue-watching/all?page=${pageParam}`),
         initialPageParam: 1,
-        getNextPageParam: (lastPage: Anime[], allPages) => {
+        getNextPageParam: (lastPage, allPages) => {
             return lastPage.length > 0 ? allPages.length + 1 : undefined;
         },
     });
@@ -82,10 +92,10 @@ export const useSearchAnime = (searchQueryString: string) => {
     });
 };
 
-export const useInfiniteWatchlist = () => {
+export const useInfiniteWatchlist = (status: string) => {
     return useInfiniteQuery<Anime[]>({
-        queryKey: ['watchlist'],
-        queryFn: ({ pageParam = 1 }) => fetchApi(`/api/watchlist?page=${pageParam}&limit=14`),
+        queryKey: ['watchlist', status],
+        queryFn: ({ pageParam = 1 }) => fetchApi(`/api/watchlist?status=${status}&page=${pageParam}&limit=14`),
         initialPageParam: 1,
         getNextPageParam: (lastPage, allPages) => {
             return lastPage.length > 0 ? allPages.length + 1 : undefined;
@@ -107,7 +117,11 @@ export const useRemoveFromWatchlist = () => {
       }
     },
     onSuccess: () => {
+      toast.success('Removed from watchlist');
       queryClient.invalidateQueries({ queryKey: ['watchlist'] });
+    },
+    onError: (error) => {
+      toast.error(`Failed to remove: ${error.message}`);
     },
   });
 };

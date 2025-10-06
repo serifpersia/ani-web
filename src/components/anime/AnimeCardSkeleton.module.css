@@ -7,9 +7,7 @@
     flex-direction: column;
 }
 
-body.light .skeletonCard {
-    background-color: var(--light-bg-secondary);
-}
+
 
 .poster {
     height: 250px;

@@ -13,6 +13,9 @@ const MAL = lazy(() => import('./pages/MAL'));
 
 import { useSidebar } from './hooks/useSidebar';
 
+import { Toaster } from 'react-hot-toast';
+import TopProgressBar from './components/common/TopProgressBar';
+
 function App() {
   const { isOpen, setIsOpen } = useSidebar();
 
@@ -39,13 +42,39 @@ function App() {
 
   return (
     <div className={`app-container`}>
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          style: {
+            background: '#262829',
+            color: '#fff',
+            border: '1px solid #444',
+          },
+          success: {
+            style: {
+              background: 'var(--accent)',
+              color: '#fff',
+            },
+            iconTheme: {
+              primary: '#fff',
+              secondary: 'var(--accent)',
+            },
+          },
+          error: {
+            style: {
+              background: '#992a2a',
+              color: '#fff',
+            },
+          },
+        }}
+      />
       <Header />
       <Sidebar />
       <main>
-        <Suspense fallback={<div>Loading...</div>}>
+        <Suspense fallback={<TopProgressBar />}>
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/watchlist" element={<Watchlist />} />
+            <Route path="/watchlist/:filter?" element={<Watchlist />} />
             <Route path="/search" element={<Search />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/mal" element={<MAL />} />

@@ -1,6 +1,5 @@
 :root {
     --dark-watched-color: #034e46;
-    --light-watched-color: #a7d9d0;
 }
 
 .playerPage {
@@ -45,9 +44,7 @@
     color: var(--dark-text-secondary);
 }
 
-body.light .scheduleInfo {
-    color: var(--light-text-secondary);
-}
+
 
 .status {
     background-color: var(--accent);
@@ -66,10 +63,7 @@ body.light .scheduleInfo {
     white-space: nowrap;
 }
 
-body.light .nextEpisode {
-    background-color: var(--light-bg-primary);
-    color: var(--light-text);
-}
+
 
 .controls {
     display: flex;
@@ -96,11 +90,7 @@ body.light .nextEpisode {
     transition: all 0.2s;
 }
 
-body.light .seekBtn {
-    background-color: var(--light-bg-secondary);
-    color: var(--light-text);
-    border-color: var(--light-border);
-}
+
 
 .seekBtn:hover {
     background-color: var(--accent);
@@ -130,11 +120,7 @@ body.light .seekBtn {
     gap: 0.5rem;
 }
 
-body.light .watchlistBtn {
-    background-color: var(--light-bg-secondary);
-    color: var(--light-text);
-    border-color: var(--light-border);
-}
+
 
 .watchlistBtn:hover {
     border-color: var(--accent);
@@ -448,9 +434,7 @@ body.light .watchlistBtn {
     border-radius: var(--card-border-radius);
 }
 
-body.light .sourceGroup {
-    background-color: var(--light-bg-secondary);
-}
+
 
 .sourceGroup h4 {
     margin-top: 0;
@@ -458,9 +442,7 @@ body.light .sourceGroup {
     color: var(--dark-text);
 }
 
-body.light .sourceGroup h4 {
-    color: var(--light-text);
-}
+
 
 .qualityList {
     display: flex;
@@ -478,11 +460,7 @@ body.light .sourceGroup h4 {
     transition: all 0.2s;
 }
 
-body.light .qualityItem {
-    background-color: var(--light-bg-primary);
-    color: var(--light-text-secondary);
-    border-color: var(--light-border);
-}
+
 
 .qualityItem.active {
     background-color: var(--accent);
@@ -613,9 +591,7 @@ body.light .qualityItem {
     font-size: 0.9rem;
 }
 
-body.light .descriptionBox {
-    background-color: var(--light-bg-secondary);
-}
+
 
 .episodeListContainer {
     margin-bottom: 1.5rem;
@@ -653,11 +629,7 @@ body.light .descriptionBox {
     border-color: var(--accent);
 }
 
-body.light .episodeItem {
-    background-color: var(--light-bg-secondary);
-    color: var(--light-text);
-    border-color: var(--light-border);
-}
+
 
 .episodeItem.active {
     background-color: var(--accent);
@@ -672,11 +644,7 @@ body.light .episodeItem {
     color: #fff;
 }
 
-body.light .episodeItem.watched {
-    background-color: var(--light-watched-color);
-    border-color: var(--light-watched-color);
-    color: var(--light-text);
-}
+
 
 .epJumpControls {
     margin-bottom: 1rem;
@@ -688,9 +656,7 @@ body.light .episodeItem.watched {
     gap: 0.5rem;
 }
 
-body.light .epJumpControls {
-    background-color: var(--light-bg-secondary);
-}
+
 
 .epRangeButtons {
     display: flex;
@@ -709,11 +675,7 @@ body.light .epJumpControls {
     font-size: 0.85rem;
 }
 
-body.light .epRangeBtn {
-    background-color: var(--light-bg-primary);
-    color: var(--light-text);
-    border-color: var(--light-border);
-}
+
 
 .epRangeBtn:hover {
     background-color: var(--accent);
@@ -736,11 +698,7 @@ body.light .epRangeBtn {
     color: var(--dark-text);
 }
 
-body.light .epJumpInputGroup input {
-    border-color: var(--light-border);
-    background-color: var(--light-bg-primary);
-    color: var(--light-text);
-}
+
 
 .epJumpInputGroup button {
     background-color: var(--accent);
@@ -899,9 +857,7 @@ body.light .epJumpInputGroup input {
     border-radius: var(--card-border-radius);
 }
 
-body.light .mobileControls {
-    background-color: var(--light-bg-secondary);
-}
+
 
 .sourceQualityControls {
     display: flex;
@@ -930,11 +886,7 @@ body.light .mobileControls {
     transition: all 0.2s;
 }
 
-body.light .sourceButton, body.light .qualityButton {
-    background-color: var(--light-bg-primary);
-    color: var(--light-text-secondary);
-    border-color: var(--light-border);
-}
+
 
 .sourceButton.active, .qualityButton.active {
     background-color: var(--accent);
@@ -1145,11 +1097,7 @@ body.light .sourceButton, body.light .qualityButton {
     border-color: var(--accent);
 }
 
-body.light .websiteLink {
-    background-color: var(--light-bg-primary);
-    color: var(--light-text-secondary);
-    border-color: var(--light-border);
-}
+
 
 .detailsError {
     color: #ff4d4d;
@@ -1186,9 +1134,7 @@ body.light .websiteLink {
     margin-bottom: 1.5rem;
 }
 
-body.light .sourceLoader {
-    background-color: var(--light-bg-secondary);
-}
+
 
 .bufferingOverlay {
     position: absolute;

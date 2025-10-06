@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import TitlePreferenceToggle from '../components/common/TitlePreferenceToggle';
 import styles from './Settings.module.css';
 
+import WatchlistSettings from '../components/settings/WatchlistSettings';
+
 const Settings: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -68,6 +70,7 @@ const Settings: React.FC = () => {
       <div className={styles['settings-section']}>
         <TitlePreferenceToggle />
       </div>
+      <WatchlistSettings />
       <div className={styles['settings-section']}>
         <h3>Database Backup and Restore</h3>
         <div className={styles.controls}>
