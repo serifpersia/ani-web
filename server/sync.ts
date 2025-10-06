@@ -284,7 +284,7 @@ export function initializeDatabase(dbPath: string): Promise<Database> {
             db.run(`CREATE INDEX IF NOT EXISTS idx_watched_episodes_watchedAt ON watched_episodes(watchedAt)`);
             db.run(`CREATE INDEX IF NOT EXISTS idx_watchlist_status ON watchlist(status)`);
 
-            db.all("PRAGMA table_info(watchlist)", (err, rows: any[]) => {
+            db.all("PRAGMA table_info(watchlist)", (err, rows: { name: string }[]) => {
                 if (err) { log.error({ err }, "Error checking watchlist schema"); return; }
                 const columns = rows.map(col => col.name);
                 if (!columns.includes("nativeName")) {
@@ -295,7 +295,7 @@ export function initializeDatabase(dbPath: string): Promise<Database> {
                 }
             });
 
-            db.all("PRAGMA table_info(shows_meta)", (err, rows: any[]) => {
+            db.all("PRAGMA table_info(shows_meta)", (err, rows: { name: string }[]) => {
                 if (err) { log.error({ err }, "Error checking shows_meta schema"); return; }
                 const columns = rows.map(col => col.name);
                 if (!columns.includes("nativeName")) {

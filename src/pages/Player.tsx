@@ -26,7 +26,7 @@ interface SimpleShowMeta {
   };
 }
 
-interface DetailedShowMeta {
+export interface DetailedShowMeta {
   id: string;
   route: string;
   title: string;
@@ -63,7 +63,7 @@ interface DetailedShowMeta {
   nextEpisodeAirDate?: string;
 }
 
-interface AllMangaDetail {
+export interface AllMangaDetail {
   Rating: string;
   Season: string;
   Episodes: string;

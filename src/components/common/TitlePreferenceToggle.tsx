@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styles from './TitlePreferenceToggle.module.css';
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext';
-import type { TitlePreference } from '../../contexts/TitlePreferenceContext';
+import type { TitlePreferenceContextType as TitlePreference } from '../../contexts/TitlePreferenceContext';
 
 const preferences: readonly TitlePreference[] = ['name', 'nativeName', 'englishName'];
 const preferenceLabels: Record<TitlePreference, string> = {

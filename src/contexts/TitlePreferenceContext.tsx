@@ -1,12 +1,10 @@
-import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
-export type TitlePreference = 'name' | 'nativeName' | 'englishName';
-
-export interface TitlePreferenceContextType {
-  titlePreference: TitlePreference;
-  setTitlePreference: (preference: TitlePreference) => void;
+export type TitlePreferenceContextType = {
+  titlePreference: 'english' | 'native';
+  setTitlePreference: (preference: 'english' | 'native') => void;
   loading: boolean;
-}
+};
 
 export const TitlePreferenceContext = createContext<TitlePreferenceContextType | undefined>(undefined);
 
@@ -15,7 +13,7 @@ interface TitlePreferenceProviderProps {
 }
 
 export const TitlePreferenceProvider: React.FC<TitlePreferenceProviderProps> = ({ children }) => {
-  const [titlePreference, setTitlePreference] = useState<TitlePreference>('name');
+  const [titlePreference, setTitlePreference] = useState<'english' | 'native'>('english');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,7 +23,7 @@ export const TitlePreferenceProvider: React.FC<TitlePreferenceProviderProps> = (
         if (response.ok) {
           const data = await response.json();
           if (data.value) {
-            setTitlePreference(data.value as TitlePreference);
+            setTitlePreference(data.value as 'english' | 'native');
           }
         }
       } catch (err) {
@@ -45,7 +43,7 @@ export const TitlePreferenceProvider: React.FC<TitlePreferenceProviderProps> = (
   );
 };
 
-export const useTitlePreference = () => {
+export const useTitlePreference = (): TitlePreferenceContextType => {
   const context = useContext(TitlePreferenceContext);
   if (context === undefined) {
     throw new Error('useTitlePreference must be used within a TitlePreferenceProvider');

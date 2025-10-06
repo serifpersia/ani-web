@@ -1,6 +1,6 @@
 import axios from 'axios';
 import logger from '../logger';
-import { Provider, Show, VideoSource, EpisodeDetails, SkipIntervals, VideoLink, SubtitleTrack } from './provider.interface';
+import { Provider, Show, VideoSource, EpisodeDetails, SkipIntervals, VideoLink, SubtitleTrack, SearchOptions, ShowDetails, AllmangaDetails } from './provider.interface';
 import * as cheerio from 'cheerio';
 
 const API_BASE_URL = 'https://allanime.day';
@@ -115,7 +115,7 @@ export class AllAnimeProvider implements Provider {
         }));
     }
 
-    async search(options: any): Promise<Show[]> {
+    async search(options: SearchOptions): Promise<Show[]> {
         const { query, season, year, sortBy, page, type, country, translation, genres, excludeGenres, tags, excludeTags, studios } = options;
         const searchObj: { [key: string]: unknown } = { allowAdult: false };
         if (query) searchObj.query = query;
@@ -261,7 +261,7 @@ export class AllAnimeProvider implements Provider {
                     if (!source.sourceUrl.startsWith('--')) return null;
 
                     let videoLinks: VideoLink[] = [];
-                    let subtitles: any[] = [];
+                    let subtitles: SubtitleTrack[] = [];
 
                     const decryptedUrl = ((s: string) => {
                         let d = '';
@@ -316,7 +316,7 @@ export class AllAnimeProvider implements Provider {
         return results.map(result => result.status === 'fulfilled' ? result.value : null).filter(Boolean) as VideoSource[];
     }
 
-    async getShowDetails(showId: string): Promise<any> {
+    async getShowDetails(showId: string): Promise<ShowDetails> {
         const metaQuery = `query($showId: String!) { show(_id: $showId) { name } }`;
         const metaResponse = await axios.get(API_ENDPOINT, {
             headers: { 'User-Agent': USER_AGENT, 'Referer': REFERER },
@@ -338,7 +338,7 @@ export class AllAnimeProvider implements Provider {
             if (firstResult.status === 'Ongoing') {
                 try {
                     const pageResponse = await axios.get(`https://animeschedule.net/anime/${firstResult.route}`, { timeout: 10000 });
-                    const countdownMatch = pageResponse.data.match(/countdown-time" datetime=\"([^"]*)\"/);
+                    const countdownMatch = pageResponse.data.match(/countdown-time" datetime="([^"]*)"/);
                     if (countdownMatch) {
                         firstResult.nextEpisodeAirDate = countdownMatch[1];
                     }
@@ -352,7 +352,7 @@ export class AllAnimeProvider implements Provider {
         throw new Error('Not Found on Schedule');
     }
 
-    async getAllmangaDetails(showId: string): Promise<any> {
+    async getAllmangaDetails(showId: string): Promise<AllmangaDetails> {
         const url = `https://allmanga.to/bangumi/${showId}`;
         const headers = {
             "User-Agent": USER_AGENT,
@@ -362,7 +362,7 @@ export class AllAnimeProvider implements Provider {
         const response = await axios.get(url, { headers });
         const $ = cheerio.load(response.data);
 
-        const details: { [key: string]: string } = {
+        const details: AllmangaDetails = {
             "Rating": "N/A",
             "Season": "N/A",
             "Episodes": "N/A",
@@ -371,7 +371,7 @@ export class AllAnimeProvider implements Provider {
         };
 
         $('.info-season').each((_i, elem) => {
-            const label = $(elem).find('h4').text().trim();
+            const label = $(elem).find('h4').text().trim() as keyof AllmangaDetails;
             const value = $(elem).find('li').text().trim();
             if (Object.prototype.hasOwnProperty.call(details, label)) {
                 details[label] = value;
