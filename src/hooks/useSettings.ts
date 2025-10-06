@@ -10,7 +10,7 @@ const fetchSettings = async (key: string) => {
   return data.value;
 };
 
-const updateSettings = async ({ key, value }: { key: string, value: any }) => {
+const updateSettings = async ({ key, value }: { key: string, value: unknown }) => {
   const response = await fetch('/api/settings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -23,7 +23,7 @@ const updateSettings = async ({ key, value }: { key: string, value: any }) => {
 };
 
 export const useSetting = (key: string) => {
-  return useQuery<any>({
+  return useQuery<unknown>({
     queryKey: ['settings', key],
     queryFn: () => fetchSettings(key),
   });
