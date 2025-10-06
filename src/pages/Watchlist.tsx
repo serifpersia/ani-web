@@ -7,6 +7,7 @@ import { useInfiniteWatchlist, useRemoveFromWatchlist, useAllContinueWatching } 
 import { useSetting, useUpdateSetting } from '../hooks/useSettings';
 import RemoveConfirmationModal from '../components/common/RemoveConfirmationModal';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 
 const SkeletonGrid = React.memo(() => (
     <div className="grid-container">
@@ -50,7 +51,11 @@ const Watchlist: React.FC = () => {
       if (!response.ok) throw new Error("Failed to remove from backend");
     },
     onSuccess: () => {
+      toast.success('Removed from Continue Watching');
       queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] });
+    },
+    onError: (error) => {
+      toast.error(`Failed to remove: ${error.message}`);
     },
   });
 
@@ -91,7 +96,11 @@ const Watchlist: React.FC = () => {
       return response.json();
     },
     onSuccess: () => {
+      toast.success('Watchlist status updated');
       queryClient.invalidateQueries({ queryKey: ['watchlist'] });
+    },
+    onError: (error) => {
+      toast.error(`Failed to update status: ${error.message}`);
     },
   });
 

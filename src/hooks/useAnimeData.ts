@@ -1,4 +1,5 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 
 export interface Anime {
     _id: string;
@@ -116,7 +117,11 @@ export const useRemoveFromWatchlist = () => {
       }
     },
     onSuccess: () => {
+      toast.success('Removed from watchlist');
       queryClient.invalidateQueries({ queryKey: ['watchlist'] });
+    },
+    onError: (error) => {
+      toast.error(`Failed to remove: ${error.message}`);
     },
   });
 };
