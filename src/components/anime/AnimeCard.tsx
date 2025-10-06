@@ -17,6 +17,8 @@ interface Anime {
   episodeNumber?: number;
   currentTime?: number;
   duration?: number;
+  nextEpisodeToWatch?: string;
+  newEpisodesCount?: number;
   availableEpisodesDetail?: {
     sub?: string[];
     dub?: string[];
@@ -33,9 +35,18 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
   const isMobile = useIsMobile();
   const { titlePreference } = useTitlePreference();
 
+  const isUpNext = anime.newEpisodesCount !== undefined && anime.newEpisodesCount > 0;
+  const isInProgress = continueWatching && !isUpNext;
+
   const displayTitle = anime[titlePreference] || anime.name;
 
-  const progressPercent = continueWatching && anime.currentTime && anime.duration
+  const linkTarget = isUpNext
+    ? `/player/${anime._id}/${anime.nextEpisodeToWatch}`
+    : isInProgress
+        ? `/player/${anime._id}/${anime.episodeNumber}`
+        : `/player/${anime._id}`;
+
+  const progressPercent = isInProgress && anime.currentTime && anime.duration
     ? (anime.currentTime / anime.duration) * 100
     : 0;
 
@@ -50,12 +61,14 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
     }
   };
 
-  const episodeNumberElement = continueWatching && anime.episodeNumber && (
-    <div className={isMobile ? styles.episodeNumberInline : styles.episodeNumberOverlay}>EP {anime.episodeNumber}</div>
+  const episodeInfoElement = (isUpNext || isInProgress) && (
+    <div className={isMobile ? styles.episodeNumberInline : styles.episodeNumberOverlay}>
+      {isUpNext ? `Next: EP ${anime.nextEpisodeToWatch}` : `EP ${anime.episodeNumber}`}
+    </div>
   );
 
   const episodeCountElement = (
-    <div className={isMobile ? styles.episodeCountInline : (continueWatching ? styles.episodeCountOverlay : `${styles.episodeCountOverlay} ${styles.normalCardEpisodeCount}`)}>
+    <div className={isMobile ? styles.episodeCountInline : (isInProgress ? styles.episodeCountOverlay : `${styles.episodeCountOverlay} ${styles.normalCardEpisodeCount}`)}>
       {anime.availableEpisodesDetail?.sub && anime.availableEpisodesDetail.sub.length > 0 && (
         <div className={`${styles.episodeCountItem} ${styles.subCount}`}><FaClosedCaptioning /> {anime.availableEpisodesDetail.sub.length}</div>
       )}
@@ -65,7 +78,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
     </div>
   );
 
-  const progressElement = continueWatching && (
+  const progressElement = isInProgress && (
     <div className={isMobile ? styles.progressInline : styles.progressOverlay}>
       <div className={styles.progressBar}>
         <div className={styles.progress} style={{ width: `${progressPercent}%` }}></div>
@@ -86,14 +99,14 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
 
   return (
     <Link 
-      to={continueWatching ? `/player/${anime._id}/${anime.episodeNumber}` : `/player/${anime._id}`}
+      to={linkTarget}
       className={styles.card}
     >
       <div className={styles.posterContainer}>
-        {!isMobile && episodeNumberElement}
-        {!isMobile && continueWatching && episodeCountElement}
+        {isUpNext && <div className={styles.newEpisodesBadge}>+{anime.newEpisodesCount} NEW</div>}
+        {!isMobile && episodeInfoElement}
+        {!isMobile && episodeCountElement}
         {!isMobile && progressElement}
-        {!isMobile && !continueWatching && episodeCountElement}
         <img 
           src={fixThumbnailUrl(anime.thumbnail)} 
           alt={anime.name} 
@@ -118,7 +131,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
           <div className={styles.mobileDetailsBottom}>
             <div className={styles.mobileDetailsBottomLeft}>
               {showTypeElement} 
-              {continueWatching && episodeNumberElement}
+              {episodeInfoElement}
             </div>
             <div className={styles.mobileDetailsBottomRight}>
               {episodeCountElement}
@@ -126,7 +139,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
           </div>
         )}
         {isMobile && progressElement}
-        {!isMobile && continueWatching && removeButtonElement}
+        {!isMobile && removeButtonElement}
         {!isMobile && showTypeElement}
         {continueWatching ? null : (
           <div className={styles.details}>

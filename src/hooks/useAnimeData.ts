@@ -12,6 +12,8 @@ export interface Anime {
     episodeNumber?: number;
     currentTime?: number;
     duration?: number;
+    nextEpisodeToWatch?: string;
+    newEpisodesCount?: number;
     availableEpisodesDetail?: {
       sub?: string[];
       dub?: string[];
@@ -44,14 +46,18 @@ export const useCurrentSeason = () => {
     });
 };
 
-export const useInfiniteContinueWatching = () => {
-    return useInfiniteQuery({
+export const useContinueWatching = () => {
+    return useQuery<Anime[]>({
         queryKey: ['continueWatching'],
-        queryFn: ({ pageParam = 1 }) => fetchApi(`/api/continue-watching?page=${pageParam}&limit=14`),
-        initialPageParam: 1,
-        getNextPageParam: (lastPage: Anime[], allPages) => {
-            return lastPage.length > 0 ? allPages.length + 1 : undefined;
-        },
+        queryFn: () => fetchApi(`/api/continue-watching`),
+    });
+};
+
+export const useAllContinueWatching = () => {
+    return useQuery<Anime[]>({
+        queryKey: ['allContinueWatching'],
+        queryFn: () => fetchApi(`/api/continue-watching/all`),
+        enabled: false,
     });
 };
 
