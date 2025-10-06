@@ -280,6 +280,10 @@ export function initializeDatabase(dbPath: string): Promise<Database> {
             db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('last_synced_version', 0)`);
             db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('is_dirty', 0)`);
 
+            db.run(`CREATE INDEX IF NOT EXISTS idx_watched_episodes_showId ON watched_episodes(showId)`);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_watched_episodes_watchedAt ON watched_episodes(watchedAt)`);
+            db.run(`CREATE INDEX IF NOT EXISTS idx_watchlist_status ON watchlist(status)`);
+
             db.all("PRAGMA table_info(watchlist)", (err, rows: any[]) => {
                 if (err) { log.error({ err }, "Error checking watchlist schema"); return; }
                 const columns = rows.map(col => col.name);

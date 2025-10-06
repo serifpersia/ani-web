@@ -54,10 +54,13 @@ export const useContinueWatching = () => {
 };
 
 export const useAllContinueWatching = () => {
-    return useQuery<Anime[]>({
+    return useInfiniteQuery<Anime[]>({
         queryKey: ['allContinueWatching'],
-        queryFn: () => fetchApi(`/api/continue-watching/all`),
-        enabled: false,
+        queryFn: ({ pageParam = 1 }) => fetchApi(`/api/continue-watching/all?page=${pageParam}`),
+        initialPageParam: 1,
+        getNextPageParam: (lastPage, allPages) => {
+            return lastPage.length > 0 ? allPages.length + 1 : undefined;
+        },
     });
 };
 
@@ -88,10 +91,10 @@ export const useSearchAnime = (searchQueryString: string) => {
     });
 };
 
-export const useInfiniteWatchlist = () => {
+export const useInfiniteWatchlist = (status: string) => {
     return useInfiniteQuery<Anime[]>({
-        queryKey: ['watchlist'],
-        queryFn: ({ pageParam = 1 }) => fetchApi(`/api/watchlist?page=${pageParam}&limit=14`),
+        queryKey: ['watchlist', status],
+        queryFn: ({ pageParam = 1 }) => fetchApi(`/api/watchlist?status=${status}&page=${pageParam}&limit=14`),
         initialPageParam: 1,
         getNextPageParam: (lastPage, allPages) => {
             return lastPage.length > 0 ? allPages.length + 1 : undefined;

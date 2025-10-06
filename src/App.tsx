@@ -45,7 +45,7 @@ function App() {
         <Suspense fallback={<div>Loading...</div>}>
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/watchlist" element={<Watchlist />} />
+            <Route path="/watchlist/:filter?" element={<Watchlist />} />
             <Route path="/search" element={<Search />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/mal" element={<MAL />} />

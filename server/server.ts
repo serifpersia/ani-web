@@ -184,7 +184,7 @@ app.post('/api/import/mal-xml', multer().single('xmlfile'), async (req, res) => 
     });
 });
 
-async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeProvider, limit?: number): Promise<any[]> {
+async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeProvider, limit?: number, page?: number): Promise<any[]> {
     // List 1: In-Progress
     const inProgressQuery = `
         SELECT
@@ -279,8 +279,8 @@ async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeP
     const combinedList = [];
     const seenShowIds = new Set();
 
-    // Add in-progress shows first
-    for (const show of inProgressShows) {
+    // Add up-next shows first
+    for (const show of upNextShows) {
         if (!seenShowIds.has(show.id)) {
             combinedList.push({
                 ...show,
@@ -290,8 +290,8 @@ async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeP
         }
     }
 
-    // Add up-next shows
-    for (const show of upNextShows) {
+    // Add in-progress shows
+    for (const show of inProgressShows) {
         if (!seenShowIds.has(show.id)) {
             combinedList.push({
                 ...show,
@@ -312,6 +312,11 @@ async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeP
         }
     }
 
+    if (page && limit) {
+        const offset = (page - 1) * limit;
+        return combinedList.slice(offset, offset + limit);
+    }
+
     if (limit) {
         return combinedList.slice(0, limit);
     }
@@ -321,7 +326,9 @@ async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeP
 
 app.get('/api/continue-watching/all', async (req, res) => {
     try {
-        const data = await getContinueWatchingData(req.db, provider);
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 10;
+        const data = await getContinueWatchingData(req.db, provider, limit, page);
         res.json(data);
     } catch (error) {
         logger.error({ err: error }, 'DB error on /api/continue-watching/all');
@@ -331,7 +338,7 @@ app.get('/api/continue-watching/all', async (req, res) => {
 
 app.get('/api/continue-watching', async (req, res) => {
     try {
-        const data = await getContinueWatchingData(req.db, provider, 8);
+        const data = await getContinueWatchingData(req.db, provider, 6);
         res.json(data);
     } catch (error) {
         logger.error({ err: error }, 'DB error on /api/continue-watching');
@@ -417,11 +424,25 @@ app.get('/api/watchlist', (req, res) => {
     const offset = (page - 1) * limit;
     const orderByClause = sort === 'name_asc' ? 'ORDER BY name ASC' : sort === 'name_desc' ? 'ORDER BY name DESC' : 'ORDER BY ROWID DESC';
 
-    req.db.get('SELECT COUNT(*) as count FROM watchlist', [], (err, row: any) => {
+    const status = req.query.status as string;
+    let whereClause = '';
+    const params: any[] = [];
+
+    if (status && status !== 'All') {
+        whereClause = 'WHERE status = ?';
+        params.push(status);
+    }
+
+    const countQuery = `SELECT COUNT(*) as count FROM watchlist ${whereClause}`;
+    req.db.get(countQuery, params, (err, row: any) => {
         if (err) return res.status(500).json({ error: 'DB error on count' });
         res.setHeader('X-Total-Count', row.count.toString());
-        req.db.all(`SELECT id as _id, id, name, thumbnail, status, nativeName, englishName FROM watchlist ${orderByClause} LIMIT ? OFFSET ?`, [limit, offset],
-            (err, rows) => res.status(err ? 500 : 200).json(err ? { error: 'DB error on data' } : rows));
+
+        const dataQuery = `SELECT id as _id, id, name, thumbnail, status, nativeName, englishName FROM watchlist ${whereClause} ${orderByClause} LIMIT ? OFFSET ?`;
+        const dataParams = [...params, limit, offset];
+        req.db.all(dataQuery, dataParams, (err, rows) => {
+            res.status(err ? 500 : 200).json(err ? { error: 'DB error on data' } : rows);
+        });
     });
 });
 
