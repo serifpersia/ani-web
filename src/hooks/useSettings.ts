@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 
 const fetchSettings = async (key: string) => {
   const response = await fetch(`/api/settings?key=${key}`);
@@ -32,8 +33,12 @@ export const useUpdateSetting = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: updateSettings,
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['settings', variables.key] });
+    onSuccess: () => {
+      toast.success('Setting updated!');
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+    },
+    onError: (error) => {
+      toast.error(`Failed to update setting: ${error.message}`);
     },
   });
 };
