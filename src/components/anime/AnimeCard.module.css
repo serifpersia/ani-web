@@ -128,6 +128,19 @@
   transform: scale(1.1);
 }
 
+.newEpisodesBadge {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.5rem;
+  background-color: var(--accent-blue);
+  color: white;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  z-index: 11;
+}
+
 .showType {
   position: absolute;
   top: 0.5rem;
