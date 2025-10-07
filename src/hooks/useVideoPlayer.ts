@@ -289,10 +289,10 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
         onVolumeChange, onProgress, onTimeUpdate, onEnded, setShowControls, setIsScrubbing, setHoverTime,
         setIsAutoSkipEnabled, setCurrentSkipInterval, setShowCCMenu, setSubtitleFontSize,
         setSubtitlePosition, setAvailableSubtitles, setActiveSubtitleTrack, setShowSourceMenu,
-        wasPlayingBeforeScrub, inactivityTimer, setIsFullscreen, onWaiting, onPlaying
+        wasPlayingBeforeScrub, inactivityTimer, setIsFullscreen, onWaiting, onPlaying, setCurrentTime
     }), [
         togglePlay, seek, toggleMute, toggleFullscreen, onPlay, onPause, onLoadedMetadata,
-        onVolumeChange, onProgress, onTimeUpdate, onEnded, setIsFullscreen, onWaiting, onPlaying
+        onVolumeChange, onProgress, onTimeUpdate, onEnded, setIsFullscreen, onWaiting, onPlaying, setCurrentTime
     ]);
 
     return {

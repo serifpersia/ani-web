@@ -161,7 +161,8 @@ export async function syncDownOnBoot(db: Database, dbPath: string, remoteDir: st
             await fs.copyFile(dbPath, backupPath);
             log.info('Backup complete.');
 
-            await executeRclone(['copyto', `${getRemoteString(remoteDir)}/anime.db`, dbPath, '--ignore-times']);
+            const dbName = path.basename(dbPath);
+            await executeRclone(['copyto', `${getRemoteString(remoteDir)}/${dbName}`, dbPath, '--ignore-times']);
             log.info('Download complete. Database is now up to date.');
             
             await fs.unlink(backupPath);
@@ -196,13 +197,14 @@ export async function syncUp(db: Database, dbPath: string, remoteDir: string): P
 
     const performUpload = async () => {
         log.info(`Local DB (v${localVersion}) is newer than remote (v${remoteVersion}). Uploading...`);
+        const dbName = path.basename(dbPath);
         try {
             try {
-                await executeRclone(['deletefile', `${getRemoteString(remoteDir)}/anime.db`]);
+                await executeRclone(['deletefile', `${getRemoteString(remoteDir)}/${dbName}`]);
             } catch (e) {
                 log.warn('Could not delete remote DB before upload (it may not have existed).');
             }
-            await executeRclone(['copyto', dbPath, `${getRemoteString(remoteDir)}/anime.db`]);
+            await executeRclone(['copyto', dbPath, `${getRemoteString(remoteDir)}/${dbName}`]);
             
             const newManifest = JSON.stringify({ version: localVersion });
             await fs.writeFile(TEMP_MANIFEST_PATH, newManifest);

@@ -31,7 +31,7 @@ const ShowDetails: React.FC<ShowDetailsProps> = ({ showMeta, allMangaDetails, lo
                         <>
                             <div className={styles.detailsGridContainer}>
                                 <div className={styles.detailItem}><strong>Type:</strong> {showMeta.mediaTypes?.[0]?.name}</div>
-                                <div className={styles.detailItem}><strong>Status:</strong> {showMeta.status}</div>
+                                <div className={styles.detailItem}><strong>Status:</strong> <span className={styles.animeStatus}>{showMeta.status}</span></div>
                                 <div className={styles.detailItem}><strong>Score:</strong> {showMeta.stats ? (showMeta.stats.averageScore / 10).toFixed(1) : 'N/A'}</div>
                                 <div className={styles.detailItem}><strong>Studios:</strong> {showMeta.studios?.map((s: { name: string }) => s.name).join(', ')}</div>
                                 <div className={styles.detailItem}><strong>Source:</strong> {showMeta.sources?.[0]?.name}</div>

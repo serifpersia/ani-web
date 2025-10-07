@@ -3,7 +3,7 @@ import React from 'react';
 
 const Logo: React.FC = () => {
   return (
-    <svg height="40" style={{ display: 'block' }}>
+    <svg height="40" width="125" style={{ display: 'block' }}>
       <style>
         {`
           .ani-text,

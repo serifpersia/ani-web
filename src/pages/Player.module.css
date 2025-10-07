@@ -2,33 +2,11 @@
     --dark-watched-color: #034e46;
 }
 
-.playerPage {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 1rem;
-}
-
-.headerContainer {
+.controls {
     display: flex;
-    gap: 1.5rem;
-    margin-bottom: 1rem;
-    align-items: flex-start;
-}
-
-.headerThumbnail {
-    width: 150px;
-    height: auto;
-    border-radius: 8px;
-}
-
-.header {
-    display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 1.5rem;
     flex-wrap: wrap;
-    gap: 1rem;
-    margin-bottom: 1rem;
-    flex-grow: 1;
 }
 
 .titleContainer {
@@ -44,7 +22,9 @@
     color: var(--dark-text-secondary);
 }
 
-
+body.light .scheduleInfo {
+    color: var(--light-text-secondary);
+}
 
 .status {
     background-color: var(--accent);
@@ -56,14 +36,12 @@
 }
 
 .nextEpisode {
-    background-color: var(--dark-bg-primary);
-    color: var(--dark-text);
+    background-color: #232323;
+    color: #a3a3a3;
     padding: 0.2rem 0.6rem;
     border-radius: 4px;
     white-space: nowrap;
 }
-
-
 
 .controls {
     display: flex;
@@ -90,8 +68,6 @@
     transition: all 0.2s;
 }
 
-
-
 .seekBtn:hover {
     background-color: var(--accent);
     border-color: var(--accent);
@@ -104,6 +80,11 @@
     gap: 0.5rem;
     font-size: 0.9rem;
     font-weight: 600;
+}
+
+.bottomControls .toggleContainer,
+.mobileControls .toggleContainer {
+    color: white;
 }
 
 .watchlistBtn {
@@ -119,8 +100,6 @@
     align-items: center;
     gap: 0.5rem;
 }
-
-
 
 .watchlistBtn:hover {
     border-color: var(--accent);
@@ -204,30 +183,24 @@
     pointer-events: none;
 }
 
-.centerPlayPause {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.5);
-    border: 2px solid white;
-    color: white;
-    border-radius: 50%;
-    width: 80px;
-    height: 80px;
-    font-size: 2.5rem;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    padding: 0;
-    padding-left: 10px;
-}
+    .centerPlayPause {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: transparent;
+        border: none;
+        color: white;
+        font-size: 4rem;
+        cursor: pointer;
+        padding: 0;
+        transition: transform 0.2s ease-in-out;
+    }
 
-.centerPlayPause:hover {
-    background: rgba(0, 0, 0, 0.7);
-}
-
+    .centerPlayPause:hover {
+        background: transparent;
+        transform: translate(-50%, -50%) scale(1.1);
+    }
 .bottomControls {
     position: absolute;
     bottom: 0;
@@ -290,7 +263,8 @@
     transition: transform 0.2s;
 }
 
-.progressBarContainer:hover .thumb {
+.progressBarContainer:hover .thumb,
+.progressBarContainer.scrubbing .thumb {
     transform: translate(-50%, -50%) scale(1);
 }
 
@@ -336,6 +310,7 @@
 .timeDisplay {
     font-size: 0.9rem;
     font-weight: 500;
+    color: white;
 }
 
 .leftControls {
@@ -400,8 +375,6 @@
     box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
 }
 
-
-
 .rightControls {
     display: flex;
     align-items: center;
@@ -434,15 +407,11 @@
     border-radius: var(--card-border-radius);
 }
 
-
-
 .sourceGroup h4 {
     margin-top: 0;
     margin-bottom: 0.8rem;
     color: var(--dark-text);
 }
-
-
 
 .qualityList {
     display: flex;
@@ -460,18 +429,11 @@
     transition: all 0.2s;
 }
 
-
-
 .qualityItem.active {
     background-color: var(--accent);
     color: #fff;
     border-color: var(--accent);
     font-weight: 600;
-}
-
-.contentLayout {
-    display: block;
-    margin-top: 1.5rem;
 }
 
 .detailItem {
@@ -591,61 +553,6 @@
     font-size: 0.9rem;
 }
 
-
-
-.episodeListContainer {
-    margin-bottom: 1.5rem;
-}
-
-.episodeListContainer h3 {
-    margin-top: 0;
-}
-
-.episodeList {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-    gap: 1rem;
-    max-height: 400px;
-    overflow-y: auto;
-    padding: 0.5rem;
-}
-
-.episodeItem {
-    background-color: var(--dark-bg-secondary);
-    color: var(--dark-text);
-    border: 1px solid var(--dark-border);
-    padding: 0.75rem;
-    border-radius: 8px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s ease-in-out;
-}
-
-.episodeItem:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    background-color: var(--accent);
-    color: white;
-    border-color: var(--accent);
-}
-
-
-
-.episodeItem.active {
-    background-color: var(--accent);
-    color: #fff;
-    border-color: var(--accent);
-    font-weight: 600;
-}
-
-.episodeItem.watched {
-    background-color: var(--dark-watched-color);
-    border-color: var(--dark-watched-color);
-    color: #fff;
-}
-
-
-
 .epJumpControls {
     margin-bottom: 1rem;
     padding: 0.5rem;
@@ -655,8 +562,6 @@
     flex-direction: column;
     gap: 0.5rem;
 }
-
-
 
 .epRangeButtons {
     display: flex;
@@ -674,8 +579,6 @@
     transition: all 0.2s;
     font-size: 0.85rem;
 }
-
-
 
 .epRangeBtn:hover {
     background-color: var(--accent);
@@ -697,8 +600,6 @@
     background-color: var(--dark-bg-primary);
     color: var(--dark-text);
 }
-
-
 
 .epJumpInputGroup button {
     background-color: var(--accent);
@@ -810,8 +711,6 @@
     box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
 }
 
-
-
 .ccSliderContainer span {
     font-size: 0.8rem;
     text-align: right;
@@ -857,8 +756,6 @@
     border-radius: var(--card-border-radius);
 }
 
-
-
 .sourceQualityControls {
     display: flex;
     flex-direction: column;
@@ -886,8 +783,6 @@
     transition: all 0.2s;
 }
 
-
-
 .sourceButton.active, .qualityButton.active {
     background-color: var(--accent);
     color: #fff;
@@ -896,20 +791,6 @@
 }
 
 @media (max-width: 768px) {
-    .contentLayout {
-        grid-template-columns: 1fr;
-    }
-
-    .header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .controls {
-        width: 100%;
-        justify-content: space-between;
-    }
-
     .bottomControls {
         padding: 5px 10px;
     }
@@ -1097,8 +978,6 @@
     border-color: var(--accent);
 }
 
-
-
 .detailsError {
     color: #ff4d4d;
     font-weight: 500;
@@ -1133,8 +1012,6 @@
     border-radius: var(--card-border-radius);
     margin-bottom: 1.5rem;
 }
-
-
 
 .bufferingOverlay {
     position: absolute;

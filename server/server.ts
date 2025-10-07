@@ -15,6 +15,8 @@ import logger from './logger';
 import { AllAnimeProvider } from './providers/allanime.provider';
 import sharp from 'sharp';
 
+const isDebug = process.argv.includes('--debug');
+
 declare module 'express-serve-static-core' {
     interface Request {
         db: sqlite3.Database;
@@ -494,17 +496,19 @@ app.post('/api/settings', async (req, res) => {
 });
 
 app.get('/api/backup-db', (_req, res) => {
-   const dbPath = path.join(__dirname, 'anime.db');
+   const dbName = isDebug ? 'anime.debug.db' : 'anime.db';
+   const dbPath = path.join(__dirname, dbName);
    _req.db.close(err => {
         if (err) return res.status(500).json({ error: 'Failed to close database.' });
         res.download(dbPath, 'ani-web-backup.db', () => initializeDatabase(dbPath).then(newDb => db = newDb));
    });
 });
 
-app.post('/api/restore-db', multer({ storage: multer.diskStorage({ destination: (_req, _f, cb) => cb(null, __dirname), filename: (_r, _f, cb) => cb(null, 'anime.db.temp') }) }).single('dbfile'), (req, res) => {
+app.post('/api/restore-db', multer({ storage: multer.diskStorage({ destination: (_req, _f, cb) => cb(null, __dirname), filename: (_r, _f, cb) => cb(null, `${isDebug ? 'anime.debug.db' : 'anime.db'}.temp`) }) }).single('dbfile'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
-    const tempPath = path.join(__dirname, 'anime.db.temp');
-    const dbPath = path.join(__dirname, 'anime.db');
+    const dbName = isDebug ? 'anime.debug.db' : 'anime.db';
+    const tempPath = path.join(__dirname, `${dbName}.temp`);
+    const dbPath = path.join(__dirname, dbName);
     req.db.close(err => {
         if (err) return res.status(500).json({ error: 'Failed to close database.' });
         fs.rename(tempPath, dbPath, err => {
@@ -675,7 +679,11 @@ app.get(/^(?!\/api).*$/, (_req, res) => res.sendFile(path.join(__dirname, '../..
 app.get('/api/genres-and-tags', (_req, res) => res.json({ genres, tags, studios }));
 
 async function main() {
-    const dbPath = path.join(__dirname, 'anime.db');
+    const dbName = isDebug ? 'anime.debug.db' : 'anime.db';
+    const dbPath = path.join(__dirname, dbName);
+    if (isDebug) {
+        logger.info('DEBUG MODE ENABLED');
+    }
     const isSyncEnabled = await verifyRclone();
     db = await initializeDatabase(dbPath);
     logger.info('Database initialized.');
