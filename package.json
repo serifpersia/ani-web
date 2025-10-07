@@ -9,7 +9,8 @@
     "build:server": "tsc -p server/tsconfig.json",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "node server/dist/server.js"
+    "start": "node server/dist/server.js",
+    "start:dev": "node server/dist/server.js --debug"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.2",

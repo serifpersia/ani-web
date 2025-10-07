@@ -1,6 +1,7 @@
 import React, { useEffect, useReducer, useRef, useCallback, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styles from './Player.module.css';
+import layoutStyles from './PlayerPageLayout.module.css';
 import ToggleSwitch from '../components/common/ToggleSwitch';
 import { FaCheck, FaPlus } from 'react-icons/fa';
 import toast from 'react-hot-toast';
@@ -595,167 +596,162 @@ const Player: React.FC = () => {
   if (!state.showMeta.name) return <p>Show not found.</p>;
 
   return (
-    <div className={styles.playerPage}>
+    <div className={layoutStyles.playerPageLayout}>
         <ResumeModal 
             show={state.showResumeModal}
             resumeTime={player.actions.formatTime(state.resumeTime)}
             onResume={handleResume}
             onStartOver={handleStartOver}
         />
-      <div className={styles.headerContainer}>
-        <img src={fixThumbnailUrl(state.showMeta.thumbnail!)} alt={displayTitle} className={styles.headerThumbnail} />
-        <div className={styles.header}>
-          <div className={styles.titleContainer}>
-            <h2>{displayTitle}</h2>
-            <div className={styles.scheduleInfo}>
-              {state.loadingDetails ? (
-                <div className={styles.spinner}></div>
-              ) : state.detailsError ? (
-                <span className={styles.detailsError}>{state.detailsError}</span>
-              ) : (
-                <>
-                  {state.showMeta.status && <span className={styles.status}>{state.showMeta.status}</span>}
-                  {state.showMeta.nextEpisodeAirDate && <span className={styles.nextEpisode}>Next: {state.showMeta.nextEpisodeAirDate}</span>}
-                </>
-              )}
-            </div>
-          </div>
-          <div className={styles.controls}>
-
-              <button className={`${styles.watchlistBtn} ${state.inWatchlist ? styles.inList : ''}`} onClick={toggleWatchlist}>
-                {state.inWatchlist ? <FaCheck /> : <FaPlus />}
-                {state.inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
-              </button>
-              <div className={styles.toggleContainer}>
-                  <span>SUB</span>
-                  <ToggleSwitch 
-                      id="dub-toggle"
-                      isChecked={state.currentMode === 'dub'} 
-                      onChange={() => {
-                        const newMode = state.currentMode === 'sub' ? 'dub' : 'sub';
-                        dispatch({ type: 'SET_STATE', payload: { currentMode: newMode } });
-                        toast.success(`Switched to ${newMode.toUpperCase()}`);
-                      }} 
-                  />
-                  <span>DUB</span>
-              </div>
-          </div>
-        </div>
-      </div>
-
-      <div className={styles.descriptionBox}>
-        <h3>Description</h3>
-        <p dangerouslySetInnerHTML={{ __html: state.showMeta.description || 'No description available.' }}></p>
-      </div>
-
-      <ShowDetails
-        showMeta={state.showMeta}
-        allMangaDetails={state.allMangaDetails}
-        loading={state.loadingDetails}
-        error={state.detailsError}
-        isOpen={state.showCombinedDetails}
-        onToggle={handleToggleDetails}
-      />
-
-      <div ref={refs.playerContainerRef} className={styles.videoContainer} onDoubleClick={actions.toggleFullscreen}>
-        {state.loadingVideo && (
-            <div className={styles.loadingOverlay}>
-                <div className={styles.loadingDots}>
-                    <div className={styles.dot}></div>
-                    <div className={styles.dot}></div>
-                    <div className={styles.dot}></div>
-                </div>
-            </div>
-        )}
-
-        {player.state.isBuffering && !state.loadingVideo && (
-            <div className={styles.bufferingOverlay}>
-                <div className={styles.bufferingSpinner}></div>
-            </div>
-        )}
-        
-        {state.selectedSource?.type === 'iframe' ? (
-            !state.loadingVideo && <iframe
-                src={state.selectedLink?.link}
-                className={styles.videoIframe}
-                allow="autoplay; fullscreen; picture-in-picture"
-                allowFullScreen
-                sandbox={state.selectedSource.sandbox ? `${state.selectedSource.sandbox} allow-fullscreen allow-popups allow-popups-to-escape-sandbox` : undefined}
-            ></iframe>
-        ) : (
-          <>
-            {!state.loadingVideo && !isMobile && <PlayerControls 
-                player={player}
-                isAutoplayEnabled={state.isAutoplayEnabled}
-                onAutoplayChange={handleAutoplayChange}
-                videoSources={state.videoSources}
-                selectedSource={state.selectedSource}
-                selectedLink={state.selectedLink}
-                onSourceChange={(source, link) => dispatch({ type: 'SET_STATE', payload: { selectedSource: source, selectedLink: link }})}
-                loadingVideo={state.loadingVideo}
-            />}
-
-            {!state.loadingVideo && <video 
-                ref={refs.videoRef} 
-                controls={isMobile}
-                onClick={!isMobile ? actions.togglePlay : undefined}
-                onPlay={actions.onPlay}
-                onPause={actions.onPause}
-                onLoadedMetadata={actions.onLoadedMetadata}
-                onTimeUpdate={actions.onTimeUpdate}
-                onProgress={actions.onProgress}
-                onVolumeChange={actions.onVolumeChange}
-                onWaiting={actions.onWaiting}
-                onPlaying={actions.onPlaying}
-            />}
-          </>
-        )}
-      </div>
-
-      {state.loadingVideo ? (
-        <div className={styles.sourceLoader}>
-            <div className={styles.spinner}></div>
-        </div>
-      ) : (
-        <SourceSelector 
-            videoSources={state.videoSources}
-            selectedSource={state.selectedSource}
-            onSourceChange={(source) => {
-              const bestLink = source.links.sort((a, b) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0))[0];
-              dispatch({ type: 'SET_STATE', payload: { selectedSource: source, selectedLink: bestLink } })
-            }}
-        />
-      )}
-
-      {isMobile && state.selectedSource?.type !== 'iframe' && (
-        <div className={styles.mobileControls}>
-            <div className={styles.playerActions}>
-                <button className={styles.seekBtn} onClick={() => actions.seek(-10)}>-10s</button>
-                <button className={styles.seekBtn} onClick={() => actions.seek(10)}>+10s</button>
-                <div className={styles.toggleContainer}>
-                    <span>Auto Skip</span>
-                    <ToggleSwitch id="auto-skip-toggle-mobile" isChecked={player.state.isAutoSkipEnabled} onChange={(e) => {
-                        const checked = e.target.checked;
-                        actions.setIsAutoSkipEnabled(checked);
-                        localStorage.setItem('autoSkipEnabled', checked.toString());
-                    }} />
-                </div>
-                <div className={styles.toggleContainer}>
-                    <span>Autoplay</span>
-                    <ToggleSwitch id="autoplay-toggle-mobile" isChecked={state.isAutoplayEnabled} onChange={(e) => handleAutoplayChange(e.target.checked)} />
-                </div>
-            </div>
-        </div>
-      )}
-
-      <div className={styles.contentLayout}>
+      <aside className={layoutStyles.episodeSidebar}>
         <EpisodeList 
             episodes={state.episodes}
             currentEpisode={state.currentEpisode}
             watchedEpisodes={state.watchedEpisodes}
-            currentMode={state.currentMode}
             onEpisodeClick={handleEpisodeClick}
         />
+      </aside>
+
+      <div className={layoutStyles.playerMain}>
+        <div ref={refs.playerContainerRef} className={`${styles.videoContainer} ${layoutStyles.videoPlayerWrapper}`} onDoubleClick={actions.toggleFullscreen}>
+          {state.loadingVideo && (
+              <div className={styles.loadingOverlay}>
+                  <div className={styles.loadingDots}>
+                      <div className={styles.dot}></div>
+                      <div className={styles.dot}></div>
+                      <div className={styles.dot}></div>
+                  </div>
+              </div>
+          )}
+
+          {player.state.isBuffering && !state.loadingVideo && (
+              <div className={styles.bufferingOverlay}>
+                  <div className={styles.bufferingSpinner}></div>
+              </div>
+          )}
+          
+          {state.selectedSource?.type === 'iframe' ? (
+              !state.loadingVideo && <iframe
+                  src={state.selectedLink?.link}
+                  className={styles.videoIframe}
+                  allow="autoplay; fullscreen; picture-in-picture"
+                  allowFullScreen
+                  sandbox={state.selectedSource.sandbox ? `${state.selectedSource.sandbox} allow-fullscreen allow-popups allow-popups-to-escape-sandbox` : undefined}
+              ></iframe>
+          ) : (
+            <>
+              {!state.loadingVideo && !isMobile && <PlayerControls 
+                  player={player}
+                  isAutoplayEnabled={state.isAutoplayEnabled}
+                  onAutoplayChange={handleAutoplayChange}
+                  videoSources={state.videoSources}
+                  selectedSource={state.selectedSource}
+                  selectedLink={state.selectedLink}
+                  onSourceChange={(source, link) => dispatch({ type: 'SET_STATE', payload: { selectedSource: source, selectedLink: link }})}
+                  loadingVideo={state.loadingVideo}
+              />}
+
+              {!state.loadingVideo && <video 
+                  ref={refs.videoRef} 
+                  controls={isMobile}
+                  onClick={!isMobile ? actions.togglePlay : undefined}
+                  onPlay={actions.onPlay}
+                  onPause={actions.onPause}
+                  onLoadedMetadata={actions.onLoadedMetadata}
+                  onTimeUpdate={actions.onTimeUpdate}
+                  onProgress={actions.onProgress}
+                  onVolumeChange={actions.onVolumeChange}
+                  onWaiting={actions.onWaiting}
+                  onPlaying={actions.onPlaying}
+              />}
+            </>
+          )}
+        </div>
+
+        {state.loadingVideo ? (
+          <div className={styles.sourceLoader}>
+              <div className={styles.spinner}></div>
+          </div>
+        ) : (
+          <SourceSelector 
+              videoSources={state.videoSources}
+              selectedSource={state.selectedSource}
+              onSourceChange={(source) => {
+                const bestLink = source.links.sort((a, b) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0))[0];
+                dispatch({ type: 'SET_STATE', payload: { selectedSource: source, selectedLink: bestLink } })
+              }}
+          />
+        )}
+
+        <div className={layoutStyles.playerInfoHeader}>
+            <div className={layoutStyles.playerAnimeCard}>
+                <img src={fixThumbnailUrl(state.showMeta.thumbnail!)} alt={displayTitle} />
+            </div>
+            <div className={layoutStyles.videoTitleSection}>
+                <div className={styles.titleContainer}>
+                    <h1>{displayTitle}</h1>
+                    <div className={styles.scheduleInfo}>
+                        {state.showMeta.status && <span className={styles.status}>{state.showMeta.status}</span>}
+                        {state.showMeta.nextEpisodeAirDate && (
+                            <span className={styles.nextEpisode}>
+                                Next episode: {state.showMeta.nextEpisodeAirDate}
+                            </span>
+                        )}
+                    </div>
+                </div>
+                <div className={styles.controls}>
+                    <button className={`${styles.watchlistBtn} ${state.inWatchlist ? styles.inList : ''}`} onClick={toggleWatchlist}>
+                        {state.inWatchlist ? <FaCheck /> : <FaPlus />}
+                        {state.inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
+                    </button>
+                    <div className={styles.toggleContainer}>
+                        <span>SUB</span>
+                        <ToggleSwitch 
+                            id="dub-toggle"
+                            isChecked={state.currentMode === 'dub'} 
+                            onChange={() => {
+                                const newMode = state.currentMode === 'sub' ? 'dub' : 'sub';
+                                dispatch({ type: 'SET_STATE', payload: { currentMode: newMode } });
+                                toast.success(`Switched to ${newMode.toUpperCase()}`);
+                            }} 
+                        />
+                        <span>DUB</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <p className={layoutStyles.videoDescription} dangerouslySetInnerHTML={{ __html: state.showMeta.description || 'No description available.' }}></p>
+        
+        <ShowDetails
+          showMeta={state.showMeta}
+          allMangaDetails={state.allMangaDetails}
+          loading={state.loadingDetails}
+          error={state.detailsError}
+          isOpen={state.showCombinedDetails}
+          onToggle={handleToggleDetails}
+        />
+
+        {isMobile && state.selectedSource?.type !== 'iframe' && (
+          <div className={styles.mobileControls}>
+              <div className={styles.playerActions}>
+                  <button className={styles.seekBtn} onClick={() => actions.seek(-10)}>-10s</button>
+                  <button className={styles.seekBtn} onClick={() => actions.seek(10)}>+10s</button>
+                  <div className={styles.toggleContainer}>
+                      <span>Auto Skip</span>
+                      <ToggleSwitch id="auto-skip-toggle-mobile" isChecked={player.state.isAutoSkipEnabled} onChange={(e) => {
+                          const checked = e.target.checked;
+                          actions.setIsAutoSkipEnabled(checked);
+                          localStorage.setItem('autoSkipEnabled', checked.toString());
+                      }} />
+                  </div>
+                  <div className={styles.toggleContainer}>
+                      <span>Autoplay</span>
+                      <ToggleSwitch id="autoplay-toggle-mobile" isChecked={state.isAutoplayEnabled} onChange={(e) => handleAutoplayChange(e.target.checked)} />
+                  </div>
+              </div>
+          </div>
+        )}
       </div>
     </div>
   );

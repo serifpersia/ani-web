@@ -73,6 +73,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({ player, isAutoplayEnabl
             const percent = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
             const scrubTime = percent * state.duration;
             refs.videoRef.current.currentTime = scrubTime;
+            actions.setCurrentTime(scrubTime);
             actions.setHoverTime({ time: scrubTime, position: e.clientX - rect.left });
         };
         const handleDocumentMouseUp = () => {
@@ -101,7 +102,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({ player, isAutoplayEnabl
             )}
             <div className={styles.bottomControls}>
                 <div
-                    className={styles.progressBarContainer}
+                    className={`${styles.progressBarContainer} ${state.isScrubbing ? styles.scrubbing : ''}`}
                     ref={refs.progressBarRef}
                     onClick={handleProgressBarClick}
                     onMouseMove={handleProgressBarMouseMove}
@@ -164,7 +165,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({ player, isAutoplayEnabl
                                 <svg width="36" height="36" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" strokeWidth="3" stroke="currentColor" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M34 52h18V16H24"/><path strokeLinecap="round" d="M24 16H8"/><path strokeLinecap="round" strokeLinejoin="round" d="m11.5 12-4 4 4 4"/><text x="3" y="53" fontSize="28" fill="currentColor" stroke="none">10</text></svg>
                             </button>
                             <button className={styles.controlBtn} onClick={() => actions.seek(10)}>
-                                <svg width="36" height="36" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" strokeWidth="3" stroke="currentColor" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M30 52H12V16h28"/><path strokeLinecap="round" d="M40 16h16"/><path strokeLinecap="round" strokeLinejoin="round" d="m52 12 4.5 4-4.5 4"/><text x="29" y="53.5" fontSize="28" fill="currentColor" stroke="none">10</text></svg>
+                                <svg width="36" height="36" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" strokeWidth="3" stroke="currentColor" fill="none"><path strokeLinecap="round" strokeLinejoin="round" d="M30 52H12V16h28"/><path strokeLinecap="round" d="M40 16h16"/><path strokeLinecap="round" strokeLinejoin="round" d="m52 12 4.5 4-4.5 4"/><text x="32" y="53.5" fontSize="28" fill="currentColor" stroke="none">10</text></svg>
                             </button>
                         </div>
                         <div className={styles.toggleContainer}>

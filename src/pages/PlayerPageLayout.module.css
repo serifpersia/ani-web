@@ -1,0 +1,172 @@
+:root {
+    --bg-primary: #121212;
+    --bg-secondary: #1E1E1E;
+    --bg-tertiary: #2A2A2A;
+    --text-primary: #F5F5F5;
+    --text-secondary: #A0A0A0;
+    --accent-primary: #9F55FF;
+    --accent-secondary: #7A28D9;
+    --border-color: #333333;
+}
+
+.playerPageLayout {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 3fr) 0.5fr;
+    gap: 0.8rem;
+}
+
+.videoPlayerWrapper {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background-color: black;
+    border-radius: 16px;
+    margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--text-secondary);
+}
+
+.playerInfoHeader {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+}
+
+.playerAnimeCard {
+    width: 110px;
+    flex-shrink: 0;
+}
+
+.playerAnimeCard img {
+    width: 100%;
+    border-radius: 8px;
+}
+
+.videoTitleSection {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+}
+
+.videoTitleSection h1 {
+    font-size: 2.2rem;
+    margin-bottom: 0.5rem;
+    line-height: 1.2;
+    color: var(--text-primary);
+}
+
+.videoMeta {
+    display: flex;
+    gap: 1rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+}
+
+.videoMeta span {
+    background-color: var(--bg-tertiary);
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.videoDescription {
+    line-height: 1.7;
+    color: var(--text-secondary);
+    margin-bottom: 2.5rem;
+}
+
+.infoSection {
+    background-color: var(--bg-secondary);
+    padding: 1.5rem;
+    border-radius: 12px;
+}
+
+.infoGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.infoItem {
+    font-size: 0.9rem;
+}
+
+.infoItem strong {
+    color: var(--text-primary);
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.infoItem span {
+    color: var(--text-secondary);
+}
+
+.episodeSidebar {
+    background-color: var(--bg-secondary);
+    border-radius: 16px;
+    height: fit-content;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.episodeListTitle {
+    padding: 1.5rem 1.5rem 1rem;
+    font-size: 1.2rem;
+    color: var(--text-primary);
+}
+
+.episodeList {
+    list-style: none;
+}
+
+.episodeItem {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.episodeItem:last-child {
+    border-bottom: none;
+}
+
+.episodeItem:hover {
+    background-color: var(--bg-tertiary);
+}
+
+.episodeItem.active {
+    background-color: var(--accent-primary);
+    color: white;
+}
+
+.epNumber {
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.rangeButton.active {
+    background-color: #9F55FF;
+    color: white;
+    border-color: #9F55FF;
+}
+
+@media (max-width: 768px) {
+    .playerPageLayout {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+
+    .episodeSidebar {
+        order: 2;
+    }
+
+    .playerMain {
+        order: 1;
+    }
+}
