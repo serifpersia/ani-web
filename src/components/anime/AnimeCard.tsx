@@ -95,7 +95,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
   );
 
   const progressElement = isInProgress && (
-    <div className={isMobile ? styles.progressInline : styles.progressOverlay}>
+    <div className={styles.progressContainer}>
       <div className={styles.progressBar}>
         <div className={styles.progress} style={{ width: `${progressPercent}%` }}></div>
       </div>
@@ -123,7 +123,6 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
           {isUpNext && <div className={styles.newEpisodesBadge}>+{anime.newEpisodesCount} NEW</div>}
           {!isMobile && episodeInfoElement}
           {!isMobile && episodeCountElement}
-          {!isMobile && progressElement}
           <img 
             src={fixThumbnailUrl(anime.thumbnail)} 
             alt={anime.name} 
@@ -143,6 +142,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
         </div>
         <div className={styles.info}>
           {isMobile && removeButtonElement}
+          {progressElement}
           <div className={styles.title} title={displayTitle}>{displayTitle}</div>
           {isMobile && (
             <div className={styles.mobileDetailsBottom}>
@@ -155,7 +155,6 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
               </div>
             </div>
           )}
-          {isMobile && progressElement}
           {!isMobile && removeButtonElement}
           {!isMobile && showTypeElement}
           {continueWatching ? null : (
