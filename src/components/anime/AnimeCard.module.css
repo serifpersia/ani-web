@@ -9,6 +9,10 @@
   color: inherit;
 }
 
+.cardWrapper {
+  position: relative;
+}
+
 .card:hover {
   transform: translateY(-5px);
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
@@ -52,6 +56,7 @@
 .info {
   padding: 0.5rem 1rem;
   background-color: #262829;
+  position: relative;
 }
 
 .progressBar {
@@ -128,7 +133,7 @@
   opacity: 0;
 }
 
-.card:hover .removeBtn {
+.cardWrapper:hover .removeBtn {
   opacity: 1;
 }
 
