@@ -1,4 +1,5 @@
-import React, { memo, useState } from 'react';
+import React, { memo, useState, useRef } from 'react';
+import AnimeInfoPopup from './AnimeInfoPopup';
 import RemoveConfirmationModal from '../common/RemoveConfirmationModal';
 import { useRemoveFromWatchlist } from '../../hooks/useAnimeData';
 import { Link } from 'react-router-dom';
@@ -37,6 +38,8 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
   const isMobile = useIsMobile();
   const { titlePreference } = useTitlePreference();
   const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [showPopup, setShowPopup] = useState(false);
+  const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
   const removeWatchlistMutation = useRemoveFromWatchlist();
 
   const isUpNext = anime.newEpisodesCount !== undefined && anime.newEpisodesCount > 0;
@@ -109,12 +112,38 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
     <button className={isMobile ? styles.removeBtnInline : styles.removeBtn} onClick={handleRemoveClick}>x</button>
   );
 
+  const handleMouseEnter = () => {
+    if (isMobile) return;
+    if (hoverTimeout.current) {
+      clearTimeout(hoverTimeout.current);
+    }
+    hoverTimeout.current = setTimeout(() => {
+      setShowPopup(true);
+    }, 500);
+  };
+
+  const handleMouseLeave = () => {
+    if (isMobile) return;
+    if (hoverTimeout.current) {
+      clearTimeout(hoverTimeout.current);
+    }
+    hoverTimeout.current = setTimeout(() => {
+      setShowPopup(false);
+    }, 100);
+  };
+
   const showTypeElement = (
     <div className={isMobile ? styles.showTypeInline : styles.showType}>{anime.type || 'TV'}</div>
   );
 
   return (
-    <>
+    <div 
+      className={styles.cardWrapper}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      {continueWatching && !isMobile && removeButtonElement}
+      {!isMobile && showTypeElement}
       <Link 
         to={linkTarget}
         className={styles.card}
@@ -155,14 +184,13 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
               </div>
             </div>
           )}
-          {!isMobile && removeButtonElement}
-          {!isMobile && showTypeElement}
           {continueWatching ? null : (
             <div className={styles.details}>
             </div>
           )}
         </div>
       </Link>
+      <AnimeInfoPopup animeId={anime._id} isVisible={showPopup} />
       <RemoveConfirmationModal
         isOpen={showRemoveModal}
         onClose={handleCancelRemove}
@@ -170,7 +198,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
         animeName={displayTitle}
         scenario="continueWatching"
       />
-    </>
+    </div>
   );
 });
 

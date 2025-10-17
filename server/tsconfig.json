@@ -6,7 +6,8 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node", "express", "multer", "cors", "xml2js"]
   },
   "include": ["./**/*.ts"],
   "exclude": ["node_modules"]
