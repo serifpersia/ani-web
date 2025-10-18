@@ -185,6 +185,7 @@ const Player: React.FC = () => {
 
   const hlsInstance = useRef<Hls | null>(null);
   const isMobile = useIsMobile();
+  const wasFullscreenRef = useRef(false);
 
   const fetchWithProfile = async (url: string, options: RequestInit = {}) => {
     const newOptions: RequestInit = { ...options };
@@ -442,6 +443,7 @@ const Player: React.FC = () => {
             const currentIndex = state.episodes.findIndex(ep => ep === state.currentEpisode);
             if (currentIndex > -1 && currentIndex < state.episodes.length - 1) {
                 const nextEpisode = state.episodes[currentIndex + 1];
+                wasFullscreenRef.current = player.state.isFullscreen;
                 navigate(`/player/${showId}/${nextEpisode}`);
             }
         }
@@ -452,7 +454,14 @@ const Player: React.FC = () => {
             videoElement.removeEventListener('ended', handleVideoEnd);
         }
     };
-  }, [state.isAutoplayEnabled, state.episodes, state.currentEpisode, showId, navigate, refs.videoRef, actions]);
+  }, [state.isAutoplayEnabled, state.episodes, state.currentEpisode, showId, navigate, refs.videoRef, actions, player.state.isFullscreen]);
+
+  useEffect(() => {
+    if (!state.loadingVideo && wasFullscreenRef.current) {
+      player.actions.toggleFullscreen();
+      wasFullscreenRef.current = false;
+    }
+  }, [state.loadingVideo, player.actions]);
 
   useEffect(() => {
     if (state.showResumeModal && refs.videoRef.current) {
