@@ -1,4 +1,3 @@
-
 .scheduleSection {
     padding: var(--section-padding);
 }
@@ -35,9 +34,10 @@
 
 .dayBtn.active {
     background-color: var(--accent);
-    border-color: var(--accent);
+    border-color: var(--accent-purple-dark);
     color: #fff;
-    font-weight: 600;
+    font-weight: 700;
+    box-shadow: 0 0 10px var(--accent-purple);
 }
 
 .dayName {
@@ -47,4 +47,20 @@
 
 .dayDate {
     font-size: 0.8rem;
+}
+
+.gridContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1.5rem;
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }

@@ -20,7 +20,7 @@ interface Anime {
   }
 
 const SkeletonGrid = () => (
-    <div className="grid-container">
+    <div className={styles.gridContainer}>
         {Array.from({ length: 10 }).map((_, i) => <AnimeCardSkeleton key={i} />)}
     </div>
 );
@@ -100,7 +100,7 @@ const Schedule: React.FC = () => {
       ) : scheduleData.length === 0 ? (
         <p style={{textAlign: 'center', marginTop: '1rem'}}>No episodes scheduled for this day.</p>
       ) : (
-        <div className="grid-container">
+        <div key={selectedDate} className={styles.gridContainer}>
           {scheduleData.map(anime => (
             <AnimeCard key={anime._id} anime={anime} continueWatching={false} />
           ))}
