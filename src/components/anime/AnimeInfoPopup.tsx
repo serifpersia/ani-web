@@ -5,6 +5,9 @@ interface ShowDetails {
   title: string;
   description: string;
   genres: { name: string }[];
+  averageScore?: number;
+  status?: string;
+  episodes?: number;
 }
 
 interface AnimeInfoPopupProps {
@@ -48,6 +51,11 @@ const AnimeInfoPopup: React.FC<AnimeInfoPopupProps> = ({ animeId, isVisible }) =
       ) : details ? (
         <>
           <h3>{details.title}</h3>
+          <div className={styles.detailsGrid}>
+            {details.averageScore && <div><strong>Score:</strong> {details.averageScore}</div>}
+            {details.status && <div><strong>Status:</strong> {details.status}</div>}
+            {details.episodes && <div><strong>Episodes:</strong> {details.episodes}</div>}
+          </div>
           <p dangerouslySetInnerHTML={{ __html: details.description }}></p>
           <div className={styles.genres}>
             {details.genres.map((genre) => (

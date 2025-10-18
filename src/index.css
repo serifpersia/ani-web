@@ -362,3 +362,15 @@ footer a:hover {
 #nprogress .peg {
   box-shadow: 0 0 10px var(--accent), 0 0 5px var(--accent) !important;
 }
+
+.top-10-list .list-item.top-1 .rank {
+  color: #ffd700;
+}
+
+.top-10-list .list-item.top-2 .rank {
+  color: #c0c0c0;
+}
+
+.top-10-list .list-item.top-3 .rank {
+  color: #cd7f32;
+}
