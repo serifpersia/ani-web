@@ -13,7 +13,6 @@ import { initializeDatabase, syncDownOnBoot, syncUp, performWriteTransaction, ve
 import chokidar from 'chokidar';
 import logger from './logger';
 import { AllAnimeProvider } from './providers/allanime.provider';
-import sharp from 'sharp';
 
 const isDebug = process.argv.includes('--debug');
 
@@ -546,19 +545,9 @@ app.get('/api/image-proxy', async (req, res) => {
             headers: { Referer: 'https://allanime.day', 'User-Agent': 'Mozilla/5.0' },
         });
 
-        let transformer = sharp(imageResponse.data);
-
-        if (width || height) {
-            transformer = transformer.resize(width, height, { fit: 'cover' });
-        }
-
-        transformer = transformer.webp({ quality: 80 });
-
-        res.set('Content-Type', 'image/webp');
+        res.set('Content-Type', imageResponse.headers['content-type']);
         res.set('Cache-Control', 'public, max-age=604800, immutable');
-
-        const resizedImageBuffer = await transformer.toBuffer();
-        res.send(resizedImageBuffer);
+        res.send(imageResponse.data);
 
     } catch (e) {
         logger.error({ err: e }, 'Image proxy error');
