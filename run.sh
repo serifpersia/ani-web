@@ -57,7 +57,7 @@ elif [ "$choice" == "2" ]; then
     echo -e "\033[1;32mRunning in PRODUCTION mode... \033[0m"
     echo
     echo "--> Installing production dependencies (npm install --omit=dev)..."
-    npm install --omit=dev
+    npm install --no-audit --omit=dev
     if [ $? -ne 0 ]; then
         echo -e "\033[1;31mError: npm install failed!\033[0m"
         read -p "Press Enter to exit..."
