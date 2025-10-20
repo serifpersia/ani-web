@@ -168,7 +168,7 @@ app.get('/api/skip-times/:showId/:episodeNumber', async (req, res) => {
 
 app.post('/api/import/mal-xml', multer().single('xmlfile'), async (req, res) => {
     const { erase } = req.body;
-    const xml = req.file && req.file.buffer ? req.file.buffer.toString('utf-8') : undefined;
+    const xml = req.file?.buffer.toString('utf-8');
     if (!xml) return res.status(400).json({ error: 'XML content is required' });
 
     parseString(xml, async (err, result) => {
