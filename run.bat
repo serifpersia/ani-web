@@ -39,7 +39,7 @@ goto menu
 powershell -NoProfile -Command "Write-Host 'Running in DEVELOPMENT mode...' -ForegroundColor Cyan"
 echo.
 echo --^> Installing all dependencies ^(npm install^)...
-call npm install
+call npm install --no-audit
 if !errorlevel! neq 0 (
     powershell -NoProfile -Command "Write-Host 'Error: npm install failed!' -ForegroundColor Red"
     pause
