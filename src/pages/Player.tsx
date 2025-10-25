@@ -600,6 +600,12 @@ const Player: React.FC = () => {
     return state.showMeta.name;
   }, [state.showMeta, titlePreference]);
 
+  useEffect(() => {
+    if (displayTitle && displayTitle !== 'Loading...' && state.currentEpisode) {
+      document.title = `► ${displayTitle} #${state.currentEpisode} - ani-web`;
+    }
+  }, [displayTitle, state.currentEpisode]);
+
   if (state.loadingShowData) return <p className="loading">Loading show data...</p>;
   if (state.error) return <p className="error-message">Error: {state.error}</p>;
   if (!state.showMeta.name) return <p>Show not found.</p>;
