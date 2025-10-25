@@ -41,7 +41,7 @@ const Home: React.FC = () => {
 
   const currentSeason = useMemo(() => currentSeasonPages?.pages.flat() || [], [currentSeasonPages]);
 
-  const { data: continueWatchingList, isLoading: loadingContinueWatching } = useContinueWatching();
+  const { data: continueWatchingList, isLoading: loadingContinueWatching } = useContinueWatching(6);
 
   const removeContinueWatchingMutation = useMutation({
     mutationFn: async (showId: string) => {

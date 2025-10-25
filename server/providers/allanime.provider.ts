@@ -2,6 +2,7 @@ import axios from 'axios';
 import logger from '../logger';
 import { Provider, Show, VideoSource, EpisodeDetails, SkipIntervals, VideoLink, SubtitleTrack, SearchOptions, ShowDetails, AllmangaDetails } from './provider.interface';
 import * as cheerio from 'cheerio';
+import NodeCache from 'node-cache';
 
 const API_BASE_URL = 'https://allanime.day';
 const API_ENDPOINT = `https://api.allanime.day/api`;
@@ -25,6 +26,11 @@ const DEOBFUSCATION_MAP: { [key: string]: string } = {
 
 export class AllAnimeProvider implements Provider {
     name = 'AllAnime';
+    private cache: NodeCache;
+
+    constructor(cache: NodeCache) {
+        this.cache = cache;
+    }
 
     public deobfuscateUrl(obfuscatedUrl: string): string {
         if (!obfuscatedUrl) return '';
@@ -205,6 +211,12 @@ export class AllAnimeProvider implements Provider {
     }
 
     async getEpisodes(showId: string, mode: 'sub' | 'dub'): Promise<EpisodeDetails | null> {
+        const cacheKey = `episodes-${showId}-${mode}`;
+        const cachedData = this.cache.get<EpisodeDetails>(cacheKey);
+        if (cachedData) {
+            return cachedData;
+        }
+
         const response = await axios.get(API_ENDPOINT, {
             headers: { 'User-Agent': USER_AGENT, 'Referer': REFERER },
             params: { query: `query($showId: String!) { show(_id: $showId) { availableEpisodesDetail, description } }`, variables: JSON.stringify({ showId }) },
@@ -212,7 +224,9 @@ export class AllAnimeProvider implements Provider {
         });
         const showData = response.data.data.show;
         if (showData) {
-            return { episodes: showData.availableEpisodesDetail[mode] as string[] || [], description: showData.description };
+            const episodeDetails = { episodes: showData.availableEpisodesDetail[mode] as string[] || [], description: showData.description };
+            this.cache.set(cacheKey, episodeDetails);
+            return episodeDetails;
         }
         return null;
     }

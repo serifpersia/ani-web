@@ -47,10 +47,11 @@ export const useCurrentSeason = () => {
     });
 };
 
-export const useContinueWatching = () => {
+export const useContinueWatching = (limit?: number) => {
+    const url = limit ? `/api/continue-watching?limit=${limit}` : '/api/continue-watching';
     return useQuery<Anime[]>({
-        queryKey: ['continueWatching'],
-        queryFn: () => fetchApi(`/api/continue-watching`),
+        queryKey: ['continueWatching', { limit }],
+        queryFn: () => fetchApi(url),
     });
 };
 
