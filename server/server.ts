@@ -63,7 +63,7 @@ interface WatchedEpisode {
 
 const app = express();
 const apiCache = new NodeCache({ stdTTL: 3600 });
-const provider = new AllAnimeProvider();
+const provider = new AllAnimeProvider(apiCache);
 
 let db: sqlite3.Database;
 
@@ -357,7 +357,8 @@ app.get('/api/continue-watching/all', async (req, res) => {
 
 app.get('/api/continue-watching', async (req, res) => {
     try {
-        const data = await getContinueWatchingData(req.db, provider, 6);
+        const limit = parseInt(req.query.limit as string) || 6;
+        const data = await getContinueWatchingData(req.db, provider, limit);
         res.json(data);
     } catch (error) {
         logger.error({ err: error }, 'DB error on /api/continue-watching');
