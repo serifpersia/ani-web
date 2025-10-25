@@ -42,6 +42,10 @@ const Search: React.FC = () => {
     const searchResults = data?.pages ? data.pages.flatMap(page => page.results || []) : [];
 
     useEffect(() => {
+        setQuery(searchParams.get('query') || '');
+    }, [searchParams]);
+
+    useEffect(() => {
         const fetchGenresAndTags = async () => {
             try {
                 const response = await fetch('/api/genres-and-tags');
@@ -57,6 +61,14 @@ const Search: React.FC = () => {
         };
         fetchGenresAndTags();
     }, []);
+
+    useEffect(() => {
+        if (query) {
+            document.title = `Search for "${query}" - ani-web`;
+        } else {
+            document.title = 'Search - ani-web';
+        }
+    }, [query]);
 
     useEffect(() => {
         const handleScroll = () => {

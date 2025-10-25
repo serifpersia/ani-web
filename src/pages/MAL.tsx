@@ -4,6 +4,11 @@ import styles from './MAL.module.css';
 
 const MAL: React.FC = () => {
   const { setIsOpen } = useSidebar();
+
+  React.useEffect(() => {
+    document.title = 'MyAnimeList Import - ani-web';
+  }, []);
+
   const [importStatus, setImportStatus] = useState<string>('');
   const [eraseWatchlist, setEraseWatchlist] = useState<boolean>(false);
 

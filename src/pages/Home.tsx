@@ -20,6 +20,10 @@ const Home: React.FC = () => {
   const invalidationRef = useRef(false);
 
   useEffect(() => {
+    document.title = 'Home - ani-web';
+  }, []);
+
+  useEffect(() => {
     if (!invalidationRef.current) {
       queryClient.invalidateQueries({ queryKey: ['continueWatching'] });
       invalidationRef.current = true;

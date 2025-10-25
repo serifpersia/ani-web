@@ -8,6 +8,11 @@ const Settings: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  React.useEffect(() => {
+    document.title = 'Settings - ani-web';
+  }, []);
+
+
   const handleBackup = async () => {
     setStatusMessage('Backing up database...');
     try {

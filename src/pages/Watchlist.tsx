@@ -24,6 +24,11 @@ const Watchlist: React.FC = () => {
   const [animeToRemoveId, setAnimeToRemoveId] = useState<string | null>(null);
   const [animeToRemoveName, setAnimeToRemoveName] = useState<string | null>(null);
 
+  useEffect(() => {
+    document.title = `${filterBy} - Watchlist - ani-web`;
+  }, [filterBy]);
+
+
 
 
   const { data: watchlistPages, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, error } = useInfiniteWatchlist(filterBy);
