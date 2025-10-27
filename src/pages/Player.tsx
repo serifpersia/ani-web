@@ -472,35 +472,53 @@ const Player: React.FC = () => {
   useEffect(() => {
     const container = player.refs.playerContainerRef.current;
     if (!container || isMobile) return;
+
     const handleMouseMove = () => {
+        if (container.style.cursor === 'none') {
+            container.style.cursor = 'default';
+        }
         actions.setShowControls(true);
         if (player.actions.inactivityTimer.current) window.clearTimeout(player.actions.inactivityTimer.current);
         if (player.state.isPlaying) {
             player.actions.inactivityTimer.current = window.setTimeout(() => {
                 actions.setShowControls(false);
+                if (player.state.isFullscreen) {
+                    container.style.cursor = 'none';
+                }
             }, 3000);
         }
     };
+
     const handleMouseLeave = () => {
         if (player.state.isPlaying) {
             actions.setShowControls(false);
+            if (player.state.isFullscreen) {
+                container.style.cursor = 'none';
+            }
         }
         if (player.actions.inactivityTimer.current) window.clearTimeout(player.actions.inactivityTimer.current);
     };
+
     container.addEventListener('mousemove', handleMouseMove);
     container.addEventListener('mouseleave', handleMouseLeave);
+
     if (!player.state.isPlaying) {
         actions.setShowControls(true);
+        if (container.style.cursor === 'none') {
+            container.style.cursor = 'default';
+        }
         if (player.actions.inactivityTimer.current) window.clearTimeout(player.actions.inactivityTimer.current);
     }
+
     return () => {
         if (container) {
             container.removeEventListener('mousemove', handleMouseMove);
             container.removeEventListener('mouseleave', handleMouseLeave);
+            container.style.cursor = 'default';
         }
         if (player.actions.inactivityTimer.current) window.clearTimeout(player.actions.inactivityTimer.current);
     };
-  }, [player.state.isPlaying, isMobile, player.refs.playerContainerRef, player.actions]);
+  }, [player.state.isPlaying, player.state.isFullscreen, isMobile, player.refs.playerContainerRef, player.actions]);
 
   const { setIsFullscreen } = actions;
 
