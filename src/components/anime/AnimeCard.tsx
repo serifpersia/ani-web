@@ -39,6 +39,8 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
   const { titlePreference } = useTitlePreference();
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
+  const [popupPosition, setPopupPosition] = useState('right');
+  const cardRef = useRef<HTMLDivElement>(null);
   const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
   const removeWatchlistMutation = useRemoveFromWatchlist();
 
@@ -112,8 +114,19 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
     <button className={isMobile ? styles.removeBtnInline : styles.removeBtn} onClick={handleRemoveClick}>x</button>
   );
 
-  const handleMouseEnter = () => {
+  const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isMobile) return;
+
+    if (cardRef.current) {
+      const rect = cardRef.current.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      if (rect.right > viewportWidth - 600) {
+        setPopupPosition('left');
+      } else {
+        setPopupPosition('right');
+      }
+    }
+
     if (hoverTimeout.current) {
       clearTimeout(hoverTimeout.current);
     }
@@ -138,6 +151,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
 
   return (
     <div 
+      ref={cardRef}
       className={styles.cardWrapper}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -190,7 +204,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
           )}
         </div>
       </Link>
-      <AnimeInfoPopup animeId={anime._id} isVisible={showPopup} />
+      <AnimeInfoPopup animeId={anime._id} isVisible={showPopup} position={popupPosition} />
       <RemoveConfirmationModal
         isOpen={showRemoveModal}
         onClose={handleCancelRemove}

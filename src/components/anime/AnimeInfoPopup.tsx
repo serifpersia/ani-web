@@ -13,9 +13,10 @@ interface ShowDetails {
 interface AnimeInfoPopupProps {
   animeId: string;
   isVisible: boolean;
+  position?: 'left' | 'right';
 }
 
-const AnimeInfoPopup: React.FC<AnimeInfoPopupProps> = ({ animeId, isVisible }) => {
+const AnimeInfoPopup: React.FC<AnimeInfoPopupProps> = ({ animeId, isVisible, position = 'right' }) => {
   const [details, setDetails] = useState<ShowDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +44,7 @@ const AnimeInfoPopup: React.FC<AnimeInfoPopupProps> = ({ animeId, isVisible }) =
   }, [animeId, isVisible]);
 
   return (
-    <div className={`${styles.popup} ${isVisible ? styles.visible : ''}`}>
+    <div className={`${styles.popup} ${isVisible ? styles.visible : ''} ${position === 'left' ? styles.left : ''}`}>
       {loading ? (
         <div className={styles.spinner}></div>
       ) : error ? (

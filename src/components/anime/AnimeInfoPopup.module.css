@@ -23,6 +23,13 @@
   pointer-events: auto;
 }
 
+.popup.left {
+    left: auto;
+    right: 100%;
+    margin-left: 0;
+    margin-right: 10px;
+}
+
 .detailsGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
