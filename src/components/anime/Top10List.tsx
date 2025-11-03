@@ -73,7 +73,7 @@ const Top10List: React.FC<Top10ListProps> = ({ title }) => {
     <div className="top-10-list content-card">
       <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
         <h3>{title}</h3>
-        <select value={timeframe} onChange={e => setTimeframe(e.target.value)} className="form-input" style={{width: 'auto'}}>
+        <select id="timeframe-select" name="timeframe-select" value={timeframe} onChange={e => setTimeframe(e.target.value)} className="form-input" style={{width: 'auto'}}>
             <option value="all">All Time</option>
             <option value="monthly">Monthly</option>
             <option value="weekly">Weekly</option>

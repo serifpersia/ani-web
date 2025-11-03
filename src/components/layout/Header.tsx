@@ -63,6 +63,8 @@ const Header: React.FC = () => {
       <div style={rightStyle}>
         <div className={styles.searchContainer}>
           <input
+            id="search-input"
+            name="search-input"
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
