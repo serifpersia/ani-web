@@ -1,14 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Logo from '../common/Logo';
 import { useSidebar } from '../../hooks/useSidebar';
 import styles from './Header.module.css';
 import { FaSearch, FaFilter } from 'react-icons/fa';
 
+const SCROLL_TIMEOUT_DURATION = 3000;
+
 const Header: React.FC = () => {
   const { isOpen, toggleSidebar } = useSidebar();
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
+  const [visible, setVisible] = useState(true);
+  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const handleSearch = () => {
     if (query.trim()) {
@@ -22,14 +26,42 @@ const Header: React.FC = () => {
     }
   };
 
+  const handleScroll = () => {
+    if (scrollTimeout.current) {
+      clearTimeout(scrollTimeout.current);
+    }
+
+    setVisible(true);
+
+    scrollTimeout.current = setTimeout(() => {
+      if (window.scrollY > 0) {
+        setVisible(false);
+      }
+    }, SCROLL_TIMEOUT_DURATION);
+  };
+
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (scrollTimeout.current) {
+        clearTimeout(scrollTimeout.current);
+      }
+    };
+  }, []);
+
   const headerStyle: React.CSSProperties = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '1rem',
-    position: 'relative',
+    position: 'sticky',
+    top: 0,
     zIndex: 110,
-    transition: 'background-color 0.2s, border-color 0.2s',
+    width: '100%',
+    backgroundColor: 'var(--bg)',
+    transition: 'transform 0.3s ease-in-out, background-color 0.2s, border-color 0.2s',
+    transform: visible ? 'translateY(0)' : 'translateY(-100%)',
   };
 
   const leftStyle: React.CSSProperties = {
