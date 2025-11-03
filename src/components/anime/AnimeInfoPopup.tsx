@@ -1,13 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import styles from './AnimeInfoPopup.module.css';
+import { useTitlePreference } from '../../contexts/TitlePreferenceContext';
 
 interface ShowDetails {
-  title: string;
   description: string;
   genres: { name: string }[];
   averageScore?: number;
   status?: string;
   episodes?: number;
+}
+
+interface ShowMeta {
+  name: string;
+  englishName?: string;
+  nativeName?: string;
 }
 
 interface AnimeInfoPopupProps {
@@ -18,20 +24,30 @@ interface AnimeInfoPopupProps {
 
 const AnimeInfoPopup: React.FC<AnimeInfoPopupProps> = ({ animeId, isVisible, position = 'right' }) => {
   const [details, setDetails] = useState<ShowDetails | null>(null);
+  const [meta, setMeta] = useState<ShowMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { titlePreference } = useTitlePreference();
 
   useEffect(() => {
     if (isVisible) {
       setLoading(true);
-      const fetchDetails = async () => {
+      const fetchAllDetails = async () => {
         try {
-          const response = await fetch(`/api/show-details/${animeId}`);
-          if (!response.ok) {
+          const [detailsResponse, metaResponse] = await Promise.all([
+            fetch(`/api/show-details/${animeId}`),
+            fetch(`/api/show-meta/${animeId}`)
+          ]);
+
+          if (!detailsResponse.ok || !metaResponse.ok) {
             throw new Error('Failed to fetch details');
           }
-          const data = await response.json();
-          setDetails(data);
+
+          const detailsData = await detailsResponse.json();
+          const metaData = await metaResponse.json();
+
+          setDetails(detailsData);
+          setMeta(metaData);
         } catch (err) {
           setError(err instanceof Error ? err.message : 'An unknown error occurred');
         } finally {
@@ -39,9 +55,15 @@ const AnimeInfoPopup: React.FC<AnimeInfoPopupProps> = ({ animeId, isVisible, pos
         }
       };
 
-      fetchDetails();
+      fetchAllDetails();
     }
   }, [animeId, isVisible]);
+
+  const getTitle = () => {
+    if (!meta) return '';
+    const title = meta[titlePreference];
+    return title || meta.name;
+  };
 
   return (
     <div className={`${styles.popup} ${isVisible ? styles.visible : ''} ${position === 'left' ? styles.left : ''}`}>
@@ -51,7 +73,7 @@ const AnimeInfoPopup: React.FC<AnimeInfoPopupProps> = ({ animeId, isVisible, pos
         <div>Error: {error}</div>
       ) : details ? (
         <>
-          <h3>{details.title}</h3>
+          <h3>{getTitle()}</h3>
           <div className={styles.detailsGrid}>
             {details.averageScore && <div><strong>Score:</strong> {details.averageScore}</div>}
             {details.status && <div><strong>Status:</strong> {details.status}</div>}
