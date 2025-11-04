@@ -1,10 +1,5 @@
 {
   "type": "commonjs",
-  "dependencies": {
-    "cli-progress": "^3.12.0",
-    "pino": "^9.12.0",
-    "pino-pretty": "^13.1.1"
-  },
   "devDependencies": {
     "@types/cli-progress": "^3.11.5"
   }
