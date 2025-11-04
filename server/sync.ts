@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { Database } from 'sqlite3';
 import sqlite3 from 'sqlite3';
+import cliProgress from 'cli-progress';
 import { initialize as initializeSyncConfig, getRemoteString, setActiveRemote } from './sync-config';
 import logger from './logger';
 
@@ -22,19 +23,47 @@ function executeCommand(command: string): Promise<string> {
 }
 
 function executeRclone(args: string[]): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const rcloneProcess = spawn('rclone', args, {
+            stdio: 'ignore'
+        });
+
+        rcloneProcess.on('close', (code) => {
+            if (code === 0) {
+                resolve();
+            } else {
+                reject(new Error(`Rclone process exited with code ${code}`));
+            }
+        });
+
+        rcloneProcess.on('error', (err) => {
+            reject(err);
+        });
+    });
+}
+
+function executeRcloneWithProgress(args: string[], multibar: cliProgress.MultiBar, taskName: string): Promise<void> {
     const argsWithProgress = [...args, '--progress'];
     log.info(`Executing: rclone ${argsWithProgress.join(' ')}`);
 
+    const progressBar = multibar.create(100, 0, { task: taskName });
+
     return new Promise((resolve, reject) => {
         const rcloneProcess = spawn('rclone', argsWithProgress, {
-            stdio: 'pipe'
+            stdio: ['ignore', 'pipe', 'pipe']
         });
 
-        rcloneProcess.stdout.pipe(process.stdout);
-        rcloneProcess.stderr.pipe(process.stderr);
+        rcloneProcess.stderr.on('data', (data: Buffer) => {
+            const line = data.toString();
+            const match = line.match(/(\d+)%/);
+            if (match) {
+                const percentage = parseInt(match[1], 10);
+                progressBar.update(percentage);
+            }
+        });
 
         rcloneProcess.on('close', (code) => {
-            process.stdout.write('\n');
+            progressBar.update(100);
             if (code === 0) {
                 log.info(`Rclone process finished successfully.`);
                 resolve();
@@ -97,10 +126,14 @@ export async function verifyRclone(): Promise<boolean> {
     return true;
 }
 
-async function getRemoteVersion(remoteDir: string): Promise<number> {
+async function getRemoteVersion(remoteDir: string, multibar?: cliProgress.MultiBar): Promise<number> {
     log.info('Fetching remote manifest...');
     try {
-        await executeRclone(['copyto', `${getRemoteString(remoteDir)}/sync_manifest.json`, TEMP_MANIFEST_PATH]);
+        if (multibar) {
+            await executeRcloneWithProgress(['copyto', `${getRemoteString(remoteDir)}/sync_manifest.json`, TEMP_MANIFEST_PATH], multibar, "Fetching remote manifest");
+        } else {
+            await executeRclone(['copyto', `${getRemoteString(remoteDir)}/sync_manifest.json`, TEMP_MANIFEST_PATH]);
+        }
         const manifestContent = await fs.readFile(TEMP_MANIFEST_PATH, 'utf-8');
         await fs.unlink(TEMP_MANIFEST_PATH);
         const manifest = JSON.parse(manifestContent);
@@ -147,8 +180,15 @@ async function getSyncMetadata(db: Database): Promise<{ localVersion: number, la
 
 export async function syncDownOnBoot(db: Database, dbPath: string, remoteDir: string, closeMainDb: () => Promise<void>): Promise<boolean> {
     log.info('--> Performing initial sync check on boot...');
+    const multibar = new cliProgress.MultiBar({
+        format: ' {bar} | {task} | {percentage}%',
+        hideCursor: true,
+    });
+    const mainProgressBar = multibar.create(100, 0, { task: "Overall Sync" });
+
     const localVersion = await getLocalVersion(db);
-    const remoteVersion = await getRemoteVersion(remoteDir);
+    const remoteVersion = await getRemoteVersion(remoteDir, multibar);
+    mainProgressBar.update(10);
 
     if (remoteVersion > localVersion) {
         log.warn(`Remote DB (v${remoteVersion}) is newer than local (v${localVersion}). A sync-down is required.`);
@@ -160,16 +200,21 @@ export async function syncDownOnBoot(db: Database, dbPath: string, remoteDir: st
             log.info(`Backing up local database to ${backupPath}...`);
             await fs.copyFile(dbPath, backupPath);
             log.info('Backup complete.');
+            mainProgressBar.update(25);
 
             const dbName = path.basename(dbPath);
-            await executeRclone(['copyto', `${getRemoteString(remoteDir)}/${dbName}`, dbPath, '--ignore-times']);
+            await executeRcloneWithProgress(['copyto', `${getRemoteString(remoteDir)}/${dbName}`, dbPath, '--ignore-times'], multibar, "Downloading Database");
             log.info('Download complete. Database is now up to date.');
+            mainProgressBar.update(75);
             
             await fs.unlink(backupPath);
             log.info('Cleaned up backup file.');
+            mainProgressBar.update(100);
+            multibar.stop();
             return true;
         } catch (err) {
             log.error({ err }, 'CRITICAL: Failed to download newer database. Restoring from backup.');
+            multibar.stop();
             try {
                 await fs.copyFile(backupPath, dbPath);
                 log.info('Successfully restored database from backup.');
@@ -180,6 +225,8 @@ export async function syncDownOnBoot(db: Database, dbPath: string, remoteDir: st
         }
     } else {
         log.info('Local database is up to date. No download needed on boot.');
+        mainProgressBar.update(100);
+        multibar.stop();
         return false;
     }
 }
@@ -193,29 +240,44 @@ export async function syncUp(db: Database, dbPath: string, remoteDir: string): P
         return;
     }
 
-    const remoteVersion = await getRemoteVersion(remoteDir);
+    const multibar = new cliProgress.MultiBar({
+        format: ' {bar} | {task} | {percentage}%',
+        hideCursor: true,
+    });
+    const mainProgressBar = multibar.create(100, 0, { task: "Overall Sync" });
+
+    const remoteVersion = await getRemoteVersion(remoteDir, multibar);
+    mainProgressBar.update(10);
 
     const performUpload = async () => {
         log.info(`Local DB (v${localVersion}) is newer than remote (v${remoteVersion}). Uploading...`);
         const dbName = path.basename(dbPath);
+
         try {
             try {
-                await executeRclone(['deletefile', `${getRemoteString(remoteDir)}/${dbName}`]);
+                await executeRcloneWithProgress(['deletefile', `${getRemoteString(remoteDir)}/${dbName}`], multibar, "Deleting old DB");
             } catch (e) {
                 log.warn('Could not delete remote DB before upload (it may not have existed).');
             }
-            await executeRclone(['copyto', dbPath, `${getRemoteString(remoteDir)}/${dbName}`]);
+            mainProgressBar.update(25);
+
+            await executeRcloneWithProgress(['copyto', dbPath, `${getRemoteString(remoteDir)}/${dbName}`], multibar, "Uploading DB");
+            mainProgressBar.update(50);
             
             const newManifest = JSON.stringify({ version: localVersion });
             await fs.writeFile(TEMP_MANIFEST_PATH, newManifest);
 
             try {
-                await executeRclone(['deletefile', `${getRemoteString(remoteDir)}/sync_manifest.json`]);
+                await executeRcloneWithProgress(['deletefile', `${getRemoteString(remoteDir)}/sync_manifest.json`], multibar, "Deleting old manifest");
             } catch (e) {
                 log.warn('Could not delete remote manifest before upload (it may not have existed).');
             }
-            await executeRclone(['copyto', TEMP_MANIFEST_PATH, `${getRemoteString(remoteDir)}/sync_manifest.json`]);
+            mainProgressBar.update(75);
+
+            await executeRcloneWithProgress(['copyto', TEMP_MANIFEST_PATH, `${getRemoteString(remoteDir)}/sync_manifest.json`], multibar, "Uploading manifest");
             await fs.unlink(TEMP_MANIFEST_PATH);
+            mainProgressBar.update(100);
+            multibar.stop();
             
             await new Promise<void>((resolve, reject) => {
                 db.serialize(() => {
@@ -229,6 +291,7 @@ export async function syncUp(db: Database, dbPath: string, remoteDir: string): P
             log.info(`<-- Manifest updated to v${localVersion}. Upload complete.`);
         } catch (err) {
             log.error({ err }, 'Upload failed.');
+            multibar.stop();
         }
     };
 
@@ -236,11 +299,13 @@ export async function syncUp(db: Database, dbPath: string, remoteDir: string): P
         await performUpload();
     } else if (remoteVersion > localVersion) {
         log.error(`CONFLICT: Remote DB (v${remoteVersion}) is newer than local (v${localVersion}), but local has unsynced changes. Manual intervention required.`);
+        multibar.stop();
     } else if (localVersion === remoteVersion && isDirty) {
         log.warn(`Divergence detected. Local and remote are at same version (${localVersion}) but local is dirty. Forcing overwrite.`);
         await performUpload();
     } else {
         log.info('Local and remote databases are in sync. No upload needed.');
+        multibar.stop();
     }
 }
 
