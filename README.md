@@ -16,31 +16,33 @@
 
 *   **Node.js**: Version 16 or higher ([Download](https://nodejs.org/)).
 
+## Website
+
+**For the best user experience, visit our new landing page:**
+
+**[https://serifpersia.github.io/ani-web/](https://serifpersia.github.io/ani-web/)**
+
 ## Quick Start
 
-This is the recommended method for most users. It will automatically download the latest pre-built version of ani-web and start the application.
-
-### For Linux & macOS
-
-Open a terminal and run this single command:
-
-```bash
-curl -sSL https://raw.githubusercontent.com/serifpersia/ani-web/main/setup.sh | bash
-```
-
-*(Prerequisites: Node.js, npm, curl, and unzip)*
+This is the recommended method for most users. It will automatically download the latest version of ani-web and set up a permanent `ani-web` command.
 
 ### For Windows
 
 Open a **PowerShell** terminal and run this single command:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -Command "iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/serifpersia/ani-web/main/setup.ps1'))"
+irm "https://serifpersia.github.io/ani-web/setup.ps1" | iex
 ```
 
-*(Prerequisites: Node.js, npm, and PowerShell)*
+### For Linux & macOS
 
-After the setup is complete, the script will start the application, and you can access it at `http://localhost:3000`.
+Open a terminal and run this single command:
+
+```bash
+curl -sSL "https://serifpersia.github.io/ani-web/setup.sh" | bash
+```
+
+After the one-time setup, you can start the application anytime by opening a new terminal and typing `ani-web`.
 
 ## Manual Installation (for Developers)
 
