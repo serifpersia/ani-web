@@ -34,7 +34,9 @@ const Header: React.FC = () => {
     setVisible(true);
 
     scrollTimeout.current = setTimeout(() => {
-      if (window.scrollY > 0) {
+      if (window.scrollY === 0) {
+        setVisible(true);
+      } else {
         setVisible(false);
       }
     }, SCROLL_TIMEOUT_DURATION);
