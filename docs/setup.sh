@@ -15,9 +15,9 @@ SETUP_SCRIPT_URL="https://serifpersia.github.io/ani-web/setup.sh"
 # --- UI Functions ---
 print_header() {
     clear
-    echo -e "\033[1;33m-----------------------------------------------"\033[0m"
+    echo -e "\033[1;33m-----------------------------------------------\033[0m"
     echo -e "            \033[1;36mani-web Setup Script\033[0m"
-    echo -e "\033[1;33m-----------------------------------------------"\033[0m"
+    echo -e "\033[1;33m-----------------------------------------------\033[0m"
     echo
 }
 
@@ -43,7 +43,7 @@ print_info() {
 run_installation() {
     # Step 1: Find latest release
     print_step "Finding latest release from GitHub..."
-    LATEST_URL=$(curl -s "$REPO_URL" | grep "browser_download_url.*ani-web\.zip" | cut -d '"' -f 4)
+    LATEST_URL=$(curl -s "$REPO_URL" | grep "browser_download_url.*ani-web.zip" | cut -d '"' -f 4)
     if [ -z "$LATEST_URL" ]; then
         print_error "Could not find the latest release URL."
     fi
@@ -84,14 +84,33 @@ run_installation() {
     mkdir -p "$BIN_DIR"
     
     LAUNCHER_CONTENT="#!/bin/bash
-# ani-web launcher with auto-update check
+# ani-web launcher with auto-update and uninstall
 
+# --- Configuration ---
 INSTALL_DIR=\"$INSTALL_DIR\"
+BIN_DIR=\"$BIN_DIR\"
+LAUNCHER_PATH=\"$LAUNCHER_PATH\"
 VERSION_FILE=\"$VERSION_FILE\"
 REMOTE_VERSION_URL=\"$REMOTE_VERSION_URL\"
 SETUP_SCRIPT_URL=\"$SETUP_SCRIPT_URL\"
+# ---
 
-# Check for updates
+# --- Uninstall Logic ---
+uninstall() {
+    echo \"Uninstalling ani-web...\"
+    rm -rf \"$INSTALL_DIR\"
+    rm -f \"$LAUNCHER_PATH\"
+    echo \"ani-web has been uninstalled.\"
+    echo \"You may need to manually remove '$BIN_DIR' from your PATH if you no longer need it.\"
+    exit 0
+}
+
+# --- Main Logic ---
+if [ \"$1\" == \"uninstall\" ]; then
+    uninstall
+fi
+
+# --- Update Check ---
 LOCAL_VERSION=\$(cat \"$VERSION_FILE\")
 REMOTE_VERSION=\$(curl -s \"$REMOTE_VERSION_URL\" | grep '\"version\"' | cut -d '\"' -f 4)
 
@@ -102,7 +121,7 @@ if [[ \"$LOCAL_VERSION\" != \"$REMOTE_VERSION\" && ! -z \"$REMOTE_VERSION\" ]]; 
     exit 0
 fi
 
-# Run the application
+# --- Run Application ---
 cd \"$INSTALL_DIR\"
 ./run.sh 2
 "
@@ -122,8 +141,7 @@ cd \"$INSTALL_DIR\"
             print_info "Your PATH does not seem to include $BIN_DIR."
             print_info "Please add the following line to your shell profile (e.g., ~/.bashrc, ~/.zshrc):"
             echo
-            echo -e "    \033[1;33mexport PATH=\"$BIN_DIR:\
-$PATH\"\033[0m"
+            echo -e "    \033[1;33mexport PATH=\"$BIN_DIR:$PATH\"\033[0m"
             echo
             print_info "After adding it, restart your terminal and you can run 'ani-web'."
             ;;

@@ -18,7 +18,7 @@
 
 ## Website
 
-**For the best user experience, visit our new landing page:**
+**For the best user experience, visit the landing page:**
 
 **[https://serifpersia.github.io/ani-web/](https://serifpersia.github.io/ani-web/)**
 

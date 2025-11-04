@@ -93,35 +93,70 @@ function Main {
     try {
         New-Item -ItemType Directory -Path $ScriptsDir -Force | Out-Null
 
-        # Create PowerShell launcher with update logic
+        # Create PowerShell launcher with update and uninstall logic
         $ps1LauncherContent = @"
-# ani-web PowerShell launcher with auto-update check
+# ani-web PowerShell launcher with auto-update and uninstall
 
+param(`$arg)
+
+# --- Configuration ---
 `$InstallDir = "$InstallDir"
+`$ScriptsDir = "$ScriptsDir"
 `$VersionFile = "$VersionFile"
 `$RemoteVersionUrl = "$RemoteVersionUrl"
 `$SetupScriptUrl = "$SetupScriptUrl"
+# ---
 
-# Check for updates
-`$LocalVersion = Get-Content "`$VersionFile"
-`$RemoteVersion = (Invoke-RestMethod -Uri "`$RemoteVersionUrl").version
-
-if ("`$LocalVersion" -ne "`$RemoteVersion" -and `$RemoteVersion) {
-    Write-Host "A new version of ani-web is available (`$LocalVersion -> `$RemoteVersion). Updating..."
-    irm "`$SetupScriptUrl" | iex
-    Write-Host "Update complete. Please run 'ani-web' again."
+# --- Uninstall Logic ---
+function Uninstall-AniWeb {
+    Write-Host "Uninstalling ani-web..."
+    try {
+        `$currentUserPath = [System.Environment]::GetEnvironmentVariable("Path", "User")
+        `$newPath = (`$currentUserPath.Split(';') | Where-Object { `$_ -ne "`$ScriptsDir" }) -join ';'
+        [System.Environment]::SetEnvironmentVariable("Path", `$newPath, "User")
+        
+        Remove-Item -Recurse -Force "`$InstallDir"
+        
+        Write-Host "ani-web has been uninstalled." -ForegroundColor Green
+        Write-Host "Please restart your terminal for the PATH changes to take effect."
+    } catch {
+        Write-Host "An error occurred during uninstallation: `$($_.Exception.Message)" -ForegroundColor Red
+    }
     exit 0
 }
+# ---
 
-# Run the application
+# --- Main Logic ---
+if (`$arg -eq "uninstall") {
+    Uninstall-AniWeb
+}
+# ---
+
+# --- Update Check ---
+try {
+    `$LocalVersion = Get-Content "`$VersionFile"
+    `$RemoteVersion = (Invoke-RestMethod -Uri "`$RemoteVersionUrl").version
+
+    if ("`$LocalVersion" -ne "`$RemoteVersion" -and `$RemoteVersion) {
+        Write-Host "A new version of ani-web is available (`$LocalVersion -> `$RemoteVersion). Updating..."
+        irm "`$SetupScriptUrl" | iex
+        Write-Host "Update complete. Please run 'ani-web' again."
+        exit 0
+    }
+} catch {
+    Write-Host "Could not check for updates. Starting application anyway..." -ForegroundColor Yellow
+}
+# ---
+
+# --- Run Application ---
 pushd "`$InstallDir"
 cmd.exe /c "run.bat 2"
 popd
 "@
         Set-Content -Path $LauncherPs1Path -Value $ps1LauncherContent
 
-        # Create Batch file to call the PowerShell launcher
-        $batLauncherContent = "@echo off`r`npowershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$LauncherPs1Path`""
+        # Create Batch file to call the PowerShell launcher and pass arguments
+        $batLauncherContent = "@echo off`r`npowershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$LauncherPs1Path`" %*"
         Set-Content -Path $LauncherBatPath -Value $batLauncherContent
 
         Print-Success "Command created at $LauncherBatPath"
