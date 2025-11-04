@@ -44,6 +44,16 @@ curl -sSL "https://serifpersia.github.io/ani-web/setup.sh" | bash
 
 After the one-time setup, you can start the application anytime by opening a new terminal and typing `ani-web`.
 
+## Uninstalling
+
+To remove the application from your system, open a terminal and run:
+
+```bash
+ani-web uninstall
+```
+
+This will delete the application files and remove the `ani-web` command from your system's PATH.
+
 ## Manual Installation (for Developers)
 
 If you want to work with the source code, you can clone the repository and build the project manually.
