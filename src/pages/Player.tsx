@@ -624,9 +624,21 @@ const Player: React.FC = () => {
     }
   }, [displayTitle, state.currentEpisode]);
 
-  if (state.loadingShowData) return <p className="loading">Loading show data...</p>;
-  if (state.error) return <p className="error-message">Error: {state.error}</p>;
-  if (!state.showMeta.name) return <p>Show not found.</p>;
+  if (state.loadingShowData) {
+    return <p className="loading">Loading show data...</p>;
+  }
+
+  if (state.error) {
+    return <p className="error-message">Error: {state.error}</p>;
+  }
+
+  if (!state.showMeta.name) {
+    return <p>Show not found.</p>;
+  }
+
+  if (state.episodes.length === 0 || !state.currentEpisode) {
+    return <p className="error-message">No episodes found for this show, or current episode could not be determined.</p>;
+  }
 
   return (
     <div className={layoutStyles.playerPageLayout}>
