@@ -16,15 +16,8 @@
 
 *   **Node.js**: Version 16 or higher ([Download](https://nodejs.org/)).
 
-## Website
-
-**For the best user experience, visit the landing page:**
-
-**[https://serifpersia.github.io/ani-web/](https://serifpersia.github.io/ani-web/)**
 
 ## Quick Start
-
-This is the recommended method for most users. It will automatically download the latest version of ani-web and set up a permanent `ani-web` command.
 
 ### For Windows
 

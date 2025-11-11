@@ -16,9 +16,7 @@
     animation: pulse 1.5s infinite ease-in-out;
 }
 
-body.light .poster {
-    background-color: var(--light-border);
-}
+
 
 .info {
     padding: 1rem;
@@ -31,9 +29,7 @@ body.light .poster {
     animation: pulse 1.5s infinite ease-in-out;
 }
 
-body.light .line {
-    background-color: var(--light-border);
-}
+
 
 .line.short {
     width: 60%;

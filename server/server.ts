@@ -530,9 +530,8 @@ app.get('/api/subtitle-proxy', async (req, res) => {
 });
 
 app.get('/api/image-proxy', async (req, res) => {
-    const { url, w, h } = req.query;
+    const { url, w } = req.query;
     const width = w ? parseInt(w as string) : undefined;
-    const height = h ? parseInt(h as string) : undefined;
 
     if (!url) {
         return res.status(400).send('URL is required');

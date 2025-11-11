@@ -58,42 +58,7 @@ export class AllAnimeProvider implements Provider {
         return finalUrl;
     }
 
-    private unpackPackedJs(packedJs: string): string {
-        try {
-            const payloadMatch = packedJs.match(/}\((.*)\)\)$/);
-            if (!payloadMatch) return '';
-            
-            const payload = payloadMatch[1];
-            const parts = payload.split(',').map(part => part.trim());
-            if (parts.length < 4) return '';
 
-            const p = parts[0].replace(/^'|'$/g, '');
-            const a = parseInt(parts[1]);
-            const c = parseInt(parts[2]);
-            const k = parts[3].replace(/^'|'$/g, '').split('|');
-            if (isNaN(a) || isNaN(c) || k.length !== c) return '';
-
-            let unpacked = p;
-            const alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-            const toBase = (n: number, base: number): string => {
-                let result = '';
-                while (n > 0) {
-                    result = alphabet[n % base] + result;
-                    n = Math.floor(n / base);
-                }
-                return result || '0';
-            };
-
-            for (let i = c - 1; i >= 0; i--) {
-                const key = toBase(i, a);
-                unpacked = unpacked.replace(new RegExp(`\\b${key}\\b`, 'g'), k[i] || key);
-            }
-            return unpacked;
-        } catch (e) {
-            logger.error({ err: e }, 'Failed to unpack JS');
-            return '';
-        }
-    }
 
     private async _fetchShows(variables: Record<string, unknown>, extensions?: Record<string, unknown>): Promise<Show[]> {
         const params: { [key: string]: string } = { variables: JSON.stringify(variables) };

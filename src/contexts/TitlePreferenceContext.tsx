@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
 export type TitlePreferenceContextType = {
-  titlePreference: 'english' | 'native';
-  setTitlePreference: (preference: 'english' | 'native') => void;
+  titlePreference: 'name' | 'nativeName' | 'englishName';
+  setTitlePreference: (preference: 'name' | 'nativeName' | 'englishName') => void;
   loading: boolean;
 };
 
@@ -13,7 +13,7 @@ interface TitlePreferenceProviderProps {
 }
 
 export const TitlePreferenceProvider: React.FC<TitlePreferenceProviderProps> = ({ children }) => {
-  const [titlePreference, setTitlePreference] = useState<'english' | 'native'>('english');
+  const [titlePreference, setTitlePreference] = useState<'name' | 'nativeName' | 'englishName'>('englishName');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

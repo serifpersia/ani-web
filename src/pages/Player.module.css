@@ -448,47 +448,19 @@ body.light .scheduleInfo {
     gap: 0.5rem;
 }
 
-.charactersBox {
-    background-color: var(--dark-bg-secondary);
-    padding: 1.5rem;
-    border-radius: var(--card-border-radius);
-    margin-bottom: 1.5rem;
-}
 
-.charactersList {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 1rem;
-}
 
-.characterCard {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-}
 
-.characterCard img {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 0.5rem;
-}
 
-.characterInfo {
-    font-size: 0.9rem;
-}
 
-.characterName {
-    font-weight: 600;
-    margin: 0;
-}
 
-.characterRole {
-    color: var(--dark-text-secondary);
-    margin: 0;
-}
+
+
+
+
+
+
+
 
 .detailsBox {
     background-color: var(--dark-bg-secondary);
