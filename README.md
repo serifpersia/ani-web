@@ -24,7 +24,7 @@
 Open a **PowerShell** terminal and run this single command:
 
 ```powershell
-irm "https://raw.githubusercontent.com/serifpersia/ani-web/main/docs/setup.ps1" | bash" | iex
+irm "https://raw.githubusercontent.com/serifpersia/ani-web/main/docs/setup.ps1" | iex
 ```
 
 ### For Linux & macOS
