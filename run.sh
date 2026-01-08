@@ -14,7 +14,7 @@ else
 
         echo -e "\033[1;33mPlease choose a mode to run:\033[0m"
         echo "  1) Development (Install all deps, build, and run hot-reload)"
-        echo "  2) Production  (Install, Build, Omit Dev Deps, and Run)"
+        echo "  2) Production  (Run pre-built version)"
         echo
 
         read -p "Enter your choice (1 or 2): " choice
@@ -45,22 +45,21 @@ elif [ "$choice" == "2" ]; then
     echo -e "\033[1;32mRunning in PRODUCTION mode... \033[0m"
     echo
 
-    # 1. Install dependencies needed to build
-    echo "--> Installing dependencies for build..."
-    npm install
-    npm install --prefix server
-
-    # 2. Build the project
-    echo "--> Building application..."
-    npm run build
-    if [ $? -ne 0 ]; then
-        echo -e "\033[1;31mError: Build failed!\033[0m"
-        read -p "Press Enter to exit..."
-        exit 1
+    if [ -f "server/dist/server.js" ]; then
+        echo "--> Pre-built server found. Skipping build..."
+    else
+        echo "--> Build missing. Installing and Building..."
+        npm install
+        npm install --prefix server
+        npm run build
+        if [ $? -ne 0 ]; then
+            echo -e "\033[1;31mError: Build failed!\033[0m"
+            read -p "Press Enter to exit..."
+            exit 1
+        fi
     fi
 
-    # 3. Clean up server dependencies for production (Omit)
-    echo "--> Pruning Server to Production Dependencies..."
+    echo "--> Ensuring Production Dependencies..."
     npm install --prefix server --omit=dev
 
     echo
