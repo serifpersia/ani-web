@@ -35,6 +35,29 @@ const provider = new AllAnimeProvider(apiCache);
 let db: sqlite3.Database;
 let isShuttingDown = false;
 
+async function runSyncSequence() {
+    const dbName = CONFIG.IS_DEV ? CONFIG.DB_NAME_DEV : CONFIG.DB_NAME_PROD;
+    const dbPath = path.join(CONFIG.ROOT, dbName);
+    const remoteFolder = CONFIG.IS_DEV ? CONFIG.REMOTE_FOLDER_DEV : CONFIG.REMOTE_FOLDER_PROD;
+
+    await initSyncProvider();
+
+    const didDownload = await syncDownOnBoot(db, dbPath, remoteFolder, () => {
+        return new Promise<void>(resolve => {
+            if (db) {
+                db.close(() => resolve());
+            } else {
+                resolve();
+            }
+        });
+    });
+
+    if (didDownload) {
+        db = await initializeDatabase(dbPath);
+        logger.info("Database re-initialized after sync.");
+    }
+}
+
 app.use((req, res, next) => {
     if (isShuttingDown) {
         return res.status(503).send('Server is shutting down...');
@@ -67,9 +90,19 @@ app.get('/api/auth/google/callback', async (req, res) => {
         try {
             await googleDriveService.handleCallback(code);
             const user = await googleDriveService.getUserProfile();
+
+            logger.info("User logged in. Syncing database (please wait)...");
+            try {
+                await runSyncSequence();
+            } catch (err) {
+                logger.error({ err }, "Post-login sync failed");
+            }
+
             const responseHtml = `
             <html>
             <body>
+            <h1>Authentication Successful</h1>
+            <p>Database synced. Closing window...</p>
             <script>
             if (window.opener) {
                 window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', user: ${JSON.stringify(user)} }, '*');
@@ -78,11 +111,11 @@ app.get('/api/auth/google/callback', async (req, res) => {
                 window.location.href = '/';
             }
             </script>
-            <p>Authenticated successfully. You can close this window.</p>
             </body>
             </html>
             `;
             res.send(responseHtml);
+
         } catch (error) {
             logger.error({ err: error }, 'Auth callback failed');
             res.status(500).send('Authentication failed');
@@ -429,15 +462,7 @@ async function main() {
     db = await initializeDatabase(dbPath);
     logger.info(`Database initialized at ${dbPath}`);
 
-    await initSyncProvider();
-
-    const didDownload = await syncDownOnBoot(db, dbPath, remoteFolder, () => {
-        return new Promise<void>(resolve => db.close(() => resolve()));
-    });
-
-    if (didDownload) {
-        db = await initializeDatabase(dbPath);
-    }
+    await runSyncSequence();
 
     const watcher = chokidar.watch(dbPath, { persistent: true, ignoreInitial: true });
     let debounceTimer: NodeJS.Timeout;

@@ -8,7 +8,10 @@ class RcloneService {
     private executeCommand(command: string): Promise<string> {
         return new Promise((resolve, reject) => {
             exec(command, (err, stdout, stderr) => {
-                if (err) return reject(new Error(stderr || err.message));
+                if (err) {
+                    if (stderr) logger.warn({ stderr }, 'Rclone command warning');
+                    return reject(new Error(stderr || err.message));
+                }
                 resolve(stdout.trim());
             });
         });
@@ -32,15 +35,22 @@ class RcloneService {
             const remotesStr = await this.executeCommand('rclone listremotes');
             const remotes = remotesStr.split('\n').map(r => r.trim());
 
-            if (remotes.includes('mega:')) {
-                this.activeRemote = 'mega';
-            } else if (remotes.includes('gdrive:')) {
-                this.activeRemote = 'gdrive';
+            const gdriveRemote = remotes.find(r => r.toLowerCase() === 'gdrive:');
+            const megaRemote = remotes.find(r => r.toLowerCase() === 'mega:');
+
+            if (megaRemote) {
+                this.activeRemote = megaRemote.slice(0, -1);
+            } else if (gdriveRemote) {
+                this.activeRemote = gdriveRemote.slice(0, -1);
+            } else if (remotes.length > 0) {
+                logger.info({ remotes }, "Rclone initialized but no 'gdrive:' or 'mega:' found.");
+                return false;
             } else {
                 return false;
             }
             return true;
         } catch (error) {
+            logger.warn({ err: error }, "Rclone initialization failed");
             return false;
         }
     }
