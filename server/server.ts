@@ -14,7 +14,7 @@ import chokidar from 'chokidar';
 import logger from './logger';
 import { AllAnimeProvider } from './providers/allanime.provider';
 
-const isDebug = process.argv.includes('--debug');
+const isDev = process.argv.includes('--dev');
 
 declare module 'express-serve-static-core' {
     interface Request {
@@ -496,7 +496,7 @@ app.post('/api/settings', async (req, res) => {
 });
 
 app.get('/api/backup-db', (_req, res) => {
-   const dbName = isDebug ? 'anime.debug.db' : 'anime.db';
+   const dbName = isDev ? 'anime.dev.db' : 'anime.db';
    const dbPath = path.join(__dirname, dbName);
    _req.db.close(err => {
         if (err) return res.status(500).json({ error: 'Failed to close database.' });
@@ -504,9 +504,9 @@ app.get('/api/backup-db', (_req, res) => {
    });
 });
 
-app.post('/api/restore-db', multer({ storage: multer.diskStorage({ destination: (_req, _f, cb) => cb(null, __dirname), filename: (_r, _f, cb) => cb(null, `${isDebug ? 'anime.debug.db' : 'anime.db'}.temp`) }) }).single('dbfile'), (req, res) => {
+app.post('/api/restore-db', multer({ storage: multer.diskStorage({ destination: (_req, _f, cb) => cb(null, __dirname), filename: (_r, _f, cb) => cb(null, `${isDev ? 'anime.dev.db' : 'anime.db'}.temp`) }) }).single('dbfile'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
-    const dbName = isDebug ? 'anime.debug.db' : 'anime.db';
+    const dbName = isDev ? 'anime.dev.db' : 'anime.db';
     const tempPath = path.join(__dirname, `${dbName}.temp`);
     const dbPath = path.join(__dirname, dbName);
     req.db.close(err => {
@@ -663,36 +663,54 @@ app.get('/api/allmanga-details/:id', async (req, res) => {
     }
 });
 
-app.use(express.static(path.join(__dirname, '../../dist')));
-app.get(/^(?!\/api).*$/, (_req, res) => res.sendFile(path.join(__dirname, '../../dist/index.html')));
 app.get('/api/genres-and-tags', (_req, res) => res.json({ genres, tags, studios }));
 
+if (!isDev) {
+    app.use(express.static(path.join(__dirname, '../../dist')));
+    app.get(/^(?!\/api).*$/, (_req, res) => res.sendFile(path.join(__dirname, '../../dist/index.html')));
+}
+
 async function main() {
-    const dbName = isDebug ? 'anime.debug.db' : 'anime.db';
+    const dbName = isDev ? 'anime.dev.db' : 'anime.db';
     const dbPath = path.join(__dirname, dbName);
-    if (isDebug) {
-        logger.info('DEBUG MODE ENABLED');
+
+    if (isDev) {
+        logger.info('DEV MODE ENABLED: Using temporary database.');
+        try {
+            if (fs.existsSync(dbPath)) {
+                fs.unlinkSync(dbPath);
+                logger.info('Previous dev database deleted.');
+            }
+        } catch (err) {
+            logger.error({ err }, "Could not delete dev database.");
+        }
     }
-    const isSyncEnabled = await verifyRclone();
+
     db = await initializeDatabase(dbPath);
     logger.info('Database initialized.');
 
-    if (isSyncEnabled) {
-        const didSyncDown = await syncDownOnBoot(db, dbPath, 'aniweb_db', () => new Promise<void>(res => db.close(() => res())));
-        if (didSyncDown) db = await initializeDatabase(dbPath);
+    if (!isDev) {
+        const isSyncEnabled = await verifyRclone();
+        if (isSyncEnabled) {
+            logger.info("Rclone sync is enabled.");
+            const didSyncDown = await syncDownOnBoot(db, dbPath, 'aniweb_db', () => new Promise<void>(res => db.close(() => res())));
+            if (didSyncDown) db = await initializeDatabase(dbPath);
 
-        const watcher = chokidar.watch(dbPath, { persistent: true, ignoreInitial: true });
-        let debounceTimer: NodeJS.Timeout;
-        watcher.on('change', () => {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => syncUp(db, dbPath, 'aniweb_db'), 15000);
-        });
+            const watcher = chokidar.watch(dbPath, { persistent: true, ignoreInitial: true });
+            let debounceTimer: NodeJS.Timeout;
+            watcher.on('change', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => syncUp(db, dbPath, 'aniweb_db'), 15000);
+            });
 
-        process.on('SIGINT', async () => {
-            clearTimeout(debounceTimer);
-            await syncUp(db, dbPath, 'aniweb_db');
-            db.close(() => process.exit(0));
-        });
+            process.on('SIGINT', async () => {
+                clearTimeout(debounceTimer);
+                await syncUp(db, dbPath, 'aniweb_db');
+                db.close(() => process.exit(0));
+            });
+        } else {
+            logger.info("Rclone sync is disabled or not configured.");
+        }
     }
 
     app.listen(port, () => logger.info(`Server is running on http://localhost:${port}`));

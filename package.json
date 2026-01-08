@@ -4,13 +4,13 @@
   "version": "1.0.4",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"npm:server:dev\" \"vite\"",
+    "server:dev": "nodemon --watch 'server/**/*.ts' --exec 'ts-node' server/server.ts --dev",
     "build": "npm run build:server && vite build",
     "build:server": "tsc -p server/tsconfig.json",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "node server/dist/server.js",
-    "start:dev": "node server/dist/server.js --debug"
+    "start": "node server/dist/server.js"
   },
   "dependencies": {
     "@tanstack/query-sync-storage-persister": "^5.90.7",
@@ -43,21 +43,24 @@
   },
   "devDependencies": {
     "@eslint/js": "9.33.0",
+    "@types/cli-progress": "^3.11.5",
     "@types/cors": "^2.8.19",
     "@types/multer": "^2.0.0",
     "@types/react": "19.1.10",
     "@types/react-dom": "19.1.7",
     "@types/xml2js": "^0.4.14",
     "@vitejs/plugin-react": "5.0.0",
-    "@types/cli-progress": "^3.11.5",
+    "baseline-browser-mapping": "^2.9.13",
+    "concurrently": "^9.2.1",
     "eslint": "9.33.0",
     "eslint-plugin-react-hooks": "5.2.0",
     "eslint-plugin-react-refresh": "0.4.20",
     "globals": "16.3.0",
+    "nodemon": "^3.1.11",
     "rimraf": "^6.0.1",
     "typescript": "5.8.3",
     "typescript-eslint": "8.39.1",
-    "vite": "7.1.6"
+    "vite": "^7.3.1"
   },
   "overrides": {
     "node-gyp": "^10.0.0",
