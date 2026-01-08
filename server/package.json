@@ -1,9 +1,9 @@
 {
   "type": "commonjs",
-  "devDependencies": {
-    "@types/cli-progress": "^3.11.5"
-  },
   "dependencies": {
+    "express": "^5.1.0",
+    "cors": "^2.8.5",
+    "multer": "^2.0.2",
     "dotenv": "^17.2.3",
     "google-auth-library": "^10.5.0",
     "googleapis": "^170.0.0"
