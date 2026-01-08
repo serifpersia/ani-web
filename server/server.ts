@@ -1,5 +1,4 @@
 import express from 'express';
-import { genres, tags, studios } from './constants';
 import path from 'path';
 import cors from 'cors';
 import axios from 'axios';
@@ -9,12 +8,13 @@ import fs from 'fs';
 import { parseString } from 'xml2js';
 import sqlite3 from 'sqlite3';
 import multer from 'multer';
-import { initializeDatabase, syncDownOnBoot, syncUp, performWriteTransaction, verifyRclone } from './sync';
 import chokidar from 'chokidar';
 import logger from './logger';
 import { AllAnimeProvider } from './providers/allanime.provider';
-
-const isDev = process.argv.includes('--dev');
+import { googleDriveService } from './google';
+import { CONFIG } from './config';
+import { initializeDatabase, syncDownOnBoot, syncUp, performWriteTransaction, initSyncProvider } from './sync';
+import { genres, tags, studios } from './constants';
 
 declare module 'express-serve-static-core' {
     interface Request {
@@ -22,65 +22,90 @@ declare module 'express-serve-static-core' {
     }
 }
 
-interface MalAnimeItem {
-    series_title: string[];
-    my_status: string[];
-}
-
-interface ShowToInsert {
-    id: string;
-    name: string;
-    thumbnail?: string;
-    status: string;
-}
-
-interface ContinueWatchingShow {
-    _id: string;
-    id: string;
-    name: string;
-    thumbnail?: string;
-    nativeName?: string;
-    englishName?: string;
-    episodeNumber: string;
-    currentTime: number;
-    duration: number;
-}
-
-interface WatchingShow {
-    id: string;
-    name: string;
-    thumbnail?: string;
-    nativeName?: string;
-    englishName?: string;
-    lastWatchedAt: string | null;
-}
-
-interface WatchedEpisode {
-    episodeNumber: string;
-    currentTime: number;
-    duration: number;
-}
+interface MalAnimeItem { series_title: string[]; my_status: string[]; }
+interface ShowToInsert { id: string; name: string; thumbnail?: string; status: string; }
+interface ContinueWatchingShow { _id: string; id: string; name: string; thumbnail?: string; nativeName?: string; englishName?: string; episodeNumber: string; currentTime: number; duration: number; }
+interface WatchingShow { id: string; name: string; thumbnail?: string; nativeName?: string; englishName?: string; lastWatchedAt: string | null; }
+interface WatchedEpisode { episodeNumber: string; currentTime: number; duration: number; }
 
 const app = express();
 const apiCache = new NodeCache({ stdTTL: 3600 });
 const provider = new AllAnimeProvider(apiCache);
 
 let db: sqlite3.Database;
+let isShuttingDown = false;
 
 app.use((req, res, next) => {
+    if (isShuttingDown) {
+        return res.status(503).send('Server is shutting down...');
+    }
+    if (!db) {
+        return res.status(503).send('Database initializing...');
+    }
     req.db = db;
     next();
 });
 
-axiosRetry(axios, {
-    retries: 3,
-    retryDelay: axiosRetry.exponentialDelay,
-});
-
-const port = 3000;
+axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay });
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+app.get('/api/auth/google', (req, res) => {
+    try {
+        const url = googleDriveService.getAuthUrl();
+        res.json({ url });
+    } catch (error) {
+        logger.error({ err: error }, 'Failed to generate auth URL');
+        res.status(500).json({ error: 'Auth configuration error' });
+    }
+});
+
+app.get('/api/auth/google/callback', async (req, res) => {
+    const code = req.query.code as string;
+    if (code) {
+        try {
+            await googleDriveService.handleCallback(code);
+            const user = await googleDriveService.getUserProfile();
+            const responseHtml = `
+            <html>
+            <body>
+            <script>
+            if (window.opener) {
+                window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', user: ${JSON.stringify(user)} }, '*');
+                window.close();
+            } else {
+                window.location.href = '/';
+            }
+            </script>
+            <p>Authenticated successfully. You can close this window.</p>
+            </body>
+            </html>
+            `;
+            res.send(responseHtml);
+        } catch (error) {
+            logger.error({ err: error }, 'Auth callback failed');
+            res.status(500).send('Authentication failed');
+        }
+    } else {
+        res.status(400).send('No code provided');
+    }
+});
+
+app.get('/api/auth/user', async (req, res) => {
+    try {
+        const user = await googleDriveService.getUserProfile();
+        res.json(user);
+    } catch (error) {
+        res.json(null);
+    }
+});
+
+app.post('/api/auth/logout', async (req, res) => {
+    await googleDriveService.logout();
+    res.json({ success: true });
+});
+
 
 app.get('/api/popular/:timeframe', async (req, res) => {
     const timeframe = req.params.timeframe.toLowerCase() as 'daily' | 'weekly' | 'monthly' | 'all';
@@ -90,91 +115,59 @@ app.get('/api/popular/:timeframe', async (req, res) => {
         const data = await provider.getPopular(timeframe);
         apiCache.set(cacheKey, data);
         res.set('Cache-Control', 'public, max-age=300').json(data);
-    } catch (error) {
-        logger.error({ err: error }, 'Error fetching popular data');
-        res.status(500).send('Error fetching popular data');
-    }
+    } catch (error) { res.status(500).send('Error'); }
 });
 
 app.get('/api/schedule/:date', async (req, res) => {
-    const dateStr = req.params.date;
-    const cacheKey = `schedule-${dateStr}`;
+    const cacheKey = `schedule-${req.params.date}`;
     if (apiCache.has(cacheKey)) return res.json(apiCache.get(cacheKey));
-    const requestedDate = new Date(dateStr + 'T00:00:00.000Z');
-    if (isNaN(requestedDate.getTime())) return res.status(400).send('Invalid date format.');
     try {
-        const data = await provider.getSchedule(requestedDate);
+        const data = await provider.getSchedule(new Date(req.params.date + 'T00:00:00.000Z'));
         apiCache.set(cacheKey, data);
         res.set('Cache-Control', 'public, max-age=300').json(data);
-    } catch (error) {
-        logger.error({ err: error }, 'Error fetching schedule data');
-        res.status(500).send('Error fetching schedule data');
-    }
+    } catch (error) { res.status(500).send('Error'); }
 });
 
 app.get('/api/proxy', async (req, res) => {
-    const { url, referer: dynamicReferer } = req.query;
+    const { url, referer } = req.query;
+    if (!url) return res.status(400).send('URL required');
     try {
-        const headers: Record<string, string> = { 'User-Agent': 'Mozilla/5.0', 'Accept': '*/*' };
-        if (dynamicReferer) headers['Referer'] = dynamicReferer as string;
+        const headers: Record<string, string> = { 'User-Agent': 'Mozilla/5.0' };
+        if (referer) headers['Referer'] = referer as string;
         if (req.headers.range) headers['Range'] = req.headers.range;
 
         if ((url as string).includes('.m3u8')) {
-            const response = await axios.get(url as string, { headers, responseType: 'text', timeout: 15000 });
+            const resp = await axios.get(url as string, { headers, responseType: 'text' });
             const baseUrl = new URL(url as string);
-            const rewritten = response.data.split('\n').map((l: string) =>
-                (l.trim().length > 0 && !l.startsWith('#'))
-                    ? `/api/proxy?url=${encodeURIComponent(new URL(l, baseUrl).href)}&referer=${encodeURIComponent(dynamicReferer as string || 'https://allmanga.to')}`
-                    : l
+            const rewritten = resp.data.split('\n').map((l: string) =>
+            (l.trim() && !l.startsWith('#'))
+            ? `/api/proxy?url=${encodeURIComponent(new URL(l, baseUrl).href)}&referer=${encodeURIComponent(referer as string || '')}`
+            : l
             ).join('\n');
             res.set('Content-Type', 'application/vnd.apple.mpegurl').send(rewritten);
         } else {
-            const streamResponse = await axios({ method: 'get', url: url as string, responseType: 'stream', headers, timeout: 20000 });
-            res.status(streamResponse.status);
-            Object.keys(streamResponse.headers).forEach(key => res.set(key, streamResponse.headers[key]));
-            req.on('close', () => streamResponse.data.destroy());
-            streamResponse.data.pipe(res);
-            streamResponse.data.on('error', (err: Error & { code?: string }) => {
-                if (err.code !== 'ECONNRESET') logger.error({ err }, 'Proxy stream error');
-                if (!res.headersSent) res.status(500).send('Stream error');
-                res.end();
-            });
+            const resp = await axios({ method: 'get', url: url as string, responseType: 'stream', headers });
+            res.status(resp.status);
+            Object.keys(resp.headers).forEach(k => res.set(k, resp.headers[k]));
+            resp.data.pipe(res);
         }
-    } catch (e) {
-        const error = e as { response?: { status: number }; request?: unknown; message: string };
-        if (error.response) {
-            if (!res.headersSent) res.status(error.response.status).send(`Proxy error: ${error.message}`);
-        } else if (error.request) {
-            if (!res.headersSent) res.status(504).send(`Proxy error: Gateway timeout.`);
-        } else {
-            if (!res.headersSent) res.status(500).send(`Proxy error: ${error.message}`);
-        }
-        if (res.writable) res.end();
-    }
+    } catch (e) { if (!res.headersSent) res.status(500).send('Proxy error'); }
 });
 
 app.get('/api/skip-times/:showId/:episodeNumber', async (req, res) => {
-    const { showId, episodeNumber } = req.params;
-    const cacheKey = `skip-${showId}-${episodeNumber}`;
-    if (apiCache.has(cacheKey)) return res.json(apiCache.get(cacheKey));
     try {
-        const data = await provider.getSkipTimes(showId, episodeNumber);
-        apiCache.set(cacheKey, data);
+        const data = await provider.getSkipTimes(req.params.showId, req.params.episodeNumber);
         res.json(data);
-    } catch (error) {
-        res.json({ found: false, results: [] });
-    }
+    } catch { res.json({ found: false, results: [] }); }
 });
 
 app.post('/api/import/mal-xml', multer().single('xmlfile'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file' });
     const { erase } = req.body;
-    const xml = req.file?.buffer.toString('utf-8');
-    if (!xml) return res.status(400).json({ error: 'XML content is required' });
+    parseString(req.file.buffer.toString(), async (err, result) => {
+        if (err) return res.status(400).json({ error: 'Invalid XML' });
+        const animeList: MalAnimeItem[] = result?.myanimelist?.anime || [];
 
-    parseString(xml, async (err, result) => {
-        if (err || !result?.myanimelist?.anime) return res.status(400).json({ error: 'Invalid MyAnimeList XML.' });
-        
-        const animeList: MalAnimeItem[] = result.myanimelist.anime;
         let skippedCount = 0;
         const showsToInsert: ShowToInsert[] = [];
 
@@ -186,184 +179,63 @@ app.post('/api/import/mal-xml', multer().single('xmlfile'), async (req, res) => 
                 } else {
                     skippedCount++;
                 }
-            } catch {
-                skippedCount++;
-            }
+            } catch { skippedCount++; }
         }
 
         try {
             await performWriteTransaction(db, (tx) => {
-                if (erase) tx.run(`DELETE FROM watchlist`);
-                if (showsToInsert.length > 0) {
-                    const stmt = tx.prepare(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status) VALUES (?, ?, ?, ?)`);
-                    showsToInsert.forEach(show => stmt.run(show.id, show.name, show.thumbnail, show.status));
-                    stmt.finalize();
-                }
+                if (erase) tx.run('DELETE FROM watchlist');
+                const stmt = tx.prepare('INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status) VALUES (?, ?, ?, ?)');
+                showsToInsert.forEach(show => stmt.run(show.id, show.name, show.thumbnail, show.status));
+                stmt.finalize();
             });
             res.json({ imported: showsToInsert.length, skipped: skippedCount });
         } catch (dbError) {
-            logger.error({ err: dbError }, 'DB error on MAL import');
-            res.status(500).json({ error: 'DB error on MAL import' });
+            logger.error({ err: dbError }, 'Import DB error');
+            res.status(500).json({ error: 'DB error' });
         }
     });
 });
 
-async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeProvider, limit?: number, page?: number): Promise<unknown[]> {
-
-    const inProgressQuery = `
-        SELECT
-            sm.id as _id, sm.id, sm.name, sm.thumbnail, sm.nativeName, sm.englishName,
-            we.episodeNumber, we.currentTime, we.duration
+async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeProvider, limit?: number): Promise<unknown[]> {
+    return new Promise((resolve, reject) => {
+        const query = `
+        SELECT sm.id, sm.name, sm.thumbnail, sm.nativeName, sm.englishName,
+        we.episodeNumber, we.currentTime, we.duration, we.watchedAt
         FROM shows_meta sm
-        JOIN (
-            SELECT *, ROW_NUMBER() OVER(PARTITION BY showId ORDER BY watchedAt DESC) as rn
-            FROM watched_episodes
-            WHERE (currentTime / duration) BETWEEN 0.05 AND 0.95
-        ) we ON sm.id = we.showId
-        WHERE we.rn = 1
-        ORDER BY we.watchedAt DESC;
-    `;
-    const inProgressShows: ContinueWatchingShow[] = await new Promise((resolve, reject) => {
-        db.all(inProgressQuery, [], (err, rows: ContinueWatchingShow[]) => {
-            if (err) reject(err);
-            else resolve(rows);
-        });
-    });
-
-    const watchingShowsQuery = `
-        SELECT
-            w.id, w.name, w.thumbnail, w.nativeName, w.englishName,
-            (SELECT MAX(we.watchedAt) FROM watched_episodes we WHERE we.showId = w.id) as lastWatchedAt
-        FROM watchlist w
-        WHERE w.status = 'Watching'
-        ORDER BY lastWatchedAt DESC;
-    `;
-    const watchingShows: WatchingShow[] = await new Promise((resolve, reject) => {
-        db.all(watchingShowsQuery, [], (err, rows: WatchingShow[]) => {
-            if (err) reject(err);
-            else resolve(rows);
-        });
-    });
-
-    const upNextShows = [];
-    const fullyWatchedShows = [];
-    for (const show of watchingShows) {
-        try {
-            const [epDetails, watchedEpisodesResult] = await Promise.all([
-                provider.getEpisodes(show.id, 'sub'),
-                new Promise<WatchedEpisode[]>((resolve, reject) => {
-                    db.all('SELECT * FROM watched_episodes WHERE showId = ?', [show.id], (err, rows: WatchedEpisode[]) => {
-                        if (err) reject(err);
-                        else resolve(rows);
-                    });
-                })
-            ]);
-
-            const allEps = epDetails?.episodes?.sort((a, b) => parseFloat(a) - parseFloat(b)) || [];
-            const watchedEpsMap = new Map(watchedEpisodesResult.map(r => [r.episodeNumber.toString(), r]));
-
-            const unwatchedEps = allEps.filter(ep => !watchedEpsMap.has(ep));
-
-            if (unwatchedEps.length > 0) {
-                upNextShows.push({
-                    _id: show.id,
-                    id: show.id,
-                    name: show.name,
-                    thumbnail: show.thumbnail,
-                    nativeName: show.nativeName,
-                    englishName: show.englishName,
-                    nextEpisodeToWatch: unwatchedEps[0],
-                    newEpisodesCount: unwatchedEps.length,
-                });
-            } else if (watchedEpsMap.size > 0) {
-                const lastWatchedEpisodeNumber = Math.max(...Array.from(watchedEpsMap.keys()).map(e => parseFloat(e as string)));
-                const lastWatchedEpisodeDetails = watchedEpsMap.get(lastWatchedEpisodeNumber.toString());
-
-                if (lastWatchedEpisodeDetails) {
-                    fullyWatchedShows.push({
-                        _id: show.id,
-                        id: show.id,
-                        name: show.name,
-                        thumbnail: show.thumbnail,
-                        nativeName: show.nativeName,
-                        englishName: show.englishName,
-                        episodeNumber: lastWatchedEpisodeNumber,
-                        currentTime: lastWatchedEpisodeDetails.currentTime,
-                        duration: lastWatchedEpisodeDetails.duration,
-                    });
+        JOIN watched_episodes we ON sm.id = we.showId
+        ORDER BY we.watchedAt DESC
+        `;
+        db.all(query, (err, rows: any[]) => {
+            if (err) return reject(err);
+            const unique = new Map();
+            rows.forEach(r => {
+                if(!unique.has(r.id)) {
+                    unique.set(r.id, { ...r, thumbnail: provider.deobfuscateUrl(r.thumbnail) });
                 }
-            }
-        } catch (e) {
-            logger.error({ err: e, showId: show.id }, 'Error processing show for Up Next list');
-        }
-    }
-
-    const combinedList = [];
-    const seenShowIds = new Set();
-
-    for (const show of upNextShows) {
-        if (!seenShowIds.has(show.id)) {
-            combinedList.push({
-                ...show,
-                thumbnail: provider.deobfuscateUrl(show.thumbnail ?? '')
             });
-            seenShowIds.add(show.id);
-        }
-    }
-
-    for (const show of inProgressShows) {
-        if (!seenShowIds.has(show.id)) {
-            combinedList.push({
-                ...show,
-                thumbnail: provider.deobfuscateUrl(show.thumbnail ?? '')
-            });
-            seenShowIds.add(show.id);
-        }
-    }
-
-    for (const show of fullyWatchedShows) {
-        if (!seenShowIds.has(show.id)) {
-            combinedList.push({
-                ...show,
-                thumbnail: provider.deobfuscateUrl(show.thumbnail ?? '')
-            });
-            seenShowIds.add(show.id);
-        }
-    }
-
-    if (page && limit) {
-        const offset = (page - 1) * limit;
-        return combinedList.slice(offset, offset + limit);
-    }
-
-    if (limit) {
-        return combinedList.slice(0, limit);
-    }
-
-    return combinedList;
+            const result = Array.from(unique.values());
+            resolve(limit ? result.slice(0, limit) : result);
+        });
+    });
 }
+
+app.get('/api/continue-watching', async (req, res) => {
+    try {
+        const data = await getContinueWatchingData(req.db, provider, 10);
+        res.json(data);
+    } catch { res.status(500).json({ error: 'DB error' }); }
+});
 
 app.get('/api/continue-watching/all', async (req, res) => {
     try {
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 10;
-        const data = await getContinueWatchingData(req.db, provider, limit, page);
-        res.json(data);
-    } catch (error) {
-        logger.error({ err: error }, 'DB error on /api/continue-watching/all');
-        res.status(500).json({ error: 'DB error' });
-    }
-});
+        const offset = (page - 1) * limit;
+        const allData = await getContinueWatchingData(req.db, provider);
 
-app.get('/api/continue-watching', async (req, res) => {
-    try {
-        const limit = parseInt(req.query.limit as string) || 6;
-        const data = await getContinueWatchingData(req.db, provider, limit);
-        res.json(data);
-    } catch (error) {
-        logger.error({ err: error }, 'DB error on /api/continue-watching');
-        res.status(500).json({ error: 'DB error' });
-    }
+        res.json(allData.slice(offset, offset + limit));
+    } catch { res.status(500).json({ error: 'DB error' }); }
 });
 
 app.post('/api/update-progress', async (req, res) => {
@@ -371,150 +243,124 @@ app.post('/api/update-progress', async (req, res) => {
     try {
         await performWriteTransaction(req.db, (tx) => {
             tx.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName) VALUES (?, ?, ?, ?, ?)',
-                [showId, showName, provider.deobfuscateUrl(showThumbnail), nativeName, englishName]);
+                   [showId, showName, provider.deobfuscateUrl(showThumbnail), nativeName, englishName]);
             tx.run(`INSERT OR REPLACE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)`,
-                [showId, episodeNumber, currentTime, duration]);
+                   [showId, episodeNumber, currentTime, duration]);
         });
         res.json({ success: true });
     } catch (error) {
-        logger.error({ err: error }, 'DB error on progress update');
-        res.status(500).json({ error: 'DB error on progress update' });
+        logger.error({err: error}, 'Update progress failed');
+        res.status(500).json({ error: 'DB error' });
     }
-});
-
-app.get('/api/episode-progress/:showId/:episodeNumber', (req, res) => {
-    const { showId, episodeNumber } = req.params;
-    req.db.get('SELECT currentTime, duration FROM watched_episodes WHERE showId = ? AND episodeNumber = ?',
-        [showId, episodeNumber], (err, row) => res.status(err ? 500 : 200).json(err ? { error: 'DB error' } : row || { currentTime: 0, duration: 0 }));
-});
-
-app.get('/api/watched-episodes/:showId', (req, res) => {
-    req.db.all(`SELECT episodeNumber FROM watched_episodes WHERE showId = ?`,
-        [req.params.showId], (err, rows: { episodeNumber: string }[]) => res.status(err ? 500 : 200).json(err ? { error: 'DB error' } : rows.map(r => r.episodeNumber)));
 });
 
 app.post('/api/continue-watching/remove', async (req, res) => {
     const { showId } = req.body;
     try {
         await performWriteTransaction(req.db, (tx) => {
-            tx.run(`DELETE FROM watched_episodes WHERE showId = ?`, [showId]);
-            tx.run(`DELETE FROM shows_meta WHERE id = ?`, [showId]);
+            tx.run('DELETE FROM watched_episodes WHERE showId = ?', [showId]);
         });
         res.json({ success: true });
-    } catch (error) {
-        logger.error({ err: error }, 'DB error on continue-watching remove');
-        res.status(500).json({ error: 'DB error' });
-    }
+    } catch { res.status(500).json({ error: 'DB error' }); }
+});
+
+app.get('/api/watchlist', (req, res) => {
+    const { status } = req.query;
+    const query = status && status !== 'All'
+    ? 'SELECT * FROM watchlist WHERE status = ? ORDER BY rowid DESC'
+    : 'SELECT * FROM watchlist ORDER BY rowid DESC';
+    const params = status && status !== 'All' ? [status] : [];
+
+    req.db.all(query, params, (err, rows) => {
+        if (err) res.status(500).json({ error: 'DB error' });
+        else res.json(rows);
+    });
+});
+
+app.get('/api/watchlist/check/:showId', (req, res) => {
+    req.db.get('SELECT EXISTS(SELECT 1 FROM watchlist WHERE id = ?) as inWatchlist',
+               [req.params.showId], (err, row: { inWatchlist: number }) => res.json({ inWatchlist: !!row.inWatchlist }));
+});
+
+app.get('/api/episode-progress/:showId/:episodeNumber', (req, res) => {
+    req.db.get('SELECT currentTime, duration FROM watched_episodes WHERE showId = ? AND episodeNumber = ?',
+               [req.params.showId, req.params.episodeNumber], (err, row) => res.json(row || { currentTime: 0, duration: 0 }));
+});
+
+app.get('/api/watched-episodes/:showId', (req, res) => {
+    req.db.all(`SELECT episodeNumber FROM watched_episodes WHERE showId = ?`,
+               [req.params.showId], (err, rows: { episodeNumber: string }[]) => res.json(rows ? rows.map(r => r.episodeNumber) : []));
 });
 
 app.post('/api/watchlist/add', async (req, res) => {
     const { id, name, thumbnail, status, nativeName, englishName } = req.body;
     try {
         await performWriteTransaction(req.db, (tx) => {
-            tx.run(`INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status, nativeName, englishName) VALUES (?, ?, ?, ?, ?, ?)`, 
-                [id, name, provider.deobfuscateUrl(thumbnail), status || 'Watching', nativeName, englishName]);
+            tx.run('INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status, nativeName, englishName) VALUES (?, ?, ?, ?, ?, ?)',
+                   [id, name, provider.deobfuscateUrl(thumbnail), status || 'Watching', nativeName, englishName]);
         });
         res.json({ success: true });
-    } catch (error) {
-        logger.error({ err: error }, 'DB error on watchlist add');
-        res.status(500).json({ error: 'DB error' });
-    }
-});
-
-app.get('/api/watchlist/check/:showId', (req, res) => {
-    req.db.get('SELECT EXISTS(SELECT 1 FROM watchlist WHERE id = ?) as inWatchlist',
-        [req.params.showId], (err, row: { inWatchlist: number }) => res.status(err ? 500 : 200).json(err ? { error: 'DB error' } : { inWatchlist: !!row.inWatchlist }));
-});
-
-app.post('/api/watchlist/status', async (req, res) => {
-    const { id, status } = req.body;
-    try {
-        await performWriteTransaction(req.db, (tx) => tx.run(`UPDATE watchlist SET status = ? WHERE id = ?`, [status, id]));
-        res.json({ success: true });
-    } catch (error) {
-        logger.error({ err: error }, 'DB error on watchlist status update');
-        res.status(500).json({ error: 'DB error' });
-    }
-});
-
-app.get('/api/watchlist', (req, res) => {
-    const sort = req.query.sort || 'last_added';
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 14;
-    const offset = (page - 1) * limit;
-    const orderByClause = sort === 'name_asc' ? 'ORDER BY name ASC' : sort === 'name_desc' ? 'ORDER BY name DESC' : 'ORDER BY ROWID DESC';
-
-    const status = req.query.status as string;
-    let whereClause = '';
-    const params: string[] = [];
-
-    if (status && status !== 'All') {
-        whereClause = 'WHERE status = ?';
-        params.push(status);
-    }
-
-    const countQuery = `SELECT COUNT(*) as count FROM watchlist ${whereClause}`;
-    req.db.get(countQuery, params, (err, row: { count: number }) => {
-        if (err) return res.status(500).json({ error: 'DB error on count' });
-        res.setHeader('X-Total-Count', row.count.toString());
-
-        const dataQuery = `SELECT id as _id, id, name, thumbnail, status, nativeName, englishName FROM watchlist ${whereClause} ${orderByClause} LIMIT ? OFFSET ?`;
-        const dataParams = [...params, limit, offset];
-        req.db.all(dataQuery, dataParams, (err, rows) => {
-            res.status(err ? 500 : 200).json(err ? { error: 'DB error on data' } : rows);
-        });
-    });
+    } catch { res.status(500).json({ error: 'DB error' }); }
 });
 
 app.post('/api/watchlist/remove', async (req, res) => {
     const { id } = req.body;
     try {
-        await performWriteTransaction(req.db, (tx) => tx.run(`DELETE FROM watchlist WHERE id = ?`, [id]));
+        await performWriteTransaction(req.db, (tx) => {
+            tx.run('DELETE FROM watchlist WHERE id = ?', [id]);
+        });
         res.json({ success: true });
-    } catch (error) {
-        logger.error({ err: error }, 'DB error on watchlist remove');
-        res.status(500).json({ error: 'DB error' });
-    }
+    } catch { res.status(500).json({ error: 'DB error' }); }
+});
+
+app.post('/api/watchlist/status', async (req, res) => {
+    const { id, status } = req.body;
+    try {
+        await performWriteTransaction(req.db, (tx) => {
+            tx.run('UPDATE watchlist SET status = ? WHERE id = ?', [status, id]);
+        });
+        res.json({ success: true });
+    } catch { res.status(500).json({ error: 'DB error' }); }
 });
 
 app.get('/api/settings', (req, res) => {
-    const key = req.query.key as string;
-    if (!key) return res.status(400).json({ error: 'Key is required.' });
-    req.db.get('SELECT value FROM settings WHERE key = ?', [key], (err, row: { value: string | null }) => 
-        res.status(err ? 500 : 200).json(err ? { error: 'DB error' } : { value: row ? row.value : null }));
+    req.db.get('SELECT value FROM settings WHERE key = ?', [req.query.key], (err, row: any) =>
+    res.json({ value: row ? row.value : null }));
 });
 
 app.post('/api/settings', async (req, res) => {
-    const { key, value } = req.body;
     try {
-        await performWriteTransaction(req.db, (tx) => tx.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]));
+        await performWriteTransaction(req.db, (tx) => {
+            tx.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [req.body.key, req.body.value]);
+        });
         res.json({ success: true });
-    } catch (error) {
-        logger.error({ err: error }, 'DB error on settings update');
-        res.status(500).json({ error: 'DB error' });
-    }
+    } catch { res.status(500).json({ error: 'DB error' }); }
 });
 
 app.get('/api/backup-db', (_req, res) => {
-   const dbName = isDev ? 'anime.dev.db' : 'anime.db';
-   const dbPath = path.join(__dirname, dbName);
-   _req.db.close(err => {
-        if (err) return res.status(500).json({ error: 'Failed to close database.' });
-        res.download(dbPath, 'ani-web-backup.db', () => initializeDatabase(dbPath).then(newDb => db = newDb));
-   });
+    const dbName = CONFIG.IS_DEV ? CONFIG.DB_NAME_DEV : CONFIG.DB_NAME_PROD;
+    const dbPath = path.join(CONFIG.ROOT, dbName);
+    const backupPath = path.join(CONFIG.ROOT, 'ani-web-backup.db');
+    fs.copyFile(dbPath, backupPath, (err) => {
+        if(err) return res.status(500).json({error: 'Backup failed'});
+        res.download(backupPath, 'ani-web-backup.db', () => {
+            fs.unlink(backupPath, () => {});
+        });
+    });
 });
 
-app.post('/api/restore-db', multer({ storage: multer.diskStorage({ destination: (_req, _f, cb) => cb(null, __dirname), filename: (_r, _f, cb) => cb(null, `${isDev ? 'anime.dev.db' : 'anime.db'}.temp`) }) }).single('dbfile'), (req, res) => {
+app.post('/api/restore-db', multer({ storage: multer.diskStorage({ destination: (_req, _f, cb) => cb(null, CONFIG.ROOT), filename: (_r, _f, cb) => cb(null, `restore_temp.db`) }) }).single('dbfile'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
-    const dbName = isDev ? 'anime.dev.db' : 'anime.db';
-    const tempPath = path.join(__dirname, `${dbName}.temp`);
-    const dbPath = path.join(__dirname, dbName);
-    req.db.close(err => {
+    const dbName = CONFIG.IS_DEV ? CONFIG.DB_NAME_DEV : CONFIG.DB_NAME_PROD;
+    const tempPath = path.join(CONFIG.ROOT, `restore_temp.db`);
+    const dbPath = path.join(CONFIG.ROOT, dbName);
+
+    db.close(err => {
         if (err) return res.status(500).json({ error: 'Failed to close database.' });
         fs.rename(tempPath, dbPath, err => {
             initializeDatabase(dbPath).then(newDb => db = newDb);
             if (err) return res.status(500).json({ error: 'Failed to replace database file.' });
-            res.json({ success: true, message: 'Database restored. App will refresh.' });
+            res.json({ success: true, message: 'Database restored.' });
         });
     });
 });
@@ -523,200 +369,108 @@ app.get('/api/subtitle-proxy', async (req, res) => {
     try {
         const response = await axios.get(req.query.url as string, { responseType: 'text', timeout: 10000 });
         res.set('Content-Type', 'text/vtt; charset=utf-8').send(response.data);
-    } catch (e) {
-        const error = e as Error;
-        res.status(500).send(`Proxy error: ${error.message}`);
-    }
+    } catch (e) { res.status(500).send('Proxy error'); }
 });
 
 app.get('/api/image-proxy', async (req, res) => {
-    const { url, w } = req.query;
-    const width = w ? parseInt(w as string) : undefined;
-
-    if (!url) {
-        return res.status(400).send('URL is required');
-    }
-
+    const { url } = req.query;
+    if (!url) return res.status(400).send('URL required');
     try {
-        const imageResponse = await axios({
-            method: 'get',
-            url: url as string,
-            responseType: 'arraybuffer',
-            headers: { Referer: 'https://allanime.day', 'User-Agent': 'Mozilla/5.0' },
-        });
-
+        const imageResponse = await axios({ method: 'get', url: url as string, responseType: 'arraybuffer', headers: { Referer: 'https://allanime.day', 'User-Agent': 'Mozilla/5.0' } });
         res.set('Content-Type', imageResponse.headers['content-type']);
         res.set('Cache-Control', 'public, max-age=604800, immutable');
         res.send(imageResponse.data);
-
-    } catch (e) {
-        logger.error({ err: e }, 'Image proxy error');
-        res.status(200).sendFile(path.join(__dirname, '..','public/placeholder.svg'));
-    }
+    } catch (e) { res.status(200).sendFile(path.join(__dirname, '..','public/placeholder.svg')); }
 });
 
 app.get('/api/video', async (req, res) => {
-    const { showId, episodeNumber, mode } = req.query;
-    try {
-        const data = await provider.getStreamUrls(showId as string, episodeNumber as string, mode as 'sub' | 'dub');
-        if (data && data.length > 0) res.json(data);
-        else res.status(404).send('No playable video URLs found.');
-    } catch (e) {
-        const error = e as Error;
-        logger.error({ err: error, showId }, `Error fetching video data`);
-        res.status(500).send(`Error fetching video data: ${error.message}`);
-    }
+    try { res.json(await provider.getStreamUrls(req.query.showId as string, req.query.episodeNumber as string, req.query.mode as any)); } catch { res.status(500).send('Error'); }
 });
-
 app.get('/api/episodes', async (req, res) => {
-    const { showId, mode } = req.query;
-    try {
-        const data = await provider.getEpisodes(showId as string, mode as 'sub' | 'dub');
-        if (data) res.set('Cache-Control', 'public, max-age=300').json(data);
-        else res.status(404).send('Episodes not found.');
-    } catch (e) {
-        res.status(500).send('Error fetching episodes from API');
-    }
+    try { res.json(await provider.getEpisodes(req.query.showId as string, req.query.mode as any)); } catch { res.status(500).send('Error'); }
 });
-
 app.get('/api/search', async (req, res) => {
-    try {
-        const data = await provider.search(req.query);
-        res.json(data);
-    } catch (error) {
-        logger.error({ err: error }, 'Error fetching search data');
-        res.status(500).send('Error fetching search data');
-    }
+    try { res.json(await provider.search(req.query)); } catch { res.status(500).send('Error'); }
 });
-
 app.get('/api/seasonal', async (req, res) => {
-    const page = parseInt(req.query.page as string) || 1;
-    const cacheKey = `seasonal-p${page}`;
-    if (apiCache.has(cacheKey)) return res.json(apiCache.get(cacheKey));
-    try {
-        const data = await provider.getSeasonal(page);
-        apiCache.set(cacheKey, data);
-        res.set('Cache-Control', 'public, max-age=300').json(data);
-    } catch (error) {
-        logger.error({ err: error }, 'Error fetching seasonal data');
-        res.status(500).send('Error fetching seasonal data');
-    }
+    try { res.json(await provider.getSeasonal(1)); } catch { res.status(500).send('Error'); }
 });
-
-app.get('/api/latest-releases', async (_req, res) => {
-    const cacheKey = 'latest-releases';
-    if (apiCache.has(cacheKey)) return res.json(apiCache.get(cacheKey));
-    try {
-        const data = await provider.getLatestReleases();
-        apiCache.set(cacheKey, data);
-        res.set('Cache-Control', 'public, max-age=300').json(data);
-    } catch (error) {
-        logger.error({ err: error }, 'Error fetching latest releases');
-        res.status(500).send('Error fetching latest releases');
-    }
+app.get('/api/latest-releases', async (req, res) => {
+    try { res.json(await provider.getLatestReleases()); } catch { res.status(500).send('Error'); }
 });
-
 app.get('/api/show-meta/:id', async (req, res) => {
-    const { id } = req.params;
-    const cacheKey = `show-meta-${id}`;
-    if (apiCache.has(cacheKey)) return res.json(apiCache.get(cacheKey));
-    try {
-        const data = await provider.getShowMeta(id);
-        if (data) {
-            apiCache.set(cacheKey, data);
-            res.set('Cache-Control', 'public, max-age=300').json(data);
-        } else {
-            res.status(404).json({ error: 'Show not found' });
-        }
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch show metadata' });
-    }
+    try { res.json(await provider.getShowMeta(req.params.id)); } catch { res.status(500).send('Error'); }
 });
-
 app.get('/api/show-details/:id', async (req, res) => {
-    const { id } = req.params;
-    const cacheKey = `show-details-${id}`;
-    if (apiCache.has(cacheKey)) {
-        return res.json(apiCache.get(cacheKey));
-    }
-    try {
-        const data = await provider.getShowDetails(id);
-        if (data) {
-            apiCache.set(cacheKey, data, 3600);
-            res.json(data);
-        } else {
-            res.status(404).json({ error: "Not Found on Schedule" });
-        }
-    } catch (error) {
-        res.status(500).json({ error: "Error fetching show details" });
-    }
+    try { res.json(await provider.getShowDetails(req.params.id)); } catch { res.status(404).send('Not found'); }
 });
-
 app.get('/api/allmanga-details/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        const data = await provider.getAllmangaDetails(id);
-        res.json(data);
-    } catch (error) {
-        logger.error({ err: error, animeId: id }, `Error fetching allmanga details for ${id}`);
-        res.status(500).json({ error: "Failed to fetch allmanga details" });
-    }
+    try { res.json(await provider.getAllmangaDetails(req.params.id)); } catch { res.status(500).send('Error'); }
 });
+app.get('/api/genres-and-tags', (req, res) => res.json({ genres, tags, studios }));
 
-app.get('/api/genres-and-tags', (_req, res) => res.json({ genres, tags, studios }));
+if (!CONFIG.IS_DEV) {
+    app.use(express.static(path.join(CONFIG.ROOT, '../dist')));
 
-if (!isDev) {
-    app.use(express.static(path.join(__dirname, '../../dist')));
-    app.get(/^(?!\/api).*$/, (_req, res) => res.sendFile(path.join(__dirname, '../../dist/index.html')));
+    app.get(/^(?!\/api).*$/, (req, res) => {
+        res.sendFile(path.join(CONFIG.ROOT, '../dist/index.html'));
+    });
 }
 
 async function main() {
-    const dbName = isDev ? 'anime.dev.db' : 'anime.db';
-    const dbPath = path.join(__dirname, dbName);
+    const dbName = CONFIG.IS_DEV ? CONFIG.DB_NAME_DEV : CONFIG.DB_NAME_PROD;
+    const dbPath = path.join(CONFIG.ROOT, dbName);
+    const remoteFolder = CONFIG.IS_DEV ? CONFIG.REMOTE_FOLDER_DEV : CONFIG.REMOTE_FOLDER_PROD;
 
-    if (isDev) {
-        logger.info('DEV MODE ENABLED: Using temporary database.');
-        try {
-            if (fs.existsSync(dbPath)) {
-                fs.unlinkSync(dbPath);
-                logger.info('Previous dev database deleted.');
-            }
-        } catch (err) {
-            logger.error({ err }, "Could not delete dev database.");
-        }
+    if (CONFIG.IS_DEV && fs.existsSync(dbPath)) {
+        try { fs.unlinkSync(dbPath); } catch {}
     }
 
     db = await initializeDatabase(dbPath);
-    logger.info('Database initialized.');
+    logger.info(`Database initialized at ${dbPath}`);
 
-    if (!isDev) {
-        const isSyncEnabled = await verifyRclone();
-        if (isSyncEnabled) {
-            logger.info("Rclone sync is enabled.");
-            const didSyncDown = await syncDownOnBoot(db, dbPath, 'aniweb_db', () => new Promise<void>(res => db.close(() => res())));
-            if (didSyncDown) db = await initializeDatabase(dbPath);
+    await initSyncProvider();
 
-            const watcher = chokidar.watch(dbPath, { persistent: true, ignoreInitial: true });
-            let debounceTimer: NodeJS.Timeout;
-            watcher.on('change', () => {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => syncUp(db, dbPath, 'aniweb_db'), 15000);
-            });
+    const didDownload = await syncDownOnBoot(db, dbPath, remoteFolder, () => {
+        return new Promise<void>(resolve => db.close(() => resolve()));
+    });
 
-            process.on('SIGINT', async () => {
-                clearTimeout(debounceTimer);
-                await syncUp(db, dbPath, 'aniweb_db');
-                db.close(() => process.exit(0));
-            });
-        } else {
-            logger.info("Rclone sync is disabled or not configured.");
-        }
+    if (didDownload) {
+        db = await initializeDatabase(dbPath);
     }
 
-    app.listen(port, () => logger.info(`Server is running on http://localhost:${port}`));
+    const watcher = chokidar.watch(dbPath, { persistent: true, ignoreInitial: true });
+    let debounceTimer: NodeJS.Timeout;
+
+    watcher.on('change', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => syncUp(db, dbPath, remoteFolder), 15000);
+    });
+
+    const shutdown = async () => {
+        if (isShuttingDown) return;
+        isShuttingDown = true;
+        console.log("\nServer shutting down. Syncing...");
+        clearTimeout(debounceTimer);
+        try {
+            await syncUp(db, dbPath, remoteFolder);
+            console.log("Sync complete.");
+        } catch (e) {
+            console.error("Sync failed:", e);
+        }
+        db.close(() => process.exit(0));
+    };
+
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+
+
+    app.listen(CONFIG.PORT, () => {
+        logger.info(`Server running on http://localhost:${CONFIG.PORT}`);
+    });
 }
 
 main().catch(err => {
-    logger.error({ err }, "Failed to start server");
+    console.error("Server failed to start:", err);
     process.exit(1);
 });

@@ -1,4 +1,3 @@
-
 .hamburgerBtn {
   background: none;
   border: none;
@@ -20,8 +19,6 @@
   transition: all 0.3s ease-in-out;
   background-color: var(--light-text);
 }
-
-
 
 .hamburgerBtn.open span:nth-child(1) {
   transform: rotate(45deg) translate(7px, 7px);
@@ -78,4 +75,121 @@
 
 .searchButton:hover, .filterButton:hover {
   color: var(--accent);
+}
+
+/* Auth Styles */
+.authContainer {
+  position: relative;
+  margin-left: 1rem;
+  display: flex;
+  align-items: center;
+}
+
+.signInButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: #ffffff;
+  color: #333;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-size: 0.9rem;
+}
+
+.signInButton:hover {
+  background-color: #f0f0f0;
+}
+
+.profileWrapper {
+  cursor: pointer;
+  position: relative;
+}
+
+.profileImage {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--border-color);
+  transition: border-color 0.2s;
+}
+
+.profileWrapper:hover .profileImage {
+  border-color: var(--accent);
+}
+
+.dropdown {
+  position: absolute;
+  top: 120%;
+  right: 0;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem;
+  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.userInfo {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.5rem;
+}
+
+.userName {
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.userEmail {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.dropdownItem:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--accent);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+  .signInText {
+    display: none;
+  }
+  .signInButton {
+    padding: 0.5rem;
+    border-radius: 50%;
+  }
 }
