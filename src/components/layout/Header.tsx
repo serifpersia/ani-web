@@ -3,9 +3,15 @@ import { Link, useNavigate } from 'react-router-dom';
 import Logo from '../common/Logo';
 import { useSidebar } from '../../hooks/useSidebar';
 import styles from './Header.module.css';
-import { FaSearch, FaFilter } from 'react-icons/fa';
+import { FaSearch, FaFilter, FaGoogle, FaSignOutAlt } from 'react-icons/fa';
 
 const SCROLL_TIMEOUT_DURATION = 3000;
+
+interface UserProfile {
+  name: string;
+  picture: string;
+  email: string;
+}
 
 const Header: React.FC = () => {
   const { isOpen, toggleSidebar } = useSidebar();
@@ -13,6 +19,33 @@ const Header: React.FC = () => {
   const navigate = useNavigate();
   const [visible, setVisible] = useState(true);
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // Auth State
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Check if user is logged in on mount
+    fetch('/api/auth/user')
+    .then(res => {
+      if (res.ok) return res.json();
+      return null;
+    })
+    .then(data => setUser(data))
+    .catch(() => setUser(null));
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleSearch = () => {
     if (query.trim()) {
@@ -52,6 +85,30 @@ const Header: React.FC = () => {
     };
   }, []);
 
+  const handleSignIn = async () => {
+    try {
+      const res = await fetch('/api/auth/google');
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error('Failed to initiate Google login', error);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      setUser(null);
+      setShowDropdown(false);
+      // Optional: Refresh page to reset sync state
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to sign out', error);
+    }
+  };
+
   const headerStyle: React.CSSProperties = {
     display: 'flex',
     justifyContent: 'space-between',
@@ -80,40 +137,70 @@ const Header: React.FC = () => {
 
   return (
     <header style={headerStyle}>
-      <div style={leftStyle}>
-        <button 
-          className={`${styles.hamburgerBtn} hamburger-button ${isOpen ? styles.open : ''}`}
-          onClick={toggleSidebar} 
-          aria-label="Toggle navigation menu"
-        >
-          <span></span>
-          <span></span>
-          <span></span>
-        </button>
-        <Link to="/" className="logo-link" aria-label="Homepage">
-          <Logo />
-        </Link>
-      </div>
-      <div style={rightStyle}>
-        <div className={styles.searchContainer}>
-          <input
-            id="search-input"
-            name="search-input"
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Search..."
-            className={styles.searchInput}
-          />
-          <button onClick={handleSearch} className={styles.searchButton} aria-label="Search">
-            <FaSearch />
-          </button>
-          <button onClick={() => navigate('/search')} className={styles.filterButton} aria-label="Filters">
-            <FaFilter />
-          </button>
+    <div style={leftStyle}>
+    <button
+    className={`${styles.hamburgerBtn} hamburger-button ${isOpen ? styles.open : ''}`}
+    onClick={toggleSidebar}
+    aria-label="Toggle navigation menu"
+    >
+    <span></span>
+    <span></span>
+    <span></span>
+    </button>
+    <Link to="/" className="logo-link" aria-label="Homepage">
+    <Logo />
+    </Link>
+    </div>
+    <div style={rightStyle}>
+    <div className={styles.searchContainer}>
+    <input
+    id="search-input"
+    name="search-input"
+    type="text"
+    value={query}
+    onChange={(e) => setQuery(e.target.value)}
+    onKeyPress={handleKeyPress}
+    placeholder="Search..."
+    className={styles.searchInput}
+    />
+    <button onClick={handleSearch} className={styles.searchButton} aria-label="Search">
+    <FaSearch />
+    </button>
+    <button onClick={() => navigate('/search')} className={styles.filterButton} aria-label="Filters">
+    <FaFilter />
+    </button>
+    </div>
+
+    {/* Auth Button / Profile */}
+    <div className={styles.authContainer} ref={dropdownRef}>
+    {user ? (
+      <div className={styles.profileWrapper} onClick={() => setShowDropdown(!showDropdown)}>
+      <img
+      src={user.picture}
+      alt="User Profile"
+      className={styles.profileImage}
+      referrerPolicy="no-referrer"
+      />
+      {showDropdown && (
+        <div className={styles.dropdown}>
+        <div className={styles.userInfo}>
+        <p className={styles.userName}>{user.name}</p>
+        <p className={styles.userEmail}>{user.email}</p>
         </div>
+        <button onClick={handleSignOut} className={styles.dropdownItem}>
+        <FaSignOutAlt /> Sign Out
+        </button>
+        </div>
+      )}
       </div>
+    ) : (
+      <button onClick={handleSignIn} className={styles.signInButton}>
+      <FaGoogle />
+      <span className={styles.signInText}>Sign In</span>
+      </button>
+    )}
+    </div>
+    </div>
     </header>
   );
 };
