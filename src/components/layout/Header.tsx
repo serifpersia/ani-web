@@ -20,13 +20,11 @@ const Header: React.FC = () => {
   const [visible, setVisible] = useState(true);
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  // Auth State
   const [user, setUser] = useState<UserProfile | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Check if user is logged in on mount
     fetch('/api/auth/user')
     .then(res => {
       if (res.ok) return res.json();
@@ -36,7 +34,17 @@ const Header: React.FC = () => {
     .catch(() => setUser(null));
   }, []);
 
-  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
+        setUser(event.data.user);
+        window.location.reload();
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -90,7 +98,15 @@ const Header: React.FC = () => {
       const res = await fetch('/api/auth/google');
       const data = await res.json();
       if (data.url) {
-        window.location.href = data.url;
+        const width = 500;
+        const height = 600;
+        const left = window.screen.width / 2 - width / 2;
+        const top = window.screen.height / 2 - height / 2;
+        window.open(
+          data.url,
+          'GoogleAuth',
+          `width=${width},height=${height},top=${top},left=${left}`
+        );
       }
     } catch (error) {
       console.error('Failed to initiate Google login', error);
@@ -102,7 +118,6 @@ const Header: React.FC = () => {
       await fetch('/api/auth/logout', { method: 'POST' });
       setUser(null);
       setShowDropdown(false);
-      // Optional: Refresh page to reset sync state
       window.location.reload();
     } catch (error) {
       console.error('Failed to sign out', error);
