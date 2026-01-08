@@ -45,7 +45,7 @@ jobs:
           node-version: '20'
 
       - name: Install Dependencies
-        run: npm install
+        run: npm ci --no-audit
 
       - name: Install Server Dependencies
         run: npm install --prefix server
@@ -56,18 +56,10 @@ jobs:
       - name: Create Release Archive
         run: |
           mkdir -p release-package/server
-
           cp -r dist release-package/
-
           cp -r server/dist release-package/server/
           cp server/package.json release-package/server/
-
-          if [ -f server/package-lock.json ]; then
-            cp server/package-lock.json release-package/server/
-          fi
-
           cp package.json package-lock.json run.bat run.sh release-package/
-
           cd release-package
           zip -r ../ani-web.zip .
 
