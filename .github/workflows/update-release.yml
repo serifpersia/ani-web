@@ -45,21 +45,23 @@ jobs:
           node-version: '20'
 
       - name: Install Dependencies
-        run: npm ci --no-audit
-
-      - name: Install Server Dependencies
-        run: npm install --prefix server
+        run: npm install
 
       - name: Build Application
         run: npm run build
 
       - name: Create Release Archive
         run: |
-          mkdir -p release-package/server
-          cp -r dist release-package/
-          cp -r server/dist release-package/server/
-          cp server/package.json release-package/server/
-          cp package.json package-lock.json run.bat run.sh release-package/
+          mkdir release-package
+
+          cp -r . release-package/
+
+          rm -rf release-package/.git
+          rm -rf release-package/.github
+          rm -rf release-package/node_modules
+          rm -rf release-package/server/node_modules
+          rm -rf release-package/release-package
+
           cd release-package
           zip -r ../ani-web.zip .
 
