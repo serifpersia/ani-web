@@ -62,7 +62,7 @@ goto end
 powershell -NoProfile -Command "Write-Host 'Running in PRODUCTION mode...' -ForegroundColor Green"
 echo.
 echo --^> Installing production dependencies ^(npm install --omit=dev^)...
-call npm install --omit=dev
+call npm install --omit=dev --prefix server
 if !errorlevel! neq 0 (
     powershell -NoProfile -Command "Write-Host 'Error: npm install failed!' -ForegroundColor Red"
     pause
