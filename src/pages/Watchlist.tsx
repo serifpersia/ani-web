@@ -27,12 +27,43 @@ const Watchlist: React.FC = () => {
   const isCW = filterBy === 'Continue Watching';
 
   // Hooks
-  const { data: cwData, isLoading: loadingCW, error: errorCW } = useAllContinueWatching();
-  const { data: wlData, isLoading: loadingWL, error: errorWL } = useInfiniteWatchlist(filterBy);
+  const {
+    data: cwData,
+    isLoading: loadingCW,
+    error: errorCW,
+    fetchNextPage: fetchNextCW,
+    hasNextPage: hasNextCW,
+    isFetchingNextPage: isFetchingNextCW
+  } = useAllContinueWatching();
+
+  const {
+    data: wlData,
+    isLoading: loadingWL,
+    error: errorWL,
+    fetchNextPage: fetchNextWL,
+    hasNextPage: hasNextWL,
+    isFetchingNextPage: isFetchingNextWL
+  } = useInfiniteWatchlist(filterBy);
 
   const list = isCW ? cwData?.pages.flat() || [] : wlData?.pages.flat() || [];
   const isLoading = isCW ? loadingCW : loadingWL;
   const error = isCW ? errorCW : errorWL;
+
+  // Pagination helpers
+  const fetchNextPage = isCW ? fetchNextCW : fetchNextWL;
+  const hasNextPage = isCW ? hasNextCW : hasNextWL;
+  const isFetchingNextPage = isCW ? isFetchingNextCW : isFetchingNextWL;
+
+  // Scroll Handler
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 800 && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Mutations
   const updateStatus = useMutation({
@@ -108,6 +139,7 @@ const Watchlist: React.FC = () => {
     </div>
 
     {isLoading ? <SkeletonGrid /> : error ? <ErrorMessage message={error.message} /> : (
+      <>
       <div className="grid-container">
       {sortedList.map(item => (
         <div key={item._id} className={styles.itemWrapper}>
@@ -129,6 +161,8 @@ const Watchlist: React.FC = () => {
         </div>
       ))}
       </div>
+      {isFetchingNextPage && <SkeletonGrid count={6} />}
+      </>
     )}
 
     {!isLoading && sortedList.length === 0 && (
