@@ -650,10 +650,11 @@ app.get('/api/allmanga-details/:id', async (req, res) => {
 app.get('/api/genres-and-tags', (req, res) => res.json({ genres, tags, studios }));
 
 if (!CONFIG.IS_DEV) {
-    app.use(express.static(path.join(CONFIG.ROOT, '../dist')));
+    const clientBuildPath = path.join(CONFIG.ROOT, '../dist');
+    app.use(express.static(clientBuildPath));
 
-    app.get(/^(?!\/api).*$/, (req, res) => {
-        res.sendFile(path.join(CONFIG.ROOT, '../dist/index.html'));
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(clientBuildPath, 'index.html'));
     });
 }
 
