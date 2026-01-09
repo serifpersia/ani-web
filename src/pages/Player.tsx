@@ -208,12 +208,53 @@ const Player: React.FC = () => {
         ]);
 
         if (!metaResponse.ok) throw new Error("Failed to fetch show metadata");
-        if (!episodesResponse.ok) throw new Error("Failed to fetch episodes");
-
         const meta = await metaResponse.json();
-        const episodeData = await episodesResponse.json();
         const watchlistStatus = watchlistResponse.ok ? await watchlistResponse.json() : { inWatchlist: false };
         const watchedData = watchedResponse.ok ? await watchedResponse.json() : [];
+        if (!meta) {
+            dispatch({
+                type: 'SHOW_DATA_SUCCESS',
+                payload: {
+                    showMeta: {}, // Empty showMeta
+                    episodes: [],
+                    inWatchlist: watchlistStatus.inWatchlist,
+                    watchedEpisodes: watchedData,
+                    currentEpisode: undefined,
+                },
+            });
+            return;
+        }
+
+        if (!episodesResponse.ok) {
+            // Even if episodesResponse is not ok, we can still show the meta data
+            // but we should not try to access episodeData.description
+            dispatch({
+                type: 'SHOW_DATA_SUCCESS',
+                payload: {
+                    showMeta: { ...meta, names: meta.names || { romaji: meta.name, english: meta.englishName, native: meta.nativeName } },
+                    episodes: [],
+                    inWatchlist: watchlistStatus.inWatchlist,
+                    watchedEpisodes: watchedData,
+                    currentEpisode: undefined,
+                },
+            });
+            return;
+        }
+        const episodeData = await episodesResponse.json();
+        // Additional check if episodeData itself is null/undefined
+        if (!episodeData) {
+            dispatch({
+                type: 'SHOW_DATA_SUCCESS',
+                payload: {
+                    showMeta: { ...meta, names: meta.names || { romaji: meta.name, english: meta.englishName, native: meta.nativeName } },
+                    episodes: [],
+                    inWatchlist: watchlistStatus.inWatchlist,
+                    watchedEpisodes: watchedData,
+                    currentEpisode: undefined,
+                },
+            });
+            return;
+        }
 
         dispatch({
             type: 'SHOW_DATA_SUCCESS',
@@ -612,10 +653,15 @@ const Player: React.FC = () => {
 
   const displayTitle = useMemo(() => {
     if (!state.showMeta) return 'Loading...';
-    if (titlePreference === 'name') return state.showMeta.name;
-    if (titlePreference === 'nativeName') return state.showMeta.names?.native || state.showMeta.name;
-    if (titlePreference === 'englishName') return state.showMeta.names?.english || state.showMeta.name;
-    return state.showMeta.name;
+
+    const { name, nativeName, englishName } = state.showMeta;
+
+    if (titlePreference === 'name' && name) return name;
+    if (titlePreference === 'nativeName' && nativeName) return nativeName;
+    if (titlePreference === 'englishName' && englishName) return englishName;
+
+    // Fallback to name if preferred title is not available, or just name
+    return name || 'Loading...';
   }, [state.showMeta, titlePreference]);
 
   useEffect(() => {
