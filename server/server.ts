@@ -28,6 +28,20 @@ interface ContinueWatchingShow { _id: string; id: string; name: string; thumbnai
 interface WatchingShow { id: string; name: string; thumbnail?: string; nativeName?: string; englishName?: string; lastWatchedAt: string | null; }
 interface WatchedEpisode { episodeNumber: string; currentTime: number; duration: number; }
 
+interface CombinedContinueWatchingShow {
+    _id: string;
+    id: string;
+    name: string;
+    thumbnail?: string;
+    nativeName?: string;
+    englishName?: string;
+    episodeNumber?: string | number;
+    currentTime?: number;
+    duration?: number;
+    nextEpisodeToWatch?: string;
+    newEpisodesCount?: number;
+}
+
 const app = express();
 const apiCache = new NodeCache({ stdTTL: 3600 });
 const provider = new AllAnimeProvider(apiCache);
@@ -291,33 +305,136 @@ app.post('/api/import/mal-xml', multer().single('xmlfile'), async (req, res) => 
     });
 });
 
-async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeProvider, limit?: number): Promise<unknown[]> {
-    return new Promise((resolve, reject) => {
-        const query = `
-        SELECT sm.id, sm.name, sm.thumbnail, sm.nativeName, sm.englishName,
-        we.episodeNumber, we.currentTime, we.duration, we.watchedAt
+async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeProvider): Promise<{data: CombinedContinueWatchingShow[], total: number}> {
+
+    const inProgressQuery = `
+        SELECT
+            sm.id as _id, sm.id, sm.name, sm.thumbnail, sm.nativeName, sm.englishName,
+            we.episodeNumber, we.currentTime, we.duration
         FROM shows_meta sm
-        JOIN watched_episodes we ON sm.id = we.showId
-        ORDER BY we.watchedAt DESC
-        `;
-        db.all(query, (err, rows: any[]) => {
-            if (err) return reject(err);
-            const unique = new Map();
-            rows.forEach(r => {
-                if(!unique.has(r.id)) {
-                    unique.set(r.id, { ...r, thumbnail: provider.deobfuscateUrl(r.thumbnail) });
-                }
-            });
-            const result = Array.from(unique.values());
-            resolve(limit ? result.slice(0, limit) : result);
+        JOIN (
+            SELECT *, ROW_NUMBER() OVER(PARTITION BY showId ORDER BY watchedAt DESC) as rn
+            FROM watched_episodes
+            WHERE (currentTime / duration) BETWEEN 0.05 AND 0.95
+        ) we ON sm.id = we.showId
+        WHERE we.rn = 1
+        ORDER BY we.watchedAt DESC;
+    `;
+    const inProgressShows: ContinueWatchingShow[] = await new Promise((resolve, reject) => {
+        db.all(inProgressQuery, [], (err, rows: ContinueWatchingShow[]) => {
+            if (err) reject(err);
+            else resolve(rows);
         });
     });
+
+    const watchingShowsQuery = `
+        SELECT
+            w.id, w.name, w.thumbnail, w.nativeName, w.englishName,
+            (SELECT MAX(we.watchedAt) FROM watched_episodes we WHERE we.showId = w.id) as lastWatchedAt
+        FROM watchlist w
+        WHERE w.status = 'Watching'
+        ORDER BY lastWatchedAt DESC;
+    `;
+    const watchingShows: WatchingShow[] = await new Promise((resolve, reject) => {
+        db.all(watchingShowsQuery, [], (err, rows: WatchingShow[]) => {
+            if (err) reject(err);
+            else resolve(rows);
+        });
+    });
+
+    const upNextShows: CombinedContinueWatchingShow[] = [];
+    const fullyWatchedShows: CombinedContinueWatchingShow[] = [];
+    for (const show of watchingShows) {
+        try {
+            const [epDetails, watchedEpisodesResult] = await Promise.all([
+                provider.getEpisodes(show.id, 'sub'),
+                new Promise<WatchedEpisode[]>((resolve, reject) => {
+                    db.all('SELECT * FROM watched_episodes WHERE showId = ?', [show.id], (err, rows: WatchedEpisode[]) => {
+                        if (err) reject(err);
+                        else resolve(rows);
+                    });
+                })
+            ]);
+
+            const allEps = epDetails?.episodes?.sort((a, b) => parseFloat(a) - parseFloat(b)) || [];
+            const watchedEpsMap = new Map(watchedEpisodesResult.map(r => [r.episodeNumber.toString(), r]));
+
+            const unwatchedEps = allEps.filter(ep => !watchedEpsMap.has(ep));
+
+            if (unwatchedEps.length > 0) {
+                upNextShows.push({
+                    _id: show.id,
+                    id: show.id,
+                    name: show.name,
+                    thumbnail: show.thumbnail,
+                    nativeName: show.nativeName,
+                    englishName: show.englishName,
+                    nextEpisodeToWatch: unwatchedEps[0],
+                    newEpisodesCount: unwatchedEps.length,
+                });
+            } else if (watchedEpsMap.size > 0) {
+                const lastWatchedEpisodeNumber = Math.max(...Array.from(watchedEpsMap.keys()).map(e => parseFloat(e as string)));
+                const lastWatchedEpisodeDetails = watchedEpsMap.get(lastWatchedEpisodeNumber.toString());
+
+                if (lastWatchedEpisodeDetails) {
+                    fullyWatchedShows.push({
+                        _id: show.id,
+                        id: show.id,
+                        name: show.name,
+                        thumbnail: show.thumbnail,
+                        nativeName: show.nativeName,
+                        englishName: show.englishName,
+                        episodeNumber: lastWatchedEpisodeNumber,
+                        currentTime: lastWatchedEpisodeDetails.currentTime,
+                        duration: lastWatchedEpisodeDetails.duration,
+                    });
+                }
+            }
+        } catch (e) {
+            logger.error({ err: e, showId: show.id }, 'Error processing show for Up Next list');
+        }
+    }
+
+    const combinedList: CombinedContinueWatchingShow[] = [];
+    const seenShowIds = new Set<string>();
+
+    for (const show of upNextShows) {
+        if (!seenShowIds.has(show.id)) {
+            combinedList.push({
+                ...show,
+                thumbnail: provider.deobfuscateUrl(show.thumbnail ?? '')
+            });
+            seenShowIds.add(show.id);
+        }
+    }
+
+    for (const show of inProgressShows) {
+        if (!seenShowIds.has(show.id)) {
+            combinedList.push({
+                ...show,
+                thumbnail: provider.deobfuscateUrl(show.thumbnail ?? '')
+            });
+            seenShowIds.add(show.id);
+        }
+    }
+
+    for (const show of fullyWatchedShows) {
+        if (!seenShowIds.has(show.id)) {
+            combinedList.push({
+                ...show,
+                thumbnail: provider.deobfuscateUrl(show.thumbnail ?? '')
+            });
+            seenShowIds.add(show.id);
+        }
+    }
+
+    return { data: combinedList, total: combinedList.length };
 }
 
 app.get('/api/continue-watching', async (req, res) => {
     try {
-        const data = await getContinueWatchingData(req.db, provider, 10);
-        res.json(data);
+        const data = await getContinueWatchingData(req.db, provider);
+        res.json(data.data.slice(0, 10)); // Still returning a fixed limit for the main continue watching
     } catch { res.status(500).json({ error: 'DB error' }); }
 });
 
@@ -326,9 +443,14 @@ app.get('/api/continue-watching/all', async (req, res) => {
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 10;
         const offset = (page - 1) * limit;
-        const allData = await getContinueWatchingData(req.db, provider);
+        const { data: allData, total } = await getContinueWatchingData(req.db, provider);
 
-        res.json(allData.slice(offset, offset + limit));
+        res.json({
+            data: allData.slice(offset, offset + limit),
+            total,
+            page,
+            limit
+        });
     } catch { res.status(500).json({ error: 'DB error' }); }
 });
 
@@ -359,15 +481,36 @@ app.post('/api/continue-watching/remove', async (req, res) => {
 });
 
 app.get('/api/watchlist', (req, res) => {
-    const { status } = req.query;
-    const query = status && status !== 'All'
-    ? 'SELECT * FROM watchlist WHERE status = ? ORDER BY rowid DESC'
-    : 'SELECT * FROM watchlist ORDER BY rowid DESC';
-    const params = status && status !== 'All' ? [status] : [];
+    const { status, page: pageStr, limit: limitStr } = req.query;
+    const page = parseInt(pageStr as string) || 1;
+    const limit = parseInt(limitStr as string) || 10;
+    const offset = (page - 1) * limit;
 
-    req.db.all(query, params, (err, rows) => {
-        if (err) res.status(500).json({ error: 'DB error' });
-        else res.json(rows);
+    let query = 'SELECT * FROM watchlist';
+    let countQuery = 'SELECT COUNT(*) as total FROM watchlist';
+    const params: (string | number)[] = [];
+
+    if (status && status !== 'All') {
+        query += ' WHERE status = ?';
+        countQuery += ' WHERE status = ?';
+        params.push(status as string);
+    }
+
+    query += ' ORDER BY rowid DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+
+    req.db.all(query, params, (err, rows: any[]) => {
+        if (err) return res.status(500).json({ error: 'DB error', details: err.message });
+
+        req.db.get(countQuery, params.slice(0, -2), (countErr, countRow: { total: number }) => {
+            if (countErr) return res.status(500).json({ error: 'DB error', details: countErr.message });
+            res.json({
+                data: rows.map(row => ({ ...row, _id: row.id })), // Map id to _id
+                total: countRow.total,
+                page,
+                limit
+            });
+        });
     });
 });
 

@@ -1,0 +1,102 @@
+.filterContainer {
+    background-color: var(--bg-secondary);
+    padding: 1.5rem;
+    border-radius: var(--card-border-radius);
+    margin-bottom: 2rem;
+    border: 1px solid var(--border-color);
+}
+
+.searchBar {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.advancedFilters {
+    display: none;
+    flex-direction: column;
+    gap: 1.5rem;
+    animation: slideDown 0.3s ease-out;
+}
+
+.advancedFilters.show {
+    display: flex;
+}
+
+.selectGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+}
+
+.genreTags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 1.5rem;
+}
+
+.genreBtn {
+    background-color: var(--bg-main);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 0.4rem 0.9rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+}
+
+.genreBtn:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+.genreBtn.include {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.genreBtn.exclude {
+    background-color: var(--bg-main);
+    border-color: var(--danger);
+    color: var(--danger);
+    text-decoration: line-through;
+    opacity: 0.8;
+}
+
+.genreIndicator {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 16px;
+    height: 16px;
+    background-color: var(--bg-tertiary);
+    border-radius: 50%;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    border: 1px solid var(--border-color);
+    font-weight: bold;
+}
+
+.loading {
+    text-align: center;
+    padding: 2rem;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+    .searchBar {
+        flex-direction: column;
+    }
+}

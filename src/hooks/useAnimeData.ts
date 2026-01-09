@@ -55,17 +55,6 @@ export const useContinueWatching = (limit?: number) => {
     });
 };
 
-export const useAllContinueWatching = () => {
-    return useInfiniteQuery<Anime[]>({
-        queryKey: ['allContinueWatching'],
-        queryFn: ({ pageParam = 1 }) => fetchApi(`/api/continue-watching/all?page=${pageParam}`),
-        initialPageParam: 1,
-        getNextPageParam: (lastPage, allPages) => {
-            return lastPage.length > 0 ? allPages.length + 1 : undefined;
-        },
-    });
-};
-
 interface SearchResult {
     results: Anime[];
     totalPages: number;
@@ -93,15 +82,100 @@ export const useSearchAnime = (searchQueryString: string) => {
     });
 };
 
+interface PaginatedAnimeResponse {
+
+    data: Anime[];
+
+    total: number;
+
+    page: number;
+
+    limit: number;
+
+}
+
+
+
 export const useInfiniteWatchlist = (status: string) => {
-    return useInfiniteQuery<Anime[]>({
+
+    return useInfiniteQuery<PaginatedAnimeResponse, Error, PaginatedAnimeResponse, Anime[], string[]> ({
+
         queryKey: ['watchlist', status],
-        queryFn: ({ pageParam = 1 }) => fetchApi(`/api/watchlist?status=${status}&page=${pageParam}&limit=14`),
-        initialPageParam: 1,
-        getNextPageParam: (lastPage, allPages) => {
-            return lastPage.length > 0 ? allPages.length + 1 : undefined;
+
+        queryFn: async ({ pageParam = 1 }) => {
+
+            const response = await fetchApi(`/api/watchlist?status=${status}&page=${pageParam}&limit=14`);
+
+            return response;
+
         },
+
+        initialPageParam: 1,
+
+        getNextPageParam: (lastPage) => {
+
+            if (lastPage.data.length === 0 || (lastPage.page * lastPage.limit) >= lastPage.total) {
+
+                return undefined;
+
+            }
+
+                                    return lastPage.page + 1;
+
+                                },
+
+                                select: (data) => ({
+
+                                    ...data,
+
+                                    pages: data.pages.flatMap(page => page.data),
+
+                                }),
+
     });
+
+};
+
+
+
+export const useAllContinueWatching = () => {
+
+    return useInfiniteQuery<PaginatedAnimeResponse, Error, PaginatedAnimeResponse, Anime[], string[]> ({
+
+        queryKey: ['allContinueWatching'],
+
+        queryFn: async ({ pageParam = 1 }) => {
+
+            const response = await fetchApi(`/api/continue-watching/all?page=${pageParam}&limit=10`);
+
+            return response;
+
+        },
+
+        initialPageParam: 1,
+
+        getNextPageParam: (lastPage) => {
+
+            if (lastPage.data.length === 0 || (lastPage.page * lastPage.limit) >= lastPage.total) {
+
+                return undefined;
+
+            }
+
+            return lastPage.page + 1;
+
+        },
+
+        select: (data) => ({
+
+            ...data,
+
+            pages: data.pages.flatMap(page => page.data),
+
+        }),
+
+    });
+
 };
 
 export const useRemoveFromWatchlist = () => {

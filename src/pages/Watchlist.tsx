@@ -1,253 +1,234 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import AnimeCard from '../components/anime/AnimeCard';
-import AnimeCardSkeleton from '../components/anime/AnimeCardSkeleton';
-import ErrorMessage from '../components/common/ErrorMessage';
-import { useInfiniteWatchlist, useRemoveFromWatchlist, useAllContinueWatching } from '../hooks/useAnimeData';
-import { useSetting, useUpdateSetting } from '../hooks/useSettings';
-import RemoveConfirmationModal from '../components/common/RemoveConfirmationModal';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 
-const SkeletonGrid = React.memo(() => (
-    <div className="grid-container">
-        {Array.from({ length: 10 }).map((_, i) => <AnimeCardSkeleton key={i} />)}
-    </div>
-));
+import AnimeCard from '../components/anime/AnimeCard';
+import SkeletonGrid from '../components/common/SkeletonGrid';
+import ErrorMessage from '../components/common/ErrorMessage';
+import RemoveConfirmationModal from '../components/common/RemoveConfirmationModal';
+
+import { useInfiniteWatchlist, useRemoveFromWatchlist, useAllContinueWatching } from '../hooks/useAnimeData';
+import { useSetting, useUpdateSetting } from '../hooks/useSettings';
+import styles from './Watchlist.module.css';
+
+const FILTERS = ['All', 'Continue Watching', 'Watching', 'Completed', 'On-Hold', 'Dropped', 'Planned'];
 
 const Watchlist: React.FC = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { filter: filterBy = 'All' } = useParams<{ filter: string }>();
   const [sortBy, setSortBy] = useState("last_added");
+
+  // Modal State
   const [showRemoveModal, setShowRemoveModal] = useState(false);
-  const [animeToRemoveId, setAnimeToRemoveId] = useState<string | null>(null);
-  const [animeToRemoveName, setAnimeToRemoveName] = useState<string | null>(null);
+  const [itemToRemove, setItemToRemove] = useState<{id: string, name: string} | null>(null);
 
   useEffect(() => {
     document.title = `${filterBy} - Watchlist - ani-web`;
   }, [filterBy]);
 
+  // Data Fetching
+  const {
+    data: watchlistPages,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    isError,
+    error
+  } = useInfiniteWatchlist(filterBy);
 
-
-
-  const { data: watchlistPages, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, error } = useInfiniteWatchlist(filterBy);
   const watchlist = useMemo(() => watchlistPages?.pages.flat() || [], [watchlistPages]);
-  
+
   const {
     data: continueWatchingPages,
-    fetchNextPage: fetchNextContinueWatching,
-    hasNextPage: hasNextContinueWatching,
-    isFetchingNextPage: isFetchingNextContinueWatching,
-    isLoading: loadingAllContinueWatching,
-    isError: isErrorAllContinueWatching,
-    error: errorAllContinueWatching
+    fetchNextPage: fetchNextCW,
+    hasNextPage: hasNextCW,
+    isFetchingNextPage: isFetchingNextCW,
+    isLoading: loadingCW,
+    isError: isErrorCW,
+    error: errorCW
   } = useAllContinueWatching();
 
-  const allContinueWatchingList = useMemo(() => continueWatchingPages?.pages.flat() || [], [continueWatchingPages]);
+  const cwList = useMemo(() => continueWatchingPages?.pages.flat() || [], [continueWatchingPages]);
 
-  const removeContinueWatchingMutation = useMutation({
+  // Mutations
+  const removeCwMutation = useMutation({
     mutationFn: async (showId: string) => {
-      const response = await fetch("/api/continue-watching/remove", {
+      const res = await fetch("/api/continue-watching/remove", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ showId }),
       });
-      if (!response.ok) throw new Error("Failed to remove from backend");
+      if (!res.ok) throw new Error("Failed to remove");
     },
     onSuccess: () => {
       toast.success('Removed from Continue Watching');
       queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] });
     },
-    onError: (error) => {
-      toast.error(`Failed to remove: ${error.message}`);
-    },
+    onError: (err) => toast.error(`Error: ${err.message}`)
   });
-
-  const handleRemoveContinueWatching = useCallback((showId: string) => {
-    removeContinueWatchingMutation.mutate(showId);
-  }, [removeContinueWatchingMutation]);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const isAtBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000;
-      if (filterBy === 'Continue Watching') {
-        if (isAtBottom && !isFetchingNextContinueWatching && hasNextContinueWatching) {
-          fetchNextContinueWatching();
-        }
-      } else {
-        if (isAtBottom && !isFetchingNextPage && hasNextPage) {
-          fetchNextPage();
-        }
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [
-      fetchNextPage, hasNextPage, isFetchingNextPage,
-      filterBy,
-      fetchNextContinueWatching, hasNextContinueWatching, isFetchingNextContinueWatching
-    ]);
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const response = await fetch('/api/watchlist/status', {
+      const res = await fetch('/api/watchlist/status', {
         method: "POST",
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status }),
       });
-      if (!response.ok) throw new Error("Failed to update status");
-      return response.json();
+      if (!res.ok) throw new Error("Failed to update status");
     },
     onSuccess: () => {
-      toast.success('Watchlist status updated');
+      toast.success('Status updated');
       queryClient.invalidateQueries({ queryKey: ['watchlist'] });
     },
-    onError: (error) => {
-      toast.error(`Failed to update status: ${error.message}`);
-    },
+    onError: (err) => toast.error(`Error: ${err.message}`)
   });
 
-  const { data: skipRemoveConfirmationSetting } = useSetting('skipRemoveConfirmation');
-  const skipRemoveConfirmation = skipRemoveConfirmationSetting == true;
-  const updateSettingMutation = useUpdateSetting();
-
   const removeMutation = useRemoveFromWatchlist();
+  const { data: skipConfirm } = useSetting('skipRemoveConfirmation');
+  const updateSetting = useUpdateSetting();
 
-  const updateStatus = useCallback((id: string, status: string) => {
-    updateStatusMutation.mutate({ id, status });
-  }, [updateStatusMutation]);
-
+  // Handlers
   const handleRemoveClick = useCallback((id: string, name: string) => {
-    if (skipRemoveConfirmation) {
+    if (skipConfirm === true) {
       removeMutation.mutate(id);
     } else {
-      setAnimeToRemoveId(id);
-      setAnimeToRemoveName(name);
+      setItemToRemove({ id, name });
       setShowRemoveModal(true);
     }
-  }, [skipRemoveConfirmation, removeMutation]);
+  }, [skipConfirm, removeMutation]);
 
-  const handleConfirmRemove = useCallback((options: { rememberPreference?: boolean }) => {
-    if (animeToRemoveId) {
-      removeMutation.mutate(animeToRemoveId);
-      if (options.rememberPreference) {
-        updateSettingMutation.mutate({ key: 'skipRemoveConfirmation', value: true });
+  const handleConfirmRemove = useCallback((opts: { rememberPreference?: boolean }) => {
+    if (itemToRemove) {
+      removeMutation.mutate(itemToRemove.id);
+      if (opts.rememberPreference) {
+        updateSetting.mutate({ key: 'skipRemoveConfirmation', value: true });
       }
-      setAnimeToRemoveId(null);
-      setAnimeToRemoveName(null);
+      setItemToRemove(null);
       setShowRemoveModal(false);
     }
-  }, [animeToRemoveId, removeMutation, updateSettingMutation]);
+  }, [itemToRemove, removeMutation, updateSetting]);
 
-  const handleCancelRemove = useCallback(() => {
-    setAnimeToRemoveId(null);
-    setAnimeToRemoveName(null);
-    setShowRemoveModal(false);
-  }, []);
-
-  const listToDisplay = useMemo(() => {
-    if (filterBy === 'Continue Watching') {
-      return allContinueWatchingList || [];
-    }
-    return watchlist || [];
-  }, [watchlist, filterBy, allContinueWatchingList]);
+  // Derived State Logic
+  const isContinueWatching = filterBy === 'Continue Watching';
+  const listToDisplay = isContinueWatching ? cwList : watchlist;
+  const isLoadingList = isContinueWatching ? loadingCW : isLoading;
+  const hasNextList = isContinueWatching ? hasNextCW : hasNextPage;
+  const fetchNextList = isContinueWatching ? fetchNextCW : fetchNextPage;
+  const isFetchingNextList = isContinueWatching ? isFetchingNextCW : isFetchingNextPage;
+  const errorList = isContinueWatching ? errorCW : error;
+  const isErrorList = isContinueWatching ? isErrorCW : isError;
 
   const sortedList = useMemo(() => {
     return [...listToDisplay].sort((a, b) => {
       if (sortBy === "name_asc") return a.name.localeCompare(b.name);
       if (sortBy === "name_desc") return b.name.localeCompare(a.name);
-      return 0;
+      return 0; // Default: last added/watched
     });
   }, [listToDisplay, sortBy]);
 
-  const isLoadingList = filterBy === 'Continue Watching' ? loadingAllContinueWatching : isLoading;
-  const isErrorList = filterBy === 'Continue Watching' ? isErrorAllContinueWatching : isError;
-  const errorList = filterBy === 'Continue Watching' ? errorAllContinueWatching : error;
-  const isFetchingNext = filterBy === 'Continue Watching' ? isFetchingNextContinueWatching : isFetchingNextPage;
-  const hasNext = filterBy === 'Continue Watching' ? hasNextContinueWatching : hasNextPage;
+  // Infinite Scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500 && !isFetchingNextList && hasNextList) {
+        fetchNextList();
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isFetchingNextList, hasNextList, fetchNextList]);
 
   return (
-    <div className="page-container" style={{padding: '1rem'}}>
-      <h1>My Watchlist</h1>
+    <div className="page-container">
+    <h1 className="section-title">My Watchlist</h1>
 
-      <div className="watchlist-controls-container" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
-        <div className="filter-buttons">
-          {['All', 'Continue Watching', 'Watching', 'Completed', 'On-Hold', 'Dropped', 'Planned'].map(status => (
-            <button key={status} className={`status-btn ${filterBy === status ? 'active' : ''}`} onClick={() => navigate(`/watchlist/${status}`)}>
-              {status}
-            </button>
-          ))}
-        </div>
+    <div className={styles.controlsContainer}>
+    <div className={styles.filterGroup}>
+    {FILTERS.map(status => (
+      <button
+      key={status}
+      className={`${styles.filterBtn} ${filterBy === status ? styles.active : ''}`}
+      onClick={() => navigate(`/watchlist/${status}`)}
+      >
+      {status}
+      </button>
+    ))}
+    </div>
 
-        <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="form-input">
-          <option value="last_added">Last Added</option>
-          <option value="name_asc">Name (A-Z)</option>
-          <option value="name_desc">Name (Z-A)</option>
-        </select>
+    <select
+    value={sortBy}
+    onChange={e => setSortBy(e.target.value)}
+    className={`form-select ${styles.sortSelect}`}
+    >
+    <option value="last_added">Last Added</option>
+    <option value="name_asc">Name (A-Z)</option>
+    <option value="name_desc">Name (Z-A)</option>
+    </select>
+    </div>
+
+    {isLoadingList ? (
+      <SkeletonGrid count={18} />
+    ) : isErrorList ? (
+      <ErrorMessage message={errorList?.message || 'Error loading watchlist'} />
+    ) : sortedList.length === 0 ? (
+      <div className={styles.emptyState}>
+      <h3>Your list is empty</h3>
+      <p>Go explore and add some anime to track your progress!</p>
+      <button className="btn btn-primary" onClick={() => navigate('/search')} style={{marginTop: '1rem'}}>
+      Browse Anime
+      </button>
       </div>
+    ) : (
+      <div className="grid-container">
+      {sortedList.map(item => (
+        <div key={item.id || item._id} className={styles.itemWrapper}>
+        <AnimeCard
+        anime={item}
+        continueWatching={isContinueWatching}
+        onRemove={isContinueWatching ? (id) => removeCwMutation.mutate(id) : undefined}
+        />
 
-      {isLoadingList ? (
-        <SkeletonGrid />
-      ) : isErrorList ? (
-        <ErrorMessage message={errorList?.message || 'An unknown error occurred'} />
-      ) : sortedList.length === 0 ? (
-        <p style={{textAlign: 'center', marginTop: '1rem'}}>Your list is empty.</p>
-      ) : (
-        <>
-          <div className="grid-container">
-            {sortedList.map(item => (
-              filterBy === 'Continue Watching' ? (
-                <AnimeCard 
-                  key={item.id || item._id}
-                  anime={item} 
-                  continueWatching={true} 
-                  onRemove={handleRemoveContinueWatching}
-                />
-              ) : (
-                <div key={item.id || item._id} className="watchlist-item-wrapper">
-                  <AnimeCard 
-                    anime={item} 
-                    continueWatching={false} 
-                  />
-                  <div className="watchlist-controls" style={{marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-                    <select
-                      className="form-input"
-                      value={item.status}
-                      onChange={(e) => updateStatus(item.id, e.target.value)}
-                      disabled={updateStatusMutation.isPending}
-                    >
-                      <option value="Watching">Watching</option>
-                      <option value="Completed">Completed</option>
-                      <option value="On-Hold">On-Hold</option>
-                      <option value="Dropped">Dropped</option>
-                      <option value="Planned">Planned</option>
-                    </select>
-                    <button 
-                      className="btn-danger" 
-                      onClick={() => handleRemoveClick(item.id, item.name)}
-                      disabled={removeMutation.isPending}
-                    >
-                      {removeMutation.isPending ? 'Removing...' : 'Remove'}
-                    </button>
-                  </div>
-                </div>
-              )
-            ))}
-            {isFetchingNext && <SkeletonGrid />}
+        {!isContinueWatching && (
+          <div className={styles.itemControls}>
+          <select
+          className={styles.statusSelect}
+          value={item.status}
+          onChange={(e) => updateStatusMutation.mutate({ id: item.id, status: e.target.value })}
+          onClick={(e) => e.stopPropagation()}
+          >
+          {FILTERS.slice(2).map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <button
+          className={`btn btn-danger ${styles.removeBtn}`}
+          onClick={(e) => {
+            e.preventDefault();
+            handleRemoveClick(item.id, item.name);
+          }}
+          title="Remove from watchlist"
+          >
+          ×
+          </button>
           </div>
-          {!hasNext && sortedList.length > 0 && <p style={{textAlign: 'center', margin: '1rem'}}>No more results.</p>}
-        </>
-      )}
+        )}
+        </div>
+      ))}
+      {isFetchingNextList && <SkeletonGrid count={6} />}
+      </div>
+    )}
 
-      <RemoveConfirmationModal
-        isOpen={showRemoveModal}
-        onClose={handleCancelRemove}
-        onConfirm={handleConfirmRemove}
-        animeName={animeToRemoveName || ''}
-        scenario="watchlist"
-      />
+    {!hasNextList && sortedList.length > 0 && (
+      <p style={{textAlign: 'center', margin: '2rem 0', color: 'var(--text-secondary)'}}>End of list</p>
+    )}
+
+    <RemoveConfirmationModal
+    isOpen={showRemoveModal}
+    onClose={() => setShowRemoveModal(false)}
+    onConfirm={handleConfirmRemove}
+    animeName={itemToRemove?.name || ''}
+    scenario="watchlist"
+    />
     </div>
   );
 };
