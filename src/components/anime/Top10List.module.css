@@ -1,0 +1,132 @@
+.container {
+    background-color: var(--bg-secondary);
+    padding: 1.5rem;
+    border-radius: var(--card-radius);
+    border: 1px solid var(--border);
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+}
+
+.timeSelect {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    outline: none;
+    cursor: pointer;
+}
+
+.list {
+    display: flex;
+    flex-direction: column;
+}
+
+.item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+    transition: background-color 0.2s;
+    text-decoration: none;
+}
+
+.item:last-child {
+    border-bottom: none;
+}
+
+.item:hover .title {
+    color: var(--accent);
+}
+
+.rank {
+    font-size: 1.5rem;
+    font-weight: 700;
+    width: 40px; /* Increased width to separate from image */
+    text-align: center;
+    flex-shrink: 0;
+    color: var(--text-muted);
+    margin-right: 0.5rem; /* Added margin right for extra safety */
+}
+
+.item:nth-child(1) .rank { color: #FFD700; }
+.item:nth-child(2) .rank { color: #C0C0C0; }
+.item:nth-child(3) .rank { color: #CD7F32; }
+
+.poster {
+    width: 50px;
+    height: 70px;
+    object-fit: cover;
+    border-radius: 4px;
+    flex-shrink: 0;
+    background-color: var(--bg-tertiary);
+}
+
+.info {
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 0.3rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.2s;
+}
+
+.meta {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Skeletons */
+.skeletonItem {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 0;
+}
+
+.skeletonRank {
+    width: 30px;
+    height: 30px;
+    background-color: var(--bg-tertiary);
+    border-radius: 4px;
+}
+
+.skeletonPoster {
+    width: 50px;
+    height: 70px;
+    background-color: var(--bg-tertiary);
+    border-radius: 4px;
+}
+
+.skeletonText {
+    flex-grow: 1;
+    height: 16px;
+    background-color: var(--bg-tertiary);
+    border-radius: 4px;
+    width: 60%;
+}

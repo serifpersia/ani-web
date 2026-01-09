@@ -1,7 +1,8 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { FaTrash } from 'react-icons/fa';
 
 import AnimeCard from '../components/anime/AnimeCard';
 import SkeletonGrid from '../components/common/SkeletonGrid';
@@ -15,219 +16,131 @@ import styles from './Watchlist.module.css';
 const FILTERS = ['All', 'Continue Watching', 'Watching', 'Completed', 'On-Hold', 'Dropped', 'Planned'];
 
 const Watchlist: React.FC = () => {
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const { filter: filterBy = 'All' } = useParams<{ filter: string }>();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [sortBy, setSortBy] = useState("last_added");
 
   // Modal State
-  const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [itemToRemove, setItemToRemove] = useState<{id: string, name: string} | null>(null);
 
-  useEffect(() => {
-    document.title = `${filterBy} - Watchlist - ani-web`;
-  }, [filterBy]);
+  const isCW = filterBy === 'Continue Watching';
 
-  // Data Fetching
-  const {
-    data: watchlistPages,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading,
-    isError,
-    error
-  } = useInfiniteWatchlist(filterBy);
+  // Hooks
+  const { data: cwData, isLoading: loadingCW, error: errorCW } = useAllContinueWatching();
+  const { data: wlData, isLoading: loadingWL, error: errorWL } = useInfiniteWatchlist(filterBy);
 
-  const watchlist = useMemo(() => watchlistPages?.pages.flat() || [], [watchlistPages]);
-
-  const {
-    data: continueWatchingPages,
-    fetchNextPage: fetchNextCW,
-    hasNextPage: hasNextCW,
-    isFetchingNextPage: isFetchingNextCW,
-    isLoading: loadingCW,
-    isError: isErrorCW,
-    error: errorCW
-  } = useAllContinueWatching();
-
-  const cwList = useMemo(() => continueWatchingPages?.pages.flat() || [], [continueWatchingPages]);
+  const list = isCW ? cwData?.pages.flat() || [] : wlData?.pages.flat() || [];
+  const isLoading = isCW ? loadingCW : loadingWL;
+  const error = isCW ? errorCW : errorWL;
 
   // Mutations
-  const removeCwMutation = useMutation({
-    mutationFn: async (showId: string) => {
-      const res = await fetch("/api/continue-watching/remove", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ showId }),
-      });
-      if (!res.ok) throw new Error("Failed to remove");
+  const updateStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string, status: string }) => {
+      await fetch('/api/watchlist/status', { method: 'POST', body: JSON.stringify({ id, status }), headers: {'Content-Type': 'application/json'} });
     },
     onSuccess: () => {
-      toast.success('Removed from Continue Watching');
-      queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] });
-    },
-    onError: (err) => toast.error(`Error: ${err.message}`)
-  });
-
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const res = await fetch('/api/watchlist/status', {
-        method: "POST",
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status }),
-      });
-      if (!res.ok) throw new Error("Failed to update status");
-    },
-    onSuccess: () => {
-      toast.success('Status updated');
       queryClient.invalidateQueries({ queryKey: ['watchlist'] });
-    },
-    onError: (err) => toast.error(`Error: ${err.message}`)
+      toast.success('Status updated');
+    }
   });
 
-  const removeMutation = useRemoveFromWatchlist();
+  const removeCw = useMutation({
+    mutationFn: async (showId: string) => {
+      await fetch('/api/continue-watching/remove', { method: 'POST', body: JSON.stringify({ showId }), headers: {'Content-Type': 'application/json'} });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+  });
+
+  const removeWl = useRemoveFromWatchlist();
   const { data: skipConfirm } = useSetting('skipRemoveConfirmation');
   const updateSetting = useUpdateSetting();
 
-  // Handlers
-  const handleRemoveClick = useCallback((id: string, name: string) => {
-    if (skipConfirm === true) {
-      removeMutation.mutate(id);
-    } else {
-      setItemToRemove({ id, name });
-      setShowRemoveModal(true);
-    }
-  }, [skipConfirm, removeMutation]);
-
-  const handleConfirmRemove = useCallback((opts: { rememberPreference?: boolean }) => {
-    if (itemToRemove) {
-      removeMutation.mutate(itemToRemove.id);
-      if (opts.rememberPreference) {
-        updateSetting.mutate({ key: 'skipRemoveConfirmation', value: true });
-      }
-      setItemToRemove(null);
-      setShowRemoveModal(false);
-    }
-  }, [itemToRemove, removeMutation, updateSetting]);
-
-  // Derived State Logic
-  const isContinueWatching = filterBy === 'Continue Watching';
-  const listToDisplay = isContinueWatching ? cwList : watchlist;
-  const isLoadingList = isContinueWatching ? loadingCW : isLoading;
-  const hasNextList = isContinueWatching ? hasNextCW : hasNextPage;
-  const fetchNextList = isContinueWatching ? fetchNextCW : fetchNextPage;
-  const isFetchingNextList = isContinueWatching ? isFetchingNextCW : isFetchingNextPage;
-  const errorList = isContinueWatching ? errorCW : error;
-  const isErrorList = isContinueWatching ? isErrorCW : isError;
-
+  // Logic
   const sortedList = useMemo(() => {
-    return [...listToDisplay].sort((a, b) => {
+    return [...list].sort((a, b) => {
       if (sortBy === "name_asc") return a.name.localeCompare(b.name);
       if (sortBy === "name_desc") return b.name.localeCompare(a.name);
-      return 0; // Default: last added/watched
+      return 0;
     });
-  }, [listToDisplay, sortBy]);
+  }, [list, sortBy]);
 
-  // Infinite Scroll
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500 && !isFetchingNextList && hasNextList) {
-        fetchNextList();
-      }
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [isFetchingNextList, hasNextList, fetchNextList]);
+  const handleRemove = (id: string, name: string) => {
+    if (skipConfirm) {
+      isCW ? removeCw.mutate(id) : removeWl.mutate(id);
+    } else {
+      setItemToRemove({ id, name });
+    }
+  };
+
+  const confirmRemove = (opts: { rememberPreference?: boolean }) => {
+    if (!itemToRemove) return;
+    isCW ? removeCw.mutate(itemToRemove.id) : removeWl.mutate(itemToRemove.id);
+    if (opts.rememberPreference) updateSetting.mutate({ key: 'skipRemoveConfirmation', value: true });
+    setItemToRemove(null);
+  };
 
   return (
     <div className="page-container">
-    <h1 className="section-title">My Watchlist</h1>
+    <div className="section-title">My Watchlist</div>
 
-    <div className={styles.controlsContainer}>
-    <div className={styles.filterGroup}>
-    {FILTERS.map(status => (
+    <div className={styles.controls}>
+    <div className={styles.filters}>
+    {FILTERS.map(f => (
       <button
-      key={status}
-      className={`${styles.filterBtn} ${filterBy === status ? styles.active : ''}`}
-      onClick={() => navigate(`/watchlist/${status}`)}
+      key={f}
+      className={`${styles.filterBtn} ${filterBy === f ? styles.active : ''}`}
+      onClick={() => navigate(`/watchlist/${f}`)}
       >
-      {status}
+      {f}
       </button>
     ))}
     </div>
-
     <select
+    className={`form-select ${styles.sortSelect}`}
     value={sortBy}
     onChange={e => setSortBy(e.target.value)}
-    className={`form-select ${styles.sortSelect}`}
     >
-    <option value="last_added">Last Added</option>
+    <option value="last_added">Recently Added</option>
     <option value="name_asc">Name (A-Z)</option>
     <option value="name_desc">Name (Z-A)</option>
     </select>
     </div>
 
-    {isLoadingList ? (
-      <SkeletonGrid count={18} />
-    ) : isErrorList ? (
-      <ErrorMessage message={errorList?.message || 'Error loading watchlist'} />
-    ) : sortedList.length === 0 ? (
-      <div className={styles.emptyState}>
-      <h3>Your list is empty</h3>
-      <p>Go explore and add some anime to track your progress!</p>
-      <button className="btn btn-primary" onClick={() => navigate('/search')} style={{marginTop: '1rem'}}>
-      Browse Anime
-      </button>
-      </div>
-    ) : (
+    {isLoading ? <SkeletonGrid /> : error ? <ErrorMessage message={error.message} /> : (
       <div className="grid-container">
       {sortedList.map(item => (
-        <div key={item.id || item._id} className={styles.itemWrapper}>
-        <AnimeCard
-        anime={item}
-        continueWatching={isContinueWatching}
-        onRemove={isContinueWatching ? (id) => removeCwMutation.mutate(id) : undefined}
-        />
-
-        {!isContinueWatching && (
-          <div className={styles.itemControls}>
+        <div key={item._id} className={styles.itemWrapper}>
+        <AnimeCard anime={item} continueWatching={isCW} onRemove={() => handleRemove(item.id, item.name)} />
+        {!isCW && (
+          <div className={styles.cardActions}>
           <select
           className={styles.statusSelect}
           value={item.status}
-          onChange={(e) => updateStatusMutation.mutate({ id: item.id, status: e.target.value })}
-          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => updateStatus.mutate({ id: item.id, status: e.target.value })}
           >
           {FILTERS.slice(2).map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          <button
-          className={`btn btn-danger ${styles.removeBtn}`}
-          onClick={(e) => {
-            e.preventDefault();
-            handleRemoveClick(item.id, item.name);
-          }}
-          title="Remove from watchlist"
-          >
-          ×
+          <button className={styles.removeBtn} onClick={() => handleRemove(item.id, item.name)}>
+          <FaTrash size={12} />
           </button>
           </div>
         )}
         </div>
       ))}
-      {isFetchingNextList && <SkeletonGrid count={6} />}
       </div>
     )}
 
-    {!hasNextList && sortedList.length > 0 && (
-      <p style={{textAlign: 'center', margin: '2rem 0', color: 'var(--text-secondary)'}}>End of list</p>
+    {!isLoading && sortedList.length === 0 && (
+      <div className={styles.emptyState}>No anime found in this list.</div>
     )}
 
     <RemoveConfirmationModal
-    isOpen={showRemoveModal}
-    onClose={() => setShowRemoveModal(false)}
-    onConfirm={handleConfirmRemove}
+    isOpen={!!itemToRemove}
+    onClose={() => setItemToRemove(null)}
+    onConfirm={confirmRemove}
     animeName={itemToRemove?.name || ''}
-    scenario="watchlist"
+    scenario={isCW ? 'continueWatching' : 'watchlist'}
     />
     </div>
   );
