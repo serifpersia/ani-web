@@ -1,25 +1,15 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import AnimeCard from './AnimeCard';
-import AnimeCardSkeleton from './AnimeCardSkeleton';
+import SkeletonGrid from '../common/SkeletonGrid';
 import styles from './AnimeSection.module.css';
 
 interface Anime {
   _id: string;
-  id:string;
+  id: string;
   name: string;
-  nativeName?: string;
-  englishName?: string;
   thumbnail: string;
-  type?: string;
-  episodeNumber?: number;
-  currentTime?: number;
-  duration?: number;
-  availableEpisodesDetail?: {
-    sub?: string[];
-    dub?: string[];
-  };
+  [key: string]: any;
 }
 
 interface AnimeSectionProps {
@@ -31,40 +21,43 @@ interface AnimeSectionProps {
   showSeeMore?: boolean;
 }
 
-const AnimeSection: React.FC<AnimeSectionProps> = React.memo(
-  ({ title, animeList, continueWatching = false, onRemove, loading, showSeeMore = false }) => {
-    const handleRemoveCard = (id: string) => {
-      if (onRemove) {
-        onRemove(id);
-      }
-    };
+const AnimeSection: React.FC<AnimeSectionProps> = ({
+  title,
+  animeList,
+  continueWatching,
+  onRemove,
+  loading,
+  showSeeMore
+}) => {
+  if (!loading && animeList.length === 0) return null;
 
-    return (
-      <section>
-        <div className={styles['section-header']}>
-          <h2 className="section-title">{title}</h2>
-          {showSeeMore && (
-            <Link to="/watchlist/Continue Watching" className={styles['see-more-button']}>
-              See More
-            </Link>
-          )}
-        </div>
-        <div className="grid-container">
-          {loading ? (
-            Array.from({ length: 10 }).map((_, i) => <AnimeCardSkeleton key={i} />)
-          ) : (
-            animeList.map(anime => (
-              <AnimeCard 
-                key={anime._id} 
-                anime={anime} 
-                continueWatching={continueWatching} 
-                onRemove={handleRemoveCard} 
-              />
-            ))
-          )}
-        </div>
-      </section>
-    );
-  }
-);
-export default AnimeSection;
+  return (
+    <section style={{ marginBottom: '2.5rem' }}>
+    <div className={styles['section-header']}>
+    <div className="section-title" style={{ marginBottom: 0 }}>{title}</div>
+    {showSeeMore && (
+      <Link to="/watchlist/Continue Watching" className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}>
+      View All
+      </Link>
+    )}
+    </div>
+
+    <div className="grid-container">
+    {loading ? (
+      <SkeletonGrid count={6} />
+    ) : (
+      animeList.map(anime => (
+        <AnimeCard
+        key={anime._id}
+        anime={anime}
+        continueWatching={continueWatching}
+        onRemove={onRemove}
+        />
+      ))
+    )}
+    </div>
+    </section>
+  );
+};
+
+export default React.memo(AnimeSection);

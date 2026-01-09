@@ -1,20 +1,20 @@
-.controlsContainer {
-    background-color: var(--bg-secondary);
-    padding: 1rem;
-    border-radius: var(--card-border-radius);
-    margin-bottom: 2rem;
+.controls {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
     gap: 1.5rem;
-    flex-wrap: wrap;
-    border: 1px solid var(--border-color);
+    margin-bottom: 2rem;
+    background-color: var(--bg-secondary);
+    padding: 1rem;
+    border-radius: var(--card-radius);
+    border: 1px solid var(--border);
 }
 
-.filterGroup {
+.filters {
     display: flex;
-    gap: 0.5rem;
     flex-wrap: wrap;
+    gap: 0.5rem;
 }
 
 .filterBtn {
@@ -24,97 +24,63 @@
     padding: 0.5rem 1rem;
     border-radius: 20px;
     font-size: 0.9rem;
-    cursor: pointer;
     transition: all 0.2s;
-    font-weight: 500;
 }
 
 .filterBtn:hover {
-    color: var(--text-primary);
     background-color: var(--bg-tertiary);
+    color: var(--text-primary);
 }
 
 .filterBtn.active {
     background-color: var(--accent);
     color: white;
-    font-weight: 600;
-    box-shadow: 0 2px 8px rgba(138, 79, 255, 0.4);
 }
 
 .sortSelect {
-    width: auto;
-    min-width: 160px;
+    width: 180px;
 }
 
-/* Card Item Wrapper for Watchlist actions */
 .itemWrapper {
-    position: relative;
     display: flex;
     flex-direction: column;
     height: 100%;
 }
 
-.itemControls {
+.cardActions {
     margin-top: 0.75rem;
-    display: grid;
-    grid-template-columns: 1fr auto;
+    display: flex;
     gap: 0.5rem;
-    background-color: var(--bg-secondary);
-    padding: 0.5rem;
-    border-radius: var(--btn-border-radius);
-    border: 1px solid var(--border-color);
 }
 
 .statusSelect {
-    padding: 0.4rem 0.8rem;
-    font-size: 0.85rem;
-    background-color: var(--bg-main);
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
+    flex-grow: 1;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 0.4rem;
     border-radius: 6px;
-    cursor: pointer;
-}
-
-.statusSelect:focus {
-    outline: none;
-    border-color: var(--accent);
 }
 
 .removeBtn {
-    padding: 0.4rem 0.8rem !important;
-    font-size: 0.8rem !important;
-    height: 100%;
+    background-color: var(--bg-tertiary);
+    color: var(--danger);
+    border: 1px solid var(--border);
+    width: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.removeBtn:hover {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-color: var(--danger);
 }
 
 .emptyState {
     text-align: center;
     padding: 4rem 1rem;
-    color: var(--text-secondary);
-    background-color: var(--bg-secondary);
-    border-radius: var(--card-border-radius);
-    border: 1px dashed var(--border-color);
-}
-
-.emptyState h3 {
-    font-size: 1.5rem;
-    margin-bottom: 0.5rem;
-    color: var(--text-primary);
-}
-
-@media (max-width: 768px) {
-    .controlsContainer {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 1rem;
-    }
-
-    .filterGroup {
-        justify-content: center;
-        width: 100%;
-    }
-
-    .filterBtn {
-        flex-grow: 1;
-        text-align: center;
-    }
+    color: var(--text-muted);
 }

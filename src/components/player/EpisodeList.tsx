@@ -32,34 +32,33 @@ const EpisodeList: React.FC<EpisodeListProps> = ({ episodes, currentEpisode, wat
     }, [episodes, episodeRanges, selectedRange]);
 
     return (
-        <>
-            <h3 className={styles.episodeListTitle}>Episodes</h3>
-            {episodeRanges.length > 0 && (
-                <div className={styles.rangeSelector}>
-                    {episodeRanges.map((range, index) => (
-                        <button
-                            key={range}
-                            className={`${styles.rangeButton} ${selectedRange === index ? styles.active : ''}`}
-                            onClick={() => setSelectedRange(index)}
-                        >
-                            {range}
-                        </button>
-                    ))}
-                </div>
-            )}
-            <ul className={styles.episodeList}>
-                {filteredEpisodes.map(ep => (
-                    <li
-                        key={ep}
-                        className={`${styles.episodeItem} ${watchedEpisodes.includes(ep) ? styles.watched : ''} ${ep === currentEpisode ? styles.active : ''}`}
-                        onClick={() => onEpisodeClick(ep)}
-                    >
-                        <span className={styles.epNumber}>{ep}</span>
-                        <span className={styles.epTitle}>Episode {ep}</span>
-                    </li>
-                ))}
-            </ul>
-        </>
+        <div className={styles.episodeListContainer}>
+        <h3 className={styles.episodeListTitle}>Episodes</h3>
+        {episodeRanges.length > 0 && (
+            <div className={styles.rangeSelector}>
+            {episodeRanges.map((range, index) => (
+                <button
+                key={range}
+                className={`${styles.rangeButton} ${selectedRange === index ? styles.active : ''}`}
+                onClick={() => setSelectedRange(index)}
+                >
+                {range}
+                </button>
+            ))}
+            </div>
+        )}
+        <div className={styles.episodeList}>
+        {filteredEpisodes.map(ep => (
+            <div
+            key={ep}
+            className={`${styles.episodeItem} ${watchedEpisodes.includes(ep) ? styles.watched : ''} ${ep === currentEpisode ? styles.active : ''}`}
+            onClick={() => onEpisodeClick(ep)}
+            >
+            <span>Episode {ep}</span>
+            </div>
+        ))}
+        </div>
+        </div>
     );
 };
 

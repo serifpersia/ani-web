@@ -1,83 +1,76 @@
 .episodeListContainer {
-    background-color: #1E1E1E;
-    border-radius: 16px;
-    height: fit-content;
-    max-height: 90vh;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
 }
 
 .episodeListTitle {
-    padding: 1.5rem 1.5rem 1rem;
-    font-size: 1.2rem;
-    color: #F5F5F5;
-}
-
-.episodeList {
-    list-style: none;
-    padding: 0;
+    padding: 1.5rem;
     margin: 0;
-}
-
-.episodeItem {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1rem 1.5rem;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    border-bottom: 1px solid #333333;
-}
-
-.episodeItem:last-child {
-    border-bottom: none;
-}
-
-.episodeItem:hover {
-    background-color: #2A2A2A;
-}
-
-.episodeItem.watched {
-    color: #9F55FF;
-}
-
-.episodeItem.active, .episodeItem.watched.active {
-    background-color: #9F55FF;
-    color: white;
-}
-
-.epNumber {
-    font-weight: 600;
-    color: #A0A0A0;
-}
-
-.episodeItem.active .epNumber {
-    color: rgba(255,255,255,0.7);
-}
-
-.watched .epNumber {
-    color: #9F55FF;
+    font-size: 1.1rem;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background-color: var(--bg-secondary);
+    z-index: 10;
+    color: var(--text-primary);
 }
 
 .rangeSelector {
+    padding: 1rem;
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
-    padding: 0 1.5rem 1rem;
+    border-bottom: 1px solid var(--border);
 }
 
 .rangeButton {
-    background-color: #2A2A2A;
-    color: #A0A0A0;
-    border: 1px solid #333333;
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
-    cursor: pointer;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 0.3rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
     transition: all 0.2s;
 }
 
-.rangeButton.active {
-    background-color: #9F55FF;
-    color: white;
-    border-color: #9F55FF;
+.rangeButton:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
 }
 
+.rangeButton.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+.episodeList {
+    display: flex;
+    flex-direction: column;
+}
+
+.episodeItem {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background-color 0.2s;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.episodeItem:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.episodeItem.watched {
+    color: var(--text-muted);
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+.episodeItem.active {
+    background-color: rgba(138, 79, 255, 0.1);
+    color: var(--accent);
+    border-left: 3px solid var(--accent);
+}

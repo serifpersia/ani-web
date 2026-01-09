@@ -5,7 +5,7 @@ interface SkeletonGridProps {
     count?: number;
 }
 
-const SkeletonGrid: React.FC<SkeletonGridProps> = React.memo(({ count = 12 }) => {
+const SkeletonGrid: React.FC<SkeletonGridProps> = ({ count = 12 }) => {
     return (
         <div className="grid-container">
         {Array.from({ length: count }).map((_, i) => (
@@ -13,6 +13,6 @@ const SkeletonGrid: React.FC<SkeletonGridProps> = React.memo(({ count = 12 }) =>
         ))}
         </div>
     );
-});
+};
 
-export default SkeletonGrid;
+export default React.memo(SkeletonGrid);
