@@ -308,17 +308,17 @@ app.post('/api/import/mal-xml', multer().single('xmlfile'), async (req, res) => 
 async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeProvider): Promise<{data: CombinedContinueWatchingShow[], total: number}> {
 
     const inProgressQuery = `
-        SELECT
-            sm.id as _id, sm.id, sm.name, sm.thumbnail, sm.nativeName, sm.englishName,
-            we.episodeNumber, we.currentTime, we.duration
-        FROM shows_meta sm
-        JOIN (
-            SELECT *, ROW_NUMBER() OVER(PARTITION BY showId ORDER BY watchedAt DESC) as rn
-            FROM watched_episodes
-            WHERE (currentTime / duration) BETWEEN 0.05 AND 0.95
-        ) we ON sm.id = we.showId
-        WHERE we.rn = 1
-        ORDER BY we.watchedAt DESC;
+    SELECT
+    sm.id as _id, sm.id, sm.name, sm.thumbnail, sm.nativeName, sm.englishName,
+    we.episodeNumber, we.currentTime, we.duration
+    FROM shows_meta sm
+    JOIN (
+        SELECT *, ROW_NUMBER() OVER(PARTITION BY showId ORDER BY watchedAt DESC) as rn
+        FROM watched_episodes
+        WHERE (currentTime / duration) BETWEEN 0.05 AND 0.95
+    ) we ON sm.id = we.showId
+    WHERE we.rn = 1
+    ORDER BY we.watchedAt DESC;
     `;
     const inProgressShows: ContinueWatchingShow[] = await new Promise((resolve, reject) => {
         db.all(inProgressQuery, [], (err, rows: ContinueWatchingShow[]) => {
@@ -328,12 +328,12 @@ async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeP
     });
 
     const watchingShowsQuery = `
-        SELECT
-            w.id, w.name, w.thumbnail, w.nativeName, w.englishName,
-            (SELECT MAX(we.watchedAt) FROM watched_episodes we WHERE we.showId = w.id) as lastWatchedAt
-        FROM watchlist w
-        WHERE w.status = 'Watching'
-        ORDER BY lastWatchedAt DESC;
+    SELECT
+    w.id, w.name, w.thumbnail, w.nativeName, w.englishName,
+    (SELECT MAX(we.watchedAt) FROM watched_episodes we WHERE we.showId = w.id) as lastWatchedAt
+    FROM watchlist w
+    WHERE w.status = 'Watching'
+    ORDER BY lastWatchedAt DESC;
     `;
     const watchingShows: WatchingShow[] = await new Promise((resolve, reject) => {
         db.all(watchingShowsQuery, [], (err, rows: WatchingShow[]) => {
@@ -348,12 +348,12 @@ async function getContinueWatchingData(db: sqlite3.Database, provider: AllAnimeP
         try {
             const [epDetails, watchedEpisodesResult] = await Promise.all([
                 provider.getEpisodes(show.id, 'sub'),
-                new Promise<WatchedEpisode[]>((resolve, reject) => {
-                    db.all('SELECT * FROM watched_episodes WHERE showId = ?', [show.id], (err, rows: WatchedEpisode[]) => {
-                        if (err) reject(err);
-                        else resolve(rows);
-                    });
-                })
+                                                                         new Promise<WatchedEpisode[]>((resolve, reject) => {
+                                                                             db.all('SELECT * FROM watched_episodes WHERE showId = ?', [show.id], (err, rows: WatchedEpisode[]) => {
+                                                                                 if (err) reject(err);
+                                                                                 else resolve(rows);
+                                                                             });
+                                                                         })
             ]);
 
             const allEps = epDetails?.episodes?.sort((a, b) => parseFloat(a) - parseFloat(b)) || [];
@@ -447,9 +447,9 @@ app.get('/api/continue-watching/all', async (req, res) => {
 
         res.json({
             data: allData.slice(offset, offset + limit),
-            total,
-            page,
-            limit
+                 total,
+                 page,
+                 limit
         });
     } catch { res.status(500).json({ error: 'DB error' }); }
 });
@@ -506,9 +506,9 @@ app.get('/api/watchlist', (req, res) => {
             if (countErr) return res.status(500).json({ error: 'DB error', details: countErr.message });
             res.json({
                 data: rows.map(row => ({ ...row, _id: row.id })), // Map id to _id
-                total: countRow.total,
-                page,
-                limit
+                     total: countRow.total,
+                     page,
+                     limit
             });
         });
     });
@@ -650,10 +650,26 @@ app.get('/api/allmanga-details/:id', async (req, res) => {
 app.get('/api/genres-and-tags', (req, res) => res.json({ genres, tags, studios }));
 
 if (!CONFIG.IS_DEV) {
-    app.use(express.static(path.join(CONFIG.ROOT, '../dist')));
+    // Attempt to locate the frontend dist directory
+    const possiblePaths = [
+        path.join(CONFIG.ROOT, '../dist'), // Standard relative path from server root
+        path.join(__dirname, '../../dist'), // Relative to compiled server.js
+        path.join(process.cwd(), 'dist')   // Relative to current working directory
+    ];
+
+    let frontendPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html')));
+
+    if (!frontendPath) {
+        logger.warn(`Could not locate frontend dist directory. Tried: ${possiblePaths.join(', ')}`);
+        frontendPath = path.join(CONFIG.ROOT, '../dist'); // Default fallback
+    } else {
+        logger.info(`Serving frontend from: ${frontendPath}`);
+    }
+
+    app.use(express.static(frontendPath));
 
     app.get(/^(?!\/api).*$/, (req, res) => {
-        res.sendFile(path.join(CONFIG.ROOT, '../dist/index.html'));
+        res.sendFile(path.join(frontendPath!, 'index.html'));
     });
 }
 
