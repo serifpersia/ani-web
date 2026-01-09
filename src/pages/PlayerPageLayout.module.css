@@ -1,12 +1,12 @@
 .playerPageLayout {
     display: grid;
-    /* 280px fixed sidebar, rest for player content */
-    grid-template-columns: 280px 1fr;
+    /* left fixed sidebar, centered main column, right flexible gutter */
+    grid-template-columns: 280px min(980px, 75%) 1fr;
     gap: 2rem;
     padding: 1.5rem;
     width: 100%;
-    max-width: 2000px; /* Allow it to go wide */
-    margin: 0; /* Align left */
+    max-width: 2000px;
+    margin: 0 auto; /* center the whole layout */
     align-items: start;
 }
 
@@ -19,6 +19,7 @@
     border: 1px solid var(--border);
     display: flex;
     flex-direction: column;
+    grid-column: 1;
 }
 
 .playerMain {
@@ -26,6 +27,7 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    grid-column: 2;
 }
 
 .videoPlayerWrapper {
@@ -84,11 +86,14 @@
 
     .episodeSidebar {
         max-height: 500px;
+        /* show episodes below the player on small screens */
         order: 2;
+        grid-column: auto;
     }
 
     .playerMain {
         order: 1;
+        grid-column: auto;
     }
 }
 

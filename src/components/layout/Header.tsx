@@ -19,21 +19,36 @@ const Header: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const navigate = useNavigate();
-  const lastScrollY = useRef(0);
+  const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const HIDE_DELAY_MS = 3000; // Hide header after 3 seconds of no scrolling
 
-  // Scroll visibility logic
+  // Scroll visibility logic with debounced hide
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-      if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
-        setVisible(false);
-      } else {
-        setVisible(true);
+      // Show header when we scroll
+      setVisible(true);
+
+      // Clear existing timer
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
       }
-      lastScrollY.current = currentScrollY;
+
+      // Set new timer to hide header if not at top
+      hideTimerRef.current = setTimeout(() => {
+        if (window.scrollY > 100) {
+          setVisible(false);
+        }
+      }, HIDE_DELAY_MS);
     };
+
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+      }
+    };
   }, []);
 
   // Auth & User logic
