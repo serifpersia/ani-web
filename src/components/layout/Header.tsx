@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import Logo from '../common/Logo';
 import { useSidebar } from '../../hooks/useSidebar';
 import styles from './Header.module.css';
-import { FaSearch, FaFilter, FaGoogle, FaSignOutAlt } from 'react-icons/fa';
+import { FaSearch, FaFilter, FaGoogle, FaSignOutAlt, FaCog } from 'react-icons/fa';
+import GenericModal from '../common/GenericModal';
 
 const SCROLL_TIMEOUT_DURATION = 3000;
 
@@ -23,6 +24,7 @@ const Header: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [showConfigModal, setShowConfigModal] = useState(false);
 
   useEffect(() => {
     fetch('/api/auth/user')
@@ -95,6 +97,14 @@ const Header: React.FC = () => {
 
   const handleSignIn = async () => {
     try {
+      const configRes = await fetch('/api/auth/config-status');
+      const configData = await configRes.json();
+
+      if (!configData.hasConfig) {
+        setShowConfigModal(true);
+        return;
+      }
+
       const res = await fetch('/api/auth/google');
       const data = await res.json();
       if (data.url) {
@@ -122,6 +132,11 @@ const Header: React.FC = () => {
     } catch (error) {
       console.error('Failed to sign out', error);
     }
+  };
+
+  const navigateToSettings = () => {
+    setShowConfigModal(false);
+    navigate('/settings');
   };
 
   const headerStyle: React.CSSProperties = {
@@ -186,7 +201,6 @@ const Header: React.FC = () => {
     </button>
     </div>
 
-    {/* Auth Button / Profile */}
     <div className={styles.authContainer} ref={dropdownRef}>
     {user ? (
       <div className={styles.profileWrapper} onClick={() => setShowDropdown(!showDropdown)}>
@@ -202,6 +216,9 @@ const Header: React.FC = () => {
         <p className={styles.userName}>{user.name}</p>
         <p className={styles.userEmail}>{user.email}</p>
         </div>
+        <Link to="/settings" className={styles.dropdownItem} onClick={() => setShowDropdown(false)}>
+        <FaCog /> Settings
+        </Link>
         <button onClick={handleSignOut} className={styles.dropdownItem}>
         <FaSignOutAlt /> Sign Out
         </button>
@@ -216,6 +233,25 @@ const Header: React.FC = () => {
     )}
     </div>
     </div>
+    <GenericModal
+    isOpen={showConfigModal}
+    onClose={() => setShowConfigModal(false)}
+    title="Google Auth Configuration Missing"
+    >
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <p>
+    To sign in with Google, you need to configure your Client ID and Client Secret in the settings.
+    </p>
+    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+    <button className="btn-secondary" onClick={() => setShowConfigModal(false)}>
+    Cancel
+    </button>
+    <button className="btn-primary" onClick={navigateToSettings}>
+    Go to Settings
+    </button>
+    </div>
+    </div>
+    </GenericModal>
     </header>
   );
 };

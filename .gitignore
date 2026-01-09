@@ -133,3 +133,4 @@ out
 device_id.json
 /sync_temp
 /server/dist
+server/google_tokens.json

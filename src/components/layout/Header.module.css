@@ -89,19 +89,20 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background-color: #ffffff;
-  color: #333;
-  border: none;
+  background-color: #2e2e2e; /* Dark Gray background */
+  color: #e4e6eb; /* Light text */
+  border: 1px solid #393a3b; /* Subtle border */
   padding: 0.5rem 1rem;
   border-radius: 20px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, border-color 0.2s;
   font-size: 0.9rem;
 }
 
 .signInButton:hover {
-  background-color: #f0f0f0;
+  background-color: #3e3e3e; /* Lighter Gray on hover */
+  border-color: #4e4e4e;
 }
 
 .profileWrapper {
