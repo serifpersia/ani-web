@@ -28,7 +28,7 @@ export const CONFIG = {
 
     MANIFEST_FILENAME: 'sync_manifest.json',
     GOOGLE_SCOPES: [
-        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/drive',
         'https://www.googleapis.com/auth/userinfo.profile'
     ],
 
