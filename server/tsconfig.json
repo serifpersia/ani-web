@@ -2,12 +2,15 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
+    "moduleResolution": "node",
     "outDir": "./dist",
     "strict": true,
+    "noImplicitAny": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["node", "express", "multer", "cors", "xml2js"]
+    "resolveJsonModule": true,
+    "typeRoots": ["./node_modules/@types"]
   },
   "include": ["./**/*.ts"],
   "exclude": ["node_modules", "dist"]

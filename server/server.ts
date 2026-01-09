@@ -58,6 +58,40 @@ async function runSyncSequence() {
     }
 }
 
+async function updateEnvFile(updates: Record<string, string>) {
+    const envPath = CONFIG.ENV_PATH;
+
+    let envContent = '';
+    if (fs.existsSync(envPath)) {
+        envContent = fs.readFileSync(envPath, 'utf8');
+    }
+
+    const lines = envContent.split('\n');
+    const newLines = [...lines];
+
+    Object.entries(updates).forEach(([key, value]) => {
+        let found = false;
+        for (let i = 0; i < newLines.length; i++) {
+            if (newLines[i].startsWith(`${key}=`)) {
+                if (value === '') {
+                    newLines.splice(i, 1);
+                    i--;
+                } else {
+                    newLines[i] = `${key}=${value}`;
+                }
+                found = true;
+                break;
+            }
+        }
+        if (!found && value !== '') {
+            newLines.push(`${key}=${value}`);
+        }
+    });
+
+    const finalContent = newLines.join('\n').replace(/\n{2,}/g, '\n').trim() + '\n';
+    fs.writeFileSync(envPath, finalContent);
+}
+
 app.use((req, res, next) => {
     if (isShuttingDown) {
         return res.status(503).send('Server is shutting down...');
@@ -73,6 +107,33 @@ axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay });
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+app.get('/api/auth/config-status', (req, res) => {
+    const hasConfig = !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
+    res.json({ hasConfig });
+});
+
+app.get('/api/settings/google-auth', (req, res) => {
+    res.json({
+        clientId: process.env.GOOGLE_CLIENT_ID || '',
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET || ''
+    });
+});
+
+app.post('/api/settings/google-auth', async (req, res) => {
+    const { clientId, clientSecret } = req.body;
+
+    try {
+        await updateEnvFile({
+            GOOGLE_CLIENT_ID: clientId,
+            GOOGLE_CLIENT_SECRET: clientSecret
+        });
+        res.json({ success: true });
+    } catch (error) {
+        logger.error({ err: error }, 'Failed to update .env file');
+        res.status(500).json({ error: 'Failed to save configuration' });
+    }
+});
 
 app.get('/api/auth/google', (req, res) => {
     try {

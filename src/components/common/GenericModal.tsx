@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 import styles from './GenericModal.module.css';
 
 interface GenericModalProps {
@@ -13,13 +14,14 @@ const GenericModal: React.FC<GenericModalProps> = ({ isOpen, onClose, children, 
     return null;
   }
 
-  return (
+  return ReactDOM.createPortal(
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.content} onClick={(e) => e.stopPropagation()}>
-        {title && <h3 className={styles.title}>{title}</h3>}
-        {children}
-      </div>
+    <div className={styles.content} onClick={(e) => e.stopPropagation()}>
+    {title && <h3 className={styles.title}>{title}</h3>}
+    {children}
     </div>
+    </div>,
+    document.body
   );
 };
 

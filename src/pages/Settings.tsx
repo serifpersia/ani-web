@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import TitlePreferenceToggle from '../components/common/TitlePreferenceToggle';
 import styles from './Settings.module.css';
-
+import GoogleAuthSettings from '../components/settings/GoogleAuthSettings';
 import WatchlistSettings from '../components/settings/WatchlistSettings';
 
 const Settings: React.FC = () => {
@@ -71,26 +71,29 @@ const Settings: React.FC = () => {
 
   return (
     <div className="page-container">
-      <h2 className="section-title">Settings</h2>
-      <div className={styles['settings-section']}>
-        <TitlePreferenceToggle />
-      </div>
-      <WatchlistSettings />
-      <div className={styles['settings-section']}>
-        <h3>Database Backup and Restore</h3>
-        <div className={styles.controls}>
-          <button onClick={handleBackup} className="btn-primary">Backup Database</button>
-          <button onClick={triggerFileSelect} className="btn-primary">Restore Database</button>
-        </div>
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleRestore}
-          style={{ display: 'none' }}
-          accept=".db"
-        />
-        {statusMessage && <p className={styles.status}>{statusMessage}</p>}
-      </div>
+    <h2 className="section-title">Settings</h2>
+
+    <GoogleAuthSettings />
+
+    <div className={styles['settings-section']}>
+    <TitlePreferenceToggle />
+    </div>
+    <WatchlistSettings />
+    <div className={styles['settings-section']}>
+    <h3>Database Backup and Restore</h3>
+    <div className={styles.controls}>
+    <button onClick={handleBackup} className="btn-primary">Backup Database</button>
+    <button onClick={triggerFileSelect} className="btn-primary">Restore Database</button>
+    </div>
+    <input
+    type="file"
+    ref={fileInputRef}
+    onChange={handleRestore}
+    style={{ display: 'none' }}
+    accept=".db"
+    />
+    {statusMessage && <p className={styles.status}>{statusMessage}</p>}
+    </div>
     </div>
   );
 };

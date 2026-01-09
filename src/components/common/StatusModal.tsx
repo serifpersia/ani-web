@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 import styles from './StatusModal.module.css';
 
 interface StatusModalProps {
@@ -26,26 +27,27 @@ const StatusModal: React.FC<StatusModalProps> = ({
     return null;
   }
 
-  return (
+  return ReactDOM.createPortal(
     <div className={styles.modalOverlay}>
-      <div className={`${styles.modalContent} ${styles[type]}`}>
-        <p className={styles.message}>{message}</p>
-        <div className={styles.modalActions}>
-          {showConfirmButton ? (
-            <>
-              <button className="btn-danger" onClick={onConfirm}>
-                {confirmButtonText}
-              </button>
-              <button className="btn-primary" onClick={onClose}>
-                {cancelButtonText}
-              </button>
-            </>
-          ) : (
-            <button className="btn-primary" onClick={onClose}>OK</button>
-          )}
-        </div>
-      </div>
+    <div className={`${styles.modalContent} ${styles[type]}`}>
+    <p className={styles.message}>{message}</p>
+    <div className={styles.modalActions}>
+    {showConfirmButton ? (
+      <>
+      <button className="btn-danger" onClick={onConfirm}>
+      {confirmButtonText}
+      </button>
+      <button className="btn-primary" onClick={onClose}>
+      {cancelButtonText}
+      </button>
+      </>
+    ) : (
+      <button className="btn-primary" onClick={onClose}>OK</button>
+    )}
     </div>
+    </div>
+    </div>,
+    document.body
   );
 };
 

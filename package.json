@@ -7,7 +7,7 @@
     "dev": "concurrently \"npm:server:dev\" \"vite\"",
     "server:dev": "npm run dev --prefix server",
     "build": "npm run build:server && vite build",
-    "build:server": "tsc -p server/tsconfig.json",
+    "build:server": "npm run build --prefix server",
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "node server/dist/server.js",
