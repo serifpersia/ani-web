@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { fixThumbnailUrl } from '../../lib/utils';
 import ErrorMessage from '../common/ErrorMessage';
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext';
+import styles from './Top10List.module.css';
 
 interface AnimeItem {
   _id: string;
@@ -38,7 +39,6 @@ const Top10List: React.FC<Top10ListProps> = ({ title }) => {
         setTop10List(data);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : 'An unknown error occurred');
-        console.error(`Error fetching top 10 popular for ${timeframe}:`, e);
       } finally {
         setLoading(false);
       }
@@ -48,17 +48,14 @@ const Top10List: React.FC<Top10ListProps> = ({ title }) => {
   }, [timeframe]);
 
   const renderSkeletons = () => (
-    <div>
-        {Array.from({ length: 10 }).map((_, i) => (
-            <div key={i} style={{display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 0'}}>
-                <div style={{width: '30px', height: '27px', backgroundColor: 'var(--dark-border)', borderRadius: '4px'}}></div>
-                <div style={{width: '50px', height: '70px', backgroundColor: 'var(--dark-border)', borderRadius: '4px'}}></div>
-                <div style={{flexGrow: 1}}>
-                    <div style={{height: '20px', backgroundColor: 'var(--dark-border)', borderRadius: '4px'}}></div>
-                    <div style={{height: '16px', width: '60%', backgroundColor: 'var(--dark-border)', borderRadius: '4px', marginTop: '0.5rem'}}></div>
-                </div>
-            </div>
-        ))}
+    <div className={styles.list}>
+    {Array.from({ length: 10 }).map((_, i) => (
+      <div key={i} className={styles.skeletonItem}>
+      <div className={styles.skeletonRank}></div>
+      <div className={styles.skeletonPoster}></div>
+      <div className={styles.skeletonText}></div>
+      </div>
+    ))}
     </div>
   );
 
@@ -70,51 +67,56 @@ const Top10List: React.FC<Top10ListProps> = ({ title }) => {
   };
 
   return (
-    <div className="top-10-list content-card">
-      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-        <h3>{title}</h3>
-        <select id="timeframe-select" name="timeframe-select" value={timeframe} onChange={e => setTimeframe(e.target.value)} className="form-input" style={{width: 'auto'}}>
-            <option value="all">All Time</option>
-            <option value="monthly">Monthly</option>
-            <option value="weekly">Weekly</option>
-            <option value="daily">Daily</option>
-        </select>
-      </div>
-      {loading ? (
-        renderSkeletons()
-      ) : error ? (
-        <ErrorMessage message={error} />
-      ) : (
-        <div>
-          {top10List.map((item, i) => (
-            <Link to={`/player/${item._id}`} key={item._id} className={`list-item ${i < 3 ? `top-${i + 1}` : ''}`}>
-              <div className="rank">{i + 1}</div>
-              <img 
-                src={fixThumbnailUrl(item.thumbnail)} 
-                alt={item.name} 
-                className="poster-img" 
-                loading="lazy" 
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src = '/placeholder.png'; 
-                  target.className = 'poster-img loaded';
-                }}
-              />
-              <div className="item-info">
-                <div className="title">{getDisplayTitle(item)}</div>
-                <div className="details">
-                  {item.availableEpisodes.sub && (
-                    <span>SUB: {item.availableEpisodes.sub}</span>
-                  )}
-                  {item.availableEpisodes.dub && (
-                    <span> DUB: {item.availableEpisodes.dub}</span>
-                  )}
-                </div>
-              </div>
-            </Link>
-          ))}
+    <div className={styles.container}>
+    <div className={styles.header}>
+    <h3>{title}</h3>
+    <select
+    id="timeframe-select"
+    value={timeframe}
+    onChange={e => setTimeframe(e.target.value)}
+    className={styles.timeSelect}
+    >
+    <option value="all">All Time</option>
+    <option value="monthly">Monthly</option>
+    <option value="weekly">Weekly</option>
+    <option value="daily">Daily</option>
+    </select>
+    </div>
+
+    {loading ? (
+      renderSkeletons()
+    ) : error ? (
+      <ErrorMessage message={error} />
+    ) : (
+      <div className={styles.list}>
+      {top10List.map((item, i) => (
+        <Link to={`/player/${item._id}`} key={item._id} className={styles.item}>
+        <div className={styles.rank}>#{i + 1}</div>
+        <img
+        src={fixThumbnailUrl(item.thumbnail)}
+        alt={item.name}
+        className={styles.poster}
+        loading="lazy"
+        onError={(e) => {
+          const target = e.target as HTMLImageElement;
+          target.src = '/placeholder.svg';
+        }}
+        />
+        <div className={styles.info}>
+        <div className={styles.title} title={getDisplayTitle(item)}>{getDisplayTitle(item)}</div>
+        <div className={styles.meta}>
+        {item.availableEpisodes.sub && (
+          <span>SUB: {item.availableEpisodes.sub}</span>
+        )}
+        {item.availableEpisodes.dub && (
+          <span> DUB: {item.availableEpisodes.dub}</span>
+        )}
         </div>
-      )}
+        </div>
+        </Link>
+      ))}
+      </div>
+    )}
     </div>
   );
 };

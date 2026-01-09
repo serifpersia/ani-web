@@ -1,122 +1,91 @@
-import React, { useEffect, useCallback, useMemo, useRef } from 'react';
-import AnimeCard from '../components/anime/AnimeCard';
+import React, { useEffect, useMemo } from 'react';
+import { useQueryClient, useMutation } from '@tanstack/react-query';
 import AnimeSection from '../components/anime/AnimeSection';
 import Top10List from '../components/anime/Top10List';
 import Schedule from '../components/anime/Schedule';
-import AnimeCardSkeleton from '../components/anime/AnimeCardSkeleton';
-import type { Anime as _Anime } from '../hooks/useAnimeData';
+import AnimeCard from '../components/anime/AnimeCard';
+import SkeletonGrid from '../components/common/SkeletonGrid';
 import { useLatestReleases, useCurrentSeason, useContinueWatching } from '../hooks/useAnimeData';
-import { useQueryClient, useMutation } from '@tanstack/react-query';
-
-const SkeletonGrid = React.memo(() => (
-    <>
-        {Array.from({ length: 10 }).map((_, i) => <AnimeCardSkeleton key={i} />)}
-    </>
-));
+import useIsMobile from '../hooks/useIsMobile';
 
 const Home: React.FC = () => {
   const queryClient = useQueryClient();
-
-  const invalidationRef = useRef(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     document.title = 'Home - ani-web';
   }, []);
 
-  useEffect(() => {
-    if (!invalidationRef.current) {
-      queryClient.invalidateQueries({ queryKey: ['continueWatching'] });
-      invalidationRef.current = true;
-    }
-  }, [queryClient]);
+  const { data: latest, isLoading: loadingLatest } = useLatestReleases();
+  const { data: cwList } = useContinueWatching(6);
+  const { data: seasonPages, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading: loadingSeason } = useCurrentSeason();
 
-  const { data: latestReleases, isLoading: loadingLatestReleases } = useLatestReleases();
-  const {
-    data: currentSeasonPages,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading: loadingCurrentSeason,
-  } = useCurrentSeason();
+  const currentSeason = useMemo(() => seasonPages?.pages.flat() || [], [seasonPages]);
 
-  const currentSeason = useMemo(() => currentSeasonPages?.pages.flat() || [], [currentSeasonPages]);
-
-  const { data: continueWatchingList, isLoading: loadingContinueWatching } = useContinueWatching(6);
-
-  const removeContinueWatchingMutation = useMutation({
+  const removeCw = useMutation({
     mutationFn: async (showId: string) => {
-      const response = await fetch("/api/continue-watching/remove", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ showId }),
-      });
-      if (!response.ok) {
-        throw new Error("Failed to remove from backend");
-      }
+      await fetch("/api/continue-watching/remove", { method: "POST", body: JSON.stringify({ showId }), headers: { "Content-Type": "application/json" } });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['continueWatching'] });
-    },
-    onError: (error) => {
-      console.error("Error removing from continue watching:", error);
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['continueWatching'] })
   });
-
-  const handleRemoveContinueWatching = useCallback((showId: string) => {
-    removeContinueWatchingMutation.mutate(showId);
-  }, [removeContinueWatchingMutation]);
 
   useEffect(() => {
     const handleScroll = () => {
-      if (
-        window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000 &&
-        !isFetchingNextPage &&
-        hasNextPage
-      ) {
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 800 && hasNextPage && !isFetchingNextPage) {
         fetchNextPage();
       }
     };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [isFetchingNextPage, hasNextPage, fetchNextPage]);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return (
-    <div>
-      <div className="home-container">
-        <div className="main-content">
-          <AnimeSection 
-            title="Continue Watching" 
-            continueWatching={true} 
-            animeList={continueWatchingList || []} 
-            onRemove={handleRemoveContinueWatching} 
-            loading={loadingContinueWatching}
-            showSeeMore={true}
-          />
+    <div style={{ paddingBottom: '2rem' }}>
+    <div style={{
+      display: 'flex',
+      gap: '2rem',
+      padding: isMobile ? '1rem' : '1.5rem',
+      alignItems: 'flex-start',
+      flexWrap: 'wrap'
+    }}>
 
-          <AnimeSection title="Latest Releases" continueWatching={false} animeList={latestReleases || []} loading={loadingLatestReleases} />
+    {/* Main Content Column */}
+    <div style={{ flex: '1', minWidth: '0' }}>
 
-          <section>
-            <h2 className="section-title">Current Season</h2>
-            <div className="grid-container">
-              {currentSeason.map(anime => (
-                <AnimeCard 
-                  key={anime._id} 
-                  anime={anime} 
-                />
-              ))}
-              {(loadingCurrentSeason || isFetchingNextPage) && <SkeletonGrid />}
-            </div>
-            {!hasNextPage && currentSeason.length > 0 && <p style={{textAlign: 'center', margin: '1rem'}}>No more Current Season anime.</p>}
-          </section>
-        </div>
-        <aside className="sidebar">
-          <Top10List title="Top 10 Popular" />
-        </aside>
-      </div>
-      <Schedule />
+    {cwList && cwList.length > 0 && (
+      <AnimeSection
+      title="Continue Watching"
+      animeList={cwList}
+      continueWatching
+      onRemove={(id) => removeCw.mutate(id)}
+      showSeeMore
+      />
+    )}
+
+    <AnimeSection title="Latest Releases" animeList={latest || []} loading={loadingLatest} />
+
+    <section>
+    <div className="section-title">Current Season</div>
+    <div className="grid-container">
+    {currentSeason.map(anime => <AnimeCard key={anime._id} anime={anime} />)}
+    {(loadingSeason || isFetchingNextPage) && <SkeletonGrid count={6} />}
+    </div>
+    </section>
+    </div>
+
+    {/* Sidebar Column - Only visible on desktop - Natural Scroll (Not Sticky) */}
+    {!isMobile && (
+      <aside style={{
+        width: '320px',
+        flexShrink: 0,
+        marginTop: '0'
+      }}>
+      <Top10List title="Top 10 Popular" />
+      </aside>
+    )}
+    </div>
+
+    <Schedule />
     </div>
   );
 };

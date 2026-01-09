@@ -1,35 +1,49 @@
-.hamburgerBtn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  width: 30px;
-  height: 22px;
+.header {
+  height: var(--header-height);
+  background-color: #1a1a1a; /* Solid background, no transparency */
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 0;
-  z-index: 1200;
+  align-items: center;
+  padding: 0 1.5rem;
+  transition: transform 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
 }
 
-.hamburgerBtn span {
-  display: block;
-  height: 3px;
-  width: 100%;
-  border-radius: 3px;
-  transition: all 0.3s ease-in-out;
-  background-color: var(--light-text);
+.header.hidden {
+  transform: translateY(-100%);
 }
 
-.hamburgerBtn.open span:nth-child(1) {
-  transform: rotate(45deg) translate(7px, 7px);
+.leftSection {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex: 1;
 }
 
-.hamburgerBtn.open span:nth-child(2) {
-  opacity: 0;
+.hamburgerBtn {
+  background-color: transparent; /* Default transparent */
+  border: 1px solid transparent;
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  padding: 0.5rem;
+  border-radius: 50%;
+  display: flex;
+  cursor: pointer;
+  transition: background-color 0.2s;
 }
 
-.hamburgerBtn.open span:nth-child(3) {
-  transform: rotate(-45deg) translate(7px, -7px);
+.hamburgerBtn:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border);
+}
+
+.rightSection {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .searchContainer {
@@ -39,158 +53,77 @@
 }
 
 .searchInput {
-  background-color: var(--input-bg);
-  border: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 0.6rem 2.5rem 0.6rem 1rem;
   border-radius: 20px;
-  padding: 0.5rem 2.5rem 0.5rem 1rem;
-  color: var(--text-color);
   width: 250px;
-  transition: all 0.3s ease;
+  transition: all 0.2s;
 }
 
 .searchInput:focus {
-  outline: none;
-  border-color: var(--accent-color);
+  border-color: var(--accent);
   width: 300px;
+  outline: none;
 }
 
-.searchButton, .filterButton {
-  background: none;
-  border: none;
-  cursor: pointer;
+.searchIcon {
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--icon-color);
-  padding: 0.5rem;
+  right: 12px;
+  color: var(--text-muted);
+  pointer-events: none;
 }
 
-.searchButton {
-  right: 2.2rem;
-}
-
-.filterButton {
-  right: 0;
-}
-
-.searchButton:hover, .filterButton:hover {
-  color: var(--accent);
-}
-
-/* Auth Styles */
-.authContainer {
-  position: relative;
-  margin-left: 1rem;
-  display: flex;
-  align-items: center;
-}
-
-.signInButton {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background-color: #2e2e2e; /* Dark Gray background */
-  color: #e4e6eb; /* Light text */
-  border: 1px solid #393a3b; /* Subtle border */
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.2s, border-color 0.2s;
-  font-size: 0.9rem;
-}
-
-.signInButton:hover {
-  background-color: #3e3e3e; /* Lighter Gray on hover */
-  border-color: #4e4e4e;
-}
-
-.profileWrapper {
-  cursor: pointer;
-  position: relative;
-}
-
-.profileImage {
-  width: 40px;
-  height: 40px;
+.profileBtn {
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid var(--border-color);
+  overflow: hidden;
+  border: 2px solid var(--border);
+  cursor: pointer;
   transition: border-color 0.2s;
 }
 
-.profileWrapper:hover .profileImage {
+.profileBtn:hover {
   border-color: var(--accent);
 }
 
-.dropdown {
-  position: absolute;
-  top: 120%;
-  right: 0;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.5rem;
-  min-width: 200px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-  animation: fadeIn 0.2s ease-out;
+.profileImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.userInfo {
-  padding: 0.5rem 1rem;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 0.5rem;
-}
-
-.userName {
-  font-weight: 600;
-  color: var(--text);
-  margin: 0;
-  font-size: 0.9rem;
-}
-
-.userEmail {
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dropdownItem {
+.signInBtn {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  width: 100%;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
   padding: 0.5rem 1rem;
-  background: none;
-  border: none;
-  color: var(--text);
-  cursor: pointer;
-  text-align: left;
-  border-radius: 4px;
+  border-radius: 20px;
   font-size: 0.9rem;
-  transition: background-color 0.2s;
+  font-weight: 500;
+  transition: all 0.2s;
 }
 
-.dropdownItem:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: var(--accent);
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-5px); }
-  to { opacity: 1; transform: translateY(0); }
+.signInBtn:hover {
+  background-color: var(--border);
 }
 
 @media (max-width: 768px) {
+  .header {
+    padding: 0 1rem;
+  }
+  .searchInput {
+    width: 160px;
+  }
+  .searchInput:focus {
+    width: 200px;
+  }
   .signInText {
     display: none;
-  }
-  .signInButton {
-    padding: 0.5rem;
-    border-radius: 50%;
   }
 }
