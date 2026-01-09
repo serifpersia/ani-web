@@ -487,7 +487,10 @@ app.get('/api/search', async (req, res) => {
     try { res.json(await provider.search(req.query)); } catch { res.status(500).send('Error'); }
 });
 app.get('/api/seasonal', async (req, res) => {
-    try { res.json(await provider.getSeasonal(1)); } catch { res.status(500).send('Error'); }
+    try {
+        const page = parseInt(req.query.page as string) || 1;
+        res.json(await provider.getSeasonal(page));
+    } catch { res.status(500).send('Error'); }
 });
 app.get('/api/latest-releases', async (req, res) => {
     try { res.json(await provider.getLatestReleases()); } catch { res.status(500).send('Error'); }
