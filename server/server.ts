@@ -650,27 +650,27 @@ app.get('/api/allmanga-details/:id', async (req, res) => {
 app.get('/api/genres-and-tags', (req, res) => res.json({ genres, tags, studios }));
 
 if (!CONFIG.IS_DEV) {
-    // Attempt to locate the frontend dist directory
-    const possiblePaths = [
-        path.join(CONFIG.ROOT, '../dist'), // Standard relative path from server root
-        path.join(__dirname, '../../dist'), // Relative to compiled server.js
-        path.join(process.cwd(), 'dist')   // Relative to current working directory
-    ];
+    // Manually resolve the frontend path relative to the running script (server/dist/server.js)
+    const frontendPath = path.resolve(__dirname, '../../dist');
+    const indexHtmlPath = path.join(frontendPath, 'index.html');
 
-    let frontendPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html')));
+    logger.info(`Checking for frontend at: ${frontendPath}`);
 
-    if (!frontendPath) {
-        logger.warn(`Could not locate frontend dist directory. Tried: ${possiblePaths.join(', ')}`);
-        frontendPath = path.join(CONFIG.ROOT, '../dist'); // Default fallback
+    if (fs.existsSync(indexHtmlPath)) {
+        logger.info(`Frontend found at: ${frontendPath}`);
+        app.use(express.static(frontendPath));
+
+        app.get(/^(?!\/api).*$/, (req, res) => {
+            // Use resolve to ensure absolute path passed to sendFile
+            res.sendFile(indexHtmlPath);
+        });
     } else {
-        logger.info(`Serving frontend from: ${frontendPath}`);
+        logger.error(`Frontend NOT found at: ${frontendPath}. Please check your build structure.`);
+        // Fallback or error response to prevent crash
+        app.get(/^(?!\/api).*$/, (req, res) => {
+            res.status(404).send('Frontend application not found. Please ensure the project is built correctly.');
+        });
     }
-
-    app.use(express.static(frontendPath));
-
-    app.get(/^(?!\/api).*$/, (req, res) => {
-        res.sendFile(path.join(frontendPath!, 'index.html'));
-    });
 }
 
 async function main() {
