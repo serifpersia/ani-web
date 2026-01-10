@@ -651,7 +651,7 @@ app.get('/api/genres-and-tags', (req, res) => res.json({ genres, tags, studios }
 
 if (!CONFIG.IS_DEV) {
 
-    const frontendPath = path.resolve(__dirname, '../../dist');
+    const frontendPath = path.resolve(__dirname, '../../client/dist');
     const indexHtml = path.join(frontendPath, 'index.html');
 
     logger.info(`Serving frontend from: ${frontendPath}`);

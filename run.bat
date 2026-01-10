@@ -38,11 +38,8 @@ goto menu
 :execute_dev
 powershell -NoProfile -Command "Write-Host 'Running in DEVELOPMENT mode...' -ForegroundColor Cyan"
 echo.
-echo --^> Installing Client Dependencies...
+echo --^> Installing all dependencies...
 call npm install
-echo.
-echo --^> Installing Server Dependencies...
-call npm install --prefix server
 echo.
 echo --^> Starting Development Server...
 call npm run dev
@@ -52,12 +49,16 @@ goto end
 powershell -NoProfile -Command "Write-Host 'Running in PRODUCTION mode...' -ForegroundColor Green"
 echo.
 
-if exist "server\dist\server.js" (
-    echo --^> Pre-built server found. Skipping build...
+if exist "server\dist\server.js" if exist "client\dist" (
+    echo --^> Pre-built files found. Skipping build...
 ) else (
     echo --^> Build missing. Installing and Building...
     call npm install
-    call npm install --prefix server
+    if !errorlevel! neq 0 (
+        powershell -NoProfile -Command "Write-Host 'Error: Install failed!' -ForegroundColor Red"
+        pause
+        exit /b 1
+    )
     call npm run build
     if !errorlevel! neq 0 (
         powershell -NoProfile -Command "Write-Host 'Error: Build failed!' -ForegroundColor Red"
@@ -67,12 +68,14 @@ if exist "server\dist\server.js" (
 )
 
 echo.
-echo --^> Ensuring Production Dependencies...
-call npm install --prefix server --omit=dev
+echo --^> Ensuring Production Dependencies for server...
+cd server
+call npm install --omit=dev
+cd ..
 
 echo.
-echo --^> Starting Application...
-call npm start
+echo --^> Starting application in production mode...
+call npm run start --prefix server
 goto end
 
 :end
