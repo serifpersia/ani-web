@@ -12,7 +12,7 @@ BIN_DIR="$HOME/.local/bin"
 LAUNCHER_PATH="$BIN_DIR/ani-web"
 VERSION_FILE="$INSTALL_DIR/.version"
 REPO_URL="https://api.github.com/repos/serifpersia/ani-web/releases/latest"
-REMOTE_VERSION_URL="https://raw.githubusercontent.com/serifpersia/ani-web/main/package.json"
+REMOTE_VERSION_URL="https://raw.githubusercontent.com/serifpersia/ani-web/main/server/package.json"
 SETUP_SCRIPT_URL="https://raw.githubusercontent.com/serifpersia/ani-web/main/docs/setup.sh"
 # ---
 
@@ -35,7 +35,6 @@ print_info() { echo -e "    \033[1;34mInfo:\033[0m $1"; }
 run_installation() {
     # Step 1: Stop any running instances
     print_step "Checking for running instances of ani-web..."
-    # Silently try to kill any node process running from the install directory
     pkill -f "$INSTALL_DIR/server/dist/server.js" &>/dev/null || true
     print_info "Any running instances have been stopped."
     echo
@@ -58,6 +57,7 @@ run_installation() {
         print_step "Updating application..."
     else
         print_step "Installing application for the first time..."
+        mkdir -p "$INSTALL_DIR"
     fi
 
     # Unzip to a temporary location
@@ -67,26 +67,20 @@ run_installation() {
 
     if [ "$IS_UPDATE" = true ]; then
         print_info "Copying new application files..."
-        # Copy over new files, which will overwrite old ones but leave node_modules alone.
-        # The -a flag preserves attributes, and the . at the end handles dotfiles.
         cp -R "$TEMP_UNZIP_DIR"/.* "$INSTALL_DIR"/ 2>/dev/null || true
         cp -R "$TEMP_UNZIP_DIR"/* "$INSTALL_DIR"/
     else
         # First-time install, just move the whole directory
-        mkdir -p "$INSTALL_DIR"
         mv "$TEMP_UNZIP_DIR"/* "$INSTALL_DIR"/
     fi
-
-    # Clean up temp unzip dir
     rm -rf "$TEMP_UNZIP_DIR"
 
-    # Sync dependencies based on the new package-lock.json
-    print_info "Ensuring dependencies are up to date..."
-    (cd "$INSTALL_DIR" && npm install --omit=dev --silent)
+    # Sync dependencies
+    print_info "Ensuring server dependencies are up to date..."
     (cd "$INSTALL_DIR/server" && npm install --omit=dev --silent)
 
     # Record the installed version
-    INSTALLED_VERSION=$(grep '"version"' "$INSTALL_DIR/package.json" | cut -d '"' -f 4)
+    INSTALLED_VERSION=$(grep '"version"' "$INSTALL_DIR/server/package.json" | cut -d '"' -f 4)
     [ -n "$INSTALLED_VERSION" ] || print_error "Could not determine installed version."
     echo "$INSTALLED_VERSION" > "$VERSION_FILE"
     
@@ -97,7 +91,6 @@ run_installation() {
     print_step "Creating 'ani-web' command..."
     mkdir -p "$BIN_DIR"
     
-    # This 'here document' creates the script file that will be run by the 'ani-web' command
     cat > "$LAUNCHER_PATH" << EOF
 #!/bin/bash
 # This is the ani-web launcher. It checks for updates before running the app.
@@ -105,7 +98,7 @@ run_installation() {
 # --- Configuration (self-contained) ---
 INSTALL_DIR="\$HOME/.ani-web"
 VERSION_FILE="\$INSTALL_DIR/.version"
-REMOTE_VERSION_URL="https://raw.githubusercontent.com/serifpersia/ani-web/main/package.json"
+REMOTE_VERSION_URL="https://raw.githubusercontent.com/serifpersia/ani-web/main/server/package.json"
 SETUP_SCRIPT_URL="https://raw.githubusercontent.com/serifpersia/ani-web/main/docs/setup.sh"
 
 # --- Uninstall Logic ---
@@ -122,10 +115,8 @@ fi
 LOCAL_VERSION=\$(cat "\$VERSION_FILE" 2>/dev/null || echo "0.0.0")
 REMOTE_VERSION=\$(curl -s "\$REMOTE_VERSION_URL" | grep '"version"' | cut -d '"' -f 4 || echo "0.0.0")
 
-# Compare versions using sort -V (version sort)
 if [ "\$(printf '%s\n' "\$REMOTE_VERSION" "\$LOCAL_VERSION" | sort -V | head -n 1)" != "\$REMOTE_VERSION" ]; then
     echo "A new version of ani-web is available (\$LOCAL_VERSION -> \$REMOTE_VERSION). Updating..."
-    # Safer update: download to temp file then execute
     TEMP_SETUP_SCRIPT=\$(mktemp)
     if curl -sSL "\$SETUP_SCRIPT_URL" -o "\$TEMP_SETUP_SCRIPT"; then
         bash "\$TEMP_SETUP_SCRIPT"
@@ -133,26 +124,27 @@ if [ "\$(printf '%s\n' "\$REMOTE_VERSION" "\$LOCAL_VERSION" | sort -V | head -n 
         echo "Update complete. Please run 'ani-web' again."
     else
         echo "Update download failed. Starting application anyway..."
-        cd "\$INSTALL_DIR" && ./run.sh 2
+        cd "\$INSTALL_DIR" && ./run.sh
     fi
     exit 0
 fi
 
 # --- Run Application ---
 cd "\$INSTALL_DIR"
-./run.sh 2
+./run.sh
 EOF
 
     chmod +x "$LAUNCHER_PATH"
     print_success "Command created at $LAUNCHER_PATH"
     echo
 
-    # Step 5: Check if BIN_DIR is in PATH and provide instructions if not
+    # Step 5: Check if BIN_DIR is in PATH
     print_step "Finalizing setup..."
     if [[ ":\$PATH:" != *":\$BIN_DIR:"* ]]; then
         print_info "Your PATH does not seem to include $BIN_DIR."
         print_info "Please add the following line to your shell profile (e.g., ~/.bashrc or ~/.zshrc):"
-        echo -e "\n    \033[1;33mexport PATH=\"$BIN_DIR:\$PATH\"\033[0m\n"
+        echo -e "\n    \033[1;33mexport PATH=\"$BIN_DIR:\\$PATH\"
+    \033[0m\n"
         print_info "After adding it, restart your terminal to use the 'ani-web' command."
     else
         print_success "Installation Complete!"

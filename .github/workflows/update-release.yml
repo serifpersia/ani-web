@@ -47,27 +47,29 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Install Server Dependencies
-        run: npm install --prefix server
-
       - name: Build Application
         run: npm run build
 
       - name: Create Release Archive
         run: |
+          mkdir -p release-package/client
           mkdir -p release-package/server
-
-          cp -r dist release-package/
+          cp -r client/dist release-package/client/
           cp -r server/dist release-package/server/
-
-          cp server/package.json release-package/server/
+          cp server/package.json server/package-lock.json release-package/server/
           cp package.json release-package/
 
-          cp tsconfig*.json release-package/
-          cp server/tsconfig.json release-package/server/
-          cp vite.config.ts release-package/
+          cd release-package/server && npm install --omit=dev && cd ../..
+          
+          echo "#!/bin/bash" > release-package/run.sh
+          echo "cd \"\$(dirname \"$0\")\"" >> release-package/run.sh
+          echo "node server/dist/server.js" >> release-package/run.sh
+          
+          echo "@echo off" > release-package/run.bat
+          echo "cd /d \"%~dp0\"" >> release-package/run.bat
+          echo "node server/dist/server.js" >> release-package/run.bat
 
-          cp run.bat run.sh release-package/
+          chmod +x release-package/run.sh
 
           cd release-package
           zip -r ../ani-web.zip .

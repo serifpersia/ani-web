@@ -33,10 +33,8 @@ fi
 if [ "$choice" == "1" ]; then
     echo -e "\033[1;36mRunning in DEVELOPMENT mode... \033[0m"
     echo
-    echo "--> Installing Client Dependencies..."
+    echo "--> Installing all dependencies..."
     npm install
-    echo "--> Installing Server Dependencies..."
-    npm install --prefix server
     echo
     echo "--> Starting Development Server..."
     npm run dev
@@ -45,12 +43,16 @@ elif [ "$choice" == "2" ]; then
     echo -e "\033[1;32mRunning in PRODUCTION mode... \033[0m"
     echo
 
-    if [ -f "server/dist/server.js" ]; then
-        echo "--> Pre-built server found. Skipping build..."
+    if [ -f "server/dist/server.js" ] && [ -d "client/dist" ]; then
+        echo "--> Pre-built files found. Skipping build..."
     else
         echo "--> Build missing. Installing and Building..."
         npm install
-        npm install --prefix server
+        if [ $? -ne 0 ]; then
+            echo -e "\033[1;31mError: Install failed!\033[0m"
+            read -p "Press Enter to exit..."
+            exit 1
+        fi
         npm run build
         if [ $? -ne 0 ]; then
             echo -e "\033[1;31mError: Build failed!\033[0m"
@@ -59,10 +61,10 @@ elif [ "$choice" == "2" ]; then
         fi
     fi
 
-    echo "--> Ensuring Production Dependencies..."
-    npm install --prefix server --omit=dev
+    echo "--> Ensuring Production Dependencies for server..."
+    (cd server && npm install --omit=dev)
 
     echo
-    echo "--> Starting application..."
-    npm start
+    echo "--> Starting application in production mode..."
+    npm run start --prefix server
 fi
