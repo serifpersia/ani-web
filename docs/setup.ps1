@@ -134,16 +134,20 @@ if (`$arg -eq "uninstall") {
 
 # --- Update Check ---
 try {
-    `$LocalVersion = Get-Content "`$VersionFile"
-    `$RemoteVersion = (Invoke-RestMethod -Uri "`$RemoteVersionUrl").version
+    `$LocalVersion = Get-Content "`$VersionFile" -ErrorAction SilentlyContinue
+    `$RemotePackageJson = Invoke-WebRequest -Uri "`$RemoteVersionUrl" -UseBasicParsing -ErrorAction SilentlyContinue
+    `$RemoteVersion = if (`$RemotePackageJson -and `$RemotePackageJson.Content -match '"version":\s*"([^"]+)"') { `$matches[1] } else { `$null }
 
-    if ("`$LocalVersion" -ne "`$RemoteVersion" -and `$RemoteVersion) {
+    if (`$LocalVersion -and `$RemoteVersion -and "`$LocalVersion" -ne "`$RemoteVersion") {
         Write-Host "A new version of ani-web is available (`$LocalVersion -> `$RemoteVersion). Updating..."
-        irm "`$SetupScriptUrl" | iex
+        # Use Invoke-Expression to execute the setup script from the web
+        `$setupScriptContent = (Invoke-WebRequest -Uri "`$SetupScriptUrl" -UseBasicParsing).Content
+        powershell.exe -NoProfile -ExecutionPolicy Bypass -Command `$setupScriptContent
         Write-Host "Update complete. Please run 'ani-web' again."
         exit 0
     }
 } catch {
+    # This catch block will now only trigger for more serious issues
     Write-Host "Could not check for updates. Starting application anyway..." -ForegroundColor Yellow
 }
 # ---

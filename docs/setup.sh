@@ -111,16 +111,23 @@ if [ \"$1\" == \"uninstall\" ]; then
 fi
 
 # --- Update Check ---
-LOCAL_VERSION=\$(cat \"$VERSION_FILE\")
-REMOTE_VERSION=\$(curl -s \"$REMOTE_VERSION_URL\" | grep '\"version\"' | cut -d '\"' -f 4)
+LOCAL_VERSION=$(cat "$VERSION_FILE" 2>/dev/null || echo "")
+REMOTE_VERSION=$(curl -s "$REMOTE_VERSION_URL" | grep '"version"' | cut -d '"' -f 4)
 
-if [[ \"$LOCAL_VERSION\" != \"$REMOTE_VERSION\" && ! -z \"$REMOTE_VERSION\" ]]; then
-    echo \"A new version of ani-web is available (\$LOCAL_VERSION -> \$REMOTE_VERSION). Updating...\"
-    curl -sSL \"$SETUP_SCRIPT_URL\" | bash
-    echo \"Update complete. Please run 'ani-web' again.\"
+if [[ -n "$LOCAL_VERSION" && -n "$REMOTE_VERSION" && "$LOCAL_VERSION" != "$REMOTE_VERSION" ]]; then
+    echo "A new version of ani-web is available ($LOCAL_VERSION -> $REMOTE_VERSION). Updating..."
+    
+    # Safer update: download to temp file then execute
+    TEMP_SETUP_SCRIPT=$(mktemp)
+    if curl -sSL "$SETUP_SCRIPT_URL" -o "$TEMP_SETUP_SCRIPT"; then
+        bash "$TEMP_SETUP_SCRIPT"
+        rm "$TEMP_SETUP_SCRIPT" # Clean up
+        echo "Update complete. Please run 'ani-web' again."
+    else
+        echo "Update download failed. Please try again later."
+    fi
     exit 0
 fi
-
 # --- Run Application ---
 cd \"$INSTALL_DIR\"
 ./run.sh 2
