@@ -10,7 +10,7 @@ $LauncherBatPath = Join-Path $ScriptsDir "ani-web.bat"
 $LauncherPs1Path = Join-Path $ScriptsDir "ani-web-launcher.ps1"
 $VersionFile = Join-Path $InstallDir ".version"
 $RepoUrl = "https://api.github.com/repos/serifpersia/ani-web/releases/latest"
-$RemoteVersionUrl = "https://raw.githubusercontent.com/serifpersia/ani-web/main/server/package.json"
+$RemoteVersionUrl = "https://raw.githubusercontent.com/serifpersia/ani-web/main/package.json"
 $SetupScriptUrl = "https://raw.githubusercontent.com/serifpersia/ani-web/main/docs/setup.ps1"
 # ---
 
@@ -90,12 +90,16 @@ function Start-Installation {
         }
         Remove-Item -Recurse -Force $tempUnzipDir
 
+        Print-Info "Ensuring client dependencies are up to date..."
+        Push-Location (Join-Path $InstallDir "client")
+        npm install --omit=dev --silent
+        Pop-Location
         Print-Info "Ensuring server dependencies are up to date..."
         Push-Location (Join-Path $InstallDir "server")
         npm install --omit=dev --silent
         Pop-Location
         
-        $installedVersion = (Get-Content (Join-Path $InstallDir "server/package.json") | ConvertFrom-Json).version
+        $installedVersion = (Get-Content (Join-Path $InstallDir "package.json") | ConvertFrom-Json).version
         if (-not $installedVersion) { throw "Could not determine installed version." }
         Set-Content -Path $VersionFile -Value $installedVersion
 

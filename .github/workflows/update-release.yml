@@ -56,17 +56,15 @@ jobs:
           mkdir -p release-package/server
           cp -r client/dist release-package/client/
           cp -r server/dist release-package/server/
+          cp client/package.json client/package-lock.json release-package/client/
           cp server/package.json server/package-lock.json release-package/server/
-          cp package.json release-package/
-
-          cd release-package/server && npm install --omit=dev && cd ../..
+          cp package.json package-lock.json release-package/
+          cp LICENSE README.md release-package/
           
           echo "#!/bin/bash" > release-package/run.sh
-          echo "cd \"\$(dirname \"$0\")\"" >> release-package/run.sh
           echo "node server/dist/server.js" >> release-package/run.sh
           
           echo "@echo off" > release-package/run.bat
-          echo "cd /d \"%~dp0\"" >> release-package/run.bat
           echo "node server/dist/server.js" >> release-package/run.bat
 
           chmod +x release-package/run.sh
@@ -79,7 +77,7 @@ jobs:
           gh release create "latest" \
             "ani-web.zip" \
             --title "latest" \
-            --notes "Automatically built from the latest commit. Download the 'ani-web.zip' file below and run using run.bat or run.sh." \
+            --notes "Automatically built from the latest commit. Download the 'ani-web.zip' file below, run 'npm install --omit=dev --prefix server' and 'npm install --omit=dev --prefix client' and then run using run.bat or run.sh." \
             --target ${{ github.sha }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

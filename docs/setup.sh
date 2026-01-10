@@ -12,7 +12,7 @@ BIN_DIR="$HOME/.local/bin"
 LAUNCHER_PATH="$BIN_DIR/ani-web"
 VERSION_FILE="$INSTALL_DIR/.version"
 REPO_URL="https://api.github.com/repos/serifpersia/ani-web/releases/latest"
-REMOTE_VERSION_URL="https://raw.githubusercontent.com/serifpersia/ani-web/main/server/package.json"
+REMOTE_VERSION_URL="https://raw.githubusercontent.com/serifpersia/ani-web/main/package.json"
 SETUP_SCRIPT_URL="https://raw.githubusercontent.com/serifpersia/ani-web/main/docs/setup.sh"
 # ---
 
@@ -60,27 +60,25 @@ run_installation() {
         mkdir -p "$INSTALL_DIR"
     fi
 
-    # Unzip to a temporary location
     TEMP_UNZIP_DIR=$(mktemp -d)
     unzip -q "$TEMP_ZIP" -d "$TEMP_UNZIP_DIR" || print_error "Failed to extract zip file. Is 'unzip' installed?"
-    rm "$TEMP_ZIP" # Cleanup zip
+    rm "$TEMP_ZIP"
 
     if [ "$IS_UPDATE" = true ]; then
         print_info "Copying new application files..."
         cp -R "$TEMP_UNZIP_DIR"/.* "$INSTALL_DIR"/ 2>/dev/null || true
         cp -R "$TEMP_UNZIP_DIR"/* "$INSTALL_DIR"/
     else
-        # First-time install, just move the whole directory
         mv "$TEMP_UNZIP_DIR"/* "$INSTALL_DIR"/
     fi
     rm -rf "$TEMP_UNZIP_DIR"
 
-    # Sync dependencies
+    print_info "Ensuring client dependencies are up to date..."
+    (cd "$INSTALL_DIR/client" && npm install --omit=dev --silent)
     print_info "Ensuring server dependencies are up to date..."
     (cd "$INSTALL_DIR/server" && npm install --omit=dev --silent)
 
-    # Record the installed version
-    INSTALLED_VERSION=$(grep '"version"' "$INSTALL_DIR/server/package.json" | cut -d '"' -f 4)
+    INSTALLED_VERSION=$(grep '"version"' "$INSTALL_DIR/package.json" | cut -d '"' -f 4)
     [ -n "$INSTALLED_VERSION" ] || print_error "Could not determine installed version."
     echo "$INSTALLED_VERSION" > "$VERSION_FILE"
     
@@ -98,7 +96,7 @@ run_installation() {
 # --- Configuration (self-contained) ---
 INSTALL_DIR="\$HOME/.ani-web"
 VERSION_FILE="\$INSTALL_DIR/.version"
-REMOTE_VERSION_URL="https://raw.githubusercontent.com/serifpersia/ani-web/main/server/package.json"
+REMOTE_VERSION_URL="https://raw.githubusercontent.com/serifpersia/ani-web/main/package.json"
 SETUP_SCRIPT_URL="https://raw.githubusercontent.com/serifpersia/ani-web/main/docs/setup.sh"
 
 # --- Uninstall Logic ---
