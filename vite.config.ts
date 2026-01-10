@@ -12,4 +12,9 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      external: ['react-virtualized-auto-sizer', 'react-window']
+    }
+  }
 });
