@@ -4,7 +4,7 @@
   "type": "commonjs",
   "scripts": {
     "start": "node dist/server.js",
-    "dev": "nodemon --watch '**/*.ts' --exec 'ts-node' server.ts --dev",
+    "dev": "nodemon --watch \"**/*.ts\" --exec \"npx ts-node server.ts --dev\"",
     "build": "tsc"
   },
   "dependencies": {

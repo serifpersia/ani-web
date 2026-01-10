@@ -87,7 +87,6 @@
   font-size: 0.7rem;
   font-weight: 700;
   z-index: 2;
-  backdrop-filter: blur(4px);
   box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
