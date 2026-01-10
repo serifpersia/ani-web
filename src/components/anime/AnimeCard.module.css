@@ -48,13 +48,6 @@
   transform: scale(1.05);
 }
 
-.overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 40%);
-  pointer-events: none;
-}
-
 .info {
   padding: 0.75rem;
   display: flex;

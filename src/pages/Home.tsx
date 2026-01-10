@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo } from 'react';
-import { useQueryClient, useMutation } from '@tanstack/react-query';
+import React, { useEffect, useMemo, useRef, useCallback } from 'react';
+import { useQueryClient, useMutation, useInfiniteQuery } from '@tanstack/react-query';
 import AnimeSection from '../components/anime/AnimeSection';
 import Top10List from '../components/anime/Top10List';
 import Schedule from '../components/anime/Schedule';
@@ -11,6 +11,7 @@ import useIsMobile from '../hooks/useIsMobile';
 const Home: React.FC = () => {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
+  const observerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     document.title = 'Home - ani-web';
@@ -29,14 +30,29 @@ const Home: React.FC = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['continueWatching'] })
   });
 
+  const handleRemove = useCallback((id: string) => {
+    removeCw.mutate(id);
+  }, [removeCw]);
+
   useEffect(() => {
-    const handleScroll = () => {
-      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 800 && hasNextPage && !isFetchingNextPage) {
-        fetchNextPage();
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerRef.current) {
+      observer.observe(observerRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observer.unobserve(observerRef.current);
       }
     };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return (
@@ -57,7 +73,7 @@ const Home: React.FC = () => {
       title="Continue Watching"
       animeList={cwList}
       continueWatching
-      onRemove={(id) => removeCw.mutate(id)}
+      onRemove={handleRemove}
       showSeeMore
       />
     )}
@@ -70,6 +86,7 @@ const Home: React.FC = () => {
     {currentSeason.map(anime => <AnimeCard key={anime._id} anime={anime} />)}
     {(loadingSeason || isFetchingNextPage) && <SkeletonGrid count={6} />}
     </div>
+    <div ref={observerRef} style={{ height: '20px' }} />
     </section>
     </div>
 

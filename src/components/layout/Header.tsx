@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FaBars, FaSearch, FaGoogle } from 'react-icons/fa';
 import Logo from '../common/Logo';
 import { useSidebar } from '../../hooks/useSidebar';
@@ -12,15 +13,26 @@ interface UserProfile {
   email: string;
 }
 
+const fetchUser = async (): Promise<UserProfile | null> => {
+  const res = await fetch('/api/auth/user');
+  if (!res.ok) return null;
+  return res.json();
+};
+
 const Header: React.FC = () => {
   const { toggleSidebar } = useSidebar();
   const [query, setQuery] = useState('');
   const [visible, setVisible] = useState(true);
-  const [user, setUser] = useState<UserProfile | null>(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const navigate = useNavigate();
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const queryClient = useQueryClient();
   const HIDE_DELAY_MS = 3000; // Hide header after 3 seconds of no scrolling
+
+  const { data: user } = useQuery<UserProfile | null>({
+    queryKey: ['user'],
+    queryFn: fetchUser,
+  });
 
   // Scroll visibility logic with debounced hide
   useEffect(() => {
@@ -51,21 +63,16 @@ const Header: React.FC = () => {
     };
   }, []);
 
-  // Auth & User logic
+  // Handle successful Google Auth from popup
   useEffect(() => {
-    fetch('/api/auth/user')
-    .then(res => res.ok ? res.json() : null)
-    .then(setUser)
-    .catch(() => setUser(null));
-
     const handleMessage = (event: MessageEvent) => {
       if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
-        setUser(event.data.user);
+        queryClient.setQueryData(['user'], event.data.user);
       }
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [queryClient]);
 
   const handleSearch = (e?: React.FormEvent) => {
     e?.preventDefault();

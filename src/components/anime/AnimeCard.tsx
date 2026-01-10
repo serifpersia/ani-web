@@ -1,4 +1,4 @@
-import React, { memo, useState, useRef } from 'react';
+import React, { memo, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FaMicrophone, FaClosedCaptioning, FaTimes } from 'react-icons/fa';
 import AnimeInfoPopup from './AnimeInfoPopup';
@@ -65,17 +65,17 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
   : 0;
 
   // Handlers
-  const handleRemoveClick = (e: React.MouseEvent) => {
+  const handleRemoveClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setShowRemoveModal(true);
-  };
+  }, []);
 
-  const handleConfirmRemove = (options: { removeFromWatchlist?: boolean }) => {
+  const handleConfirmRemove = useCallback((options: { removeFromWatchlist?: boolean }) => {
     if (onRemove) onRemove(anime.id);
     if (options.removeFromWatchlist) removeWatchlistMutation.mutate(anime.id);
     setShowRemoveModal(false);
-  };
+  }, [onRemove, removeWatchlistMutation, anime.id]);
 
   const handleMouseEnter = () => {
     if (isMobile) return;
@@ -107,7 +107,6 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
     loading="lazy"
     onLoad={(e) => e.currentTarget.style.opacity = '1'}
     />
-    <div className={styles.overlay} />
 
     {/* Badges */}
     <div className={styles.typeBadge}>{anime.type || 'TV'}</div>

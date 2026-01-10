@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from 'react';
 
 export type TitlePreferenceContextType = {
   titlePreference: 'name' | 'nativeName' | 'englishName';
@@ -36,8 +36,10 @@ export const TitlePreferenceProvider: React.FC<TitlePreferenceProviderProps> = (
     fetchPreference();
   }, []);
 
+  const value = useMemo(() => ({ titlePreference, setTitlePreference, loading }), [titlePreference, loading]);
+
   return (
-    <TitlePreferenceContext.Provider value={{ titlePreference, setTitlePreference, loading }}>
+    <TitlePreferenceContext.Provider value={value}>
       {children}
     </TitlePreferenceContext.Provider>
   );

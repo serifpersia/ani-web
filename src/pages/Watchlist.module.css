@@ -84,10 +84,3 @@
     padding: 4rem 1rem;
     color: var(--text-muted);
 }
-
-.animeGrid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); /* Adjust minmax for desired card size */
-    gap: 1rem; /* Gap between cards */
-    padding: 1rem; /* Padding around the grid */
-}

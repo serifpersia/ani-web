@@ -1,4 +1,4 @@
-import React, { useState, ReactNode } from 'react';
+import React, { useState, ReactNode, useMemo } from 'react';
 import { SidebarContext } from './SidebarContext';
 
 export const SidebarProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -8,8 +8,10 @@ export const SidebarProvider: React.FC<{ children: ReactNode }> = ({ children })
     setIsOpen(!isOpen);
   };
 
+  const value = useMemo(() => ({ isOpen, setIsOpen, toggleSidebar }), [isOpen]);
+
   return (
-    <SidebarContext.Provider value={{ isOpen, setIsOpen, toggleSidebar }}>
+    <SidebarContext.Provider value={value}>
       {children}
     </SidebarContext.Provider>
   );
