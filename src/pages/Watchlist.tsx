@@ -3,8 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { FaTrash } from 'react-icons/fa';
-import { FixedSizeGrid as Grid } from 'react-window';
-import AutoSizer from 'react-virtualized-auto-sizer';
 
 import AnimeCard from '../components/anime/AnimeCard';
 import SkeletonGrid from '../components/common/SkeletonGrid';
@@ -18,64 +16,7 @@ import styles from './Watchlist.module.css';
 
 const FILTERS = ['All', 'Continue Watching', 'Watching', 'Completed', 'On-Hold', 'Dropped', 'Planned'];
 
-// Constants for card dimensions and spacing
-const DESKTOP_CARD_MIN_WIDTH = 180;
-const MOBILE_CARD_HEIGHT = 110; // From AnimeCard.module.css
-const DESKTOP_CARD_CONTENT_HEIGHT = 300; // Estimated content height of AnimeCard on desktop
-const GAP = 16; // 1rem
 
-interface GridCellProps {
-  columnIndex: number;
-  rowIndex: number;
-  style: React.CSSProperties;
-  data: {
-    list: any[];
-    columnCount: number;
-    isCW: boolean;
-    handleRemove: (id: string, name: string) => void;
-    updateStatus: any; // Mutation function
-    FILTERS: string[];
-  };
-}
-
-const GridCell: React.FC<GridCellProps> = ({ columnIndex, rowIndex, style, data }) => {
-  const { list, columnCount, isCW, handleRemove, updateStatus, FILTERS } = data;
-  const itemIndex = rowIndex * columnCount + columnIndex;
-  const item = list[itemIndex];
-
-  if (!item) {
-    return null;
-  }
-
-  return (
-    <div
-      style={{
-        ...style,
-        left: (style.left as number) + GAP / 2,
-        top: (style.top as number) + GAP / 2,
-        width: `calc(${style.width} - ${GAP}px)`,
-        height: `calc(${style.height} - ${GAP}px)`,
-      }}
-      className={styles.itemWrapper}
-    >
-      <AnimeCard anime={item} continueWatching={isCW} onRemove={() => handleRemove(item.id, item.name)} />
-      {!isCW && (
-        <div className={styles.cardActions}>
-          <select
-            className={styles.statusSelect}
-            value={item.status}
-            onChange={(e) => updateStatus.mutate({ id: item.id, status: e.target.value })}
-          >
-            {FILTERS.slice(2).map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <button className={styles.removeBtn} onClick={() => handleRemove(item.id, item.name)}>
-            <FaTrash size={12} />
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
 
 const Watchlist: React.FC = () => {
   const { filter: filterBy = 'All' } = useParams<{ filter: string }>();
@@ -163,34 +104,7 @@ const Watchlist: React.FC = () => {
     setItemToRemove(null);
   };
 
-  // Virtualization calculations
-  const [columnCount, setColumnCount] = useState(1);
-  const [columnWidth, setColumnWidth] = useState(DESKTOP_CARD_MIN_WIDTH);
-  const [rowHeight, setRowHeight] = useState(isMobile ? MOBILE_CARD_HEIGHT + GAP : DESKTOP_CARD_CONTENT_HEIGHT + GAP);
 
-  const updateGridDimensions = useCallback((containerWidth: number) => {
-    if (isMobile) {
-      setColumnCount(1);
-      setColumnWidth(containerWidth); // Full width for mobile
-      setRowHeight(MOBILE_CARD_HEIGHT + GAP);
-    } else {
-      // Calculate column count based on available width and minimum card width
-      const calculatedColumnCount = Math.max(1, Math.floor((containerWidth + GAP) / (DESKTOP_CARD_MIN_WIDTH + GAP)));
-      setColumnCount(calculatedColumnCount);
-      // Distribute width evenly, accounting for gaps
-      setColumnWidth((containerWidth - (calculatedColumnCount - 1) * GAP) / calculatedColumnCount + GAP);
-      setRowHeight(DESKTOP_CARD_CONTENT_HEIGHT + GAP);
-    }
-  }, [isMobile]);
-
-  // Infinite scroll for react-window
-  const onItemsRendered = useCallback(({ visibleRowStopIndex }) => {
-    if (hasNextPage && !isFetchingNextPage && visibleRowStopIndex >= rowCount - 2) {
-      fetchNextPage();
-    }
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage, rowCount]);
-
-  const rowCount = Math.ceil(sortedList.length / columnCount);
 
   if (isLoading) {
     return <SkeletonGrid />;
@@ -230,30 +144,30 @@ const Watchlist: React.FC = () => {
       {sortedList.length === 0 ? (
         <div className={styles.emptyState}>No anime found in this list.</div>
       ) : (
-        <div style={{ flex: '1 1 auto', minHeight: '500px', margin: `0 -${GAP / 2}px` }}> {/* Adjust margin for grid */}
-          <AutoSizer>
-            {({ height, width }) => {
-              updateGridDimensions(width);
-              return (
-                <Grid
-                  columnCount={columnCount}
-                  columnWidth={columnWidth}
-                  height={height}
-                  rowCount={rowCount}
-                  rowHeight={rowHeight}
-                  width={width}
-                  itemData={{ list: sortedList, columnCount, isCW, handleRemove, updateStatus, FILTERS }}
-                  onItemsRendered={onItemsRendered}
-                >
-                  {GridCell}
-                </Grid>
-              );
-            }}
-          </AutoSizer>
+        <div className={styles.animeGrid}>
+          {sortedList.map((anime) => (
+            <div className={styles.itemWrapper} key={anime.id}>
+              <AnimeCard anime={anime} continueWatching={isCW} onRemove={() => handleRemove(anime.id, anime.name)} />
+              {!isCW && (
+                <div className={styles.cardActions}>
+                  <select
+                    className={styles.statusSelect}
+                    value={anime.status}
+                    onChange={(e) => updateStatus.mutate({ id: anime.id, status: e.target.value })}
+                  >
+                    {FILTERS.slice(2).map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <button className={styles.removeBtn} onClick={() => handleRemove(anime.id, anime.name)}>
+                    <FaTrash size={12} />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
-      {isFetchingNextPage && <SkeletonGrid count={columnCount} />}
+      {isFetchingNextPage && <SkeletonGrid />}
 
       <RemoveConfirmationModal
         isOpen={!!itemToRemove}
