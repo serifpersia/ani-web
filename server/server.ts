@@ -650,26 +650,23 @@ app.get('/api/allmanga-details/:id', async (req, res) => {
 app.get('/api/genres-and-tags', (req, res) => res.json({ genres, tags, studios }));
 
 if (!CONFIG.IS_DEV) {
-    // Attempt to locate the frontend dist directory
-    const possiblePaths = [
-        path.join(CONFIG.ROOT, '../dist'), // Standard relative path from server root
-        path.join(__dirname, '../../dist'), // Relative to compiled server.js
-        path.join(process.cwd(), 'dist')   // Relative to current working directory
-    ];
 
-    let frontendPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html')));
+    const frontendPath = path.resolve(__dirname, '../../dist');
+    const indexHtml = path.join(frontendPath, 'index.html');
 
-    if (!frontendPath) {
-        logger.warn(`Could not locate frontend dist directory. Tried: ${possiblePaths.join(', ')}`);
-        frontendPath = path.join(CONFIG.ROOT, '../dist'); // Default fallback
-    } else {
-        logger.info(`Serving frontend from: ${frontendPath}`);
-    }
+    logger.info(`Serving frontend from: ${frontendPath}`);
 
     app.use(express.static(frontendPath));
 
-    app.get(/^(?!\/api).*$/, (req, res) => {
-        res.sendFile(path.join(frontendPath!, 'index.html'));
+    app.get(/^(?!\/api).+/, (req, res) => {
+        res.sendFile(indexHtml, (err) => {
+            if (err) {
+                logger.error({ err }, `Failed to serve index.html from ${indexHtml}`);
+                if (!res.headersSent) {
+                    res.status(500).send("Server Error: Frontend build not found.");
+                }
+            }
+        });
     });
 }
 
