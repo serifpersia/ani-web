@@ -78,7 +78,7 @@ export const useSearchAnime = (searchQueryString: string) => {
         getNextPageParam: (lastPage) => {
             return lastPage.results.length > 0 ? lastPage.currentPage + 1 : undefined;
         },
-        enabled: !!searchQueryString,
+        enabled: searchQueryString != null,
     });
 };
 
