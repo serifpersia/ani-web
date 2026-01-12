@@ -1,15 +1,15 @@
 .header {
   height: var(--header-height);
-  background-color: #1a1a1a; /* Solid background, no transparency */
-  border-bottom: 1px solid var(--border);
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
   position: sticky;
   top: 0;
   z-index: 1000;
   display: flex;
   align-items: center;
-  padding: 0 1.5rem;
-  transition: transform 0.3s ease;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  padding: 0 var(--space-6);
+  transition: transform var(--transition-slow), box-shadow var(--transition-base);
+  box-shadow: var(--shadow-md);
 }
 
 .header.hidden {
@@ -19,31 +19,40 @@
 .leftSection {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: var(--space-6);
   flex: 1;
 }
 
 .hamburgerBtn {
-  background-color: transparent; /* Default transparent */
+  background-color: transparent;
   border: 1px solid transparent;
   color: var(--text-primary);
-  font-size: 1.2rem;
-  padding: 0.5rem;
+  font-size: 1.3rem;
+  padding: var(--space-3);
   border-radius: 50%;
   display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all var(--transition-base);
+  min-height: 40px;
+  min-width: 40px;
 }
 
 .hamburgerBtn:hover {
   background-color: var(--bg-tertiary);
-  border-color: var(--border);
+  border-color: var(--border-secondary);
+  color: var(--accent);
+}
+
+.hamburgerBtn:active {
+  transform: scale(0.95);
 }
 
 .rightSection {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: var(--space-5);
 }
 
 .searchContainer {
@@ -53,40 +62,64 @@
 }
 
 .searchInput {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
   color: var(--text-primary);
-  padding: 0.6rem 2.5rem 0.6rem 1rem;
-  border-radius: 20px;
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
   width: 250px;
-  transition: all 0.2s;
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  transition: all var(--transition-base);
+  min-height: 40px;
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+}
+
+.searchInput:hover {
+  background-color: var(--bg-elevated);
+  border-color: var(--border-light);
 }
 
 .searchInput:focus {
   border-color: var(--accent);
-  width: 300px;
+  background-color: var(--bg-tertiary);
+  width: 310px;
   outline: none;
+  box-shadow: var(--shadow-input-focus);
 }
 
 .searchIcon {
   position: absolute;
-  right: 12px;
+  right: var(--space-4);
   color: var(--text-muted);
   pointer-events: none;
+  font-size: 1.1rem;
 }
 
 .profileBtn {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   overflow: hidden;
-  border: 2px solid var(--border);
+  border: 2px solid var(--border-primary);
   cursor: pointer;
-  transition: border-color 0.2s;
+  transition: all var(--transition-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .profileBtn:hover {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(138, 79, 255, 0.2);
+}
+
+.profileBtn:active {
+  transform: scale(0.95);
 }
 
 .profileImg {
@@ -98,31 +131,53 @@
 .signInBtn {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: all 0.2s;
+  justify-content: center;
+  gap: var(--space-2);
+  background-color: var(--accent);
+  color: white;
+  border: none;
+  padding: var(--space-2) var(--space-5);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  font-family: inherit;
+  transition: all var(--transition-base);
+  cursor: pointer;
+  min-height: 40px;
 }
 
 .signInBtn:hover {
-  background-color: var(--border);
+  background-color: var(--accent-dark);
+  box-shadow: var(--shadow-md);
+}
+
+.signInBtn:active {
+  transform: scale(0.98);
+}
+
+.signInBtn:focus {
+  outline: none;
+  box-shadow: var(--shadow-focus);
 }
 
 @media (max-width: 768px) {
   .header {
-    padding: 0 1rem;
+    padding: 0 var(--space-4);
+    gap: var(--space-4);
   }
+
+  .leftSection {
+    gap: var(--space-4);
+  }
+
   .searchInput {
     width: 160px;
   }
+
   .searchInput:focus {
     width: 200px;
   }
+
   .signInText {
     display: none;
   }

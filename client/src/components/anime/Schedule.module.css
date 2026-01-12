@@ -1,66 +1,59 @@
 .scheduleSection {
-    padding: var(--section-padding);
+    padding: var(--space-6);
 }
 
 .daySelector {
     display: flex;
     justify-content: center;
-    gap: 0.5rem;
-    margin-bottom: 2.5rem;
+    gap: var(--space-3);
+    margin-bottom: var(--space-10);
     flex-wrap: wrap;
 }
 
 .dayBtn {
-    background-color: transparent;
-    border: 1px solid var(--dark-border);
-    color: var(--dark-text-secondary);
-    padding: 0.75rem 1.25rem;
-    border-radius: 12px;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    color: var(--text-secondary);
+    padding: var(--space-3) var(--space-5);
+    border-radius: var(--radius-lg);
     cursor: pointer;
-    transition: all 0.2s ease-in-out;
+    transition: all var(--transition-base);
     display: flex;
     flex-direction: column;
     align-items: center;
     line-height: 1.2;
+    min-height: 56px;
+    font-weight: var(--font-weight-medium);
 }
 
-
-
 .dayBtn:hover {
-    background-color: var(--accent);
+    background-color: var(--bg-elevated);
     border-color: var(--accent);
-    color: #fff;
+    color: var(--accent-light);
+    transform: translateY(-2px);
 }
 
 .dayBtn.active {
     background-color: var(--accent);
-    border-color: var(--accent-purple-dark);
-    color: #fff;
-    font-weight: 700;
-    box-shadow: 0 0 10px var(--accent-purple);
+    border-color: var(--accent-dark);
+    color: white;
+    font-weight: var(--font-weight-bold);
+    box-shadow: var(--shadow-lg);
 }
 
 .dayName {
-    font-weight: 600;
-    font-size: 1rem;
+    font-weight: var(--font-weight-bold);
+    font-size: var(--font-size-sm);
 }
 
 .dayDate {
-    font-size: 0.8rem;
+    font-size: var(--font-size-xs);
+    opacity: 0.7;
 }
 
 .gridContainer {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 1.5rem;
-  animation: fadeIn 0.5s ease-in-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  gap: var(--space-6);
+  animation: fadeIn var(--transition-slow);
 }

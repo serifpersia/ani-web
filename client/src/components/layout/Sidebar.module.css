@@ -5,20 +5,16 @@
     left: 0;
     width: 300px;
     height: 100%;
-    transition: transform 0.15s ease-in-out;
+    transition: transform var(--transition-fast);
     z-index: 1010;
-    padding: 1rem;
+    padding: var(--space-4);
     display: flex;
     flex-direction: column;
     overflow-y: auto;
     transform: translateX(-100%);
-}
-
-.sidebar {
-    /* make sidebar solid so the page blur/overlay doesn't show through */
     background-color: var(--bg-secondary);
-    color: var(--text);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    color: var(--text-primary);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
 }
 
 .sidebar.open {
@@ -28,30 +24,50 @@
 .closeBtn {
     background: none;
     border: none;
-    font-size: 2rem;
+    font-size: 1.8rem;
     line-height: 1;
     align-self: flex-end;
     cursor: pointer;
-    padding: 0.5rem;
-    margin: -0.5rem -0.5rem 1rem 0;
-    color: var(--text);
-    transition: color 0.2s;
+    padding: var(--space-3);
+    margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) var(--space-4) 0;
+    color: var(--text-primary);
+    transition: color var(--transition-base), transform var(--transition-base);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    min-height: 40px;
+    border-radius: var(--radius-md);
 }
 
 .closeBtn:hover {
-    color: var(--accent-purple) !important;
+    color: var(--accent-light);
+    background-color: var(--bg-tertiary);
+    transform: rotate(90deg);
 }
 
 .navLink {
     display: block;
-    padding: 1rem;
-    border-radius: 8px;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
     text-decoration: none;
-    transition: background-color 0.2s;
+    transition: all var(--transition-base);
+    color: var(--text-secondary);
+    font-weight: var(--font-weight-medium);
+    margin-bottom: var(--space-2);
 }
 
 .navLink:hover {
-    background-color: var(--accent);
+    background-color: var(--bg-tertiary);
+    color: var(--accent);
+    padding-left: var(--space-5);
+}
+
+.navLink.active {
+    background-color: rgba(138, 79, 255, 0.15);
+    color: var(--accent-light);
+    border-left: 3px solid var(--accent);
+    padding-left: calc(var(--space-4) - 3px);
 }
 
 .overlay {
@@ -60,13 +76,13 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0,0,0,0.5);
+    background-color: rgba(0, 0, 0, 0.5);
     z-index: 1005;
     border: none;
     padding: 0;
-    /* optimized blur: reduced intensity and gpu acceleration */
-    backdrop-filter: blur(1px);
-    will-change: backdrop-filter;
-    transition: opacity 0.3s ease-in-out;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    will-change: opacity;
+    transition: opacity var(--transition-base);
     opacity: 1;
 }

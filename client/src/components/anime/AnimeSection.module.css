@@ -3,18 +3,33 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-6);
+  gap: var(--space-4);
 }
 
 .see-more-button {
   background-color: var(--accent);
   color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 5px;
+  padding: var(--space-2) var(--space-5);
+  border-radius: var(--radius-md);
   text-decoration: none;
-  font-weight: bold;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
 }
 
 .see-more-button:hover {
   background-color: var(--accent-dark);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.see-more-button:active {
+  transform: translateY(0);
 }
