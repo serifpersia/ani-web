@@ -652,16 +652,15 @@ app.get('/api/genres-and-tags', (req, res) => res.json({ genres, tags, studios }
 if (!CONFIG.IS_DEV) {
 
     const frontendPath = path.resolve(__dirname, '../../client/dist');
-    const indexHtml = path.join(frontendPath, 'index.html');
 
     logger.info(`Serving frontend from: ${frontendPath}`);
 
     app.use(express.static(frontendPath));
 
     app.get(/^(?!\/api).+/, (req, res) => {
-        res.sendFile(indexHtml, (err) => {
+        res.sendFile('index.html', { root: frontendPath }, (err) => {
             if (err) {
-                logger.error({ err }, `Failed to serve index.html from ${indexHtml}`);
+                logger.error({ err }, `Failed to serve index.html from ${frontendPath}`);
                 if (!res.headersSent) {
                     res.status(500).send("Server Error: Frontend build not found.");
                 }
