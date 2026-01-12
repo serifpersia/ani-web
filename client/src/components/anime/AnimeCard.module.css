@@ -17,14 +17,14 @@
   border-radius: var(--card-radius);
   overflow: hidden;
   height: 100%;
-  box-shadow: var(--shadow-md);
+  box-shadow: none;
   border: 1px solid var(--border-secondary);
-  transition: border-color var(--transition-base), box-shadow var(--transition-base), background-color var(--transition-base);
+  transition: border-color var(--transition-base), background-color var(--transition-base);
 }
 
 .cardWrapper:hover .card {
   border-color: var(--border-accent);
-  box-shadow: var(--shadow-lg);
+  box-shadow: none;
   background-color: var(--bg-tertiary);
 }
 
@@ -33,7 +33,7 @@
   width: 100%;
   aspect-ratio: 3 / 4;
   overflow: hidden;
-  background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-elevated) 100%);
+  background: var(--bg-tertiary);
 }
 
 .posterImg {
@@ -41,15 +41,16 @@
   height: 100%;
   object-fit: cover;
   opacity: 0;
-  transition: opacity 0.4s ease, transform var(--transition-slow);
+  transition: opacity 0.4s ease;
 }
 
 .posterImg.loaded {
   opacity: 1;
 }
 
+/* Poster scaling removed for performance */
 .cardWrapper:hover .posterImg {
-  transform: scale(1.08);
+  transform: none;
 }
 
 .info {
@@ -85,8 +86,8 @@
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   z-index: 2;
-  box-shadow: var(--shadow-md);
-  backdrop-filter: blur(4px);
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .typeBadge {
@@ -150,7 +151,7 @@
 
 .progressBar {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--accent-light));
+  background: var(--accent);
   border-radius: var(--radius-sm);
   transition: width 0.3s ease;
 }
@@ -184,8 +185,8 @@
 .removeBtn:hover {
   background-color: var(--danger);
   border-color: var(--danger);
-  transform: scale(1.15);
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+  transform: scale(1.08);
+  box-shadow: none;
 }
 
 .cardWrapper:hover .removeBtn {
