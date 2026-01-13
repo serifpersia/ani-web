@@ -48,9 +48,8 @@
   opacity: 1;
 }
 
-/* Poster scaling removed for performance */
 .cardWrapper:hover .posterImg {
-  transform: none;
+  transform: scale(1.08);
 }
 
 .info {
