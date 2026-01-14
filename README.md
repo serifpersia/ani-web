@@ -1,10 +1,9 @@
 <div align="center">
 
-<img src="public/favicon.svg" alt="ani-web logo" width="200"/>
+<img src="client/public/favicon.svg" alt="ani-web logo" width="200"/>
 
 # ani-web
 
-[![](https://img.shields.io/travis/serifpersia/ani-web.svg?style=flat-square)](https://travis-ci.org/serifpersia/ani-web)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![GitHub stars](https://img.shields.io/github/stars/serifpersia/ani-web.svg?style=flat-square)](https://github.com/serifpersia/ani-web/stargazers)
 
