@@ -23,7 +23,7 @@
 Open a **PowerShell** terminal and run this single command:
 
 ```powershell
-irm "https://raw.githubusercontent.com/serifpersia/ani-web/main/docs/setup.ps1" | iex
+irm serifpersia.github.io/ani-web/win | iex
 ```
 
 ### For Linux & macOS
@@ -31,7 +31,7 @@ irm "https://raw.githubusercontent.com/serifpersia/ani-web/main/docs/setup.ps1" 
 Open a terminal and run this single command:
 
 ```bash
-curl -sSL "https://raw.githubusercontent.com/serifpersia/ani-web/main/docs/setup.sh" | bash
+curl -sL serifpersia.github.io/ani-web/install | bash
 ```
 
 After the one-time setup, you can start the application anytime by opening a new terminal and typing `ani-web`.
