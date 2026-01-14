@@ -1,7 +1,7 @@
 .playerPageLayout {
     display: grid;
     /* focused player layout: sidebar left, player center/right */
-    grid-template-columns: 320px 1fr;
+    grid-template-columns: 280px 1fr;
     gap: 2rem;
     padding: 2rem;
     width: 100%;
@@ -119,7 +119,7 @@
 
 @media (max-width: 1280px) {
     .playerPageLayout {
-        grid-template-columns: 280px 1fr;
+        grid-template-columns: 250px 1fr;
         padding: 1.5rem;
         gap: 1.5rem;
     }

@@ -132,11 +132,9 @@ const Header: React.FC = () => {
       <img src={user.picture} alt="Profile" className={styles.profileImg} />
       </Link>
     ) : (
-      <button onClick={handleSignIn} className={styles.signInBtn}>
-      <FaGoogle />
-      <span className={styles.signInText}>Sign In</span>
-      </button>
-    )}
+            <button onClick={handleSignIn} className={styles.signInBtn}>
+              <FaGoogle />
+            </button>    )}
     </div>
 
     <GenericModal

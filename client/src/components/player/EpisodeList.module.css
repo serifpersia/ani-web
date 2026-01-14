@@ -1,6 +1,14 @@
 .episodeListContainer {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    height: 100%;
+    overflow: hidden;
+}
+
+.episodeListHeader {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--glass-border);
+    z-index: 10;
 }
 
 .episodeListTitle {
@@ -8,12 +16,6 @@
     margin: 0;
     font-size: 1.1rem;
     font-weight: 600;
-    border-bottom: 1px solid var(--glass-border);
-    position: sticky;
-    top: 0;
-    background: rgba(10, 10, 10, 0.8);
-    backdrop-filter: blur(8px);
-    z-index: 10;
     color: var(--text-primary);
     display: flex;
     align-items: center;
@@ -21,11 +23,10 @@
 }
 
 .rangeSelector {
-    padding: 1rem;
+    padding: 0 1rem 1rem 1rem;
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
-    border-bottom: 1px solid var(--glass-border);
 }
 
 .rangeButton {
@@ -55,6 +56,7 @@
     display: flex;
     flex-direction: column;
     padding: 0.5rem;
+    overflow-y: auto;
 }
 
 .episodeItem {
