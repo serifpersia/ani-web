@@ -7,12 +7,17 @@
     padding: 1.5rem;
     margin: 0;
     font-size: 1.1rem;
-    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    border-bottom: 1px solid var(--glass-border);
     position: sticky;
     top: 0;
-    background-color: var(--bg-secondary);
+    background: rgba(10, 10, 10, 0.8);
+    backdrop-filter: blur(8px);
     z-index: 10;
     color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .rangeSelector {
@@ -20,22 +25,24 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--glass-border);
 }
 
 .rangeButton {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-primary);
     color: var(--text-secondary);
-    padding: 0.3rem 0.8rem;
-    border-radius: 6px;
+    padding: 0.4rem 0.8rem;
+    border-radius: var(--radius-sm);
     font-size: 0.85rem;
     transition: all 0.2s;
+    cursor: pointer;
 }
 
 .rangeButton:hover {
-    border-color: var(--accent);
+    border-color: var(--text-primary);
     color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .rangeButton.active {
@@ -47,30 +54,40 @@
 .episodeList {
     display: flex;
     flex-direction: column;
+    padding: 0.5rem;
 }
 
 .episodeItem {
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid var(--border);
+    padding: 0.8rem 1rem;
+    margin: 2px 0;
+    border-radius: var(--radius-md);
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: all 0.2s;
     color: var(--text-secondary);
     font-weight: 500;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.95rem;
 }
 
 .episodeItem:hover {
-    background-color: var(--bg-tertiary);
+    background: rgba(255, 255, 255, 0.05);
     color: var(--text-primary);
+    transform: translateX(4px);
 }
 
 .episodeItem.watched {
     color: var(--text-muted);
-    text-decoration: line-through;
     opacity: 0.7;
 }
 
 .episodeItem.active {
-    background-color: rgba(138, 79, 255, 0.1);
-    color: var(--accent);
+    background: linear-gradient(90deg, rgba(139, 92, 246, 0.15), transparent);
+    color: var(--accent-light);
     border-left: 3px solid var(--accent);
+}
+
+.episodeItem.active:hover {
+    transform: none;
 }
