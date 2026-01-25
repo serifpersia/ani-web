@@ -21,7 +21,7 @@ const Logo: React.FC = () => {
       `}
       </style>
       <text x="0" y="30" className="ani-text">ani</text>
-      <text x="55" y="30" className="web-text">web</text>
+      <text x="42" y="30" className="web-text">web</text>
       </svg>
   );
 };
