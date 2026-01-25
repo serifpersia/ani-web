@@ -269,21 +269,6 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
         };
     }, [isScrubbing, sendProgressUpdate]);
 
-    useEffect(() => {
-        let styleElement = document.getElementById('subtitle-style-override') as HTMLStyleElement;
-        if (!styleElement) {
-            styleElement = document.createElement('style');
-            styleElement.id = 'subtitle-style-override';
-            document.head.appendChild(styleElement);
-        }
-        styleElement.innerHTML = `
-          video::cue {
-            font-size: ${subtitleFontSize}rem !important;
-            bottom: ${Math.abs(subtitlePosition)}% !important;
-          }
-        `;
-    }, [subtitleFontSize, subtitlePosition]);
-
     const actions = useMemo(() => ({
         togglePlay, seek, toggleMute, toggleFullscreen, onPlay, onPause, onLoadedMetadata, formatTime,
         onVolumeChange, onProgress, onTimeUpdate, onEnded, setShowControls, setIsScrubbing, setHoverTime,
