@@ -44,7 +44,7 @@ run_installation() {
     LATEST_URL=$(curl -s "$REPO_URL" | grep "browser_download_url.*ani-web.zip" | cut -d '"' -f 4)
     [ -n "$LATEST_URL" ] || print_error "Could not find the latest release URL."
     print_success "Found release URL."
-    
+
     TEMP_ZIP=$(mktemp)
     curl -L -o "$TEMP_ZIP" "$LATEST_URL" || print_error "Download failed!"
     print_success "Download complete."
@@ -81,14 +81,14 @@ run_installation() {
     INSTALLED_VERSION=$(grep '"version"' "$INSTALL_DIR/package.json" | cut -d '"' -f 4)
     [ -n "$INSTALLED_VERSION" ] || print_error "Could not determine installed version."
     echo "$INSTALLED_VERSION" > "$VERSION_FILE"
-    
+
     print_success "Application version $INSTALLED_VERSION is now installed."
     echo
 
     # Step 4: Create the launcher script
     print_step "Creating 'ani-web' command..."
     mkdir -p "$BIN_DIR"
-    
+
     cat > "$LAUNCHER_PATH" << EOF
 #!/bin/bash
 # This is the ani-web launcher. It checks for updates before running the app.

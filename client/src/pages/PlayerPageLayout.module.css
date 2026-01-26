@@ -1,6 +1,5 @@
 .playerPageLayout {
     display: grid;
-    /* focused player layout: sidebar left, player center/right */
     grid-template-columns: 280px 1fr;
     gap: 2rem;
     padding: 2rem;
@@ -63,7 +62,6 @@
     box-shadow: var(--shadow-md);
     border: 1px solid var(--glass-border);
     transform: translateZ(0);
-    /* Fix for Safari border-radius overflow */
 }
 
 .playerAnimeCard img {
@@ -103,7 +101,7 @@
     font-size: 1rem;
 }
 
-/* Scrollbar for sidebar */
+
 .episodeSidebar::-webkit-scrollbar {
     width: 6px;
 }

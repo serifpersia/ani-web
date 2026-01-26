@@ -11,14 +11,12 @@ const Search: React.FC = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const [query, setQuery] = useState(searchParams.get('query') || '');
 
-    // Filters
     const [type, setType] = useState('ALL');
     const [season, setSeason] = useState('ALL');
     const [year, setYear] = useState('ALL');
     const [country, setCountry] = useState('ALL');
     const [showFilters, setShowFilters] = useState(false);
 
-    // Genres & Tags
     const [availableGenres, setAvailableGenres] = useState<string[]>([]);
     const [genreStates, setGenreStates] = useState<{[key: string]: 'include' | 'exclude'}>({});
 
@@ -38,7 +36,6 @@ const Search: React.FC = () => {
 
     const handleSearch = () => {
         const params = new URLSearchParams();
-        // Allow search even if query is empty to act as a "browse all" or "refresh"
         if (query.trim()) params.set('query', query.trim());
 
         if (type !== 'ALL') params.set('type', type);
@@ -46,7 +43,6 @@ const Search: React.FC = () => {
         if (year !== 'ALL') params.set('year', year);
         if (country !== 'ALL') params.set('country', country);
 
-        // Process genres
         const genres = Object.entries(genreStates).filter(([, s]) => s === 'include').map(([g]) => g);
         const exclude = Object.entries(genreStates).filter(([, s]) => s === 'exclude').map(([g]) => g);
 
@@ -69,7 +65,6 @@ const Search: React.FC = () => {
         });
     };
 
-    // Infinite scroll
     useEffect(() => {
         const onScroll = () => {
             if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500 && hasNextPage && !isFetchingNextPage) {
