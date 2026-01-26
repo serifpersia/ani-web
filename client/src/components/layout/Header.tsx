@@ -27,26 +27,22 @@ const Header: React.FC = () => {
   const navigate = useNavigate();
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const queryClient = useQueryClient();
-  const HIDE_DELAY_MS = 3000; // Hide header after 3 seconds of no scrolling
+  const HIDE_DELAY_MS = 3000;
 
   const { data: user } = useQuery<UserProfile | null>({
     queryKey: ['user'],
     queryFn: fetchUser,
   });
 
-  // Scroll visibility logic with debounced hide
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-      // Show header when we scroll
       setVisible(true);
 
-      // Clear existing timer
       if (hideTimerRef.current) {
         clearTimeout(hideTimerRef.current);
       }
 
-      // Set new timer to hide header if not at top
       hideTimerRef.current = setTimeout(() => {
         if (window.scrollY > 100) {
           setVisible(false);
@@ -63,7 +59,6 @@ const Header: React.FC = () => {
     };
   }, []);
 
-  // Handle successful Google Auth from popup
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {

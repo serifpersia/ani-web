@@ -84,13 +84,11 @@ export interface AllmangaDetails {
 
 export interface Provider {
     name: string;
-    
     search(options: SearchOptions): Promise<Show[]>;
     getPopular(timeframe: 'daily' | 'weekly' | 'monthly' | 'all'): Promise<Show[]>;
     getSchedule(date: Date): Promise<Show[]>;
     getSeasonal(page: number): Promise<Show[]>;
     getLatestReleases(): Promise<Show[]>;
-    
     getShowMeta(showId: string): Promise<Partial<Show> | null>;
     getEpisodes(showId: string, mode: 'sub' | 'dub'): Promise<EpisodeDetails | null>;
     getStreamUrls(showId: string, episodeNumber: string, mode: 'sub' | 'dub'): Promise<VideoSource[] | null>;

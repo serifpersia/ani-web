@@ -58,7 +58,7 @@ If you want to work with the source code, you can clone the repository and build
 
 2.  **Install, Build, and Run:**
     The `run.sh` and `run.bat` scripts provide a menu to choose between a development or production setup. To run a development environment (which will install all dependencies and build the source code), simply run the script and choose "Development".
-    
+
     To manually build run `npm install` then `npm run build`.
 
     **On Linux/macOS:**

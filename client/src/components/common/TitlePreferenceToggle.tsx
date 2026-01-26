@@ -51,7 +51,6 @@ const TitlePreferenceToggle: React.FC = () => {
         labelRef.current.style.transform = 'translateX(0)';
         labelRef.current.style.opacity = '1';
       }
-      
       try {
         await fetch('/api/settings', {
           method: 'POST',

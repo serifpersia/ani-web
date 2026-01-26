@@ -1,10 +1,9 @@
-import React, { useEffect, useReducer, useRef, useCallback, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styles from './Player.module.css';
 import layoutStyles from './PlayerPageLayout.module.css';
 import ToggleSwitch from '../components/common/ToggleSwitch';
 import { FaCheck, FaPlus } from 'react-icons/fa';
-import toast from 'react-hot-toast';
 import { fixThumbnailUrl } from '../lib/utils';
 import ResumeModal from '../components/common/ResumeModal';
 import useIsMobile from '../hooks/useIsMobile';
@@ -13,173 +12,21 @@ import { useTitlePreference } from '../contexts/TitlePreferenceContext';
 import PlayerControls from '../components/player/PlayerControls';
 import EpisodeList from '../components/player/EpisodeList';
 import SourceSelector from '../components/player/SourceSelector';
-import ShowDetails from '../components/player/ShowDetails';
 import useVideoPlayer from '../hooks/useVideoPlayer';
-
-interface SimpleShowMeta {
-  name: string;
-  thumbnail: string;
-  description?: string;
-  names?: {
-    romaji: string;
-    english: string;
-    native: string;
-  };
-}
-
-export interface DetailedShowMeta {
-  id: string;
-  route: string;
-  title: string;
-  genres: { name: string; route: string }[];
-  studios: { name: string; route: string }[];
-  sources: { name: string; route: string }[];
-  mediaTypes: { name: string; route: string }[];
-  episodes: number;
-  lengthMin: number;
-  status: string;
-  imageVersionRoute: string;
-  stats: {
-    averageScore: number;
-    ratingCount: number;
-    trackedCount: number;
-    trackedRating: number;
-    colorLightMode: string;
-    colorDarkMode: string;
-  };
-  names: {
-    romaji: string;
-    english: string;
-    native: string;
-  };
-  websites: {
-    official: string;
-    mal: string;
-    aniList: string;
-    kitsu: string;
-    animePlanet: string;
-    anidb: string;
-    streams: { platform: string; url: string; name: string }[];
-  };
-  nextEpisodeAirDate?: string;
-}
-
-export interface AllMangaDetail {
-  Rating: string;
-  Season: string;
-  Episodes: string;
-  Date: string;
-  "Original Broadcast": string;
-}
-
-export interface VideoLink {
-  resolutionStr: string;
-  link: string;
-  hls: boolean;
-  headers?: { Referer?: string };
-}
-
-export interface SubtitleTrack {
-  src: string;
-  lang: string;
-  label: string;
-}
-
-export interface VideoSource {
-  sourceName: string;
-  links: VideoLink[];
-  subtitles?: SubtitleTrack[];
-  type?: 'player' | 'iframe';
-  sandbox?: string;
-}
-
-export interface SkipInterval {
-  start_time: number;
-  end_time: number;
-  skip_type: 'op' | 'ed' | 'recap' | 'mixed_op' | 'mixed_ed' | 'mixed_recap';
-  skip_id: string;
-}
-
-interface PlayerState {
-  showMeta: Partial<SimpleShowMeta & DetailedShowMeta>;
-  episodes: string[];
-  watchedEpisodes: string[];
-  currentEpisode?: string;
-  allMangaDetails: AllMangaDetail | null;
-  showCombinedDetails: boolean;
-  currentMode: 'sub' | 'dub';
-  inWatchlist: boolean;
-  videoSources: VideoSource[];
-  selectedSource: VideoSource | null;
-  selectedLink: VideoLink | null;
-  isAutoplayEnabled: boolean;
-  showResumeModal: boolean;
-  resumeTime: number;
-  skipIntervals: SkipInterval[];
-  loadingShowData: boolean;
-  loadingVideo: boolean;
-  loadingDetails: boolean;
-  error: string | null;
-  detailsError: string | null;
-}
-
-type Action =
-  | { type: 'SET_STATE'; payload: Partial<PlayerState> }
-  | { type: 'SET_LOADING'; key: 'loadingShowData' | 'loadingVideo' | 'loadingDetails'; value: boolean }
-  | { type: 'SET_ERROR'; payload: string }
-  | { type: 'SHOW_DATA_SUCCESS'; payload: Partial<PlayerState> }
-  | { type: 'VIDEO_DATA_SUCCESS'; payload: Partial<PlayerState> };
-
-const initialState: PlayerState = {
-  showMeta: {},
-  episodes: [],
-  watchedEpisodes: [],
-  currentEpisode: undefined,
-  allMangaDetails: null,
-  showCombinedDetails: false,
-  currentMode: 'sub',
-  inWatchlist: false,
-  videoSources: [],
-  selectedSource: null,
-  selectedLink: null,
-  isAutoplayEnabled: localStorage.getItem('autoplayEnabled') === 'true',
-  showResumeModal: false,
-  resumeTime: 0,
-  skipIntervals: [],
-  loadingShowData: true,
-  loadingVideo: false,
-  loadingDetails: false,
-  error: null,
-  detailsError: null,
-};
-
-function playerReducer(state: PlayerState, action: Action): PlayerState {
-  switch (action.type) {
-    case 'SET_STATE':
-      return { ...state, ...action.payload };
-    case 'SET_LOADING':
-      return { ...state, [action.key]: action.value };
-    case 'SET_ERROR':
-      return { ...state, error: action.payload, loadingShowData: false, loadingVideo: false };
-    case 'SHOW_DATA_SUCCESS':
-      return { ...state, ...action.payload, loadingShowData: false, error: null };
-    case 'VIDEO_DATA_SUCCESS':
-      return { ...state, ...action.payload, loadingVideo: false, error: null };
-    default:
-      return state;
-  }
-}
+import { usePlayerData } from '../hooks/usePlayerData';
+import type { VideoSource, VideoLink, SubtitleTrack } from '../types/player';
 
 const Player: React.FC = () => {
   const { id: showId, episodeNumber } = useParams<{ id: string; episodeNumber?: string }>();
   const navigate = useNavigate();
-  const [state, dispatch] = useReducer(playerReducer, initialState);
-  
+
+  const { state, dispatch, toggleWatchlist } = usePlayerData(showId, episodeNumber);
+
   const player = useVideoPlayer({
-      skipIntervals: state.skipIntervals,
-      showId: showId,
-      episodeNumber: state.currentEpisode,
-      showMeta: state.showMeta
+    skipIntervals: state.skipIntervals,
+    showId: showId,
+    episodeNumber: state.currentEpisode,
+    showMeta: state.showMeta
   });
   const { refs, actions } = player;
 
@@ -187,217 +34,11 @@ const Player: React.FC = () => {
   const isMobile = useIsMobile();
   const wasFullscreenRef = useRef(false);
 
-  const fetchWithProfile = async (url: string, options: RequestInit = {}) => {
-    const newOptions: RequestInit = { ...options };
-    if (newOptions.body && typeof newOptions.body === 'string') {
-        newOptions.headers = { ...newOptions.headers, 'Content-Type': 'application/json' };
-    }
-    return fetch(url, newOptions);
-  };
-
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      if (!showId) return;
-      dispatch({ type: 'SET_LOADING', key: 'loadingShowData', value: true });
-      try {
-        const [metaResponse, episodesResponse, watchlistResponse, watchedResponse] = await Promise.all([
-            fetch(`/api/show-meta/${showId}`),
-            fetch(`/api/episodes?showId=${showId}&mode=${state.currentMode}`),
-            fetchWithProfile(`/api/watchlist/check/${showId}`),
-            fetchWithProfile(`/api/watched-episodes/${showId}`),
-        ]);
-
-        if (!metaResponse.ok) throw new Error("Failed to fetch show metadata");
-        const meta = await metaResponse.json();
-        const watchlistStatus = watchlistResponse.ok ? await watchlistResponse.json() : { inWatchlist: false };
-        const watchedData = watchedResponse.ok ? await watchedResponse.json() : [];
-        if (!meta) {
-            dispatch({
-                type: 'SHOW_DATA_SUCCESS',
-                payload: {
-                    showMeta: {}, // Empty showMeta
-                    episodes: [],
-                    inWatchlist: watchlistStatus.inWatchlist,
-                    watchedEpisodes: watchedData,
-                    currentEpisode: undefined,
-                },
-            });
-            return;
-        }
-
-        if (!episodesResponse.ok) {
-            // Even if episodesResponse is not ok, we can still show the meta data
-            // but we should not try to access episodeData.description
-            dispatch({
-                type: 'SHOW_DATA_SUCCESS',
-                payload: {
-                    showMeta: { ...meta, names: meta.names || { romaji: meta.name, english: meta.englishName, native: meta.nativeName } },
-                    episodes: [],
-                    inWatchlist: watchlistStatus.inWatchlist,
-                    watchedEpisodes: watchedData,
-                    currentEpisode: undefined,
-                },
-            });
-            return;
-        }
-        const episodeData = await episodesResponse.json();
-        // Additional check if episodeData itself is null/undefined
-        if (!episodeData) {
-            dispatch({
-                type: 'SHOW_DATA_SUCCESS',
-                payload: {
-                    showMeta: { ...meta, names: meta.names || { romaji: meta.name, english: meta.englishName, native: meta.nativeName } },
-                    episodes: [],
-                    inWatchlist: watchlistStatus.inWatchlist,
-                    watchedEpisodes: watchedData,
-                    currentEpisode: undefined,
-                },
-            });
-            return;
-        }
-
-        dispatch({
-            type: 'SHOW_DATA_SUCCESS',
-            payload: {
-                showMeta: { ...meta, description: episodeData.description, names: meta.names || { romaji: meta.name, english: meta.englishName, native: meta.nativeName } },
-                episodes: episodeData.episodes.sort((a: string, b: string) => parseFloat(a) - parseFloat(b)),
-                inWatchlist: watchlistStatus.inWatchlist,
-                watchedEpisodes: watchedData,
-                currentEpisode: episodeNumber || (episodeData.episodes.length > 0 ? episodeData.episodes[0] : undefined),
-            },
-        });
-      } catch (e) {
-        dispatch({ type: 'SET_ERROR', payload: e instanceof Error ? e.message : 'An unknown error occurred' });
-      }
-    };
-    fetchInitialData();
-  }, [showId, state.currentMode, episodeNumber]);
-
-  useEffect(() => {
-    const fetchDetails = async () => {
-        if (!showId || state.loadingShowData) return;
-        dispatch({ type: 'SET_LOADING', key: 'loadingDetails', value: true });
-        dispatch({ type: 'SET_STATE', payload: { detailsError: null } });
-        try {
-            const detailsResponse = await fetch(`/api/show-details/${showId}`);
-            if (detailsResponse.ok) {
-                const details = await detailsResponse.json();
-                dispatch({ type: 'SET_STATE', payload: { showMeta: { ...state.showMeta, ...details }, loadingDetails: false } });
-            } else {
-                throw new Error('Failed to fetch show details');
-            }
-        } catch (e) {
-            dispatch({ type: 'SET_STATE', payload: { detailsError: e instanceof Error ? e.message : 'Failed to load details', loadingDetails: false } });
-        }
-    };
-    fetchDetails();
-  }, [showId, state.loadingShowData]);
-
-  const handleToggleDetails = useCallback(async () => {
-    dispatch({ type: 'SET_STATE', payload: { showCombinedDetails: !state.showCombinedDetails } });
-
-    if (state.showCombinedDetails || state.allMangaDetails) {
-      return;
-    }
-
-    try {
-      dispatch({ type: 'SET_LOADING', key: 'loadingDetails', value: true });
-      dispatch({ type: 'SET_STATE', payload: { detailsError: null } });
-
-      const allmangaDetailsResponse = await fetch(`/api/allmanga-details/${showId}`);
-      const allmangaDetails = allmangaDetailsResponse.ok ? await allmangaDetailsResponse.json() : null;
-
-      dispatch({
-        type: 'SET_STATE',
-        payload: {
-          allMangaDetails: allmangaDetails,
-          loadingDetails: false,
-        },
-      });
-    } catch (e) {
-      dispatch({
-        type: 'SET_STATE',
-        payload: {
-          detailsError: e instanceof Error ? e.message : 'Failed to load details',
-          loadingDetails: false
-        }
-      });
-    }
-  }, [showId, state.showCombinedDetails, state.allMangaDetails]);
-
-  const setPreferredSource = useCallback(async (sourceName: string) => {
-    try {
-      await fetchWithProfile('/api/settings', {
-        method: 'POST',
-        body: JSON.stringify({ key: 'preferredSource', value: sourceName })
-      });
-    } catch (error) {
-      console.error('Error setting preferred source:', error);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!showId || !state.currentEpisode) return;
-
-    const fetchVideoSources = async () => {
-      dispatch({ type: 'SET_LOADING', key: 'loadingVideo', value: true });
-      dispatch({ type: 'SET_STATE', payload: { videoSources: [], selectedSource: null, selectedLink: null, skipIntervals: [] } });
-      try {
-        const [sourcesResponse, progressResponse, preferredSourceResponse, skipTimesResponse] = await Promise.all([
-          fetch(`/api/video?showId=${showId}&episodeNumber=${state.currentEpisode}&mode=${state.currentMode}`),
-          fetchWithProfile(`/api/episode-progress/${showId}/${state.currentEpisode}`),
-          fetchWithProfile(`/api/settings?key=preferredSource`),
-          fetch(`/api/skip-times/${showId}/${state.currentEpisode}`)
-        ]);
-
-        if (!sourcesResponse.ok) throw new Error("Failed to fetch video sources");
-        const sources: VideoSource[] = await sourcesResponse.json();
-        const preferredSourceName = preferredSourceResponse.ok ? (await preferredSourceResponse.json()).value : null;
-
-        let sourceToSelect: VideoSource | null = sources.length > 0 ? sources[0] : null;
-        if (preferredSourceName) {
-            const foundPreferredSource = sources.find(s => s.sourceName === preferredSourceName);
-            if (foundPreferredSource) sourceToSelect = foundPreferredSource;
-        }
-        
-        const selectedLink = sourceToSelect && sourceToSelect.links.length > 0
-            ? sourceToSelect.links.sort((a, b) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0))[0]
-            : null;
-
-        let resumeTime = 0;
-        let showResumeModal = false;
-        if (progressResponse.ok) {
-            const progress = await progressResponse.json();
-            if (progress?.currentTime > 0 && progress.currentTime < progress.duration * 0.95) {
-                resumeTime = progress.currentTime;
-                showResumeModal = true;
-            }
-        }
-
-        const skipIntervals = skipTimesResponse.ok ? (await skipTimesResponse.json()).results || [] : [];
-
-        dispatch({
-          type: 'VIDEO_DATA_SUCCESS',
-          payload: {
-            videoSources: sources,
-            selectedSource: sourceToSelect,
-            selectedLink,
-            resumeTime,
-            showResumeModal,
-            skipIntervals,
-          },
-        });
-
-      } catch (e) {
-        dispatch({ type: 'SET_ERROR', payload: e instanceof Error ? e.message : 'An unknown error occurred' });
-      }
-    };
-
-    fetchVideoSources();
-  }, [showId, state.currentEpisode, state.currentMode]);
 
   useEffect(() => {
     const videoElement = refs.videoRef.current;
+    if (!videoElement) return;
+
     if (!videoElement) return;
 
     if (hlsInstance.current) {
@@ -406,7 +47,7 @@ const Player: React.FC = () => {
     videoElement.pause();
     videoElement.removeAttribute('src');
     videoElement.load();
-    
+
     while (videoElement.firstChild) {
       videoElement.removeChild(videoElement.firstChild);
     }
@@ -414,26 +55,29 @@ const Player: React.FC = () => {
     if (!state.selectedSource || !state.selectedLink) return;
 
     if (state.selectedSource.type === 'iframe') {
-        return;
+      return;
     }
 
     let proxiedUrl = `/api/proxy?url=${encodeURIComponent(state.selectedLink.link)}`;
     if (state.selectedLink.headers?.Referer) {
-        proxiedUrl += `&referer=${encodeURIComponent(state.selectedLink.headers.Referer)}`;
+      proxiedUrl += `&referer=${encodeURIComponent(state.selectedLink.headers.Referer)}`;
     }
 
     if (state.selectedSource.subtitles) {
-        state.selectedSource.subtitles.forEach(sub => {
-            const track = document.createElement('track');
-            track.kind = 'subtitles';
-            track.label = sub.label;
-            track.srclang = sub.lang;
-            track.src = `/api/subtitle-proxy?url=${encodeURIComponent(sub.src)}`;
-            if (sub.lang === 'en' || sub.label === 'English') {
-                track.default = true;
-            }
-            videoElement.appendChild(track);
-        });
+      state.selectedSource.subtitles.forEach(sub => {
+        const track = document.createElement('track');
+        track.kind = 'subtitles';
+        track.label = sub.label;
+        track.srclang = sub.lang;
+        if (sub.src) {
+          track.src = `/api/subtitle-proxy?url=${encodeURIComponent(sub.src)}`;
+        }
+        if (sub.lang === 'en' || sub.label === 'English') {
+          track.default = true;
+        }
+        videoElement.appendChild(track);
+      });
+      actions.setAvailableSubtitles(state.selectedSource.subtitles);
     }
 
     if (state.selectedLink.hls) {
@@ -449,23 +93,19 @@ const Player: React.FC = () => {
       videoElement.src = proxiedUrl;
     }
 
-    setPreferredSource(state.selectedSource.sourceName);
-
     const savedVolume = localStorage.getItem('playerVolume');
     const savedMuted = localStorage.getItem('playerMuted');
 
     if (savedVolume !== null) {
-      const newVolume = parseFloat(savedVolume);
-      videoElement.volume = newVolume;
+      videoElement.volume = parseFloat(savedVolume);
     }
     if (savedMuted !== null) {
-      const newMuted = savedMuted === 'true';
-      videoElement.muted = newMuted;
+      videoElement.muted = savedMuted === 'true';
     }
 
     videoElement.play().catch(error => {
-        console.warn("Autoplay was prevented:", error);
-        actions.setShowControls(true);
+      console.warn("Autoplay was prevented:", error);
+      actions.setShowControls(true);
     });
 
     return () => {
@@ -473,27 +113,27 @@ const Player: React.FC = () => {
         hlsInstance.current.destroy();
       }
     };
-  }, [state.selectedSource, state.selectedLink, setPreferredSource, refs.videoRef, actions]);
+  }, [state.selectedSource, state.selectedLink, refs.videoRef, actions]);
 
   useEffect(() => {
     const videoElement = refs.videoRef.current;
     if (!videoElement) return;
     const handleVideoEnd = () => {
-        actions.onEnded();
-        if (state.isAutoplayEnabled) {
-            const currentIndex = state.episodes.findIndex(ep => ep === state.currentEpisode);
-            if (currentIndex > -1 && currentIndex < state.episodes.length - 1) {
-                const nextEpisode = state.episodes[currentIndex + 1];
-                wasFullscreenRef.current = player.state.isFullscreen;
-                navigate(`/player/${showId}/${nextEpisode}`);
-            }
+      actions.onEnded();
+      if (state.isAutoplayEnabled) {
+        const currentIndex = state.episodes.findIndex(ep => ep === state.currentEpisode);
+        if (currentIndex > -1 && currentIndex < state.episodes.length - 1) {
+          const nextEpisode = state.episodes[currentIndex + 1];
+          wasFullscreenRef.current = player.state.isFullscreen;
+          navigate(`/player/${showId}/${nextEpisode}`);
         }
+      }
     };
     videoElement.addEventListener('ended', handleVideoEnd);
     return () => {
-        if (videoElement) {
-            videoElement.removeEventListener('ended', handleVideoEnd);
-        }
+      if (videoElement) {
+        videoElement.removeEventListener('ended', handleVideoEnd);
+      }
     };
   }, [state.isAutoplayEnabled, state.episodes, state.currentEpisode, showId, navigate, refs.videoRef, actions, player.state.isFullscreen]);
 
@@ -506,161 +146,17 @@ const Player: React.FC = () => {
 
   useEffect(() => {
     if (state.showResumeModal && refs.videoRef.current) {
-        refs.videoRef.current.pause();
+      refs.videoRef.current.pause();
     }
   }, [state.showResumeModal, refs.videoRef]);
 
-  useEffect(() => {
-    const container = player.refs.playerContainerRef.current;
-    if (!container || isMobile) return;
-
-    const handleMouseMove = () => {
-        if (container.style.cursor === 'none') {
-            container.style.cursor = 'default';
-        }
-        actions.setShowControls(true);
-        if (player.actions.inactivityTimer.current) window.clearTimeout(player.actions.inactivityTimer.current);
-        if (player.state.isPlaying) {
-            player.actions.inactivityTimer.current = window.setTimeout(() => {
-                actions.setShowControls(false);
-                if (player.state.isFullscreen) {
-                    container.style.cursor = 'none';
-                }
-            }, 3000);
-        }
-    };
-
-    const handleMouseLeave = () => {
-        if (player.state.isPlaying) {
-            actions.setShowControls(false);
-            if (player.state.isFullscreen) {
-                container.style.cursor = 'none';
-            }
-        }
-        if (player.actions.inactivityTimer.current) window.clearTimeout(player.actions.inactivityTimer.current);
-    };
-
-    container.addEventListener('mousemove', handleMouseMove);
-    container.addEventListener('mouseleave', handleMouseLeave);
-
-    if (!player.state.isPlaying) {
-        actions.setShowControls(true);
-        if (container.style.cursor === 'none') {
-            container.style.cursor = 'default';
-        }
-        if (player.actions.inactivityTimer.current) window.clearTimeout(player.actions.inactivityTimer.current);
-    }
-
-    return () => {
-        if (container) {
-            container.removeEventListener('mousemove', handleMouseMove);
-            container.removeEventListener('mouseleave', handleMouseLeave);
-            container.style.cursor = 'default';
-        }
-        if (player.actions.inactivityTimer.current) window.clearTimeout(player.actions.inactivityTimer.current);
-    };
-  }, [player.state.isPlaying, player.state.isFullscreen, isMobile, player.refs.playerContainerRef, player.actions]);
-
-  const { setIsFullscreen } = actions;
-
-  useEffect(() => {
-    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, [setIsFullscreen]);
-
-  const { setAvailableSubtitles } = actions;
-
-  useEffect(() => {
-    const videoElement = refs.videoRef.current;
-    if (!videoElement) return;
-
-    const handleTracksChange = () => {
-        setAvailableSubtitles(Array.from(videoElement.textTracks));
-    };
-
-    videoElement.textTracks.addEventListener('addtrack', handleTracksChange);
-    videoElement.textTracks.addEventListener('removetrack', handleTracksChange);
-    handleTracksChange();
-    return () => {
-        if (videoElement) {
-            videoElement.textTracks.removeEventListener('addtrack', handleTracksChange);
-            videoElement.textTracks.removeEventListener('removetrack', handleTracksChange);
-        }
-    };
-  }, [refs.videoRef, setAvailableSubtitles]);
-
-  const { setActiveSubtitleTrack } = actions;
-
-  useEffect(() => {
-    if (player.state.activeSubtitleTrack === null && player.state.availableSubtitles.length > 0) {
-        const englishTrack = player.state.availableSubtitles.find(t => t.language === 'en' || t.label === 'English');
-        const trackToActivate = englishTrack || player.state.availableSubtitles[0];
-        setActiveSubtitleTrack(trackToActivate.language || trackToActivate.label);
-        player.state.availableSubtitles.forEach(t => t.mode = (t === trackToActivate) ? 'showing' : 'hidden');
-    }
-  }, [player.state.activeSubtitleTrack, player.state.availableSubtitles, setActiveSubtitleTrack]);
-
-  const handleEpisodeClick = (ep: string) => navigate(`/player/${showId}/${ep}`);
-
-  const toggleWatchlist = async () => {
-    if (!state.showMeta || !showId) return;
-    const wasInWatchlist = state.inWatchlist;
-    dispatch({ type: 'SET_STATE', payload: { inWatchlist: !wasInWatchlist } });
-
-    try {
-      const endpoint = wasInWatchlist ? '/api/watchlist/remove' : '/api/watchlist/add';
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: showId, name: state.showMeta.name, thumbnail: state.showMeta.thumbnail, nativeName: state.showMeta.names?.native, englishName: state.showMeta.names?.english })
-      });
-
-      if (!response.ok) {
-        throw new Error('Server responded with an error');
-      }
-
-      toast.success(wasInWatchlist ? 'Removed from watchlist' : 'Added to watchlist');
-    } catch (e) {
-      dispatch({ type: 'SET_STATE', payload: { inWatchlist: wasInWatchlist } });
-      toast.error(e instanceof Error ? e.message : 'An unknown error occurred');
-      console.error("Error toggling watchlist:", e);
-    }
-  };
-
-  const handleResume = () => {
-    if (refs.videoRef.current) {
-        refs.videoRef.current.currentTime = state.resumeTime;
-        refs.videoRef.current.play();
-    }
-    dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } });
-  };
-
-  const handleStartOver = () => {
-    if (refs.videoRef.current) {
-        refs.videoRef.current.currentTime = 0;
-        refs.videoRef.current.play();
-    }
-    dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } });
-  };
-
-  const handleAutoplayChange = (checked: boolean) => {
-      dispatch({ type: 'SET_STATE', payload: { isAutoplayEnabled: checked } });
-      localStorage.setItem('autoplayEnabled', checked.toString());
-  };
-
   const { titlePreference } = useTitlePreference();
-
   const displayTitle = useMemo(() => {
     if (!state.showMeta) return 'Loading...';
-
-    const { name, nativeName, englishName } = state.showMeta;
-
+    const { name, names } = state.showMeta;
     if (titlePreference === 'name' && name) return name;
-    if (titlePreference === 'nativeName' && nativeName) return nativeName;
-    if (titlePreference === 'englishName' && englishName) return englishName;
-
-    // Fallback to name if preferred title is not available, or just name
+    if (titlePreference === 'nativeName' && names?.native) return names.native;
+    if (titlePreference === 'englishName' && names?.english) return names.english;
     return name || 'Loading...';
   }, [state.showMeta, titlePreference]);
 
@@ -670,90 +166,213 @@ const Player: React.FC = () => {
     }
   }, [displayTitle, state.currentEpisode]);
 
-  if (state.loadingShowData) {
-    return <p className="loading">Loading show data...</p>;
-  }
 
-  if (state.error) {
-    return <p className="error-message">Error: {state.error}</p>;
-  }
+  const handleMouseMove = useCallback(() => {
+    if (player.state.isPlaying) {
+      actions.setShowControls(true);
+      if (player.actions.inactivityTimer.current) clearTimeout(player.actions.inactivityTimer.current);
+      player.actions.inactivityTimer.current = window.setTimeout(() => {
+        actions.setShowControls(false);
+      }, 1500);
+    }
+  }, [player.state.isPlaying, actions, player.actions.inactivityTimer]);
 
-  if (!state.showMeta.name) {
-    return <p>Show not found.</p>;
-  }
+  useEffect(() => {
+    const container = refs.playerContainerRef.current;
+    if (container) {
+      container.addEventListener('mousemove', handleMouseMove);
+      return () => container.removeEventListener('mousemove', handleMouseMove);
+    }
+  }, [handleMouseMove, refs.playerContainerRef]);
 
-  if (state.episodes.length === 0 || !state.currentEpisode) {
-    return <p className="error-message">No episodes found for this show, or current episode could not be determined.</p>;
-  }
+  const { setIsFullscreen, setAvailableSubtitles, setActiveSubtitleTrack } = actions;
+
+  useEffect(() => {
+    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, [setIsFullscreen]);
+
+  useEffect(() => {
+    const videoElement = refs.videoRef.current;
+    if (!videoElement) return;
+    const handleTracksChange = () => {
+      const tracks: SubtitleTrack[] = Array.from(videoElement.textTracks).map(t => ({
+        label: t.label,
+        lang: t.language,
+        src: undefined,
+        mode: t.mode as 'showing' | 'hidden' | 'disabled'
+      }));
+      setAvailableSubtitles(tracks as any);
+    };
+    videoElement.textTracks.addEventListener('addtrack', handleTracksChange);
+    videoElement.textTracks.addEventListener('removetrack', handleTracksChange);
+    handleTracksChange();
+    return () => {
+      if (videoElement) {
+        videoElement.textTracks.removeEventListener('addtrack', handleTracksChange);
+        videoElement.textTracks.removeEventListener('removetrack', handleTracksChange);
+      }
+    };
+  }, [refs.videoRef, setAvailableSubtitles]);
+
+  useEffect(() => {
+    if (player.state.activeSubtitleTrack === null && player.state.availableSubtitles.length > 0) {
+      const englishTrack = player.state.availableSubtitles.find(t => t.lang === 'en' || t.label === 'English');
+      const trackToActivate = englishTrack || player.state.availableSubtitles[0];
+      setActiveSubtitleTrack(trackToActivate.lang || trackToActivate.label);
+      player.state.availableSubtitles.forEach(t => t.mode = (t === trackToActivate) ? 'showing' : 'hidden');
+    }
+  }, [player.state.activeSubtitleTrack, player.state.availableSubtitles, setActiveSubtitleTrack]);
+
+
+  useEffect(() => {
+    const styleId = 'dynamic-subtitle-styles';
+    let styleTag = document.getElementById(styleId);
+    if (!styleTag) {
+      styleTag = document.createElement('style');
+      styleTag.id = styleId;
+      document.head.appendChild(styleTag);
+    }
+
+    const fontSize = `${player.state.subtitleFontSize}rem`;
+
+    styleTag.textContent = `
+          video::cue {
+              font-size: ${fontSize} !important;
+              background-color: rgba(0, 0, 0, 0.5) !important;
+              color: white !important;
+              text-shadow: 0 0 4px black;
+          }
+      `;
+
+    const video = refs.videoRef.current;
+    if (!video) return;
+
+    const updateCuePosition = () => {
+      const activeTrack = Array.from(video.textTracks).find(t => t.mode === 'showing');
+      if (activeTrack && activeTrack.cues) {
+        Array.from(activeTrack.cues).forEach((cue: any) => {
+          try {
+            cue.snapToLines = false;
+            const pos = Math.max(0, Math.min(100, 100 - player.state.subtitlePosition));
+            cue.line = pos;
+          } catch (e) {
+          }
+        });
+      }
+    };
+
+    updateCuePosition();
+
+    const handleCueChange = () => {
+      updateCuePosition();
+    };
+
+
+    const activeTrack = Array.from(video.textTracks).find(t => t.mode === 'showing');
+    if (activeTrack) {
+      activeTrack.addEventListener('cuechange', handleCueChange);
+      return () => activeTrack.removeEventListener('cuechange', handleCueChange);
+    }
+
+  }, [player.state.subtitleFontSize, player.state.subtitlePosition, player.state.activeSubtitleTrack, refs.videoRef]);
+
+  const handleResume = () => {
+    if (refs.videoRef.current) {
+      refs.videoRef.current.currentTime = state.resumeTime;
+      refs.videoRef.current.play();
+    }
+    dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } });
+  };
+
+  const handleStartOver = () => {
+    if (refs.videoRef.current) {
+      refs.videoRef.current.currentTime = 0;
+      refs.videoRef.current.play();
+    }
+    dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } });
+  };
+
+  const handleAutoplayChange = (checked: boolean) => {
+    dispatch({ type: 'SET_STATE', payload: { isAutoplayEnabled: checked } });
+    localStorage.setItem('autoplayEnabled', checked.toString());
+  };
+
+  if (state.loadingShowData) return <p className="loading">Loading show data...</p>;
+  if (state.error) return <p className="error-message">Error: {state.error}</p>;
+  if (!state.showMeta.name) return <p>Show not found.</p>;
+  if (state.episodes.length === 0 || !state.currentEpisode) return <p className="error-message">No episodes found.</p>;
 
   return (
     <div className={layoutStyles.playerPageLayout}>
-        <ResumeModal 
-            show={state.showResumeModal}
-            resumeTime={player.actions.formatTime(state.resumeTime)}
-            onResume={handleResume}
-            onStartOver={handleStartOver}
-        />
+      <ResumeModal
+        show={state.showResumeModal}
+        resumeTime={player.actions.formatTime(state.resumeTime)}
+        onResume={handleResume}
+        onStartOver={handleStartOver}
+      />
       <aside className={layoutStyles.episodeSidebar}>
-        <EpisodeList 
-            episodes={state.episodes}
-            currentEpisode={state.currentEpisode}
-            watchedEpisodes={state.watchedEpisodes}
-            onEpisodeClick={handleEpisodeClick}
+        <EpisodeList
+          episodes={state.episodes}
+          currentEpisode={state.currentEpisode}
+          watchedEpisodes={state.watchedEpisodes}
+          onEpisodeClick={(ep) => navigate(`/player/${showId}/${ep}`)}
         />
       </aside>
 
       <div className={layoutStyles.playerMain}>
         <div ref={refs.playerContainerRef} className={`${styles.videoContainer} ${layoutStyles.videoPlayerWrapper}`} onDoubleClick={actions.toggleFullscreen}>
           {state.loadingVideo && (
-              <div className={styles.loadingOverlay}>
-                  <div className={styles.loadingDots}>
-                      <div className={styles.dot}></div>
-                      <div className={styles.dot}></div>
-                      <div className={styles.dot}></div>
-                  </div>
+            <div className={styles.loadingOverlay}>
+              <div className={styles.loadingDots}>
+                <div className={styles.dot}></div>
+                <div className={styles.dot}></div>
+                <div className={styles.dot}></div>
               </div>
+            </div>
           )}
 
           {player.state.isBuffering && !state.loadingVideo && (
-              <div className={styles.bufferingOverlay}>
-                  <div className={styles.bufferingSpinner}></div>
-              </div>
+            <div className={styles.bufferingOverlay}>
+              <div className={styles.bufferingSpinner}></div>
+            </div>
           )}
-          
+
           {state.selectedSource?.type === 'iframe' ? (
-              !state.loadingVideo && <iframe
-                  src={state.selectedLink?.link}
-                  className={styles.videoIframe}
-                  allow="autoplay; fullscreen; picture-in-picture"
-                  allowFullScreen
-                  sandbox={state.selectedSource.sandbox ? `${state.selectedSource.sandbox} allow-fullscreen allow-popups allow-popups-to-escape-sandbox` : undefined}
-              ></iframe>
+            !state.loadingVideo && <iframe
+              src={state.selectedLink?.link}
+              className={styles.videoIframe}
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowFullScreen
+              sandbox={state.selectedSource.sandbox ? `${state.selectedSource.sandbox} allow-fullscreen allow-popups allow-popups-to-escape-sandbox` : undefined}
+            ></iframe>
           ) : (
             <>
-              {!state.loadingVideo && !isMobile && <PlayerControls 
-                  player={player}
-                  isAutoplayEnabled={state.isAutoplayEnabled}
-                  onAutoplayChange={handleAutoplayChange}
-                  videoSources={state.videoSources}
-                  selectedSource={state.selectedSource}
-                  selectedLink={state.selectedLink}
-                  onSourceChange={(source, link) => dispatch({ type: 'SET_STATE', payload: { selectedSource: source, selectedLink: link }})}
-                  loadingVideo={state.loadingVideo}
+              {!state.loadingVideo && !isMobile && <PlayerControls
+                player={player}
+                isAutoplayEnabled={state.isAutoplayEnabled}
+                onAutoplayChange={handleAutoplayChange}
+                videoSources={state.videoSources}
+                selectedSource={state.selectedSource}
+                selectedLink={state.selectedLink}
+                onSourceChange={(source, link) => dispatch({ type: 'SET_STATE', payload: { selectedSource: source, selectedLink: link } })}
+                loadingVideo={state.loadingVideo}
+                skipIntervals={state.skipIntervals}
               />}
 
-              {!state.loadingVideo && <video 
-                  ref={refs.videoRef} 
-                  controls={isMobile}
-                  onClick={!isMobile ? actions.togglePlay : undefined}
-                  onPlay={actions.onPlay}
-                  onPause={actions.onPause}
-                  onLoadedMetadata={actions.onLoadedMetadata}
-                  onTimeUpdate={actions.onTimeUpdate}
-                  onProgress={actions.onProgress}
-                  onVolumeChange={actions.onVolumeChange}
-                  onWaiting={actions.onWaiting}
-                  onPlaying={actions.onPlaying}
+              {!state.loadingVideo && <video
+                ref={refs.videoRef}
+                controls={isMobile}
+                onClick={!isMobile ? actions.togglePlay : undefined}
+                onPlay={actions.onPlay}
+                onPause={actions.onPause}
+                onLoadedMetadata={actions.onLoadedMetadata}
+                onTimeUpdate={actions.onTimeUpdate}
+                onProgress={actions.onProgress}
+                onVolumeChange={actions.onVolumeChange}
+                onWaiting={actions.onWaiting}
+                onPlaying={actions.onPlaying}
               />}
             </>
           )}
@@ -761,90 +380,70 @@ const Player: React.FC = () => {
 
         {state.loadingVideo ? (
           <div className={styles.sourceLoader}>
-              <div className={styles.spinner}></div>
+            <div className={styles.spinner}></div>
           </div>
         ) : (
-          <SourceSelector 
-              videoSources={state.videoSources}
-              selectedSource={state.selectedSource}
-              onSourceChange={(source) => {
-                const bestLink = source.links.sort((a, b) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0))[0];
-                dispatch({ type: 'SET_STATE', payload: { selectedSource: source, selectedLink: bestLink } })
-              }}
+          <SourceSelector
+            videoSources={state.videoSources}
+            selectedSource={state.selectedSource}
+            onSourceChange={(source) => {
+              const bestLink = source.links.sort((a: VideoLink, b: VideoLink) => (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0))[0];
+              dispatch({ type: 'SET_STATE', payload: { selectedSource: source, selectedLink: bestLink } })
+            }}
           />
         )}
 
         <div className={layoutStyles.playerInfoHeader}>
-            <div className={layoutStyles.playerAnimeCard}>
-                <img src={fixThumbnailUrl(state.showMeta.thumbnail!)} alt={displayTitle} />
-            </div>
-            <div className={layoutStyles.videoTitleSection}>
-                <div className={styles.titleContainer}>
-                    <h1>{displayTitle}</h1>
-                    <div className={styles.scheduleInfo}>
-                        {state.showMeta.status && <span className={styles.status}>{state.showMeta.status}</span>}
-                        {state.showMeta.nextEpisodeAirDate && (
-                            <span className={styles.nextEpisode}>
-                                Next episode: {state.showMeta.nextEpisodeAirDate}
-                            </span>
-                        )}
-                    </div>
-                </div>
-                <div className={styles.controls}>
-                    <button className={`${styles.watchlistBtn} ${state.inWatchlist ? styles.inList : ''}`} onClick={toggleWatchlist}>
-                        {state.inWatchlist ? <FaCheck /> : <FaPlus />}
-                        {state.inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
-                    </button>
-                    <div className={styles.toggleContainer}>
-                        <span>SUB</span>
-                        <ToggleSwitch 
-                            id="dub-toggle"
-                            isChecked={state.currentMode === 'dub'} 
-                            onChange={() => {
-                                const newMode = state.currentMode === 'sub' ? 'dub' : 'sub';
-                                dispatch({ type: 'SET_STATE', payload: { currentMode: newMode } });
-                                toast.success(`Switched to ${newMode.toUpperCase()}`);
-                            }} 
-                        />
-                        <span>DUB</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <p className={layoutStyles.videoDescription} dangerouslySetInnerHTML={{ __html: state.showMeta.description || 'No description available.' }}></p>
-        
-        <ShowDetails
-          showMeta={state.showMeta}
-          allMangaDetails={state.allMangaDetails}
-          loading={state.loadingDetails}
-          error={state.detailsError}
-          isOpen={state.showCombinedDetails}
-          onToggle={handleToggleDetails}
-        />
-
-        {isMobile && state.selectedSource?.type !== 'iframe' && (
-          <div className={styles.mobileControls}>
-              <div className={styles.playerActions}>
-                  <button className={styles.seekBtn} onClick={() => actions.seek(-10)}>-10s</button>
-                  <button className={styles.seekBtn} onClick={() => actions.seek(10)}>+10s</button>
-                  <div className={styles.toggleContainer}>
-                      <span>Auto Skip</span>
-                      <ToggleSwitch id="auto-skip-toggle-mobile" isChecked={player.state.isAutoSkipEnabled} onChange={(e) => {
-                          const checked = e.target.checked;
-                          actions.setIsAutoSkipEnabled(checked);
-                          localStorage.setItem('autoSkipEnabled', checked.toString());
-                      }} />
-                  </div>
-                  <div className={styles.toggleContainer}>
-                      <span>Autoplay</span>
-                      <ToggleSwitch id="autoplay-toggle-mobile" isChecked={state.isAutoplayEnabled} onChange={(e) => handleAutoplayChange(e.target.checked)} />
-                  </div>
-              </div>
+          <div className={layoutStyles.playerAnimeCard}>
+            <img src={fixThumbnailUrl(state.showMeta.thumbnail!)} alt={displayTitle} />
           </div>
-        )}
+          <div className={layoutStyles.videoTitleSection}>
+            <div className={styles.titleContainer}>
+              <h1>{displayTitle}</h1>
+              <div className={styles.scheduleInfo}>
+                {state.showMeta.status && <span className={styles.status}>{state.showMeta.status}</span>}
+                {state.showMeta.nextEpisodeAirDate && (
+                  <span className={styles.nextEpisode}>
+                    Next episode: {state.showMeta.nextEpisodeAirDate}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className={styles.controls}>
+              <button className={`${styles.watchlistBtn} ${state.inWatchlist ? styles.inList : ''}`} onClick={toggleWatchlist}>
+                {state.inWatchlist ? <FaCheck /> : <FaPlus />}
+                {state.inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
+              </button>
+              <div className={styles.toggleContainer}>
+                <span>SUB</span>
+                <ToggleSwitch
+                  id="mode-switch"
+                  isChecked={state.currentMode === 'dub'}
+                  onChange={(e) => dispatch({ type: 'SET_STATE', payload: { currentMode: e.target.checked ? 'dub' : 'sub' } })}
+                />
+                <span>DUB</span>
+              </div>
+            </div>
+
+            {}
+            <div className={styles.descriptionSection}>
+              <h3>Synopsis</h3>
+              <p className={styles.description}>
+                {state.showMeta.description
+                  ? state.showMeta.description.replace(/<[^>]*>?/gm, '')
+                  : 'No description available.'}
+              </p>
+              <div className={styles.metaTags}>
+                {state.showMeta.genres?.map(g => (
+                  <span key={g.name} className={styles.genreTag}>{g.name}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
+
   );
 };
 

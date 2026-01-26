@@ -13,7 +13,7 @@ import { googleDriveService } from './google';
 import { CONFIG } from './config';
 import { initializeDatabase, syncDownOnBoot, syncUp, initSyncProvider } from './sync';
 
-// Import route modules
+
 import { createAuthRouter } from './routes/auth.routes';
 import { createWatchlistRouter } from './routes/watchlist.routes';
 import { createDataRouter } from './routes/data.routes';
@@ -56,7 +56,7 @@ async function runSyncSequence(database: sqlite3.Database) {
     }
 }
 
-// Middleware
+
 app.use((req, res, next) => {
     if (isShuttingDown) {
         return res.status(503).send('Server is shutting down...');
@@ -73,15 +73,15 @@ axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay });
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// Mount route modules
+
 app.use('/api/auth', createAuthRouter((database) => runSyncSequence(database)));
-app.use('/api/settings', createAuthRouter((database) => runSyncSequence(database))); // Auth settings routes
+app.use('/api/settings', createAuthRouter((database) => runSyncSequence(database)));
 app.use('/api', createWatchlistRouter(provider));
 app.use('/api', createDataRouter(apiCache, provider));
 app.use('/api', createProxyRouter());
-// Settings router will be mounted after db is initialized
 
-// Serve frontend in production
+
+
 if (!CONFIG.IS_DEV) {
     const frontendPath = path.resolve(__dirname, '../../client/dist');
     logger.info(`Serving frontend from: ${frontendPath}`);
@@ -112,7 +112,6 @@ async function main() {
     db = await initializeDatabase(dbPath);
     logger.info(`Database initialized at ${dbPath}`);
 
-    // Mount settings router now that db is initialized
     app.use('/api', createSettingsRouter(provider, db, initializeDatabase));
 
     await runSyncSequence(db);

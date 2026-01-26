@@ -12,7 +12,7 @@
     margin-bottom: 1.5rem;
 }
 
-/* Hidden by default */
+
 .advancedFilters {
     display: none;
     flex-direction: column;
@@ -22,7 +22,7 @@
     animation: slideDown 0.3s ease-out;
 }
 
-/* Visible when class 'show' is added */
+
 .advancedFilters.show {
     display: flex;
 }

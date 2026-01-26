@@ -7,7 +7,6 @@ export function createDataRouter(apiCache: NodeCache, provider: AllAnimeProvider
     const router = Router();
     const controller = new DataController(provider);
 
-    // Cached routes
     router.get('/popular/:timeframe', (req, res, next) => {
         const cacheKey = `popular-${(req.params.timeframe as string).toLowerCase()}`;
         const cached = apiCache.get(cacheKey);
@@ -34,7 +33,6 @@ export function createDataRouter(apiCache: NodeCache, provider: AllAnimeProvider
         next();
     }, controller.getSchedule);
 
-    // Non-cached routes
     router.get('/skip-times/:showId/:episodeNumber', controller.getSkipTimes);
     router.get('/video', controller.getVideo);
     router.get('/episodes', controller.getEpisodes);
