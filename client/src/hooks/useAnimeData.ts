@@ -70,7 +70,7 @@ export const useSearchAnime = (searchQueryString: string) => {
             const data = await fetchApi(`/api/search?${params.toString()}`);
             return {
                 results: data,
-                totalPages: 1, 
+                totalPages: 1,
                 currentPage: pageParam,
             };
         },

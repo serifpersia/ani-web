@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import type { SkipInterval } from '../pages/Player';
+import type { SkipInterval } from '../types/player';
 
 interface VideoPlayerProps {
     skipIntervals: SkipInterval[];
@@ -208,7 +208,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
         if (!isScrubbing) {
             setCurrentTime(time);
         }
-        
+
         const now = Date.now();
         if (now - lastThrottledUpdateTime.current > 5000) {
             lastThrottledUpdateTime.current = now;

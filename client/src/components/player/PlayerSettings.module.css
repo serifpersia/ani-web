@@ -1,0 +1,114 @@
+.settingsPanel {
+    position: absolute;
+    bottom: 90px;
+    right: 24px;
+    width: 300px;
+    background: rgba(15, 15, 17, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    z-index: 60;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    position: relative;
+    height: 56px;
+}
+
+.header h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    flex-grow: 1;
+    text-align: center;
+}
+
+.backBtn {
+    background: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    position: absolute;
+    left: 12px;
+    padding: 4px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.backBtn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.contentWrapper {
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+.menuContent {
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+}
+
+.menuItem {
+    background: transparent;
+    border: none;
+    color: white;
+    padding: 12px 16px;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    font-size: 0.95rem;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.menuItem:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.menuItem.selected {
+    color: var(--accent);
+}
+
+.currentValue {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.85rem;
+}
+
+.sliderGroup {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sliderGroup label {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.sliderGroup input[type="range"] {
+    width: 100%;
+    cursor: pointer;
+    accent-color: var(--accent);
+}
+
+
+.contentWrapper::-webkit-scrollbar {
+    width: 4px;
+}

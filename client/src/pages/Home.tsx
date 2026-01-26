@@ -65,7 +65,7 @@ const Home: React.FC = () => {
       flexWrap: 'wrap'
     }}>
 
-    {/* Main Content Column */}
+    {}
     <div style={{ flex: '1', minWidth: '0' }}>
 
     {cwList && cwList.length > 0 && (
@@ -90,7 +90,7 @@ const Home: React.FC = () => {
     </section>
     </div>
 
-    {/* Sidebar Column - Only visible on desktop - Natural Scroll (Not Sticky) */}
+    {}
     {!isMobile && (
       <aside style={{
         width: '320px',

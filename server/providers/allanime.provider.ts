@@ -120,7 +120,6 @@ export class AllAnimeProvider implements Provider {
         }
         const variables = { type: "anime", size: 10, page: 1, allowAdult: false, allowUnknown: false, dateRange: dateRange };
         const extensions = { persistedQuery: { version: 1, sha256Hash: "1fc9651b0d4c3b9dfd2fa6e1d50b8f4d11ce37f988c23b8ee20f82159f7c1147" } };
-        
         const response = await axios.get(API_ENDPOINT, {
             headers: { 'User-Agent': USER_AGENT, 'Referer': REFERER },
             params: { variables: JSON.stringify(variables), extensions: JSON.stringify(extensions) },
@@ -142,7 +141,6 @@ export class AllAnimeProvider implements Provider {
         const variables = { search: { dateRangeStart: Math.floor(startOfDay.getTime() / 1000), dateRangeEnd: Math.floor(endOfDay.getTime() / 1000), sortBy: "Latest_Update" }, limit: 50, page: 1, translationType: "sub", countryOrigin: "ALL" };
         return this._fetchShows(variables);
     }
-    
     async getSeasonal(page: number): Promise<Show[]> {
         const month = new Date().getMonth();
         const season = (month >= 0 && month <= 2) ? "Winter" : (month >= 3 && month <= 5) ? "Spring" : (month >= 6 && month <= 8) ? "Summer" : "Fall";
@@ -150,7 +148,6 @@ export class AllAnimeProvider implements Provider {
         const variables = { search: { year, season, sortBy: "Latest_Update", allowAdult: false }, limit: 25, page: page, translationType: "sub", countryOrigin: "JP" };
         return this._fetchShows(variables);
     }
-    
     async getLatestReleases(): Promise<Show[]> {
         const variables = { search: { sortBy: 'Latest_Update', allowAdult: false }, limit: 10, page: 1, translationType: 'sub', countryOrigin: 'JP' };
         return this._fetchShows(variables);
@@ -165,9 +162,9 @@ export class AllAnimeProvider implements Provider {
         const show = response.data.data.show;
         if (show) {
             return {
-                name: show.name, 
-                thumbnail: this.deobfuscateUrl(show.thumbnail), 
-                nativeName: show.nativeName, 
+                name: show.name,
+                thumbnail: this.deobfuscateUrl(show.thumbnail),
+                nativeName: show.nativeName,
                 englishName: show.englishName,
                 availableEpisodesDetail: show.availableEpisodesDetail
             };
@@ -205,7 +202,6 @@ export class AllAnimeProvider implements Provider {
             });
             const malId = malIdResponse.data?.data?.show?.malId;
             if (!malId) return { found: false, results: [] };
-    
             const response = await axios.get(`https://api.aniskip.com/v1/skip-times/${malId}/${episodeNumber}?types=op&types=ed`, {
                 headers: { 'User-Agent': USER_AGENT },
                 timeout: 5000
@@ -219,9 +215,9 @@ export class AllAnimeProvider implements Provider {
     async getStreamUrls(showId: string, episodeNumber: string, mode: 'sub' | 'dub'): Promise<VideoSource[] | null> {
         const { data } = await axios.get(API_ENDPOINT, {
             headers: { 'User-Agent': USER_AGENT, 'Referer': REFERER },
-            params: { 
-                query: `query($showId: String!, $translationType: VaildTranslationTypeEnumType!, $episodeString: String!) { episode(showId: $showId, translationType: $translationType, episodeString: $episodeString) { sourceUrls } }`, 
-                variables: JSON.stringify({ showId, translationType: mode, episodeString: episodeNumber }) 
+            params: {
+                query: `query($showId: String!, $translationType: VaildTranslationTypeEnumType!, $episodeString: String!) { episode(showId: $showId, translationType: $translationType, episodeString: $episodeString) { sourceUrls } }`,
+                variables: JSON.stringify({ showId, translationType: mode, episodeString: episodeNumber })
             },
             timeout: 15000
         });
@@ -273,7 +269,6 @@ export class AllAnimeProvider implements Provider {
                     }
                     if (videoLinks.length > 0) return { sourceName: source.sourceName, links: videoLinks, subtitles, type: 'player' };
                 }
-                
                 if (source.sourceName === 'Fm-Hls') {
                     if (source.type === 'iframe') {
                         return { sourceName: source.sourceName, links: [{ resolutionStr: 'iframe', link: source.sourceUrl, hls: false }], type: 'iframe' };
@@ -310,9 +305,7 @@ export class AllAnimeProvider implements Provider {
 
         const scheduleSearchUrl = `https://animeschedule.net/api/v3/anime?q=${encodeURIComponent(showName)}`;
         const scheduleResponse = await axios.get(scheduleSearchUrl, { timeout: 10000 });
-        
         const firstResult = scheduleResponse.data?.anime?.[0];
-        
         if (firstResult) {
             if (firstResult.status === 'Ongoing') {
                 try {
@@ -327,7 +320,6 @@ export class AllAnimeProvider implements Provider {
             }
             return firstResult;
         }
-        
         throw new Error('Not Found on Schedule');
     }
 
@@ -356,7 +348,6 @@ export class AllAnimeProvider implements Provider {
                 details[label] = value;
             }
         });
-        
         return details;
     }
 }

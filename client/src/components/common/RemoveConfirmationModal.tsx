@@ -66,7 +66,7 @@ const RemoveConfirmationModal: React.FC<RemoveConfirmationModalProps> = ({
             </label>
           </div>
         )}
-        <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+        <div style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <button className="btn-secondary" onClick={onClose}>
             No
           </button>
