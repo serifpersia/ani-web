@@ -3,8 +3,8 @@ import React from 'react';
 const Logo: React.FC = () => {
   return (
     <svg height="40" width="125" style={{ display: 'block', overflow: 'visible' }}>
-    <style>
-    {`
+      <style>
+        {`
       .ani-text,
       .web-text {
         font-family: var(--font-family, sans-serif);
@@ -20,9 +20,9 @@ const Logo: React.FC = () => {
       }
       `}
       </style>
-      <text x="0" y="30" className="ani-text">ani</text>
-      <text x="42" y="30" className="web-text">web</text>
-      </svg>
+      <text x="0" y="30" className="ani-text" style={{ fill: 'var(--text-primary)' }}>ani</text>
+      <text x="42" y="30" className="web-text" style={{ fill: 'var(--accent)' }}>web</text>
+    </svg>
   );
 };
 

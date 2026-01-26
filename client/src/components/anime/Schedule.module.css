@@ -6,7 +6,7 @@
     display: flex;
     justify-content: center;
     gap: var(--space-3);
-    margin-bottom: var(--space-10);
+    margin-bottom: 2rem;
     flex-wrap: wrap;
 }
 

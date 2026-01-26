@@ -21,12 +21,10 @@ const Watchlist: React.FC = () => {
   const queryClient = useQueryClient();
   const [sortBy, setSortBy] = useState("last_added");
 
-  // Modal State
   const [itemToRemove, setItemToRemove] = useState<{id: string, name: string} | null>(null);
 
   const isCW = filterBy === 'Continue Watching';
 
-  // Hooks
   const {
     data: cwData,
     isLoading: loadingCW,
@@ -49,12 +47,10 @@ const Watchlist: React.FC = () => {
   const isLoading = isCW ? loadingCW : loadingWL;
   const error = isCW ? errorCW : errorWL;
 
-  // Pagination helpers
   const fetchNextPage = isCW ? fetchNextCW : fetchNextWL;
   const hasNextPage = isCW ? hasNextCW : hasNextWL;
   const isFetchingNextPage = isCW ? isFetchingNextCW : isFetchingNextWL;
 
-  // Scroll Handler
   useEffect(() => {
     const handleScroll = () => {
       if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 800 && hasNextPage && !isFetchingNextPage) {
@@ -65,7 +61,6 @@ const Watchlist: React.FC = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Mutations
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string, status: string }) => {
       await fetch('/api/watchlist/status', { method: 'POST', body: JSON.stringify({ id, status }), headers: {'Content-Type': 'application/json'} });
@@ -87,7 +82,6 @@ const Watchlist: React.FC = () => {
   const { data: skipConfirm } = useSetting('skipRemoveConfirmation');
   const updateSetting = useUpdateSetting();
 
-  // Logic
   const sortedList = useMemo(() => {
     return [...list].sort((a, b) => {
       if (sortBy === "name_asc") return a.name.localeCompare(b.name);

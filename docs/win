@@ -57,7 +57,7 @@ function Start-Installation {
         $release = Invoke-RestMethod -Uri $RepoUrl
         $downloadUrl = $release.assets | Where-Object { $_.name -eq $zipFileName } | Select-Object -ExpandProperty browser_download_url
         if (-not $downloadUrl) { throw "Could not find '$zipFileName' asset in the latest release." }
-        
+
         Invoke-WebRequest -Uri $downloadUrl -OutFile $tempZipPath
         Print-Success "Download complete."
     } catch {
@@ -98,7 +98,7 @@ function Start-Installation {
         Push-Location (Join-Path $InstallDir "server")
         npm install --omit=dev --silent
         Pop-Location
-        
+
         $installedVersion = (Get-Content (Join-Path $InstallDir "package.json") | ConvertFrom-Json).version
         if (-not $installedVersion) { throw "Could not determine installed version." }
         Set-Content -Path $VersionFile -Value $installedVersion

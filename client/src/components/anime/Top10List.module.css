@@ -58,11 +58,11 @@
 .rank {
     font-size: 1.5rem;
     font-weight: 700;
-    width: 40px; /* Increased width to separate from image */
+    width: 40px;
     text-align: center;
     flex-shrink: 0;
     color: var(--text-muted);
-    margin-right: 0.5rem; /* Added margin right for extra safety */
+    margin-right: 0.5rem;
 }
 
 .item:nth-child(1) .rank { color: #FFD700; }
@@ -101,7 +101,7 @@
     gap: 0.5rem;
 }
 
-/* Skeletons */
+
 .skeletonItem {
     display: flex;
     align-items: center;
