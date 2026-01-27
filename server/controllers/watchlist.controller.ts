@@ -201,11 +201,21 @@ export class WatchlistController {
     };
 
     updateProgress = async (req: Request, res: Response) => {
-        const { showId, episodeNumber, currentTime, duration, showName, showThumbnail, nativeName, englishName } = req.body;
+        const { showId, episodeNumber, currentTime, duration, showName, showThumbnail, nativeName, englishName, genres, popularityScore } = req.body;
         try {
+            const genresStr = Array.isArray(genres) ? JSON.stringify(genres) : genres;
             await performWriteTransaction(req.db, (tx) => {
-                tx.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName) VALUES (?, ?, ?, ?, ?)',
-                    [showId, showName, this.provider.deobfuscateUrl(showThumbnail), nativeName, englishName]);
+                tx.run('INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName, genres, popularityScore) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [showId, showName, this.provider.deobfuscateUrl(showThumbnail), nativeName, englishName, genresStr, popularityScore]);
+
+                
+                if (genresStr) {
+                    tx.run('UPDATE shows_meta SET genres = ? WHERE id = ? AND genres IS NULL', [genresStr, showId]);
+                }
+                if (popularityScore !== undefined && popularityScore !== null) {
+                    tx.run('UPDATE shows_meta SET popularityScore = ? WHERE id = ?', [popularityScore, showId]);
+                }
+
                 tx.run(`INSERT OR REPLACE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)`,
                     [showId, episodeNumber, currentTime, duration]);
             });

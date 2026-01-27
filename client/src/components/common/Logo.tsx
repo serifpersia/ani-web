@@ -2,7 +2,7 @@ import React from 'react';
 
 const Logo: React.FC = () => {
   return (
-    <svg height="40" width="125" style={{ display: 'block', overflow: 'visible' }}>
+    <svg height="40" width="125" viewBox="0 0 125 40" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block', overflow: 'visible' }}>
       <style>
         {`
       .ani-text,
@@ -20,8 +20,8 @@ const Logo: React.FC = () => {
       }
       `}
       </style>
-      <text x="0" y="30" className="ani-text" style={{ fill: 'var(--text-primary)' }}>ani</text>
-      <text x="42" y="30" className="web-text" style={{ fill: 'var(--accent)' }}>web</text>
+      <text x="0" y="30" className="ani-text" style={{ fill: '#ffffff' }}>ani</text>
+      <text x="42" y="30" className="web-text" style={{ fill: 'hsl(265, 95%, 72%)' }}>web</text>
     </svg>
   );
 };

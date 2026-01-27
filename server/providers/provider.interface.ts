@@ -11,6 +11,7 @@ export interface Show {
         sub?: string[];
         dub?: string[];
     };
+    score?: number;
 }
 
 export interface VideoLink {
