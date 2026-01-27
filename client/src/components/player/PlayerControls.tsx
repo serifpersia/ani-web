@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import styles from '../../pages/Player.module.css';
 import ToggleSwitch from '../common/ToggleSwitch';
 import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaVolumeDown, FaVolumeOff, FaExpand, FaCompress, FaCog } from 'react-icons/fa';
+import { MdReplay10, MdForward10 } from 'react-icons/md';
 import type { VideoSource, VideoLink, SkipInterval } from '../../types/player';
 import type useVideoPlayer from '../../hooks/useVideoPlayer';
 import PlayerSettings from './PlayerSettings';
@@ -202,6 +203,15 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                     </div>
 
                     <div className={styles.rightControls}>
+                        <div className={styles.skipControls}>
+                            <button className={styles.skipBtn} onClick={() => actions.seek(-10)} title="Skip back 10s">
+                                <MdReplay10 />
+                            </button>
+                            <button className={styles.skipBtn} onClick={() => actions.seek(10)} title="Skip forward 10s">
+                                <MdForward10 />
+                            </button>
+                        </div>
+
                         <div className={styles.toggleContainer}>
                             <span>Auto Skip</span>
                             <ToggleSwitch

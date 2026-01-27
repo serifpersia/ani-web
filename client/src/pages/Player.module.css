@@ -182,7 +182,9 @@
     transition: opacity 0.3s ease-out;
     z-index: 50;
     pointer-events: none;
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, transparent 30%);
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
 }
 
 .controlsOverlay>* {
@@ -244,6 +246,8 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
     transform-origin: bottom center;
     transition: transform 0.3s var(--ease-smooth);
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 .progressBarContainer {
@@ -406,7 +410,37 @@
 .middleControls {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 1.5rem;
+}
+
+.skipControls {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.skipBtn {
+    background: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+    transition: all 0.2s;
+    padding: 6px;
+}
+
+.skipBtn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+    color: var(--accent);
+}
+
+.skipBtn:active {
+    transform: scale(0.9);
 }
 
 
@@ -415,7 +449,7 @@
     align-items: center;
     position: relative;
     padding-right: 10px;
-    group: hover;
+
 }
 
 .volumeSlider {
@@ -655,21 +689,27 @@
     box-shadow: var(--shadow-lg);
 }
 
-.detailsToggle {
-    background: transparent;
-    border: none;
-    color: var(--text-primary);
+.detailsToggleBtn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-primary);
+    color: var(--text-secondary);
+    padding: 0.6rem 1.2rem;
+    border-radius: var(--radius-md);
     cursor: pointer;
-    padding: 0;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    transition: color 0.2s;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    width: fit-content;
 }
 
-.detailsToggle:hover {
-    color: var(--accent);
+.detailsToggleBtn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    border-color: var(--text-secondary);
 }
 
 .detailsToggle h3 {
@@ -680,8 +720,13 @@
 
 .detailsGridContainer {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1.25rem;
+    margin-top: 2rem;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 1.5rem;
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(255, 255, 255, 0.05);
     animation: fadeIn 0.3s ease-out;
 }
 
@@ -746,34 +791,49 @@
     border-color: var(--text-secondary);
 }
 
-.websitesContainer {
+.externalLinksSection {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-    border-top: 1px solid var(--border-primary);
-    padding-top: 1rem;
+    gap: 1rem;
+    width: 100%;
 }
 
-.websitesList {
+.externalLinksSection strong {
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.externalLinksGrid {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: 0.5rem;
+    width: 100%;
 }
 
 .websiteLink {
     color: var(--text-secondary);
     background: rgba(255, 255, 255, 0.05);
-    padding: 0.3rem 0.8rem;
+    padding: 0.25rem 0.75rem;
     border-radius: 6px;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     transition: all 0.2s;
     text-decoration: none;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    white-space: nowrap;
 }
 
 .websiteLink:hover {
     background: var(--accent);
     color: white;
+    border-color: var(--accent);
+    transform: translateY(-2px);
 }
 
 .loadingDetails {
@@ -796,38 +856,39 @@
 }
 
 .epRangeButtons {
-
-    .descriptionSection {
-        margin-top: 2rem;
-        padding: 1.5rem;
-        background: var(--bg-tertiary);
-        border-radius: var(--radius-lg);
-        border: 1px solid var(--border-primary);
-    }
-
-    .descriptionSection h3 {
-        font-size: 1.3rem;
-        margin-bottom: 1rem;
-        color: var(--text-primary);
-        border-left: 4px solid var(--accent);
-        padding-left: 0.8rem;
-    }
-
-    .description {
-        line-height: 1.7;
-        color: rgba(255, 255, 255, 0.6);
-        font-size: 1rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .metaTags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-    }
-
+    display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
+}
+
+.descriptionSection {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-primary);
+}
+
+.descriptionSection h3 {
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+    border-left: 4px solid var(--accent);
+    padding-left: 0.8rem;
+}
+
+.description {
+    line-height: 1.7;
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+.metaTags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
 }
 
 .epRangeBtn {
