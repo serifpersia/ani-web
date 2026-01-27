@@ -39,7 +39,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
         refs.videoRef.current.volume = newVolume;
         refs.videoRef.current.muted = newVolume === 0;
         localStorage.setItem('playerVolume', newVolume.toString());
-        e.target.style.setProperty('--volume-percent', `${newVolume * 100}%`);
     };
 
     const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -111,12 +110,9 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
 
         <div className={`${styles.controlsOverlay} ${!state.showControls && !showSettings ? styles.hidden : ''}`} onDoubleClick={(e) => e.stopPropagation()}>
 
-
-
             <div
                 className={styles.bottomControls}
             >
-                { }
                 <div
                     className={`${styles.progressBarContainer} ${state.isScrubbing ? styles.scrubbing : ''}`}
                     ref={refs.progressBarRef}
@@ -130,7 +126,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                         </div>
                     )}
                     <div className={styles.progressBar}>
-                        { }
                         {state.duration > 0 && player.state.currentSkipInterval && (
                             <div
                                 className={`${styles.skipSegment} ${styles[player.state.currentSkipInterval.skip_type]}`}
@@ -148,7 +143,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                             onMouseDown={handleThumbMouseDown}
                         ></div>
 
-                        { }
                         {skipIntervals.map(interval => {
                             const startPercent = (interval.start_time / state.duration) * 100;
                             const widthPercent = ((interval.end_time - interval.start_time) / state.duration) * 100;
@@ -164,7 +158,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                     </div>
                 </div>
 
-                { }
                 <div className={styles.bottomControlsRow}>
                     <div className={styles.leftControls}>
                         <button className={styles.controlBtn} onClick={actions.togglePlay}>
@@ -183,6 +176,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                                 value={state.isMuted ? 0 : state.volume}
                                 onChange={handleVolumeChange}
                                 className={styles.volumeSlider}
+                                style={{ '--volume-percent': `${(state.isMuted ? 0 : state.volume) * 100}%` } as React.CSSProperties}
                             />
                         </div>
 
