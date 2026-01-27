@@ -8,6 +8,7 @@ export interface SimpleShowMeta {
         english: string;
         native: string;
     };
+    score?: number;
 }
 
 export interface DetailedShowMeta {

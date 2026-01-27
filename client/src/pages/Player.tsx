@@ -14,7 +14,7 @@ import EpisodeList from '../components/player/EpisodeList';
 import SourceSelector from '../components/player/SourceSelector';
 import useVideoPlayer from '../hooks/useVideoPlayer';
 import { usePlayerData } from '../hooks/usePlayerData';
-import type { VideoSource, VideoLink, SubtitleTrack } from '../types/player';
+import type { VideoLink, SubtitleTrack } from '../types/player';
 
 const Player: React.FC = () => {
   const { id: showId, episodeNumber } = useParams<{ id: string; episodeNumber?: string }>();
@@ -22,11 +22,22 @@ const Player: React.FC = () => {
 
   const { state, dispatch, toggleWatchlist, handleToggleDetails } = usePlayerData(showId, episodeNumber);
 
+  const memoizedShowMeta = useMemo(() => {
+    if (!state.showMeta.name) return undefined;
+    return {
+      name: state.showMeta.name,
+      thumbnail: state.showMeta.thumbnail,
+      names: state.showMeta.names,
+      genres: state.showMeta.genres,
+      score: state.showMeta.score
+    };
+  }, [state.showMeta.name, state.showMeta.thumbnail, state.showMeta.names, state.showMeta.genres, state.showMeta.score]);
+
   const player = useVideoPlayer({
     skipIntervals: state.skipIntervals,
-    showId: showId,
-    episodeNumber: state.currentEpisode,
-    showMeta: state.showMeta
+    showId,
+    episodeNumber: state.currentEpisode?.toString(),
+    showMeta: memoizedShowMeta
   });
   const { refs, actions } = player;
 
@@ -208,7 +219,7 @@ const Player: React.FC = () => {
         src: undefined,
         mode: t.mode as 'showing' | 'hidden' | 'disabled'
       }));
-      setAvailableSubtitles(tracks as any);
+      setAvailableSubtitles(tracks);
     };
     videoElement.textTracks.addEventListener('addtrack', handleTracksChange);
     videoElement.textTracks.addEventListener('removetrack', handleTracksChange);

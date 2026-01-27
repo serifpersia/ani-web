@@ -19,6 +19,7 @@ import { createWatchlistRouter } from './routes/watchlist.routes';
 import { createDataRouter } from './routes/data.routes';
 import { createProxyRouter } from './routes/proxy.routes';
 import { createSettingsRouter } from './routes/settings.routes';
+import { createInsightsRouter } from './routes/insights.routes';
 
 declare module 'express-serve-static-core' {
     interface Request {
@@ -79,6 +80,7 @@ app.use('/api/settings', createAuthRouter((database) => runSyncSequence(database
 app.use('/api', createWatchlistRouter(provider));
 app.use('/api', createDataRouter(apiCache, provider));
 app.use('/api', createProxyRouter());
+app.use('/api', createInsightsRouter(provider));
 
 
 

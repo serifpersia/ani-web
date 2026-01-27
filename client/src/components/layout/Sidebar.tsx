@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useSidebar } from '../../hooks/useSidebar';
 import styles from './Sidebar.module.css';
-import { FaHome, FaSearch, FaClock, FaFileImport, FaCog } from 'react-icons/fa';
+import { FaHome, FaSearch, FaClock, FaFileImport, FaCog, FaChartPie } from 'react-icons/fa';
 import Logo from '../common/Logo';
 
 const Sidebar: React.FC = () => {
@@ -32,6 +32,9 @@ const Sidebar: React.FC = () => {
           </Link>
           <Link to="/watchlist" className={`${styles.navLink} navLink`} onClick={handleNavLinkClick}>
             <FaClock /> Watchlist
+          </Link>
+          <Link to="/insights" className={`${styles.navLink} navLink`} onClick={handleNavLinkClick}>
+            <FaChartPie /> Insights
           </Link>
           <Link to="/mal" className={`${styles.navLink} navLink`} onClick={handleNavLinkClick}>
             <FaFileImport /> MAL Import

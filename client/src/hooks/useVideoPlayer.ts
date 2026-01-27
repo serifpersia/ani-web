@@ -1,11 +1,11 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import type { SkipInterval } from '../types/player';
+import type { SkipInterval, SubtitleTrack } from '../types/player';
 
 interface VideoPlayerProps {
     skipIntervals: SkipInterval[];
     showId?: string;
     episodeNumber?: string;
-    showMeta?: { name?: string; thumbnail?: string; names?: { native?: string; english?: string } };
+    showMeta?: { name?: string; thumbnail?: string; names?: { native?: string; english?: string }; genres?: { name: string }[]; score?: number };
 }
 
 const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: VideoPlayerProps) => {
@@ -32,7 +32,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
     const [showCCMenu, setShowCCMenu] = useState(false);
     const [subtitleFontSize, setSubtitleFontSize] = useState(parseFloat(localStorage.getItem('subtitleFontSize') || '1.8'));
     const [subtitlePosition, setSubtitlePosition] = useState(parseInt(localStorage.getItem('subtitlePosition') || '-4'));
-    const [availableSubtitles, setAvailableSubtitles] = useState<TextTrack[]>([]);
+    const [availableSubtitles, setAvailableSubtitles] = useState<SubtitleTrack[]>([]);
     const [activeSubtitleTrack, setActiveSubtitleTrack] = useState<string | null>(null);
     const [showSourceMenu, setShowSourceMenu] = useState(false);
     const [isBuffering, setIsBuffering] = useState(false);
@@ -42,7 +42,14 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
         if (hasEnded.current) return;
 
         const video = videoRef.current;
-        if (!video || !showId || !episodeNumber || !showMeta?.name || isNaN(video.duration) || video.duration === 0) {
+        const name = showMeta?.name;
+        const thumbnail = showMeta?.thumbnail;
+        const nativeName = showMeta?.names?.native;
+        const englishName = showMeta?.names?.english;
+        const genres = showMeta?.genres;
+        const popularityScore = showMeta?.score;
+
+        if (!video || !showId || !episodeNumber || !name || isNaN(video.duration) || video.duration === 0) {
             return;
         }
 
@@ -63,13 +70,15 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
                 episodeNumber,
                 currentTime: timeToReport,
                 duration: video.duration,
-                showName: showMeta.name,
-                showThumbnail: showMeta.thumbnail,
-                nativeName: showMeta.names?.native,
-                englishName: showMeta.names?.english,
+                showName: name,
+                showThumbnail: thumbnail,
+                nativeName: nativeName,
+                englishName: englishName,
+                genres: genres?.map(g => g.name),
+                popularityScore
             })
         }).catch(err => console.error("Failed to update progress:", err));
-    }, [showId, episodeNumber, showMeta]);
+    }, [showId, episodeNumber, showMeta?.name, showMeta?.thumbnail, showMeta?.names?.native, showMeta?.names?.english, showMeta?.genres, showMeta?.score]);
 
     useEffect(() => {
         const handleBeforeUnload = () => {
@@ -232,7 +241,14 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
 
     const reportFinalProgress = useCallback(() => {
         const video = videoRef.current;
-        if (!video || !showId || !episodeNumber || !showMeta?.name || isNaN(video.duration) || video.duration === 0) {
+        const name = showMeta?.name;
+        const thumbnail = showMeta?.thumbnail;
+        const nativeName = showMeta?.names?.native;
+        const englishName = showMeta?.names?.english;
+        const genres = showMeta?.genres;
+        const popularityScore = showMeta?.score;
+
+        if (!video || !showId || !episodeNumber || !name || isNaN(video.duration) || video.duration === 0) {
             return;
         }
 
@@ -244,13 +260,15 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
                 episodeNumber,
                 currentTime: video.duration,
                 duration: video.duration,
-                showName: showMeta.name,
-                showThumbnail: showMeta.thumbnail,
-                nativeName: showMeta.names?.native,
-                englishName: showMeta.names?.english,
+                showName: name,
+                showThumbnail: thumbnail,
+                nativeName: nativeName,
+                englishName: englishName,
+                genres: genres?.map(g => g.name),
+                popularityScore
             })
         }).catch(err => console.error("Failed to send final progress:", err));
-    }, [showId, episodeNumber, showMeta]);
+    }, [showId, episodeNumber, showMeta?.name, showMeta?.thumbnail, showMeta?.names?.native, showMeta?.names?.english, showMeta?.genres, showMeta?.score]);
 
     const onEnded = useCallback(() => {
         hasEnded.current = true;
@@ -281,10 +299,12 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
         onVolumeChange, onProgress, onTimeUpdate, onEnded, setShowControls, setIsScrubbing, setHoverTime,
         setIsAutoSkipEnabled, setCurrentSkipInterval, setShowCCMenu, setSubtitleFontSize,
         setSubtitlePosition, setAvailableSubtitles, setActiveSubtitleTrack, setShowSourceMenu,
-        wasPlayingBeforeScrub, inactivityTimer, setIsFullscreen, onWaiting, onPlaying, setCurrentTime
+        wasPlayingBeforeScrub, inactivityTimer, setIsFullscreen, onWaiting, onPlaying, setCurrentTime,
+        sendProgressUpdate
     }), [
         togglePlay, seek, toggleMute, toggleFullscreen, onPlay, onPause, onLoadedMetadata,
-        onVolumeChange, onProgress, onTimeUpdate, onEnded, setIsFullscreen, onWaiting, onPlaying, setCurrentTime
+        onVolumeChange, onProgress, onTimeUpdate, onEnded, setIsFullscreen, onWaiting, onPlaying, setCurrentTime,
+        sendProgressUpdate
     ]);
 
     return {

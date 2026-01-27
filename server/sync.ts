@@ -129,7 +129,7 @@ export async function syncDownOnBoot(db: Database, dbPath: string, remoteFolderN
                 return true;
             } catch (err) {
                 log.error({ err }, 'Sync down failed. Restoring backup.');
-                try { await fs.copyFile(backupPath, dbPath); } catch {}
+                try { await fs.copyFile(backupPath, dbPath); } catch { }
                 return true;
             }
         } else {
@@ -226,7 +226,7 @@ export function initializeDatabase(dbPath: string): Promise<Database> {
             db.run(`CREATE TABLE IF NOT EXISTS watchlist (id TEXT NOT NULL, name TEXT, thumbnail TEXT, status TEXT, nativeName TEXT, englishName TEXT, PRIMARY KEY (id))`);
             db.run(`CREATE TABLE IF NOT EXISTS watched_episodes (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, watchedAt DATETIME DEFAULT CURRENT_TIMESTAMP, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, PRIMARY KEY (showId, episodeNumber))`);
             db.run(`CREATE TABLE IF NOT EXISTS settings (key TEXT NOT NULL, value TEXT, PRIMARY KEY (key))`);
-            db.run(`CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT, nativeName TEXT, englishName TEXT, episodeCount INTEGER)`);
+            db.run(`CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT, nativeName TEXT, englishName TEXT, episodeCount INTEGER, genres TEXT, popularityScore INTEGER)`);
             db.run(`CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`);
             db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`);
             db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('last_synced_version', 0)`);
@@ -237,7 +237,7 @@ export function initializeDatabase(dbPath: string): Promise<Database> {
 
             const addCol = (tbl: string, col: string, type: string) => {
                 db.all(`PRAGMA table_info(${tbl})`, (e: Error | null, r: any[]) => {
-                    if(!r.some(c => c.name === col)) db.run(`ALTER TABLE ${tbl} ADD COLUMN ${col} ${type}`);
+                    if (!r.some(c => c.name === col)) db.run(`ALTER TABLE ${tbl} ADD COLUMN ${col} ${type}`);
                 });
             };
             addCol('watchlist', 'nativeName', 'TEXT');
@@ -245,6 +245,8 @@ export function initializeDatabase(dbPath: string): Promise<Database> {
             addCol('shows_meta', 'nativeName', 'TEXT');
             addCol('shows_meta', 'englishName', 'TEXT');
             addCol('shows_meta', 'episodeCount', 'INTEGER');
+            addCol('shows_meta', 'genres', 'TEXT');
+            addCol('shows_meta', 'popularityScore', 'INTEGER');
 
             resolve(db);
         });

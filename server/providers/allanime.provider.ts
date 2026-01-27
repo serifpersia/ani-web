@@ -156,7 +156,7 @@ export class AllAnimeProvider implements Provider {
     async getShowMeta(showId: string): Promise<Partial<Show> | null> {
         const response = await axios.get(API_ENDPOINT, {
             headers: { 'User-Agent': USER_AGENT, 'Referer': REFERER },
-            params: { query: `query($showId: String!) { show(_id: $showId) { name, thumbnail, nativeName, englishName, availableEpisodesDetail } }`, variables: JSON.stringify({ showId }) },
+            params: { query: `query($showId: String!) { show(_id: $showId) { name, thumbnail, nativeName, englishName, availableEpisodesDetail, score } }`, variables: JSON.stringify({ showId }) },
             timeout: 15000
         });
         const show = response.data.data.show;
@@ -166,7 +166,8 @@ export class AllAnimeProvider implements Provider {
                 thumbnail: this.deobfuscateUrl(show.thumbnail),
                 nativeName: show.nativeName,
                 englishName: show.englishName,
-                availableEpisodesDetail: show.availableEpisodesDetail
+                availableEpisodesDetail: show.availableEpisodesDetail,
+                score: show.score
             };
         }
         return null;
