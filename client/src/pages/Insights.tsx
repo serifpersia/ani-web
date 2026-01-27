@@ -217,11 +217,15 @@ const Insights: React.FC = () => {
                         ))}
                     </div>
                     <div className={styles.chartSubtext}>
-                        {data.hourlyDist && data.hourlyDist.length > 0 ? (
-                            parseInt([...data.hourlyDist].sort((a, b) => b.count - a.count)[0]?.hour) > 20
-                                ? "You're a confirmed Night Owl 🦉"
-                                : "You prefer daytime watching ☀️"
-                        ) : "Watch more to see your peak hours!"}
+                        {(() => {
+                            if (!data.hourlyDist?.length) {
+                                return "Watch more to see your peak hours!";
+                            }
+                            const peakHour = parseInt([...data.hourlyDist].sort((a, b) => b.count - a.count)[0].hour);
+                            return (peakHour >= 6 && peakHour < 19)
+                                ? "You prefer daytime watching ☀️"
+                                : "You're a confirmed Night Owl 🦉";
+                        })()}
                     </div>
                 </div>
                 <div className={styles.chartWrapper}>
