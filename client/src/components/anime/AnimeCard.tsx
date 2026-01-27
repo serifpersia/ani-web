@@ -106,17 +106,20 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
             onLoad={() => setIsLoaded(true)}
           />
 
-          {}
-          <div className={styles.typeBadge}>{anime.type || 'TV'}</div>
+          {!isMobile && (
+            <>
+              <div className={styles.typeBadge}>{anime.type || 'TV'}</div>
 
-          {isUpNext && (
-            <div className={styles.newBadge}>+{anime.newEpisodesCount} NEW</div>
-          )}
+              {isUpNext && (
+                <div className={styles.newBadge}>+{anime.newEpisodesCount} NEW</div>
+              )}
 
-          {(isUpNext || continueWatching) && (
-            <div className={styles.epBadge}>
-              {isUpNext ? `Next: EP ${anime.nextEpisodeToWatch}` : `EP ${anime.episodeNumber}`}
-            </div>
+              {(isUpNext || continueWatching) && (
+                <div className={styles.epBadge}>
+                  {isUpNext ? `Next: EP ${anime.nextEpisodeToWatch}` : `EP ${anime.episodeNumber}`}
+                </div>
+              )}
+            </>
           )}
 
           {continueWatching && (
@@ -135,7 +138,20 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
             {displayTitle}
           </div>
 
-          {}
+          {isMobile && (
+            <div className={styles.mobileBadges}>
+              <span className={styles.mobileType}>{anime.type || 'TV'}</span>
+              {(isUpNext || continueWatching) && (
+                <span className={styles.mobileEp}>
+                  {isUpNext ? `Next: EP ${anime.nextEpisodeToWatch}` : `EP ${anime.episodeNumber}`}
+                </span>
+              )}
+              {isUpNext && (
+                <span className={styles.mobileNew}>+{anime.newEpisodesCount} NEW</span>
+              )}
+            </div>
+          )}
+
           {continueWatching && hasProgress && (
             <div>
               <div className={styles.progressContainer}>

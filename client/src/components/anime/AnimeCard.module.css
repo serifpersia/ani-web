@@ -197,6 +197,40 @@
 }
 
 
+.mobileBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-bottom: var(--space-1);
+}
+
+.mobileBadgeBase {
+  font-size: 10px;
+  font-weight: var(--font-weight-bold);
+  padding: 1px var(--space-1);
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.mobileType {
+  composes: mobileBadgeBase;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mobileEp {
+  composes: mobileBadgeBase;
+  background-color: var(--accent);
+  color: white;
+}
+
+.mobileNew {
+  composes: mobileBadgeBase;
+  background-color: #60a5fa;
+  color: white;
+}
+
 @media (max-width: 768px) {
   .removeBtn {
     opacity: 1;
@@ -224,28 +258,10 @@
     font-size: var(--font-size-base);
     margin-bottom: var(--space-1);
     -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
   .metaRow {
-    margin-top: var(--space-2);
-  }
-
-  .typeBadge {
-    top: var(--space-1);
-    left: var(--space-1);
-    font-size: var(--font-size-xs);
-  }
-
-  .epBadge {
-    bottom: var(--space-1);
-    left: var(--space-1);
-    font-size: var(--font-size-xs);
-  }
-
-  .newBadge {
-    right: auto;
-    left: var(--space-1);
-    top: 22px;
-    font-size: var(--font-size-xs);
+    margin-top: var(--space-1);
   }
 }
