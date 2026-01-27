@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import styles from './Player.module.css';
 import layoutStyles from './PlayerPageLayout.module.css';
 import ToggleSwitch from '../components/common/ToggleSwitch';
-import { FaCheck, FaPlus } from 'react-icons/fa';
+import { FaCheck, FaPlus, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { fixThumbnailUrl } from '../lib/utils';
 import ResumeModal from '../components/common/ResumeModal';
 import useIsMobile from '../hooks/useIsMobile';
@@ -20,7 +20,7 @@ const Player: React.FC = () => {
   const { id: showId, episodeNumber } = useParams<{ id: string; episodeNumber?: string }>();
   const navigate = useNavigate();
 
-  const { state, dispatch, toggleWatchlist } = usePlayerData(showId, episodeNumber);
+  const { state, dispatch, toggleWatchlist, handleToggleDetails } = usePlayerData(showId, episodeNumber);
 
   const player = useVideoPlayer({
     skipIntervals: state.skipIntervals,
@@ -168,9 +168,12 @@ const Player: React.FC = () => {
 
 
   const handleMouseMove = useCallback(() => {
+    actions.setShowControls(true);
+    if (player.actions.inactivityTimer.current) {
+      clearTimeout(player.actions.inactivityTimer.current);
+    }
+
     if (player.state.isPlaying) {
-      actions.setShowControls(true);
-      if (player.actions.inactivityTimer.current) clearTimeout(player.actions.inactivityTimer.current);
       player.actions.inactivityTimer.current = window.setTimeout(() => {
         actions.setShowControls(false);
       }, 1500);
@@ -186,6 +189,8 @@ const Player: React.FC = () => {
   }, [handleMouseMove, refs.playerContainerRef]);
 
   const { setIsFullscreen, setAvailableSubtitles, setActiveSubtitleTrack } = actions;
+
+
 
   useEffect(() => {
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -393,53 +398,163 @@ const Player: React.FC = () => {
           />
         )}
 
-        <div className={layoutStyles.playerInfoHeader}>
-          <div className={layoutStyles.playerAnimeCard}>
-            <img src={fixThumbnailUrl(state.showMeta.thumbnail!)} alt={displayTitle} />
+        <div className={layoutStyles.playerInfoContainer}>
+          <div className={layoutStyles.playerInfoHeader}>
+            <div className={layoutStyles.playerAnimeCard}>
+              <img src={fixThumbnailUrl(state.showMeta.thumbnail!)} alt={displayTitle} />
+            </div>
+            <div className={layoutStyles.videoTitleSection}>
+              <div className={styles.titleContainer}>
+                <h1>{displayTitle}</h1>
+                <div className={styles.scheduleInfo}>
+                  {state.showMeta.status && <span className={styles.status}>{state.showMeta.status}</span>}
+                  {state.showMeta.nextEpisodeAirDate && (
+                    <span className={styles.nextEpisode}>
+                      Next episode: {state.showMeta.nextEpisodeAirDate}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className={styles.controls}>
+                <button className={`${styles.watchlistBtn} ${state.inWatchlist ? styles.inList : ''}`} onClick={toggleWatchlist}>
+                  {state.inWatchlist ? <FaCheck /> : <FaPlus />}
+                  {state.inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
+                </button>
+                <div className={styles.toggleContainer}>
+                  <span>SUB</span>
+                  <ToggleSwitch
+                    id="mode-switch"
+                    isChecked={state.currentMode === 'dub'}
+                    onChange={(e) => dispatch({ type: 'SET_STATE', payload: { currentMode: e.target.checked ? 'dub' : 'sub' } })}
+                  />
+                  <span>DUB</span>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className={layoutStyles.videoTitleSection}>
-            <div className={styles.titleContainer}>
-              <h1>{displayTitle}</h1>
-              <div className={styles.scheduleInfo}>
-                {state.showMeta.status && <span className={styles.status}>{state.showMeta.status}</span>}
-                {state.showMeta.nextEpisodeAirDate && (
-                  <span className={styles.nextEpisode}>
-                    Next episode: {state.showMeta.nextEpisodeAirDate}
-                  </span>
+
+          <div className={styles.descriptionSection}>
+            <h3>Synopsis</h3>
+            <p className={styles.description}>
+              {state.showMeta.description
+                ? state.showMeta.description.replace(/<[^>]*>?/gm, '')
+                : 'No description available.'}
+            </p>
+          </div>
+
+          <button className={styles.detailsToggleBtn} onClick={handleToggleDetails}>
+            {state.showCombinedDetails ? <FaChevronUp /> : <FaChevronDown />}
+            {state.showCombinedDetails ? 'Hide Details' : 'Show Details'}
+          </button>
+
+          {state.showCombinedDetails && (
+            <>
+              <div className={styles.detailsGridContainer}>
+                {state.showMeta.mediaTypes?.[0] && (
+                  <div className={styles.detailItem}>
+                    <strong>Type</strong>
+                    <span>{state.showMeta.mediaTypes[0].name}</span>
+                  </div>
+                )}
+                {state.showMeta.status && (
+                  <div className={styles.detailItem}>
+                    <strong>Status</strong>
+                    <span className={styles.animeStatus}>{state.showMeta.status}</span>
+                  </div>
+                )}
+                {state.showMeta.stats?.averageScore && (
+                  <div className={styles.detailItem}>
+                    <strong>Score</strong>
+                    <span>{state.showMeta.stats.averageScore}</span>
+                  </div>
+                )}
+                {state.showMeta.studios && state.showMeta.studios.length > 0 && (
+                  <div className={styles.detailItem}>
+                    <strong>Studios</strong>
+                    <span>{state.showMeta.studios.map(s => s.name).join(', ')}</span>
+                  </div>
+                )}
+                {state.showMeta.sources?.[0] && (
+                  <div className={styles.detailItem}>
+                    <strong>Source</strong>
+                    <span>{state.showMeta.sources[0].name}</span>
+                  </div>
+                )}
+                {state.showMeta.lengthMin && (
+                  <div className={styles.detailItem}>
+                    <strong>Episode Length</strong>
+                    <span>{state.showMeta.lengthMin} min</span>
+                  </div>
+                )}
+                {state.showMeta.names?.english && (
+                  <div className={styles.detailItem}>
+                    <strong>English Title</strong>
+                    <span>{state.showMeta.names.english}</span>
+                  </div>
+                )}
+                {state.showMeta.names?.native && (
+                  <div className={styles.detailItem}>
+                    <strong>Native Title</strong>
+                    <span>{state.showMeta.names.native}</span>
+                  </div>
+                )}
+                {state.showMeta.genres && (
+                  <div className={styles.detailItem}>
+                    <strong>Genres</strong>
+                    <div className={styles.genresList}>
+                      {state.showMeta.genres.map(g => (
+                        <span key={g.name} className={styles.genreTag}>{g.name}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {state.allMangaDetails?.Rating && (
+                  <div className={styles.detailItem}>
+                    <strong>Rating</strong>
+                    <span>{state.allMangaDetails.Rating}</span>
+                  </div>
+                )}
+                {state.allMangaDetails?.Season && (
+                  <div className={styles.detailItem}>
+                    <strong>Season</strong>
+                    <span>{state.allMangaDetails.Season}</span>
+                  </div>
+                )}
+                {state.allMangaDetails?.Episodes && (
+                  <div className={styles.detailItem}>
+                    <strong>Episodes</strong>
+                    <span>{state.allMangaDetails.Episodes}</span>
+                  </div>
+                )}
+                {state.allMangaDetails?.Date && (
+                  <div className={styles.detailItem}>
+                    <strong>Date</strong>
+                    <span>{state.allMangaDetails.Date}</span>
+                  </div>
+                )}
+                {state.allMangaDetails?.['Original Broadcast'] && (
+                  <div className={styles.detailItem}>
+                    <strong>Original Broadcast</strong>
+                    <span>{state.allMangaDetails['Original Broadcast']}</span>
+                  </div>
                 )}
               </div>
-            </div>
-            <div className={styles.controls}>
-              <button className={`${styles.watchlistBtn} ${state.inWatchlist ? styles.inList : ''}`} onClick={toggleWatchlist}>
-                {state.inWatchlist ? <FaCheck /> : <FaPlus />}
-                {state.inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
-              </button>
-              <div className={styles.toggleContainer}>
-                <span>SUB</span>
-                <ToggleSwitch
-                  id="mode-switch"
-                  isChecked={state.currentMode === 'dub'}
-                  onChange={(e) => dispatch({ type: 'SET_STATE', payload: { currentMode: e.target.checked ? 'dub' : 'sub' } })}
-                />
-                <span>DUB</span>
-              </div>
-            </div>
 
-            {}
-            <div className={styles.descriptionSection}>
-              <h3>Synopsis</h3>
-              <p className={styles.description}>
-                {state.showMeta.description
-                  ? state.showMeta.description.replace(/<[^>]*>?/gm, '')
-                  : 'No description available.'}
-              </p>
-              <div className={styles.metaTags}>
-                {state.showMeta.genres?.map(g => (
-                  <span key={g.name} className={styles.genreTag}>{g.name}</span>
-                ))}
-              </div>
-            </div>
-          </div>
+              {state.showMeta.websites && (
+                <div className={styles.externalLinksSection}>
+                  <strong>External Links</strong>
+                  <div className={styles.externalLinksGrid}>
+                    {state.showMeta.websites.official && <a href={state.showMeta.websites.official} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>Official</a>}
+                    {state.showMeta.websites.mal && <a href={state.showMeta.websites.mal} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>MAL</a>}
+                    {state.showMeta.websites.aniList && <a href={state.showMeta.websites.aniList} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>AniList</a>}
+                    {state.showMeta.websites.kitsu && <a href={state.showMeta.websites.kitsu} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>Kitsu</a>}
+                    {state.showMeta.websites.animePlanet && <a href={state.showMeta.websites.animePlanet} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>Anime-Planet</a>}
+                    {state.showMeta.websites.anidb && <a href={state.showMeta.websites.anidb} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>AniDB</a>}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

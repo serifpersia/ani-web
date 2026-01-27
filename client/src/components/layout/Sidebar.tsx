@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useSidebar } from '../../hooks/useSidebar';
 import styles from './Sidebar.module.css';
 import { FaHome, FaSearch, FaClock, FaFileImport, FaCog } from 'react-icons/fa';
+import Logo from '../common/Logo';
 
 const Sidebar: React.FC = () => {
   const { isOpen, setIsOpen } = useSidebar();
@@ -17,7 +18,9 @@ const Sidebar: React.FC = () => {
         className={`${styles.sidebar} ${isOpen ? styles.open : ''} sidebar`}
       >
         <div className={styles.sidebarHeader}>
-          <div className={styles.logo}>aniweb</div>
+          <Link to="/" className={styles.logo} onClick={handleNavLinkClick}>
+            <Logo />
+          </Link>
           <button className={`${styles.closeBtn} closeBtn`} onClick={() => setIsOpen(false)} aria-label="Close menu">&times;</button>
         </div>
         <nav>

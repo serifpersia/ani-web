@@ -17,10 +17,9 @@
 }
 
 .logo {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--accent);
-    letter-spacing: -0.03em;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
 }
 
 .sidebar.open {

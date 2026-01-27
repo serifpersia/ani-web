@@ -99,8 +99,9 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
             videoRef.current.play().catch(() => console.warn("Autoplay was prevented."));
         } else {
             videoRef.current.pause();
+            setShowControls(true);
         }
-    }, []);
+    }, [setShowControls]);
 
     const seek = useCallback((seconds: number) => {
         if (videoRef.current) {
@@ -109,8 +110,9 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
             debouncedUpdateTimer.current = setTimeout(() => {
                 sendProgressUpdate();
             }, 1500);
+            setShowControls(true);
         }
-    }, [sendProgressUpdate]);
+    }, [sendProgressUpdate, setShowControls]);
 
     const toggleMute = useCallback(() => {
         if (!videoRef.current) return;
@@ -122,7 +124,8 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
             videoRef.current.volume = 0.5;
             setVolume(0.5);
         }
-    }, []);
+        setShowControls(true);
+    }, [setShowControls]);
 
     const toggleFullscreen = useCallback(() => {
         if (!playerContainerRef.current) return;
@@ -131,7 +134,8 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
         } else {
             document.exitFullscreen();
         }
-    }, []);
+        setShowControls(true);
+    }, [setShowControls]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -188,7 +192,10 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
     const onWaiting = useCallback(() => {
         setIsBuffering(true);
     }, []);
-    const onPause = useCallback(() => setIsPlaying(false), []);
+    const onPause = useCallback(() => {
+        setIsPlaying(false);
+        setShowControls(true);
+    }, [setShowControls]);
     const onLoadedMetadata = useCallback(() => setDuration(videoRef.current?.duration || 0), []);
     const onVolumeChange = useCallback(() => {
         if (videoRef.current) {

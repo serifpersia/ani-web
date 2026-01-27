@@ -46,22 +46,30 @@
 .playerInfoHeader {
     display: flex;
     gap: 2rem;
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    border: 1px solid var(--glass-border);
-    padding: 2rem;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
+    align-items: center;
 }
 
 .playerAnimeCard {
-    width: 160px;
+    width: 120px;
     flex-shrink: 0;
     border-radius: var(--radius-md);
     overflow: hidden;
     box-shadow: var(--shadow-md);
     border: 1px solid var(--glass-border);
     transform: translateZ(0);
+    aspect-ratio: 2/3;
+    height: auto;
+}
+
+.playerInfoContainer {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    padding: 2.5rem;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
 }
 
 .playerAnimeCard img {
