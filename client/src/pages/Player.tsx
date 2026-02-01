@@ -187,7 +187,7 @@ const Player: React.FC = () => {
     if (player.state.isPlaying) {
       player.actions.inactivityTimer.current = window.setTimeout(() => {
         actions.setShowControls(false);
-      }, 1500);
+      }, 1000);
     }
   }, [player.state.isPlaying, actions, player.actions.inactivityTimer]);
 
@@ -198,6 +198,24 @@ const Player: React.FC = () => {
       return () => container.removeEventListener('mousemove', handleMouseMove);
     }
   }, [handleMouseMove, refs.playerContainerRef]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(e.key.toLowerCase())) {
+        actions.setShowControls(true);
+        if (player.actions.inactivityTimer.current) {
+          clearTimeout(player.actions.inactivityTimer.current);
+        }
+        player.actions.inactivityTimer.current = window.setTimeout(() => {
+          actions.setShowControls(false);
+        }, 1000);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [actions, player.actions.inactivityTimer]);
 
   const { setIsFullscreen, setAvailableSubtitles, setActiveSubtitleTrack } = actions;
 

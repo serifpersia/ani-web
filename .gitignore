@@ -9,3 +9,5 @@
 
 # Databases
 *.db
+server/.env
+server/google_tokens.json

@@ -8,12 +8,12 @@
     margin: 0 auto;
     align-items: start;
     min-height: calc(100vh - var(--header-height));
+    background-color: #000;
 }
 
 .episodeSidebar {
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    border: 1px solid var(--glass-border);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     height: calc(100vh - var(--header-height) - 4rem);
     position: sticky;
@@ -30,6 +30,7 @@
     display: flex;
     flex-direction: column;
     gap: 2rem;
+    background-color: #000;
 }
 
 .videoPlayerWrapper {
@@ -39,7 +40,7 @@
     border-radius: var(--radius-lg);
     overflow: hidden;
     position: relative;
-    box-shadow: var(--shadow-xl), var(--shadow-glow);
+    box-shadow: var(--shadow-xl);
     border: 1px solid var(--glass-border);
 }
 
@@ -62,9 +63,8 @@
 }
 
 .playerInfoContainer {
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    border: 1px solid var(--glass-border);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
     padding: 2.5rem;
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
