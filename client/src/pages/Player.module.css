@@ -206,7 +206,6 @@
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 50%;
     color: white;
@@ -238,8 +237,6 @@
     flex-direction: column;
     gap: 0;
     background: rgba(15, 15, 17, 0.75);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 20px;
     padding: 16px 24px;

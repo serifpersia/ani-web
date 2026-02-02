@@ -97,10 +97,7 @@
     font-size: 2.2rem;
     line-height: 1.1;
     font-weight: 700;
-    background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--text-primary);
 }
 
 .videoDescription {
