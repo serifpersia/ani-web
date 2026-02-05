@@ -29,4 +29,10 @@ const SourceSelector: React.FC<SourceSelectorProps> = ({ videoSources, selectedS
     );
 };
 
-export default SourceSelector;
+export default React.memo(SourceSelector, (prevProps, nextProps) => {
+    return (
+        prevProps.selectedSource?.sourceName === nextProps.selectedSource?.sourceName &&
+        prevProps.videoSources === nextProps.videoSources &&
+        prevProps.onSourceChange === nextProps.onSourceChange
+    );
+});

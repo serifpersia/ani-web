@@ -33,9 +33,10 @@ interface AnimeCardProps {
   anime: Anime;
   continueWatching?: boolean;
   onRemove?: (id: string) => void;
+  isLCP?: boolean;
 }
 
-const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = false, onRemove }) => {
+const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = false, onRemove, isLCP = false }) => {
   const isMobile = useIsMobile();
   const { titlePreference } = useTitlePreference();
   const [showRemoveModal, setShowRemoveModal] = useState(false);
@@ -99,10 +100,13 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
       <Link to={linkTarget} className={styles.card}>
         <div className={styles.posterContainer}>
           <img
-            src={fixThumbnailUrl(anime.thumbnail)}
+            src={fixThumbnailUrl(anime.thumbnail, 300, 400)}
             alt={displayTitle}
+            width="300"
+            height="400"
             className={`${styles.posterImg} ${isLoaded ? styles.loaded : ''}`}
-            loading="lazy"
+            loading={isLCP ? "eager" : "lazy"}
+            fetchPriority={isLCP ? "high" : "auto"}
             onLoad={() => setIsLoaded(true)}
           />
 

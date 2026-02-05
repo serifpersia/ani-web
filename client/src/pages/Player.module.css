@@ -182,9 +182,7 @@
     transition: opacity 0.3s ease-out;
     z-index: 50;
     pointer-events: none;
-    transform: translateZ(0);
-    backface-visibility: hidden;
-    perspective: 1000px;
+    will-change: opacity;
 }
 
 .controlsOverlay>* {
@@ -211,14 +209,12 @@
     color: white;
     width: 80px;
     height: 80px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     font-size: 2.5rem;
     cursor: pointer;
     padding-left: 6px;
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+    will-change: transform;
 }
 
 .centerPlayPause:hover {
@@ -241,10 +237,6 @@
     border-radius: 20px;
     padding: 16px 24px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    transform-origin: bottom center;
-    transition: transform 0.3s var(--ease-smooth);
-    transform: translateZ(0);
-    backface-visibility: hidden;
 }
 
 .progressBarContainer {

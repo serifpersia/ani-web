@@ -16,6 +16,15 @@ import useVideoPlayer from '../hooks/useVideoPlayer';
 import { usePlayerData } from '../hooks/usePlayerData';
 import type { VideoLink, SubtitleTrack } from '../types/player';
 
+// Helper function to ensure URL has protocol
+const ensureHttpProtocol = (url: string): string => {
+  if (!url) return url;
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  return `https://${url}`;
+};
+
 const Player: React.FC = () => {
   const { id: showId, episodeNumber } = useParams<{ id: string; episodeNumber?: string }>();
   const navigate = useNavigate();
@@ -44,12 +53,11 @@ const Player: React.FC = () => {
   const hlsInstance = useRef<Hls | null>(null);
   const isMobile = useIsMobile();
   const wasFullscreenRef = useRef(false);
+  const rafIdRef = useRef<number | null>(null);
 
 
   useEffect(() => {
     const videoElement = refs.videoRef.current;
-    if (!videoElement) return;
-
     if (!videoElement) return;
 
     if (hlsInstance.current) {
@@ -179,17 +187,23 @@ const Player: React.FC = () => {
 
 
   const handleMouseMove = useCallback(() => {
-    actions.setShowControls(true);
-    if (player.actions.inactivityTimer.current) {
-      clearTimeout(player.actions.inactivityTimer.current);
-    }
+    // Throttle using requestAnimationFrame to prevent excessive updates
+    if (rafIdRef.current === null) {
+      rafIdRef.current = requestAnimationFrame(() => {
+        actions.setShowControls(true);
+        if (player.actions.inactivityTimer.current) {
+          clearTimeout(player.actions.inactivityTimer.current);
+        }
 
-    if (player.state.isPlaying) {
-      player.actions.inactivityTimer.current = window.setTimeout(() => {
-        actions.setShowControls(false);
-      }, 1000);
+        if (player.state.isPlaying) {
+          player.actions.inactivityTimer.current = window.setTimeout(() => {
+            actions.setShowControls(false);
+          }, 1000);
+        }
+        rafIdRef.current = null;
+      });
     }
-  }, [player.state.isPlaying, actions, player.actions.inactivityTimer]);
+  }, [player.state.isPlaying, actions, player.actions]);
 
   useEffect(() => {
     const container = refs.playerContainerRef.current;
@@ -573,12 +587,12 @@ const Player: React.FC = () => {
                 <div className={styles.externalLinksSection}>
                   <strong>External Links</strong>
                   <div className={styles.externalLinksGrid}>
-                    {state.showMeta.websites.official && <a href={state.showMeta.websites.official} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>Official</a>}
-                    {state.showMeta.websites.mal && <a href={state.showMeta.websites.mal} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>MAL</a>}
-                    {state.showMeta.websites.aniList && <a href={state.showMeta.websites.aniList} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>AniList</a>}
-                    {state.showMeta.websites.kitsu && <a href={state.showMeta.websites.kitsu} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>Kitsu</a>}
-                    {state.showMeta.websites.animePlanet && <a href={state.showMeta.websites.animePlanet} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>Anime-Planet</a>}
-                    {state.showMeta.websites.anidb && <a href={state.showMeta.websites.anidb} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>AniDB</a>}
+                    {state.showMeta.websites.official && <a href={ensureHttpProtocol(state.showMeta.websites.official)} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>Official</a>}
+                    {state.showMeta.websites.mal && <a href={ensureHttpProtocol(state.showMeta.websites.mal)} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>MAL</a>}
+                    {state.showMeta.websites.aniList && <a href={ensureHttpProtocol(state.showMeta.websites.aniList)} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>AniList</a>}
+                    {state.showMeta.websites.kitsu && <a href={ensureHttpProtocol(state.showMeta.websites.kitsu)} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>Kitsu</a>}
+                    {state.showMeta.websites.animePlanet && <a href={ensureHttpProtocol(state.showMeta.websites.animePlanet)} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>Anime-Planet</a>}
+                    {state.showMeta.websites.anidb && <a href={ensureHttpProtocol(state.showMeta.websites.anidb)} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>AniDB</a>}
                   </div>
                 </div>
               )}

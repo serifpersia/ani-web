@@ -57,52 +57,54 @@ const Home: React.FC = () => {
 
   return (
     <div style={{ paddingBottom: '2rem' }}>
-    <div style={{
-      display: 'flex',
-      gap: '2rem',
-      padding: isMobile ? '1rem' : '1.5rem',
-      alignItems: 'flex-start',
-      flexWrap: 'wrap'
-    }}>
-
-    {}
-    <div style={{ flex: '1', minWidth: '0' }}>
-
-    {cwList && cwList.length > 0 && (
-      <AnimeSection
-      title="Continue Watching"
-      animeList={cwList}
-      continueWatching
-      onRemove={handleRemove}
-      showSeeMore
-      />
-    )}
-
-    <AnimeSection title="Latest Releases" animeList={latest || []} loading={loadingLatest} />
-
-    <section>
-    <div className="section-title">Current Season</div>
-    <div className="grid-container">
-    {currentSeason.map(anime => <AnimeCard key={anime._id} anime={anime} />)}
-    {(loadingSeason || isFetchingNextPage) && <SkeletonGrid count={6} />}
-    </div>
-    <div ref={observerRef} style={{ height: '20px' }} />
-    </section>
-    </div>
-
-    {}
-    {!isMobile && (
-      <aside style={{
-        width: '320px',
-        flexShrink: 0,
-        marginTop: '0'
+      <div style={{
+        display: 'flex',
+        gap: '2rem',
+        padding: isMobile ? '1rem' : '1.5rem',
+        alignItems: 'flex-start',
+        flexWrap: 'wrap'
       }}>
-      <Top10List title="Top 10 Popular" />
-      </aside>
-    )}
-    </div>
 
-    <Schedule />
+        { }
+        <div style={{ flex: '1', minWidth: '0' }}>
+
+          {cwList && cwList.length > 0 && (
+            <AnimeSection
+              title="Continue Watching"
+              animeList={cwList}
+              continueWatching
+              onRemove={handleRemove}
+              showSeeMore
+            />
+          )}
+
+          <div style={{ minHeight: '800px' }}>
+            <AnimeSection title="Latest Releases" animeList={latest || []} loading={loadingLatest} />
+          </div>
+
+          <section>
+            <div className="section-title">Current Season</div>
+            <div className="grid-container">
+              {currentSeason.map(anime => <AnimeCard key={anime._id} anime={anime} />)}
+              {(loadingSeason || isFetchingNextPage) && <SkeletonGrid count={6} />}
+            </div>
+            <div ref={observerRef} style={{ height: '20px' }} />
+          </section>
+        </div>
+
+        { }
+        {!isMobile && (
+          <aside style={{
+            width: '320px',
+            flexShrink: 0,
+            marginTop: '0'
+          }}>
+            <Top10List title="Top 10 Popular" />
+          </aside>
+        )}
+      </div>
+
+      <Schedule />
     </div>
   );
 };

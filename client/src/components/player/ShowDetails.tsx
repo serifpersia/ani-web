@@ -1,7 +1,7 @@
 import React from 'react';
 import styles from '../../pages/Player.module.css';
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
-import type { DetailedShowMeta, AllMangaDetail } from '../../pages/Player';
+import type { DetailedShowMeta, AllMangaDetail } from '../../types/player';
 
 interface ShowDetailsProps {
     showMeta: Partial<DetailedShowMeta>;
@@ -61,7 +61,7 @@ const ShowDetails: React.FC<ShowDetailsProps> = ({ showMeta, allMangaDetails, lo
                                     <strong>External Links:</strong>
                                     <div className={styles.websitesList}>
                                         {websiteOrder.map(key => {
-                                            const url = showMeta.websites[key as keyof typeof showMeta.websites];
+                                            const url = showMeta.websites?.[key as keyof typeof showMeta.websites];
                                             if (url && typeof url === 'string') {
                                                 return <a key={key} href={`https://${url}`} target="_blank" rel="noopener noreferrer" className={styles.websiteLink}>{key.charAt(0).toUpperCase() + key.slice(1).replace('aniList', 'AniList').replace('animePlanet', 'Anime-Planet')}</a>;
                                             }

@@ -33,29 +33,30 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
 
   return (
     <section style={{ marginBottom: '2.5rem' }}>
-    <div className={styles['section-header']}>
-    <div className="section-title" style={{ marginBottom: 0 }}>{title}</div>
-    {showSeeMore && (
-      <Link to="/watchlist/Continue Watching" className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}>
-      View All
-      </Link>
-    )}
-    </div>
+      <div className={styles['section-header']}>
+        <div className="section-title" style={{ marginBottom: 0 }}>{title}</div>
+        {showSeeMore && (
+          <Link to="/watchlist/Continue Watching" className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}>
+            View All
+          </Link>
+        )}
+      </div>
 
-    <div className="grid-container">
-    {loading ? (
-      <SkeletonGrid count={6} />
-    ) : (
-      animeList.map(anime => (
-        <AnimeCard
-        key={anime._id}
-        anime={anime}
-        continueWatching={continueWatching}
-        onRemove={onRemove}
-        />
-      ))
-    )}
-    </div>
+      <div className="grid-container">
+        {loading ? (
+          <SkeletonGrid count={6} />
+        ) : (
+          animeList.map((anime, index) => (
+            <AnimeCard
+              key={anime._id}
+              anime={anime}
+              continueWatching={continueWatching}
+              onRemove={onRemove}
+              isLCP={index === 0 && title === 'Latest Releases'}
+            />
+          ))
+        )}
+      </div>
     </section>
   );
 };

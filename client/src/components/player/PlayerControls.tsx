@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import styles from '../../pages/Player.module.css';
 import ToggleSwitch from '../common/ToggleSwitch';
-import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaVolumeDown, FaVolumeOff, FaExpand, FaCompress, FaCog } from 'react-icons/fa';
+import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaVolumeDown, FaVolumeOff, FaExpand, FaCompress, FaCog, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { MdReplay10, MdForward10 } from 'react-icons/md';
 import type { VideoSource, VideoLink, SkipInterval } from '../../types/player';
 import type useVideoPlayer from '../../hooks/useVideoPlayer';
@@ -108,13 +108,13 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
 
     return (
 
-        <div className={`${styles.controlsOverlay} ${!state.showControls && !showSettings ? styles.hidden : ''}`} onDoubleClick={(e) => e.stopPropagation()}>
+        <div className={`${styles.controlsOverlay} ${!state.showControls && !showSettings ? styles.hidden : ''} `} onDoubleClick={(e) => e.stopPropagation()}>
 
             <div
                 className={styles.bottomControls}
             >
                 <div
-                    className={`${styles.progressBarContainer} ${state.isScrubbing ? styles.scrubbing : ''}`}
+                    className={`${styles.progressBarContainer} ${state.isScrubbing ? styles.scrubbing : ''} `}
                     ref={refs.progressBarRef}
                     onClick={handleProgressBarClick}
                     onMouseMove={handleProgressBarMouseMove}
@@ -128,18 +128,18 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                     <div className={styles.progressBar}>
                         {state.duration > 0 && player.state.currentSkipInterval && (
                             <div
-                                className={`${styles.skipSegment} ${styles[player.state.currentSkipInterval.skip_type]}`}
+                                className={`${styles.skipSegment} ${styles[player.state.currentSkipInterval.skip_type]} `}
                                 style={{
-                                    left: `${(player.state.currentSkipInterval.start_time / state.duration) * 100}%`,
-                                    width: `${((player.state.currentSkipInterval.end_time - player.state.currentSkipInterval.start_time) / state.duration) * 100}%`,
+                                    left: `${(player.state.currentSkipInterval.start_time / state.duration) * 100}% `,
+                                    width: `${((player.state.currentSkipInterval.end_time - player.state.currentSkipInterval.start_time) / state.duration) * 100}% `,
                                 }}
                             ></div>
                         )}
-                        <div className={styles.bufferedBar} style={{ width: `${(state.buffered / state.duration) * 100 || 0}%` }}></div>
-                        <div className={styles.watchedBar} style={{ width: `${(state.currentTime / state.duration) * 100 || 0}%` }}></div>
+                        <div className={styles.bufferedBar} style={{ width: `${(state.buffered / state.duration) * 100 || 0}% ` }}></div>
+                        <div className={styles.watchedBar} style={{ width: `${(state.currentTime / state.duration) * 100 || 0}% ` }}></div>
                         <div
                             className={styles.thumb}
-                            style={{ left: `${(state.currentTime / state.duration) * 100 || 0}%` }}
+                            style={{ left: `${(state.currentTime / state.duration) * 100 || 0}% ` }}
                             onMouseDown={handleThumbMouseDown}
                         ></div>
 
@@ -149,8 +149,8 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                             return (
                                 <div
                                     key={interval.skip_id}
-                                    className={`${styles.skipSegment} ${styles[interval.skip_type]}`}
-                                    style={{ left: `${startPercent}%`, width: `${widthPercent}%` }}
+                                    className={`${styles.skipSegment} ${styles[interval.skip_type]} `}
+                                    style={{ left: `${startPercent}% `, width: `${widthPercent}% ` }}
                                     title={interval.skip_type.toUpperCase()}
                                 />
                             );
@@ -176,7 +176,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                                 value={state.isMuted ? 0 : state.volume}
                                 onChange={handleVolumeChange}
                                 className={styles.volumeSlider}
-                                style={{ '--volume-percent': `${(state.isMuted ? 0 : state.volume) * 100}%` } as React.CSSProperties}
+                                style={{ '--volume-percent': `${(state.isMuted ? 0 : state.volume) * 100}% ` } as React.CSSProperties}
                             />
                         </div>
 
@@ -228,7 +228,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                             />
                         </div>
 
-                        <button className={`${styles.controlBtn} ${showSettings ? styles.active : ''}`} onClick={() => setShowSettings(!showSettings)}>
+                        <button className={`${styles.controlBtn} ${showSettings ? styles.active : ''} `} onClick={() => setShowSettings(!showSettings)}>
                             <FaCog />
                         </button>
 
@@ -267,4 +267,19 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     );
 };
 
-export default PlayerControls;
+export default React.memo(PlayerControls, (prevProps, nextProps) => {
+    // Only re-render if critical props change
+    return (
+        prevProps.isAutoplayEnabled === nextProps.isAutoplayEnabled &&
+        prevProps.loadingVideo === nextProps.loadingVideo &&
+        prevProps.selectedSource?.sourceName === nextProps.selectedSource?.sourceName &&
+        prevProps.selectedLink?.link === nextProps.selectedLink?.link &&
+        prevProps.player.state.isPlaying === nextProps.player.state.isPlaying &&
+        prevProps.player.state.currentTime === nextProps.player.state.currentTime &&
+        prevProps.player.state.duration === nextProps.player.state.duration &&
+        prevProps.player.state.volume === nextProps.player.state.volume &&
+        prevProps.player.state.isMuted === nextProps.player.state.isMuted &&
+        prevProps.player.state.isFullscreen === nextProps.player.state.isFullscreen &&
+        prevProps.player.state.showControls === nextProps.player.state.showControls
+    );
+});

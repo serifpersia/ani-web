@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import cors from 'cors';
+import compression from 'compression';
 import axios from 'axios';
 import axiosRetry from 'axios-retry';
 import NodeCache from 'node-cache';
@@ -70,6 +71,20 @@ app.use((req, res, next) => {
 });
 
 axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay });
+
+// Enable gzip/brotli compression for all responses
+app.use(compression({
+    level: 6, // Balance between compression ratio and speed
+    threshold: 1024, // Only compress responses larger than 1KB
+    filter: (req, res) => {
+        // Don't compress if client doesn't support it
+        if (req.headers['x-no-compression']) {
+            return false;
+        }
+        // Use compression filter
+        return compression.filter(req, res);
+    }
+}));
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));

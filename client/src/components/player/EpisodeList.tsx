@@ -64,4 +64,11 @@ const EpisodeList: React.FC<EpisodeListProps> = ({ episodes, currentEpisode, wat
     );
 };
 
-export default EpisodeList;
+export default React.memo(EpisodeList, (prevProps, nextProps) => {
+    return (
+        prevProps.currentEpisode === nextProps.currentEpisode &&
+        prevProps.episodes === nextProps.episodes &&
+        prevProps.watchedEpisodes === nextProps.watchedEpisodes &&
+        prevProps.onEpisodeClick === nextProps.onEpisodeClick
+    );
+});

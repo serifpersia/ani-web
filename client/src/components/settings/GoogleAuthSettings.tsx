@@ -178,73 +178,73 @@ const GoogleAuthSettings: React.FC = () => {
 
     return (
         <div className={styles.container}>
-        <h3 className={styles.title}>Google Authentication</h3>
+            <h3 className={styles.title}>Google Authentication</h3>
 
-        {user ? (
-            <div className={styles.userInfo}>
-                <p>Signed in as: <strong>{user.name}</strong> ({user.email})</p>
-                <button className="btn-danger" onClick={handleSignOut}>Sign Out</button>
+            {user ? (
+                <div className={styles.userInfo}>
+                    <p>Signed in as: <strong>{user.name}</strong> ({user.email})</p>
+                    <button className="btn-danger" onClick={handleSignOut}>Sign Out</button>
+                </div>
+            ) : (
+                <div className={styles.signIn}>
+                    <p>Sign in with your Google account to enable synchronization features.</p>
+                    <button
+                        className="btn-primary"
+                        onClick={handleSignIn}
+                        disabled={!hasAuthConfig}
+                        title={!hasAuthConfig ? "Google Auth is not configured on the server." : "Sign in with Google"}
+                    >
+                        Sign in with Google
+                    </button>
+                    {!hasAuthConfig && <p className={styles.warning}>Google authentication is not configured. Please set up Client ID and Secret below.</p>}
+                </div>
+            )}
+
+            <hr className={styles.hr} />
+
+            <div className={styles.formGroup}>
+                <label className={styles.label}>Client ID</label>
+                <div className={styles.inputWrapper}>
+                    <input
+                        type={showClientId ? "text" : "password"}
+                        className={styles.input}
+                        value={clientId}
+                        onChange={(e) => setClientId(e.target.value)}
+                        placeholder="Enter Google Client ID"
+                    />
+                    <button className={styles.iconButton} onClick={() => setShowClientId(!showClientId)}>
+                        {showClientId ? <FaEyeSlash /> : <FaEye />}
+                    </button>
+                </div>
             </div>
-        ) : (
-            <div className={styles.signIn}>
-                <p>Sign in with your Google account to enable synchronization features.</p>
-                <button
-                    className="btn-primary"
-                    onClick={handleSignIn}
-                    disabled={!hasAuthConfig}
-                    title={!hasAuthConfig ? "Google Auth is not configured on the server." : "Sign in with Google"}
-                >
-                    Sign in with Google
-                </button>
-                {!hasAuthConfig && <p className={styles.warning}>Google authentication is not configured. Please set up Client ID and Secret below.</p>}
+
+            <div className={styles.formGroup}>
+                <label className={styles.label}>Client Secret</label>
+                <div className={styles.inputWrapper}>
+                    <input
+                        type={showClientSecret ? "text" : "password"}
+                        className={styles.input}
+                        value={clientSecret}
+                        onChange={(e) => setClientSecret(e.target.value)}
+                        placeholder="Enter Google Client Secret"
+                    />
+                    <button className={styles.iconButton} onClick={() => setShowClientSecret(!showClientSecret)}>
+                        {showClientSecret ? <FaEyeSlash /> : <FaEye />}
+                    </button>
+                </div>
             </div>
-        )}
 
-        <hr className={styles.hr} />
+            <div className={styles.actions}>
+                <button className="btn-primary" onClick={handleSave}>Save Config</button>
+                <button className="btn-secondary" onClick={handleClear}>Clear Config</button>
+            </div>
 
-        <div className={styles.formGroup}>
-        <label className={styles.label}>Client ID</label>
-        <div className={styles.inputWrapper}>
-        <input
-        type={showClientId ? "text" : "password"}
-        className={styles.input}
-        value={clientId}
-        onChange={(e) => setClientId(e.target.value)}
-        placeholder="Enter Google Client ID"
-        />
-        <button className={styles.iconButton} onClick={() => setShowClientId(!showClientId)}>
-        {showClientId ? <FaEyeSlash /> : <FaEye />}
-        </button>
-        </div>
-        </div>
-
-        <div className={styles.formGroup}>
-        <label className={styles.label}>Client Secret</label>
-        <div className={styles.inputWrapper}>
-        <input
-        type={showClientSecret ? "text" : "password"}
-        className={styles.input}
-        value={clientSecret}
-        onChange={(e) => setClientSecret(e.target.value)}
-        placeholder="Enter Google Client Secret"
-        />
-        <button className={styles.iconButton} onClick={() => setShowClientSecret(!showClientSecret)}>
-        {showClientSecret ? <FaEyeSlash /> : <FaEye />}
-        </button>
-        </div>
-        </div>
-
-        <div className={styles.actions}>
-        <button className="btn-primary" onClick={handleSave}>Save Config</button>
-        <button className="btn-secondary" onClick={handleClear}>Clear Config</button>
-        </div>
-
-        <StatusModal
-        show={statusModal.show}
-        message={statusModal.message}
-        type={statusModal.type}
-        onClose={() => setStatusModal(prev => ({ ...prev, show: false }))}
-        />
+            <StatusModal
+                show={statusModal.show}
+                message={statusModal.message}
+                type={statusModal.type}
+                onClose={() => setStatusModal(prev => ({ ...prev, show: false }))}
+            />
         </div>
     );
 };

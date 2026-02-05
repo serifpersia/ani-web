@@ -16,8 +16,8 @@ export interface Anime {
     nextEpisodeToWatch?: string;
     newEpisodesCount?: number;
     availableEpisodesDetail?: {
-      sub?: string[];
-      dub?: string[];
+        sub?: string[];
+        dub?: string[];
     };
 }
 
@@ -62,16 +62,16 @@ interface SearchResult {
 }
 
 export const useSearchAnime = (searchQueryString: string) => {
-    return useInfiniteQuery<SearchResult>({
+    return useInfiniteQuery<SearchResult, Error>({
         queryKey: ['searchAnime', searchQueryString],
-        queryFn: async ({ pageParam = 1 }) => {
+        queryFn: async ({ pageParam }: any) => {
             const params = new URLSearchParams(searchQueryString);
-            params.set('page', pageParam.toString());
+            params.set('page', (pageParam as number || 1).toString());
             const data = await fetchApi(`/api/search?${params.toString()}`);
             return {
                 results: data,
                 totalPages: 1,
-                currentPage: pageParam,
+                currentPage: pageParam as number || 1,
             };
         },
         initialPageParam: 1,
@@ -97,106 +97,68 @@ interface PaginatedAnimeResponse {
 
 
 export const useInfiniteWatchlist = (status: string) => {
-
-    return useInfiniteQuery<PaginatedAnimeResponse, Error, PaginatedAnimeResponse, Anime[], string[]> ({
-
+    return useInfiniteQuery<PaginatedAnimeResponse, Error, { pages: Anime[], pageParams: any[] }>({
         queryKey: ['watchlist', status],
-
         queryFn: async ({ pageParam = 1 }) => {
-
             const response = await fetchApi(`/api/watchlist?status=${status}&page=${pageParam}&limit=14`);
-
             return response;
-
         },
-
         initialPageParam: 1,
-
         getNextPageParam: (lastPage) => {
-
             if (lastPage.data.length === 0 || (lastPage.page * lastPage.limit) >= lastPage.total) {
-
                 return undefined;
-
             }
-
-                                    return lastPage.page + 1;
-
-                                },
-
-                                select: (data) => ({
-
-                                    ...data,
-
-                                    pages: data.pages.flatMap(page => page.data),
-
-                                }),
-
+            return lastPage.page + 1;
+        },
+        select: (data) => ({
+            ...data,
+            pages: data.pages.flatMap(page => page.data),
+        }),
     });
-
 };
 
 
 
 export const useAllContinueWatching = () => {
-
-    return useInfiniteQuery<PaginatedAnimeResponse, Error, PaginatedAnimeResponse, Anime[], string[]> ({
-
+    return useInfiniteQuery<PaginatedAnimeResponse, Error, { pages: Anime[], pageParams: any[] }>({
         queryKey: ['allContinueWatching'],
-
         queryFn: async ({ pageParam = 1 }) => {
-
             const response = await fetchApi(`/api/continue-watching/all?page=${pageParam}&limit=10`);
-
             return response;
-
         },
-
         initialPageParam: 1,
-
         getNextPageParam: (lastPage) => {
-
             if (lastPage.data.length === 0 || (lastPage.page * lastPage.limit) >= lastPage.total) {
-
                 return undefined;
-
             }
-
             return lastPage.page + 1;
-
         },
-
         select: (data) => ({
-
             ...data,
-
             pages: data.pages.flatMap(page => page.data),
-
         }),
-
     });
-
 };
 
 export const useRemoveFromWatchlist = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (showId: string) => {
-      const response = await fetch(`/api/watchlist/remove`, {
-        method: "POST",
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: showId }),
-      });
-      if (!response.ok) {
-        throw new Error("Failed to remove from watchlist");
-      }
-    },
-    onSuccess: () => {
-      toast.success('Removed from watchlist');
-      queryClient.invalidateQueries({ queryKey: ['watchlist'] });
-    },
-    onError: (error) => {
-      toast.error(`Failed to remove: ${error.message}`);
-    },
-  });
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (showId: string) => {
+            const response = await fetch(`/api/watchlist/remove`, {
+                method: "POST",
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: showId }),
+            });
+            if (!response.ok) {
+                throw new Error("Failed to remove from watchlist");
+            }
+        },
+        onSuccess: () => {
+            toast.success('Removed from watchlist');
+            queryClient.invalidateQueries({ queryKey: ['watchlist'] });
+        },
+        onError: (error) => {
+            toast.error(`Failed to remove: ${error.message}`);
+        },
+    });
 };

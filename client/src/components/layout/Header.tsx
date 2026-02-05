@@ -101,48 +101,48 @@ const Header: React.FC = () => {
 
   return (
     <header className={`${styles.header} ${visible ? '' : styles.hidden}`}>
-    <div className={styles.leftSection}>
-    <button className={styles.hamburgerBtn} onClick={toggleSidebar} aria-label="Menu">
-    <FaBars />
-    </button>
-    <Link to="/" aria-label="Home">
-    <Logo />
-    </Link>
-    </div>
+      <div className={styles.leftSection}>
+        <button className={styles.hamburgerBtn} onClick={toggleSidebar} aria-label="Menu">
+          <FaBars />
+        </button>
+        <Link to="/" className={styles.logo} aria-label="Ani-Web Home">
+          <Logo />
+        </Link>
+      </div>
 
-    <div className={styles.rightSection}>
-    <form onSubmit={handleSearch} className={styles.searchContainer}>
-    <input
-    type="text"
-    className={styles.searchInput}
-    placeholder="Search anime..."
-    value={query}
-    onChange={(e) => setQuery(e.target.value)}
-    />
-    <FaSearch className={styles.searchIcon} />
-    </form>
+      <div className={styles.rightSection}>
+        <form onSubmit={handleSearch} className={styles.searchContainer}>
+          <input
+            type="text"
+            className={styles.searchInput}
+            placeholder="Search anime..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <FaSearch className={styles.searchIcon} />
+        </form>
 
-    {user ? (
-      <Link to="/settings" className={styles.profileBtn}>
-      <img src={user.picture} alt="Profile" className={styles.profileImg} />
-      </Link>
-    ) : (
-            <button onClick={handleSignIn} className={styles.signInBtn}>
-              <FaGoogle />
-            </button>    )}
-    </div>
+        {user ? (
+          <Link to="/settings" className={styles.profileBtn}>
+            <img src={user.picture} alt="Profile" className={styles.profileImg} />
+          </Link>
+        ) : (
+          <button onClick={handleSignIn} className={styles.signInBtn}>
+            <FaGoogle />
+          </button>)}
+      </div>
 
-    <GenericModal
-    isOpen={showConfigModal}
-    onClose={() => setShowConfigModal(false)}
-    title="Configuration Required"
-    >
-    <p>Google Client ID/Secret missing. Please configure in settings.</p>
-    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-    <button className="btn-secondary" onClick={() => setShowConfigModal(false)}>Close</button>
-    <button className="btn-primary" onClick={() => { setShowConfigModal(false); navigate('/settings'); }}>Settings</button>
-    </div>
-    </GenericModal>
+      <GenericModal
+        isOpen={showConfigModal}
+        onClose={() => setShowConfigModal(false)}
+        title="Configuration Required"
+      >
+        <p>Google Client ID/Secret missing. Please configure in settings.</p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+          <button className="btn-secondary" onClick={() => setShowConfigModal(false)}>Close</button>
+          <button className="btn-primary" onClick={() => { setShowConfigModal(false); navigate('/settings'); }}>Settings</button>
+        </div>
+      </GenericModal>
     </header>
   );
 };

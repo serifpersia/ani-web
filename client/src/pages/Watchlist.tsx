@@ -21,7 +21,7 @@ const Watchlist: React.FC = () => {
   const queryClient = useQueryClient();
   const [sortBy, setSortBy] = useState("last_added");
 
-  const [itemToRemove, setItemToRemove] = useState<{id: string, name: string} | null>(null);
+  const [itemToRemove, setItemToRemove] = useState<{ id: string, name: string } | null>(null);
 
   const isCW = filterBy === 'Continue Watching';
 
@@ -43,7 +43,7 @@ const Watchlist: React.FC = () => {
     isFetchingNextPage: isFetchingNextWL
   } = useInfiniteWatchlist(filterBy);
 
-  const list = isCW ? cwData?.pages.flat() || [] : wlData?.pages.flat() || [];
+  const list = isCW ? cwData?.pages || [] : wlData?.pages || [];
   const isLoading = isCW ? loadingCW : loadingWL;
   const error = isCW ? errorCW : errorWL;
 
@@ -63,7 +63,7 @@ const Watchlist: React.FC = () => {
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string, status: string }) => {
-      await fetch('/api/watchlist/status', { method: 'POST', body: JSON.stringify({ id, status }), headers: {'Content-Type': 'application/json'} });
+      await fetch('/api/watchlist/status', { method: 'POST', body: JSON.stringify({ id, status }), headers: { 'Content-Type': 'application/json' } });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['watchlist'] });
@@ -73,7 +73,7 @@ const Watchlist: React.FC = () => {
 
   const removeCw = useMutation({
     mutationFn: async (showId: string) => {
-      await fetch('/api/continue-watching/remove', { method: 'POST', body: JSON.stringify({ showId }), headers: {'Content-Type': 'application/json'} });
+      await fetch('/api/continue-watching/remove', { method: 'POST', body: JSON.stringify({ showId }), headers: { 'Content-Type': 'application/json' } });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
   });
@@ -107,69 +107,69 @@ const Watchlist: React.FC = () => {
 
   return (
     <div className="page-container">
-    <div className="section-title">My Watchlist</div>
+      <div className="section-title">My Watchlist</div>
 
-    <div className={styles.controls}>
-    <div className={styles.filters}>
-    {FILTERS.map(f => (
-      <button
-      key={f}
-      className={`${styles.filterBtn} ${filterBy === f ? styles.active : ''}`}
-      onClick={() => navigate(`/watchlist/${f}`)}
-      >
-      {f}
-      </button>
-    ))}
-    </div>
-    <select
-    className={`form-select ${styles.sortSelect}`}
-    value={sortBy}
-    onChange={e => setSortBy(e.target.value)}
-    >
-    <option value="last_added">Recently Added</option>
-    <option value="name_asc">Name (A-Z)</option>
-    <option value="name_desc">Name (Z-A)</option>
-    </select>
-    </div>
-
-    {isLoading ? <SkeletonGrid /> : error ? <ErrorMessage message={error.message} /> : (
-      <>
-      <div className="grid-container">
-      {sortedList.map(item => (
-        <div key={item._id} className={styles.itemWrapper}>
-        <AnimeCard anime={item} continueWatching={isCW} onRemove={() => handleRemove(item.id, item.name)} />
-        {!isCW && (
-          <div className={styles.cardActions}>
-          <select
-          className={styles.statusSelect}
-          value={item.status}
-          onChange={(e) => updateStatus.mutate({ id: item.id, status: e.target.value })}
-          >
-          {FILTERS.slice(2).map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <button className={styles.removeBtn} onClick={() => handleRemove(item.id, item.name)}>
-          <FaTrash size={12} />
-          </button>
-          </div>
-        )}
+      <div className={styles.controls}>
+        <div className={styles.filters}>
+          {FILTERS.map(f => (
+            <button
+              key={f}
+              className={`${styles.filterBtn} ${filterBy === f ? styles.active : ''}`}
+              onClick={() => navigate(`/watchlist/${f}`)}
+            >
+              {f}
+            </button>
+          ))}
         </div>
-      ))}
+        <select
+          className={`form-select ${styles.sortSelect}`}
+          value={sortBy}
+          onChange={e => setSortBy(e.target.value)}
+        >
+          <option value="last_added">Recently Added</option>
+          <option value="name_asc">Name (A-Z)</option>
+          <option value="name_desc">Name (Z-A)</option>
+        </select>
       </div>
-      {isFetchingNextPage && <SkeletonGrid count={6} />}
-      </>
-    )}
 
-    {!isLoading && sortedList.length === 0 && (
-      <div className={styles.emptyState}>No anime found in this list.</div>
-    )}
+      {isLoading ? <SkeletonGrid /> : error ? <ErrorMessage message={error.message} /> : (
+        <>
+          <div className="grid-container">
+            {sortedList.map(item => (
+              <div key={item._id} className={styles.itemWrapper}>
+                <AnimeCard anime={item} continueWatching={isCW} onRemove={() => handleRemove(item.id, item.name)} />
+                {!isCW && (
+                  <div className={styles.cardActions}>
+                    <select
+                      className={styles.statusSelect}
+                      value={item.status}
+                      onChange={(e) => updateStatus.mutate({ id: item.id, status: e.target.value })}
+                    >
+                      {FILTERS.slice(2).map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <button className={styles.removeBtn} onClick={() => handleRemove(item.id, item.name)}>
+                      <FaTrash size={12} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          {isFetchingNextPage && <SkeletonGrid count={6} />}
+        </>
+      )}
 
-    <RemoveConfirmationModal
-    isOpen={!!itemToRemove}
-    onClose={() => setItemToRemove(null)}
-    onConfirm={confirmRemove}
-    animeName={itemToRemove?.name || ''}
-    scenario={isCW ? 'continueWatching' : 'watchlist'}
-    />
+      {!isLoading && sortedList.length === 0 && (
+        <div className={styles.emptyState}>No anime found in this list.</div>
+      )}
+
+      <RemoveConfirmationModal
+        isOpen={!!itemToRemove}
+        onClose={() => setItemToRemove(null)}
+        onConfirm={confirmRemove}
+        animeName={itemToRemove?.name || ''}
+        scenario={isCW ? 'continueWatching' : 'watchlist'}
+      />
     </div>
   );
 };

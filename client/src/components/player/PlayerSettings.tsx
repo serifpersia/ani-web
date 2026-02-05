@@ -69,7 +69,7 @@ const PlayerSettings: React.FC<PlayerSettingsProps> = ({
                 {links.map(link => (
                     <button
                         key={link.resolutionStr}
-                        className={`${styles.menuItem} ${currentLink?.resolutionStr === link.resolutionStr ? styles.selected : ''}`}
+                        className={`${styles.menuItem} ${currentLink?.resolutionStr === link.resolutionStr ? styles.selected : ''} `}
                         onClick={() => onSourceChange(currentSource!, link)}
                     >
                         <span>{link.resolutionStr}</span>
@@ -86,7 +86,7 @@ const PlayerSettings: React.FC<PlayerSettingsProps> = ({
             {subtitles.map(sub => (
                 <button
                     key={sub.label}
-                    className={`${styles.menuItem} ${activeSubtitleTrack === (sub.label || sub.lang) ? styles.selected : ''}`}
+                    className={`${styles.menuItem} ${activeSubtitleTrack === (sub.label || sub.lang) ? styles.selected : ''} `}
                     onClick={() => onSubtitleChange(sub.label || sub.lang)}
                 >
                     <span>{sub.label}</span>
