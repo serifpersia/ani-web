@@ -20,7 +20,6 @@ export default defineConfig({
         manualChunks: {
           'vendor': ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query'],
           'player': ['hls.js'],
-          'icons': ['react-icons'],
         },
       },
     },

@@ -72,16 +72,13 @@ app.use((req, res, next) => {
 
 axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay });
 
-// Enable gzip/brotli compression for all responses
 app.use(compression({
-    level: 6, // Balance between compression ratio and speed
-    threshold: 1024, // Only compress responses larger than 1KB
+    level: 6,
+    threshold: 1024,
     filter: (req, res) => {
-        // Don't compress if client doesn't support it
         if (req.headers['x-no-compression']) {
             return false;
         }
-        // Use compression filter
         return compression.filter(req, res);
     }
 }));
@@ -100,20 +97,14 @@ app.use('/api', createInsightsRouter(provider));
 
 
 if (!CONFIG.IS_DEV) {
-    const frontendPath = path.resolve(__dirname, '../../client/dist');
+    const frontendPath = path.resolve(CONFIG.ROOT, '../client/dist');
     logger.info(`Serving frontend from: ${frontendPath}`);
 
     app.use(express.static(frontendPath));
 
-    app.get(/^(?!\/api).+/, (req, res) => {
-        res.sendFile('index.html', { root: frontendPath }, (err) => {
-            if (err) {
-                logger.error({ err }, `Failed to serve index.html from ${frontendPath}`);
-                if (!res.headersSent) {
-                    res.status(500).send("Server Error: Frontend build not found.");
-                }
-            }
-        });
+    app.get('/*splat', (req, res, next) => {
+        if (req.path.startsWith('/api')) return next();
+        res.sendFile(path.join(frontendPath, 'index.html'));
     });
 }
 

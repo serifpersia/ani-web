@@ -100,10 +100,10 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(({ anime, continueWatching = fa
       <Link to={linkTarget} className={styles.card}>
         <div className={styles.posterContainer}>
           <img
-            src={fixThumbnailUrl(anime.thumbnail, 300, 400)}
+            src={fixThumbnailUrl(anime.thumbnail, 150, 200)}
             alt={displayTitle}
-            width="300"
-            height="400"
+            width="150"
+            height="200"
             className={`${styles.posterImg} ${isLoaded ? styles.loaded : ''}`}
             loading={isLCP ? "eager" : "lazy"}
             fetchPriority={isLCP ? "high" : "auto"}

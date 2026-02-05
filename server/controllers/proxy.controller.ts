@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import axios from 'axios';
 import path from 'path';
-import sharp from 'sharp';
 
 export class ProxyController {
     handleProxy = async (req: Request, res: Response) => {
@@ -43,7 +42,7 @@ export class ProxyController {
     };
 
     handleImageProxy = async (req: Request, res: Response) => {
-        const { url, w, h } = req.query;
+        const { url } = req.query;
         if (!url) return res.status(400).send('URL required');
 
         try {
@@ -57,35 +56,9 @@ export class ProxyController {
                 }
             });
 
-            const width = w ? parseInt(w as string, 10) : null;
-            const height = h ? parseInt(h as string, 10) : null;
-
             res.set('Cache-Control', 'public, max-age=604800, immutable');
-
-            if (width || height) {
-                let transform = sharp(imageResponse.data);
-
-                // Convert to webp for better compression
-                transform = transform.webp({ quality: 80 });
-
-                const resizeOptions: sharp.ResizeOptions = {
-                    fit: 'cover',
-                    withoutEnlargement: true
-                };
-
-                if (width) resizeOptions.width = width;
-                if (height) resizeOptions.height = height;
-
-                const processedBuffer = await transform
-                    .resize(resizeOptions)
-                    .toBuffer();
-
-                res.set('Content-Type', 'image/webp');
-                res.send(processedBuffer);
-            } else {
-                res.set('Content-Type', imageResponse.headers['content-type']);
-                res.send(imageResponse.data);
-            }
+            res.set('Content-Type', imageResponse.headers['content-type']);
+            res.send(imageResponse.data);
         } catch (e) {
             res.status(200).sendFile(path.join(__dirname, '..', '..', 'public/placeholder.svg'));
         }

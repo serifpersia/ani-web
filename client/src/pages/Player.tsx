@@ -16,7 +16,6 @@ import useVideoPlayer from '../hooks/useVideoPlayer';
 import { usePlayerData } from '../hooks/usePlayerData';
 import type { VideoLink, SubtitleTrack } from '../types/player';
 
-// Helper function to ensure URL has protocol
 const ensureHttpProtocol = (url: string): string => {
   if (!url) return url;
   if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -187,7 +186,6 @@ const Player: React.FC = () => {
 
 
   const handleMouseMove = useCallback(() => {
-    // Throttle using requestAnimationFrame to prevent excessive updates
     if (rafIdRef.current === null) {
       rafIdRef.current = requestAnimationFrame(() => {
         actions.setShowControls(true);
