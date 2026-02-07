@@ -102,9 +102,15 @@ if (!CONFIG.IS_DEV) {
 
     app.use(express.static(frontendPath));
 
-    app.get('/*splat', (req, res, next) => {
-        if (req.path.startsWith('/api')) return next();
-        res.sendFile(path.join(frontendPath, 'index.html'));
+    app.get(/^(?!\/api).+/, (req, res) => {
+        res.sendFile('index.html', { root: frontendPath }, (err) => {
+            if (err) {
+                logger.error({ err }, `Failed to serve index.html from ${frontendPath}`);
+                if (!res.headersSent) {
+                    res.status(500).send("Server Error: Frontend build not found.");
+                }
+            }
+        });
     });
 }
 
