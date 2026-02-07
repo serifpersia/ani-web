@@ -549,9 +549,9 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: rgba(255, 255, 255, 0.5);
-    font-weight: 600;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     padding-bottom: 0.5rem;
+    font-weight: 600;
 }
 
 .qualityListInMenu,
@@ -957,4 +957,8 @@
 
 .epJumpInputGroup button:hover {
     background: var(--accent-dark);
+}
+
+.videoContainer.fullscreenActive {
+    cursor: none;
 }

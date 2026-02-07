@@ -186,9 +186,14 @@ const Player: React.FC = () => {
 
 
   const handleMouseMove = useCallback(() => {
+    const container = refs.playerContainerRef.current;
+    if (!container) return;
+
     if (rafIdRef.current === null) {
       rafIdRef.current = requestAnimationFrame(() => {
         actions.setShowControls(true);
+        container.style.cursor = 'default';
+
         if (player.actions.inactivityTimer.current) {
           clearTimeout(player.actions.inactivityTimer.current);
         }
@@ -196,12 +201,15 @@ const Player: React.FC = () => {
         if (player.state.isPlaying) {
           player.actions.inactivityTimer.current = window.setTimeout(() => {
             actions.setShowControls(false);
+            if (player.state.isFullscreen) {
+              container.style.cursor = 'none';
+            }
           }, 1000);
         }
         rafIdRef.current = null;
       });
     }
-  }, [player.state.isPlaying, actions, player.actions]);
+  }, [player.state.isPlaying, player.state.isFullscreen, actions, player.actions, refs.playerContainerRef]);
 
   useEffect(() => {
     const container = refs.playerContainerRef.current;
@@ -368,7 +376,11 @@ const Player: React.FC = () => {
       </aside>
 
       <div className={layoutStyles.playerMain}>
-        <div ref={refs.playerContainerRef} className={`${styles.videoContainer} ${layoutStyles.videoPlayerWrapper}`} onDoubleClick={actions.toggleFullscreen}>
+        <div
+          ref={refs.playerContainerRef}
+          className={`${styles.videoContainer} ${layoutStyles.videoPlayerWrapper} ${player.state.isFullscreen ? styles.fullscreenActive : ''}`}
+          onDoubleClick={actions.toggleFullscreen}
+        >
           {state.loadingVideo && (
             <div className={styles.loadingOverlay}>
               <div className={styles.loadingDots}>

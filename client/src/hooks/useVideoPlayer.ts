@@ -101,6 +101,18 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
         const hours = parseInt(result.slice(0, 2), 10);
         return hours > 0 ? result : result.slice(3);
     };
+    const toggleFullscreen = useCallback(() => {
+        if (!playerContainerRef.current) return;
+        if (!document.fullscreenElement) {
+            playerContainerRef.current.requestFullscreen().catch(err => {
+                console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+            });
+        } else {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            }
+        }
+    }, []);
 
     const togglePlay = useCallback(() => {
         if (!videoRef.current) return;
@@ -136,14 +148,17 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
         setShowControls(true);
     }, [setShowControls]);
 
-    const toggleFullscreen = useCallback(() => {
-        if (!playerContainerRef.current) return;
-        if (!document.fullscreenElement) {
-            playerContainerRef.current.requestFullscreen();
-        } else {
-            document.exitFullscreen();
-        }
-        setShowControls(true);
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            const isCurrentlyFullscreen = document.fullscreenElement !== null;
+            setIsFullscreen(isCurrentlyFullscreen);
+            if (isCurrentlyFullscreen) {
+                setShowControls(true);
+            }
+        };
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
     }, [setShowControls]);
 
     useEffect(() => {
