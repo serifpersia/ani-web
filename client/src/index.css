@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
-
 :root {
   --font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
@@ -37,7 +35,7 @@
   --text-primary: #ffffff;
   --text-secondary: #a1a1aa;
   --text-tertiary: #71717a;
-  --text-muted: #52525b;
+  --text-muted: #a1a1aa;
 
   --danger: #ef4444;
   --success: #10b981;

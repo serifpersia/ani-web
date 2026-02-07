@@ -52,7 +52,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
               anime={anime}
               continueWatching={continueWatching}
               onRemove={onRemove}
-              isLCP={index === 0 && title === 'Latest Releases'}
+              isLCP={index < 4 && title === 'Latest Releases'}
             />
           ))
         )}

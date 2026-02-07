@@ -35,7 +35,7 @@
 }
 
 .dayBtn.active {
-    background-color: var(--accent);
+    background-color: var(--accent-dark);
     border-color: var(--accent-dark);
     color: white;
     font-weight: var(--font-weight-bold);
@@ -45,11 +45,12 @@
 .dayName {
     font-weight: var(--font-weight-bold);
     font-size: var(--font-size-sm);
+    color: var(--text-primary);
 }
 
 .dayDate {
     font-size: var(--font-size-xs);
-    opacity: 0.7;
+    color: var(--text-secondary);
 }
 
 .gridContainer {

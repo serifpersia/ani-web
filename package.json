@@ -10,6 +10,8 @@
     "client": "npm start --prefix client",
     "server": "npm start --prefix server",
     "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "preview": "concurrently \"npm run start --prefix server\" \"npm run preview --prefix client\"",
+    "lighthouse": "npm run lighthouse --prefix client",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

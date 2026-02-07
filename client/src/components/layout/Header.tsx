@@ -123,11 +123,11 @@ const Header: React.FC = () => {
         </form>
 
         {user ? (
-          <Link to="/settings" className={styles.profileBtn}>
+          <Link to="/settings" className={styles.profileBtn} aria-label="View Profile">
             <img src={user.picture} alt="Profile" className={styles.profileImg} />
           </Link>
         ) : (
-          <button onClick={handleSignIn} className={styles.signInBtn}>
+          <button onClick={handleSignIn} className={styles.signInBtn} aria-label="Sign in with Google">
             <FaGoogle />
           </button>)}
       </div>

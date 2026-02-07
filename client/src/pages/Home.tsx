@@ -68,15 +68,17 @@ const Home: React.FC = () => {
         { }
         <div style={{ flex: '1', minWidth: '0' }}>
 
-          {cwList && cwList.length > 0 && (
-            <AnimeSection
-              title="Continue Watching"
-              animeList={cwList}
-              continueWatching
-              onRemove={handleRemove}
-              showSeeMore
-            />
-          )}
+          <div style={{ minHeight: cwList && cwList.length > 0 ? '280px' : '0' }}>
+            {cwList && cwList.length > 0 && (
+              <AnimeSection
+                title="Continue Watching"
+                animeList={cwList}
+                continueWatching
+                onRemove={handleRemove}
+                showSeeMore
+              />
+            )}
+          </div>
 
           <div style={{ minHeight: '800px' }}>
             <AnimeSection title="Latest Releases" animeList={latest || []} loading={loadingLatest} />
