@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import GenericModal from './GenericModal';
+import React, { useState, useEffect } from 'react'
+import GenericModal from './GenericModal'
 
 interface RemoveConfirmationModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: (options: { removeFromWatchlist?: boolean; rememberPreference?: boolean }) => void;
-  animeName: string;
-  scenario: 'continueWatching' | 'watchlist';
+  isOpen: boolean
+  onClose: () => void
+  onConfirm: (options: { removeFromWatchlist?: boolean; rememberPreference?: boolean }) => void
+  animeName: string
+  scenario: 'continueWatching' | 'watchlist'
 }
 
 const RemoveConfirmationModal: React.FC<RemoveConfirmationModalProps> = ({
@@ -16,27 +16,28 @@ const RemoveConfirmationModal: React.FC<RemoveConfirmationModalProps> = ({
   animeName,
   scenario,
 }) => {
-  const [rememberPreference, setRememberPreference] = useState(false);
-  const [removeFromWatchlist, setRemoveFromWatchlist] = useState(false);
+  const [rememberPreference, setRememberPreference] = useState(false)
+  const [removeFromWatchlist, setRemoveFromWatchlist] = useState(false)
 
   useEffect(() => {
     if (!isOpen) {
-      setRememberPreference(false);
-      setRemoveFromWatchlist(false);
+      setRememberPreference(false)
+      setRemoveFromWatchlist(false)
     }
-  }, [isOpen]);
+  }, [isOpen])
 
   const handleConfirm = () => {
     onConfirm({
       removeFromWatchlist: scenario === 'continueWatching' ? removeFromWatchlist : true,
       rememberPreference: scenario === 'watchlist' ? rememberPreference : undefined,
-    });
-  };
+    })
+  }
 
-  const title = scenario === 'continueWatching' ? 'Reset Progress' : 'Remove from Watchlist';
-  const message = scenario === 'continueWatching'
-    ? `Are you sure you want to remove your watch progress for "${animeName}"?`
-    : `Are you sure you want to remove "${animeName}" from your watchlist?`;
+  const title = scenario === 'continueWatching' ? 'Reset Progress' : 'Remove from Watchlist'
+  const message =
+    scenario === 'continueWatching'
+      ? `Are you sure you want to remove your watch progress for "${animeName}"?`
+      : `Are you sure you want to remove "${animeName}" from your watchlist?`
 
   return (
     <GenericModal isOpen={isOpen} onClose={onClose} title={title}>
@@ -66,7 +67,14 @@ const RemoveConfirmationModal: React.FC<RemoveConfirmationModalProps> = ({
             </label>
           </div>
         )}
-        <div style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <div
+          style={{
+            marginTop: '1.5rem',
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '1rem',
+          }}
+        >
           <button className="btn-secondary" onClick={onClose}>
             No
           </button>
@@ -76,7 +84,7 @@ const RemoveConfirmationModal: React.FC<RemoveConfirmationModalProps> = ({
         </div>
       </div>
     </GenericModal>
-  );
-};
+  )
+}
 
-export default RemoveConfirmationModal;
+export default RemoveConfirmationModal

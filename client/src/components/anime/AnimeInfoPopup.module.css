@@ -12,7 +12,9 @@
   color: #fff;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   opacity: 0;
-  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+  transition:
+    opacity 0.2s ease-in-out,
+    transform 0.2s ease-in-out;
   pointer-events: none;
   margin-left: 10px;
 }
@@ -24,10 +26,10 @@
 }
 
 .popup.left {
-    left: auto;
-    right: 100%;
-    margin-left: 0;
-    margin-right: 10px;
+  left: auto;
+  right: 100%;
+  margin-left: 0;
+  margin-right: 10px;
 }
 
 .detailsGrid {
@@ -63,6 +65,10 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }

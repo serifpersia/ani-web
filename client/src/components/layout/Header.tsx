@@ -1,103 +1,104 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FaBars, FaSearch, FaGoogle } from 'react-icons/fa';
-import Logo from '../common/Logo';
-import { useSidebar } from '../../hooks/useSidebar';
-import styles from './Header.module.css';
-import GenericModal from '../common/GenericModal';
+import React, { useState, useEffect, useRef } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { FaBars, FaSearch, FaGoogle } from 'react-icons/fa'
+import Logo from '../common/Logo'
+import { useSidebar } from '../../hooks/useSidebar'
+import styles from './Header.module.css'
+import GenericModal from '../common/GenericModal'
 
 interface UserProfile {
-  name: string;
-  picture: string;
-  email: string;
+  name: string
+  picture: string
+  email: string
 }
 
 const fetchUser = async (): Promise<UserProfile | null> => {
-  const res = await fetch('/api/auth/user');
-  if (!res.ok) return null;
-  return res.json();
-};
+  const res = await fetch('/api/auth/user')
+  if (!res.ok) return null
+  return res.json()
+}
 
 const Header: React.FC = () => {
-  const { toggleSidebar } = useSidebar();
-  const [query, setQuery] = useState('');
-  const [visible, setVisible] = useState(true);
-  const [showConfigModal, setShowConfigModal] = useState(false);
-  const navigate = useNavigate();
-  const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const queryClient = useQueryClient();
-  const HIDE_DELAY_MS = 3000;
+  const { toggleSidebar } = useSidebar()
+  const [query, setQuery] = useState('')
+  const [visible, setVisible] = useState(true)
+  const [showConfigModal, setShowConfigModal] = useState(false)
+  const navigate = useNavigate()
+  const hideTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const queryClient = useQueryClient()
+  const HIDE_DELAY_MS = 3000
 
   const { data: user } = useQuery<UserProfile | null>({
     queryKey: ['user'],
     queryFn: fetchUser,
-  });
+  })
 
   useEffect(() => {
     const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      setVisible(true);
+      const currentScrollY = window.scrollY
+      setVisible(true)
 
       if (hideTimerRef.current) {
-        clearTimeout(hideTimerRef.current);
+        clearTimeout(hideTimerRef.current)
       }
 
       hideTimerRef.current = setTimeout(() => {
         if (window.scrollY > 100) {
-          setVisible(false);
+          setVisible(false)
         }
-      }, HIDE_DELAY_MS);
-    };
+      }, HIDE_DELAY_MS)
+    }
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('scroll', handleScroll, { passive: true })
     return () => {
-      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scroll', handleScroll)
       if (hideTimerRef.current) {
-        clearTimeout(hideTimerRef.current);
+        clearTimeout(hideTimerRef.current)
       }
-    };
-  }, []);
+    }
+  }, [])
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
-        queryClient.setQueryData(['user'], event.data.user);
+        queryClient.setQueryData(['user'], event.data.user)
       }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [queryClient]);
+    }
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [queryClient])
 
   const handleSearch = (e?: React.FormEvent) => {
-    e?.preventDefault();
+    e?.preventDefault()
     if (query.trim()) {
-      navigate(`/search?query=${encodeURIComponent(query.trim())}`);
+      navigate(`/search?query=${encodeURIComponent(query.trim())}`)
     }
-  };
+  }
 
   const handleSignIn = async () => {
     try {
-      const configRes = await fetch('/api/auth/config-status');
-      const { hasConfig } = await configRes.json();
+      const configRes = await fetch('/api/auth/config-status')
+      const { hasConfig } = await configRes.json()
 
       if (!hasConfig) {
-        setShowConfigModal(true);
-        return;
+        setShowConfigModal(true)
+        return
       }
 
-      const res = await fetch('/api/auth/google');
-      const { url } = await res.json();
+      const res = await fetch('/api/auth/google')
+      const { url } = await res.json()
       if (url) {
-        const width = 500, height = 600;
-        const left = window.screen.width / 2 - width / 2;
-        const top = window.screen.height / 2 - height / 2;
-        window.open(url, 'GoogleAuth', `width=${width},height=${height},top=${top},left=${left}`);
+        const width = 500,
+          height = 600
+        const left = window.screen.width / 2 - width / 2
+        const top = window.screen.height / 2 - height / 2
+        window.open(url, 'GoogleAuth', `width=${width},height=${height},top=${top},left=${left}`)
       }
     } catch (e) {
-      console.error(e);
+      console.error(e)
     }
-  };
+  }
 
   return (
     <header className={`${styles.header} ${visible ? '' : styles.hidden}`}>
@@ -127,9 +128,14 @@ const Header: React.FC = () => {
             <img src={user.picture} alt="Profile" className={styles.profileImg} />
           </Link>
         ) : (
-          <button onClick={handleSignIn} className={styles.signInBtn} aria-label="Sign in with Google">
+          <button
+            onClick={handleSignIn}
+            className={styles.signInBtn}
+            aria-label="Sign in with Google"
+          >
             <FaGoogle />
-          </button>)}
+          </button>
+        )}
       </div>
 
       <GenericModal
@@ -138,13 +144,25 @@ const Header: React.FC = () => {
         title="Configuration Required"
       >
         <p>Google Client ID/Secret missing. Please configure in settings.</p>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-          <button className="btn-secondary" onClick={() => setShowConfigModal(false)}>Close</button>
-          <button className="btn-primary" onClick={() => { setShowConfigModal(false); navigate('/settings'); }}>Settings</button>
+        <div
+          style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}
+        >
+          <button className="btn-secondary" onClick={() => setShowConfigModal(false)}>
+            Close
+          </button>
+          <button
+            className="btn-primary"
+            onClick={() => {
+              setShowConfigModal(false)
+              navigate('/settings')
+            }}
+          >
+            Settings
+          </button>
         </div>
       </GenericModal>
     </header>
-  );
-};
+  )
+}
 
-export default Header;
+export default Header

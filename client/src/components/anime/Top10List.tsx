@@ -1,51 +1,51 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { fixThumbnailUrl } from '../../lib/utils';
-import ErrorMessage from '../common/ErrorMessage';
-import { useTitlePreference } from '../../contexts/TitlePreferenceContext';
-import styles from './Top10List.module.css';
+import React, { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { fixThumbnailUrl } from '../../lib/utils'
+import ErrorMessage from '../common/ErrorMessage'
+import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
+import styles from './Top10List.module.css'
 
 interface AnimeItem {
-  _id: string;
-  name: string;
-  nativeName?: string;
-  englishName?: string;
-  thumbnail: string;
+  _id: string
+  name: string
+  nativeName?: string
+  englishName?: string
+  thumbnail: string
   availableEpisodes: {
-    sub?: number;
-    dub?: number;
-  };
+    sub?: number
+    dub?: number
+  }
 }
 
 interface Top10ListProps {
-  title: string;
+  title: string
 }
 
 const Top10List: React.FC<Top10ListProps> = ({ title }) => {
-  const [top10List, setTop10List] = useState<AnimeItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [timeframe, setTimeframe] = useState('all');
-  const { titlePreference } = useTitlePreference();
+  const [top10List, setTop10List] = useState<AnimeItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [timeframe, setTimeframe] = useState('all')
+  const { titlePreference } = useTitlePreference()
 
   useEffect(() => {
     const fetchTop10List = async () => {
-      setLoading(true);
-      setError(null);
+      setLoading(true)
+      setError(null)
       try {
-        const response = await fetch(`/api/popular/${timeframe}`);
-        if (!response.ok) throw new Error("Failed to fetch top 10 popular");
-        const data = await response.json();
-        setTop10List(data);
+        const response = await fetch(`/api/popular/${timeframe}`)
+        if (!response.ok) throw new Error('Failed to fetch top 10 popular')
+        const data = await response.json()
+        setTop10List(data)
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : 'An unknown error occurred');
+        setError(e instanceof Error ? e.message : 'An unknown error occurred')
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
+    }
 
-    fetchTop10List();
-  }, [timeframe]);
+    fetchTop10List()
+  }, [timeframe])
 
   const renderSkeletons = () => (
     <div className={styles.list}>
@@ -57,14 +57,14 @@ const Top10List: React.FC<Top10ListProps> = ({ title }) => {
         </div>
       ))}
     </div>
-  );
+  )
 
   const getDisplayTitle = (item: AnimeItem) => {
-    if (titlePreference === 'name') return item.name;
-    if (titlePreference === 'nativeName') return item.nativeName || item.name;
-    if (titlePreference === 'englishName') return item.englishName || item.name;
-    return item.name;
-  };
+    if (titlePreference === 'name') return item.name
+    if (titlePreference === 'nativeName') return item.nativeName || item.name
+    if (titlePreference === 'englishName') return item.englishName || item.name
+    return item.name
+  }
 
   return (
     <div className={styles.container}>
@@ -74,7 +74,7 @@ const Top10List: React.FC<Top10ListProps> = ({ title }) => {
           id="timeframe-select"
           aria-label="Filter by timeframe"
           value={timeframe}
-          onChange={e => setTimeframe(e.target.value)}
+          onChange={(e) => setTimeframe(e.target.value)}
           className={styles.timeSelect}
         >
           <option value="all">All Time</option>
@@ -101,19 +101,17 @@ const Top10List: React.FC<Top10ListProps> = ({ title }) => {
                 className={styles.poster}
                 loading="lazy"
                 onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src = '/placeholder.svg';
+                  const target = e.target as HTMLImageElement
+                  target.src = '/placeholder.svg'
                 }}
               />
               <div className={styles.info}>
-                <div className={styles.title} title={getDisplayTitle(item)}>{getDisplayTitle(item)}</div>
+                <div className={styles.title} title={getDisplayTitle(item)}>
+                  {getDisplayTitle(item)}
+                </div>
                 <div className={styles.meta}>
-                  {item.availableEpisodes.sub && (
-                    <span>SUB: {item.availableEpisodes.sub}</span>
-                  )}
-                  {item.availableEpisodes.dub && (
-                    <span> DUB: {item.availableEpisodes.dub}</span>
-                  )}
+                  {item.availableEpisodes.sub && <span>SUB: {item.availableEpisodes.sub}</span>}
+                  {item.availableEpisodes.dub && <span> DUB: {item.availableEpisodes.dub}</span>}
                 </div>
               </div>
             </Link>
@@ -121,7 +119,7 @@ const Top10List: React.FC<Top10ListProps> = ({ title }) => {
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default Top10List;
+export default Top10List

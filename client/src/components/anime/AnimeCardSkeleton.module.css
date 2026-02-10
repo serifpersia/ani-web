@@ -1,51 +1,45 @@
 .skeletonCard {
-    border-radius: var(--card-border-radius);
-    overflow: hidden;
-    background-color: var(--dark-bg-secondary);
-    display: flex;
-    flex-direction: column;
+  border-radius: var(--card-border-radius);
+  overflow: hidden;
+  background-color: var(--dark-bg-secondary);
+  display: flex;
+  flex-direction: column;
 }
-
-
 
 .poster {
-    width: 100%;
-    aspect-ratio: 3 / 4;
-    background-color: var(--dark-border);
-    animation: pulse 1.5s infinite ease-in-out;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  background-color: var(--dark-border);
+  animation: pulse 1.5s infinite ease-in-out;
 }
 
-
-
 .info {
-    padding: 1rem;
+  padding: 1rem;
 }
 
 .line {
-    height: 20px;
-    border-radius: 4px;
-    background-color: var(--dark-border);
-    animation: pulse 1.5s infinite ease-in-out;
+  height: 20px;
+  border-radius: 4px;
+  background-color: var(--dark-border);
+  animation: pulse 1.5s infinite ease-in-out;
 }
 
-
-
 .line.short {
-    width: 60%;
-    margin-top: 0.5rem;
-    height: 16px;
+  width: 60%;
+  margin-top: 0.5rem;
+  height: 16px;
 }
 
 @keyframes pulse {
-    0% {
-        opacity: 1;
-    }
+  0% {
+    opacity: 1;
+  }
 
-    50% {
-        opacity: 0.6;
-    }
+  50% {
+    opacity: 0.6;
+  }
 
-    100% {
-        opacity: 1;
-    }
+  100% {
+    opacity: 1;
+  }
 }

@@ -1,0 +1,20 @@
+# Ignore artifacts:
+build/
+dist/
+node_modules/
+
+# Ignore client-specific artifacts:
+client/build/
+client/dist/
+client/node_modules/
+
+# Ignore server-specific artifacts:
+server/build/
+server/dist/
+server/node_modules/
+
+# Ignore lockfiles
+*.lock
+
+# Ignore .git folder
+.git/

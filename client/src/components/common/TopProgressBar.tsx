@@ -1,19 +1,19 @@
-import { useEffect } from 'react';
-import NProgress from 'nprogress';
-import 'nprogress/nprogress.css';
+import { useEffect } from 'react'
+import NProgress from 'nprogress'
+import 'nprogress/nprogress.css'
 
-NProgress.configure({ showSpinner: false });
+NProgress.configure({ showSpinner: false })
 
 const TopProgressBar: React.FC = () => {
   useEffect(() => {
-    NProgress.start();
+    NProgress.start()
 
     return () => {
-      NProgress.done();
-    };
-  }, []);
+      NProgress.done()
+    }
+  }, [])
 
-  return null;
-};
+  return null
+}
 
-export default TopProgressBar;
+export default TopProgressBar

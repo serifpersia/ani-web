@@ -1,176 +1,175 @@
 .playerPageLayout {
-    display: grid;
-    grid-template-columns: 280px 1fr;
-    gap: 2rem;
-    padding: 2rem;
-    width: 100%;
-    max-width: 1800px;
-    margin: 0 auto;
-    align-items: start;
-    min-height: calc(100vh - var(--header-height));
-    background-color: #000;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 2rem;
+  padding: 2rem;
+  width: 100%;
+  max-width: 1800px;
+  margin: 0 auto;
+  align-items: start;
+  min-height: calc(100vh - var(--header-height));
+  background-color: #000;
 }
 
 .episodeSidebar {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    height: calc(100vh - var(--header-height) - 4rem);
-    position: sticky;
-    top: 2rem;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    padding: 1rem;
-    box-shadow: var(--shadow-lg);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  height: calc(100vh - var(--header-height) - 4rem);
+  position: sticky;
+  top: 2rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  box-shadow: var(--shadow-lg);
 }
 
 .playerMain {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-    background-color: #000;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  background-color: #000;
 }
 
 .videoPlayerWrapper {
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    background-color: black;
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    position: relative;
-    box-shadow: var(--shadow-xl);
-    border: 1px solid var(--glass-border);
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background-color: black;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  position: relative;
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--glass-border);
 }
 
 .playerInfoHeader {
-    display: flex;
-    gap: 2rem;
-    align-items: center;
+  display: flex;
+  gap: 2rem;
+  align-items: center;
 }
 
 .playerAnimeCard {
-    width: 120px;
-    flex-shrink: 0;
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--glass-border);
-    transform: translateZ(0);
-    aspect-ratio: 2/3;
-    height: auto;
+  width: 120px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--glass-border);
+  transform: translateZ(0);
+  aspect-ratio: 2/3;
+  height: auto;
 }
 
 .playerInfoContainer {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    padding: 2.5rem;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
-    display: flex;
-    flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  padding: 2.5rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
 }
 
 .playerAnimeCard img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-    transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .playerAnimeCard:hover img {
-    transform: scale(1.08);
+  transform: scale(1.08);
 }
 
 .videoTitleSection {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: 1rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .videoTitleSection h1 {
-    margin: 0;
-    font-size: 2.2rem;
-    line-height: 1.1;
-    font-weight: 700;
-    color: var(--text-primary);
+  margin: 0;
+  font-size: 2.2rem;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 .videoDescription {
-    color: var(--text-secondary);
-    line-height: 1.6;
-    font-size: 1rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  font-size: 1rem;
 }
 
-
 .episodeSidebar::-webkit-scrollbar {
-    width: 6px;
+  width: 6px;
 }
 
 .episodeSidebar::-webkit-scrollbar-thumb {
-    background: var(--glass-border);
-    border-radius: 3px;
+  background: var(--glass-border);
+  border-radius: 3px;
 }
 
 .episodeSidebar::-webkit-scrollbar-thumb:hover {
-    background: var(--accent);
+  background: var(--accent);
 }
 
 @media (max-width: 1280px) {
-    .playerPageLayout {
-        grid-template-columns: 250px 1fr;
-        padding: 1.5rem;
-        gap: 1.5rem;
-    }
+  .playerPageLayout {
+    grid-template-columns: 250px 1fr;
+    padding: 1.5rem;
+    gap: 1.5rem;
+  }
 }
 
 @media (max-width: 1024px) {
-    .playerPageLayout {
-        display: flex;
-        flex-direction: column;
-        gap: 2rem;
-    }
+  .playerPageLayout {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
 
-    .episodeSidebar {
-        width: 100%;
-        height: auto;
-        max-height: 400px;
-        position: static;
-        order: 2;
-    }
+  .episodeSidebar {
+    width: 100%;
+    height: auto;
+    max-height: 400px;
+    position: static;
+    order: 2;
+  }
 
-    .playerMain {
-        order: 1;
-        width: 100%;
-    }
+  .playerMain {
+    order: 1;
+    width: 100%;
+  }
 
-    .playerInfoHeader {
-        padding: 1.5rem;
-    }
+  .playerInfoHeader {
+    padding: 1.5rem;
+  }
 }
 
 @media (max-width: 768px) {
-    .playerPageLayout {
-        padding: 1rem;
-        gap: 1.5rem;
-    }
+  .playerPageLayout {
+    padding: 1rem;
+    gap: 1.5rem;
+  }
 
-    .playerInfoHeader {
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        gap: 1.5rem;
-    }
+  .playerInfoHeader {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1.5rem;
+  }
 
-    .videoTitleSection h1 {
-        font-size: 1.75rem;
-    }
+  .videoTitleSection h1 {
+    font-size: 1.75rem;
+  }
 
-    .playerAnimeCard {
-        width: 140px;
-    }
+  .playerAnimeCard {
+    width: 140px;
+  }
 }

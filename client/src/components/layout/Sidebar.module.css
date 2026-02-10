@@ -1,95 +1,95 @@
 .sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 300px;
-    height: 100%;
-    transition: transform var(--transition-fast);
-    z-index: 1010;
-    padding: var(--space-4);
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-    transform: translateX(-100%);
-    background-color: var(--bg-secondary);
-    color: var(--text-primary);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 300px;
+  height: 100%;
+  transition: transform var(--transition-fast);
+  z-index: 1010;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  transform: translateX(-100%);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
 }
 
 .logo {
-    display: flex;
-    align-items: center;
-    text-decoration: none;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
 }
 
 .sidebar.open {
-    transform: translateX(0);
+  transform: translateX(0);
 }
 
 .sidebarHeader {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: var(--space-6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
 }
 
 .closeBtn {
-    background: none;
-    border: none;
-    font-size: 2rem;
-    line-height: 1;
-    cursor: pointer;
-    color: var(--text-primary);
-    transition: color var(--transition-base);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--space-2);
+  background: none;
+  border: none;
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: color var(--transition-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2);
 }
 
 .closeBtn:hover {
-    color: var(--accent-light);
-    transform: none;
+  color: var(--accent-light);
+  transform: none;
 }
 
 .navLink {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-md);
-    text-decoration: none;
-    transition: all var(--transition-base);
-    color: var(--text-secondary);
-    font-weight: var(--font-weight-medium);
-    margin-bottom: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: all var(--transition-base);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+  margin-bottom: var(--space-2);
 }
 
 .navLink:hover {
-    background-color: var(--bg-tertiary);
-    color: var(--accent);
+  background-color: var(--bg-tertiary);
+  color: var(--accent);
 }
 
 .navLink.active {
-    background-color: rgba(138, 79, 255, 0.15);
-    color: var(--accent-light);
-    border-left: 3px solid var(--accent);
-    padding-left: calc(var(--space-4) - 3px);
+  background-color: rgba(138, 79, 255, 0.15);
+  color: var(--accent-light);
+  border-left: 3px solid var(--accent);
+  padding-left: calc(var(--space-4) - 3px);
 }
 
 .overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 1005;
-    border: none;
-    padding: 0;
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
-    will-change: opacity;
-    transition: opacity var(--transition-base);
-    opacity: 1;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1005;
+  border: none;
+  padding: 0;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  will-change: opacity;
+  transition: opacity var(--transition-base);
+  opacity: 1;
 }

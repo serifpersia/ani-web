@@ -1,62 +1,62 @@
 .container {
-    background-color: var(--card-background);
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: var(--card-shadow);
-    margin-bottom: 20px;
+  background-color: var(--card-background);
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: var(--card-shadow);
+  margin-bottom: 20px;
 }
 
 .title {
-    color: var(--text-color-primary);
-    margin-top: 0;
-    margin-bottom: 15px;
+  color: var(--text-color-primary);
+  margin-top: 0;
+  margin-bottom: 15px;
 }
 
 .formGroup {
-    margin-bottom: 15px;
+  margin-bottom: 15px;
 }
 
 .label {
-    display: block;
-    margin-bottom: 8px;
-    color: var(--text-color-secondary);
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-color-secondary);
 }
 
 .inputWrapper {
-    display: flex;
-    gap: 10px;
+  display: flex;
+  gap: 10px;
 }
 
 .input {
-    flex-grow: 1;
-    background-color: var(--bg);
-    color: var(--text);
-    border: 1px solid var(--border);
-    padding: 0.75rem 1rem;
-    border-radius: 8px;
-    font-family: var(--font-family);
-    font-size: 1rem;
+  flex-grow: 1;
+  background-color: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-family: var(--font-family);
+  font-size: 1rem;
 }
 
 .iconButton {
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 0 1rem;
-    border-radius: 8px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
 }
 
 .iconButton:hover {
-    background-color: var(--border);
+  background-color: var(--border);
 }
 
 .actions {
-    display: flex;
-    gap: 10px;
-    margin-top: 20px;
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
 }

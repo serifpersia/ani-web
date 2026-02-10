@@ -1,94 +1,94 @@
 .controls {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-    background-color: var(--bg-secondary);
-    padding: 1rem;
-    border-radius: var(--card-radius);
-    border: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  background-color: var(--bg-secondary);
+  padding: 1rem;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border);
 }
 
 .filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .filterBtn {
-    background: transparent;
-    color: var(--text-secondary);
-    border: 1px solid transparent;
-    padding: 0.5rem 1rem;
-    border-radius: 20px;
-    font-size: 0.9rem;
-    transition: all 0.2s;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  transition: all 0.2s;
 }
 
 .filterBtn:hover {
-    background-color: var(--bg-tertiary);
-    color: var(--text-primary);
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .filterBtn.active {
-    background-color: var(--accent);
-    color: white;
+  background-color: var(--accent);
+  color: white;
 }
 
 .sortSelect {
-    width: 180px;
+  width: 180px;
 }
 
 .itemWrapper {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .cardActions {
-    margin-top: 0.75rem;
-    display: flex;
-    gap: 0.5rem;
+  margin-top: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
 }
 
 .statusSelect {
-    flex-grow: 1;
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-secondary);
-    color: var(--text-secondary);
-    padding: 0.4rem 0.6rem;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
+  flex-grow: 1;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-secondary);
+  color: var(--text-secondary);
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .statusSelect:hover {
-    background-color: var(--bg-elevated);
-    border-color: var(--text-tertiary);
-    color: var(--text-primary);
+  background-color: var(--bg-elevated);
+  border-color: var(--text-tertiary);
+  color: var(--text-primary);
 }
 
 .removeBtn {
-    background-color: var(--bg-tertiary);
-    color: var(--danger);
-    border: 1px solid var(--border);
-    width: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
-    transition: all 0.2s;
+  background-color: var(--bg-tertiary);
+  color: var(--danger);
+  border: 1px solid var(--border);
+  width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s;
 }
 
 .removeBtn:hover {
-    background-color: rgba(239, 68, 68, 0.1);
-    border-color: var(--danger);
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: var(--danger);
 }
 
 .emptyState {
-    text-align: center;
-    padding: 4rem 1rem;
-    color: var(--text-muted);
+  text-align: center;
+  padding: 4rem 1rem;
+  color: var(--text-muted);
 }

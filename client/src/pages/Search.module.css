@@ -1,86 +1,90 @@
 .filterContainer {
-    background-color: var(--bg-secondary);
-    padding: 1.5rem;
-    border-radius: var(--card-radius);
-    margin-bottom: 2rem;
-    border: 1px solid var(--border);
+  background-color: var(--bg-secondary);
+  padding: 1.5rem;
+  border-radius: var(--card-radius);
+  margin-bottom: 2rem;
+  border: 1px solid var(--border);
 }
 
 .searchBar {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
 }
-
 
 .advancedFilters {
-    display: none;
-    flex-direction: column;
-    gap: 1.5rem;
-    border-top: 1px solid var(--border);
-    padding-top: 1.5rem;
-    animation: slideDown 0.3s ease-out;
+  display: none;
+  flex-direction: column;
+  gap: 1.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1.5rem;
+  animation: slideDown 0.3s ease-out;
 }
 
-
 .advancedFilters.show {
-    display: flex;
+  display: flex;
 }
 
 .selectGrid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
 }
 
 .genreContainer {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
 }
 
 .genreButton {
-    background-color: var(--bg-main);
-    border: 1px solid var(--border);
-    color: var(--text-secondary);
-    padding: 0.4rem 0.9rem;
-    border-radius: 20px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    position: relative;
-    transition: all 0.2s;
+  background-color: var(--bg-main);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 0.4rem 0.9rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
 }
 
 .genreButton:hover {
-    border-color: var(--accent);
-    color: var(--text-primary);
+  border-color: var(--accent);
+  color: var(--text-primary);
 }
 
 .genreButton.include {
-    background-color: var(--accent);
-    border-color: var(--accent);
-    color: white;
+  background-color: var(--accent);
+  border-color: var(--accent);
+  color: white;
 }
 
 .genreButton.exclude {
-    background-color: transparent;
-    border-color: var(--danger);
-    color: var(--danger);
-    text-decoration: line-through;
-    opacity: 0.8;
+  background-color: transparent;
+  border-color: var(--danger);
+  color: var(--danger);
+  text-decoration: line-through;
+  opacity: 0.8;
 }
 
 @keyframes slideDown {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 768px) {
-    .searchBar {
-        flex-direction: column;
-    }
+  .searchBar {
+    flex-direction: column;
+  }
 
-    .searchBar input {
-        width: 100%;
-    }
+  .searchBar input {
+    width: 100%;
+  }
 }

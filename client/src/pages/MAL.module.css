@@ -37,8 +37,8 @@
   margin-bottom: 15px;
 }
 
-.importControls input[type="file"],
-.exportControls input[type="file"] {
+.importControls input[type='file'],
+.exportControls input[type='file'] {
   flex-grow: 1;
   padding: 8px;
   border: 1px solid var(--border-color);
@@ -71,7 +71,7 @@
   margin-bottom: 15px;
 }
 
-.importOptions input[type="checkbox"] {
+.importOptions input[type='checkbox'] {
   width: 18px;
   height: 18px;
   accent-color: var(--accent-color);

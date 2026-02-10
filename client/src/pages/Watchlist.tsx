@@ -1,29 +1,41 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
-import { FaTrash } from 'react-icons/fa';
+import React, { useState, useMemo, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
+import { FaTrash } from 'react-icons/fa'
 
-import AnimeCard from '../components/anime/AnimeCard';
-import SkeletonGrid from '../components/common/SkeletonGrid';
-import ErrorMessage from '../components/common/ErrorMessage';
-import RemoveConfirmationModal from '../components/common/RemoveConfirmationModal';
+import AnimeCard from '../components/anime/AnimeCard'
+import SkeletonGrid from '../components/common/SkeletonGrid'
+import ErrorMessage from '../components/common/ErrorMessage'
+import RemoveConfirmationModal from '../components/common/RemoveConfirmationModal'
 
-import { useInfiniteWatchlist, useRemoveFromWatchlist, useAllContinueWatching } from '../hooks/useAnimeData';
-import { useSetting, useUpdateSetting } from '../hooks/useSettings';
-import styles from './Watchlist.module.css';
+import {
+  useInfiniteWatchlist,
+  useRemoveFromWatchlist,
+  useAllContinueWatching,
+} from '../hooks/useAnimeData'
+import { useSetting, useUpdateSetting } from '../hooks/useSettings'
+import styles from './Watchlist.module.css'
 
-const FILTERS = ['All', 'Continue Watching', 'Watching', 'Completed', 'On-Hold', 'Dropped', 'Planned'];
+const FILTERS = [
+  'All',
+  'Continue Watching',
+  'Watching',
+  'Completed',
+  'On-Hold',
+  'Dropped',
+  'Planned',
+]
 
 const Watchlist: React.FC = () => {
-  const { filter: filterBy = 'All' } = useParams<{ filter: string }>();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [sortBy, setSortBy] = useState("last_added");
+  const { filter: filterBy = 'All' } = useParams<{ filter: string }>()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [sortBy, setSortBy] = useState('last_added')
 
-  const [itemToRemove, setItemToRemove] = useState<{ id: string, name: string } | null>(null);
+  const [itemToRemove, setItemToRemove] = useState<{ id: string; name: string } | null>(null)
 
-  const isCW = filterBy === 'Continue Watching';
+  const isCW = filterBy === 'Continue Watching'
 
   const {
     data: cwData,
@@ -31,8 +43,8 @@ const Watchlist: React.FC = () => {
     error: errorCW,
     fetchNextPage: fetchNextCW,
     hasNextPage: hasNextCW,
-    isFetchingNextPage: isFetchingNextCW
-  } = useAllContinueWatching();
+    isFetchingNextPage: isFetchingNextCW,
+  } = useAllContinueWatching()
 
   const {
     data: wlData,
@@ -40,70 +52,83 @@ const Watchlist: React.FC = () => {
     error: errorWL,
     fetchNextPage: fetchNextWL,
     hasNextPage: hasNextWL,
-    isFetchingNextPage: isFetchingNextWL
-  } = useInfiniteWatchlist(filterBy);
+    isFetchingNextPage: isFetchingNextWL,
+  } = useInfiniteWatchlist(filterBy)
 
-  const list = isCW ? cwData?.pages || [] : wlData?.pages || [];
-  const isLoading = isCW ? loadingCW : loadingWL;
-  const error = isCW ? errorCW : errorWL;
+  const list = isCW ? cwData?.pages || [] : wlData?.pages || []
+  const isLoading = isCW ? loadingCW : loadingWL
+  const error = isCW ? errorCW : errorWL
 
-  const fetchNextPage = isCW ? fetchNextCW : fetchNextWL;
-  const hasNextPage = isCW ? hasNextCW : hasNextWL;
-  const isFetchingNextPage = isCW ? isFetchingNextCW : isFetchingNextWL;
+  const fetchNextPage = isCW ? fetchNextCW : fetchNextWL
+  const hasNextPage = isCW ? hasNextCW : hasNextWL
+  const isFetchingNextPage = isCW ? isFetchingNextCW : isFetchingNextWL
 
   useEffect(() => {
     const handleScroll = () => {
-      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 800 && hasNextPage && !isFetchingNextPage) {
-        fetchNextPage();
+      if (
+        window.innerHeight + window.scrollY >= document.body.offsetHeight - 800 &&
+        hasNextPage &&
+        !isFetchingNextPage
+      ) {
+        fetchNextPage()
       }
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   const updateStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string, status: string }) => {
-      await fetch('/api/watchlist/status', { method: 'POST', body: JSON.stringify({ id, status }), headers: { 'Content-Type': 'application/json' } });
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      await fetch('/api/watchlist/status', {
+        method: 'POST',
+        body: JSON.stringify({ id, status }),
+        headers: { 'Content-Type': 'application/json' },
+      })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['watchlist'] });
-      toast.success('Status updated');
-    }
-  });
+      queryClient.invalidateQueries({ queryKey: ['watchlist'] })
+      toast.success('Status updated')
+    },
+  })
 
   const removeCw = useMutation({
     mutationFn: async (showId: string) => {
-      await fetch('/api/continue-watching/remove', { method: 'POST', body: JSON.stringify({ showId }), headers: { 'Content-Type': 'application/json' } });
+      await fetch('/api/continue-watching/remove', {
+        method: 'POST',
+        body: JSON.stringify({ showId }),
+        headers: { 'Content-Type': 'application/json' },
+      })
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
-  });
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] }),
+  })
 
-  const removeWl = useRemoveFromWatchlist();
-  const { data: skipConfirm } = useSetting('skipRemoveConfirmation');
-  const updateSetting = useUpdateSetting();
+  const removeWl = useRemoveFromWatchlist()
+  const { data: skipConfirm } = useSetting('skipRemoveConfirmation')
+  const updateSetting = useUpdateSetting()
 
   const sortedList = useMemo(() => {
     return [...list].sort((a, b) => {
-      if (sortBy === "name_asc") return a.name.localeCompare(b.name);
-      if (sortBy === "name_desc") return b.name.localeCompare(a.name);
-      return 0;
-    });
-  }, [list, sortBy]);
+      if (sortBy === 'name_asc') return a.name.localeCompare(b.name)
+      if (sortBy === 'name_desc') return b.name.localeCompare(a.name)
+      return 0
+    })
+  }, [list, sortBy])
 
   const handleRemove = (id: string, name: string) => {
     if (skipConfirm) {
-      isCW ? removeCw.mutate(id) : removeWl.mutate(id);
+      isCW ? removeCw.mutate(id) : removeWl.mutate(id)
     } else {
-      setItemToRemove({ id, name });
+      setItemToRemove({ id, name })
     }
-  };
+  }
 
   const confirmRemove = (opts: { rememberPreference?: boolean }) => {
-    if (!itemToRemove) return;
-    isCW ? removeCw.mutate(itemToRemove.id) : removeWl.mutate(itemToRemove.id);
-    if (opts.rememberPreference) updateSetting.mutate({ key: 'skipRemoveConfirmation', value: true });
-    setItemToRemove(null);
-  };
+    if (!itemToRemove) return
+    isCW ? removeCw.mutate(itemToRemove.id) : removeWl.mutate(itemToRemove.id)
+    if (opts.rememberPreference)
+      updateSetting.mutate({ key: 'skipRemoveConfirmation', value: true })
+    setItemToRemove(null)
+  }
 
   return (
     <div className="page-container">
@@ -111,7 +136,7 @@ const Watchlist: React.FC = () => {
 
       <div className={styles.controls}>
         <div className={styles.filters}>
-          {FILTERS.map(f => (
+          {FILTERS.map((f) => (
             <button
               key={f}
               className={`${styles.filterBtn} ${filterBy === f ? styles.active : ''}`}
@@ -124,7 +149,7 @@ const Watchlist: React.FC = () => {
         <select
           className={`form-select ${styles.sortSelect}`}
           value={sortBy}
-          onChange={e => setSortBy(e.target.value)}
+          onChange={(e) => setSortBy(e.target.value)}
         >
           <option value="last_added">Recently Added</option>
           <option value="name_asc">Name (A-Z)</option>
@@ -132,12 +157,20 @@ const Watchlist: React.FC = () => {
         </select>
       </div>
 
-      {isLoading ? <SkeletonGrid /> : error ? <ErrorMessage message={error.message} /> : (
+      {isLoading ? (
+        <SkeletonGrid />
+      ) : error ? (
+        <ErrorMessage message={error.message} />
+      ) : (
         <>
           <div className="grid-container">
-            {sortedList.map(item => (
+            {sortedList.map((item) => (
               <div key={item._id} className={styles.itemWrapper}>
-                <AnimeCard anime={item} continueWatching={isCW} onRemove={() => handleRemove(item.id, item.name)} />
+                <AnimeCard
+                  anime={item}
+                  continueWatching={isCW}
+                  onRemove={() => handleRemove(item.id, item.name)}
+                />
                 {!isCW && (
                   <div className={styles.cardActions}>
                     <select
@@ -145,9 +178,16 @@ const Watchlist: React.FC = () => {
                       value={item.status}
                       onChange={(e) => updateStatus.mutate({ id: item.id, status: e.target.value })}
                     >
-                      {FILTERS.slice(2).map(s => <option key={s} value={s}>{s}</option>)}
+                      {FILTERS.slice(2).map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
                     </select>
-                    <button className={styles.removeBtn} onClick={() => handleRemove(item.id, item.name)}>
+                    <button
+                      className={styles.removeBtn}
+                      onClick={() => handleRemove(item.id, item.name)}
+                    >
                       <FaTrash size={12} />
                     </button>
                   </div>
@@ -171,7 +211,7 @@ const Watchlist: React.FC = () => {
         scenario={isCW ? 'continueWatching' : 'watchlist'}
       />
     </div>
-  );
-};
+  )
+}
 
-export default Watchlist;
+export default Watchlist

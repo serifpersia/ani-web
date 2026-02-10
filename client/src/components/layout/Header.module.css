@@ -8,7 +8,9 @@
   display: flex;
   align-items: center;
   padding: 0 var(--space-6);
-  transition: transform var(--transition-slow), box-shadow var(--transition-base);
+  transition:
+    transform var(--transition-slow),
+    box-shadow var(--transition-base);
   box-shadow: var(--shadow-md);
 }
 

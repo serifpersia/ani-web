@@ -1,45 +1,45 @@
-import { useEffect, Suspense, lazy } from 'react';
-import { Routes, Route } from 'react-router-dom';
-import Header from './components/layout/Header';
-import Sidebar from './components/layout/Sidebar';
-import Footer from './components/layout/Footer';
-import ScrollToTopButton from './components/common/ScrollToTopButton';
+import { useEffect, Suspense, lazy } from 'react'
+import { Routes, Route } from 'react-router-dom'
+import Header from './components/layout/Header'
+import Sidebar from './components/layout/Sidebar'
+import Footer from './components/layout/Footer'
+import ScrollToTopButton from './components/common/ScrollToTopButton'
 
-const Home = lazy(() => import('./pages/Home'));
-const Watchlist = lazy(() => import('./pages/Watchlist'));
-const Settings = lazy(() => import('./pages/Settings'));
-const Player = lazy(() => import('./pages/Player'));
-const Search = lazy(() => import('./pages/Search'));
-const MAL = lazy(() => import('./pages/MAL'));
-const Insights = lazy(() => import('./pages/Insights'));
+const Home = lazy(() => import('./pages/Home'))
+const Watchlist = lazy(() => import('./pages/Watchlist'))
+const Settings = lazy(() => import('./pages/Settings'))
+const Player = lazy(() => import('./pages/Player'))
+const Search = lazy(() => import('./pages/Search'))
+const MAL = lazy(() => import('./pages/MAL'))
+const Insights = lazy(() => import('./pages/Insights'))
 
-import { useSidebar } from './hooks/useSidebar';
-import { Toaster } from 'react-hot-toast';
-import TopProgressBar from './components/common/TopProgressBar';
+import { useSidebar } from './hooks/useSidebar'
+import { Toaster } from 'react-hot-toast'
+import TopProgressBar from './components/common/TopProgressBar'
 
 function App() {
-  const { isOpen, setIsOpen } = useSidebar();
+  const { isOpen, setIsOpen } = useSidebar()
 
   useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {
       if (isOpen && event.key === 'Escape') {
-        setIsOpen(false);
+        setIsOpen(false)
       }
-    };
-
-    if (isOpen) {
-      document.body.classList.add('sidebar-open');
-    } else {
-      document.body.classList.remove('sidebar-open');
     }
 
-    window.addEventListener('keydown', handleKeydown);
+    if (isOpen) {
+      document.body.classList.add('sidebar-open')
+    } else {
+      document.body.classList.remove('sidebar-open')
+    }
+
+    window.addEventListener('keydown', handleKeydown)
 
     return () => {
-      window.removeEventListener('keydown', handleKeydown);
-      document.body.classList.remove('sidebar-open');
-    };
-  }, [isOpen, setIsOpen]);
+      window.removeEventListener('keydown', handleKeydown)
+      document.body.classList.remove('sidebar-open')
+    }
+  }, [isOpen, setIsOpen])
 
   return (
     <div className="app-container">
@@ -88,7 +88,7 @@ function App() {
       <Footer />
       <ScrollToTopButton />
     </div>
-  );
+  )
 }
 
-export default App;
+export default App

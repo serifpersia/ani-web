@@ -1,24 +1,24 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import AnimeCard from './AnimeCard';
-import SkeletonGrid from '../common/SkeletonGrid';
-import styles from './AnimeSection.module.css';
+import React from 'react'
+import { Link } from 'react-router-dom'
+import AnimeCard from './AnimeCard'
+import SkeletonGrid from '../common/SkeletonGrid'
+import styles from './AnimeSection.module.css'
 
 interface Anime {
-  _id: string;
-  id: string;
-  name: string;
-  thumbnail: string;
-  [key: string]: any;
+  _id: string
+  id: string
+  name: string
+  thumbnail: string
+  [key: string]: any
 }
 
 interface AnimeSectionProps {
-  title: string;
-  animeList: Anime[];
-  continueWatching?: boolean;
-  onRemove?: (id: string) => void;
-  loading?: boolean;
-  showSeeMore?: boolean;
+  title: string
+  animeList: Anime[]
+  continueWatching?: boolean
+  onRemove?: (id: string) => void
+  loading?: boolean
+  showSeeMore?: boolean
 }
 
 const AnimeSection: React.FC<AnimeSectionProps> = ({
@@ -27,16 +27,22 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
   continueWatching,
   onRemove,
   loading,
-  showSeeMore
+  showSeeMore,
 }) => {
-  if (!loading && animeList.length === 0) return null;
+  if (!loading && animeList.length === 0) return null
 
   return (
     <section style={{ marginBottom: '2.5rem' }}>
       <div className={styles['section-header']}>
-        <div className="section-title" style={{ marginBottom: 0 }}>{title}</div>
+        <div className="section-title" style={{ marginBottom: 0 }}>
+          {title}
+        </div>
         {showSeeMore && (
-          <Link to="/watchlist/Continue Watching" className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}>
+          <Link
+            to="/watchlist/Continue Watching"
+            className="btn-secondary"
+            style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}
+          >
             View All
           </Link>
         )}
@@ -58,7 +64,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
         )}
       </div>
     </section>
-  );
-};
+  )
+}
 
-export default React.memo(AnimeSection);
+export default React.memo(AnimeSection)

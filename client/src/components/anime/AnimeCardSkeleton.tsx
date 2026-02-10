@@ -1,6 +1,5 @@
-
-import React from 'react';
-import styles from './AnimeCardSkeleton.module.css';
+import React from 'react'
+import styles from './AnimeCardSkeleton.module.css'
 
 const AnimeCardSkeleton: React.FC = () => {
   return (
@@ -11,7 +10,7 @@ const AnimeCardSkeleton: React.FC = () => {
         <div className={`${styles.line} ${styles.short}`}></div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default AnimeCardSkeleton;
+export default AnimeCardSkeleton

@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "start:prod": "vite preview",
-    "lighthouse": "lighthouse http://localhost:4173 --view"
+    "lighthouse": "lighthouse http://localhost:4173 --view",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "@tanstack/query-sync-storage-persister": "^5.90.7",
@@ -35,9 +36,11 @@
     "baseline-browser-mapping": "^2.9.13",
     "concurrently": "^9.2.1",
     "eslint": "9.33.0",
+    "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-react-hooks": "5.2.0",
     "eslint-plugin-react-refresh": "0.4.20",
     "globals": "16.3.0",
+    "prettier": "^3.0.0",
     "rimraf": "^6.0.1",
     "typescript": "5.8.3",
     "typescript-eslint": "8.39.1",

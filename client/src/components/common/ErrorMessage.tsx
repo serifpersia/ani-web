@@ -1,10 +1,9 @@
-
-import React from 'react';
-import styles from './ErrorMessage.module.css';
-import { FaExclamationTriangle } from 'react-icons/fa';
+import React from 'react'
+import styles from './ErrorMessage.module.css'
+import { FaExclamationTriangle } from 'react-icons/fa'
 
 interface ErrorMessageProps {
-  message: string;
+  message: string
 }
 
 const ErrorMessage: React.FC<ErrorMessageProps> = ({ message }) => {
@@ -13,7 +12,7 @@ const ErrorMessage: React.FC<ErrorMessageProps> = ({ message }) => {
       <FaExclamationTriangle className={styles.icon} />
       <span>{message}</span>
     </div>
-  );
-};
+  )
+}
 
-export default ErrorMessage;
+export default ErrorMessage
