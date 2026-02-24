@@ -7,7 +7,7 @@ import { FaCheck, FaPlus, FaChevronDown, FaChevronUp } from 'react-icons/fa'
 import { fixThumbnailUrl } from '../lib/utils'
 import ResumeModal from '../components/common/ResumeModal'
 import useIsMobile from '../hooks/useIsMobile'
-import Hls from 'hls.js'
+import type Hls from 'hls.js'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import PlayerControls from '../components/player/PlayerControls'
 import EpisodeList from '../components/player/EpisodeList'
@@ -110,14 +110,17 @@ const Player: React.FC = () => {
     }
 
     if (state.selectedLink.hls) {
-      if (Hls.isSupported()) {
-        const hls = new Hls()
-        hlsInstance.current = hls
-        hls.loadSource(proxiedUrl)
-        hls.attachMedia(videoElement)
-      } else {
-        videoElement.src = proxiedUrl
-      }
+      import('hls.js/dist/hls.light.mjs').then((module) => {
+        const Hls = module.default
+        if (Hls.isSupported()) {
+          const hls = new Hls()
+          hlsInstance.current = hls
+          hls.loadSource(proxiedUrl)
+          hls.attachMedia(videoElement)
+        } else {
+          videoElement.src = proxiedUrl
+        }
+      })
     } else {
       videoElement.src = proxiedUrl
     }
@@ -337,7 +340,7 @@ const Player: React.FC = () => {
             cue.snapToLines = false
             const pos = Math.max(0, Math.min(100, 100 - player.state.subtitlePosition))
             cue.line = pos
-          } catch (e) {}
+          } catch (e) { }
         })
       }
     }
@@ -514,7 +517,7 @@ const Player: React.FC = () => {
                 src={fixThumbnailUrl(state.showMeta.thumbnail || '')}
                 alt={displayTitle}
                 onError={(e) => {
-                  ;(e.target as HTMLImageElement).src = '/placeholder.svg'
+                  ; (e.target as HTMLImageElement).src = '/placeholder.svg'
                 }}
               />
             </div>

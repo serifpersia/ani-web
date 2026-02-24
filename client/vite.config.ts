@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import preact from '@preact/preset-vite'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [preact()],
   server: {
     proxy: {
       '/api': {
@@ -12,12 +12,19 @@ export default defineConfig({
       },
     },
   },
+  resolve: {
+    alias: {
+      react: 'preact/compat',
+      'react-dom/test-utils': 'preact/test-utils',
+      'react-dom': 'preact/compat',
+      'react/jsx-runtime': 'preact/jsx-runtime'
+    },
+  },
   build: {
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query'],
-          player: ['hls.js'],
+          vendor: ['preact', 'react-router-dom', '@tanstack/react-query'],
         },
       },
     },

@@ -1,7 +1,7 @@
-import React, { useState, ReactNode, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { SidebarContext } from './SidebarContext'
 
-export const SidebarProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isOpen, setIsOpen] = useState(false)
 
   const toggleSidebar = () => {

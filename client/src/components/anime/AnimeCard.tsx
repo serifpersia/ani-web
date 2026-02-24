@@ -110,6 +110,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
               height="200"
               className={`${styles.posterImg} ${isLoaded ? styles.loaded : ''}`}
               loading={isLCP ? 'eager' : 'lazy'}
+              decoding="async"
               fetchPriority={isLCP ? 'high' : 'auto'}
               onLoad={() => setIsLoaded(true)}
             />

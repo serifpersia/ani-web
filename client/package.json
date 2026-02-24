@@ -14,6 +14,7 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@preact/preset-vite": "^2.10.3",
     "@tanstack/query-sync-storage-persister": "^5.90.7",
     "@tanstack/react-query": "^5.90.2",
     "@tanstack/react-query-persist-client": "^5.90.7",
@@ -21,6 +22,7 @@
     "cli-progress": "^3.12.0",
     "hls.js": "^1.6.12",
     "nprogress": "^0.2.0",
+    "preact": "^10.28.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-hot-toast": "^2.6.0",
@@ -40,11 +42,11 @@
     "eslint-plugin-react-hooks": "5.2.0",
     "eslint-plugin-react-refresh": "0.4.20",
     "globals": "16.3.0",
+    "lighthouse": "^13.0.1",
     "prettier": "^3.0.0",
     "rimraf": "^6.0.1",
     "typescript": "5.8.3",
     "typescript-eslint": "8.39.1",
-    "lighthouse": "^13.0.1",
     "vite": "^7.3.1",
     "vite-plugin-compression": "^0.5.1"
   },

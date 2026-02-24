@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from 'react'
-
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react'
 export type TitlePreferenceContextType = {
   titlePreference: 'name' | 'nativeName' | 'englishName'
   setTitlePreference: (preference: 'name' | 'nativeName' | 'englishName') => void
@@ -11,7 +10,7 @@ export const TitlePreferenceContext = createContext<TitlePreferenceContextType |
 )
 
 interface TitlePreferenceProviderProps {
-  children: ReactNode
+  children: React.ReactNode
 }
 
 export const TitlePreferenceProvider: React.FC<TitlePreferenceProviderProps> = ({ children }) => {
