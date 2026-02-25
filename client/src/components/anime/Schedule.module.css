@@ -52,10 +52,3 @@
   font-size: var(--font-size-xs);
   color: var(--text-secondary);
 }
-
-.gridContainer {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: var(--space-6);
-  animation: fadeIn var(--transition-slow);
-}

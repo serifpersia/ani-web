@@ -113,7 +113,7 @@ export const useAllContinueWatching = () => {
   return useInfiniteQuery<PaginatedAnimeResponse, Error, { pages: Anime[]; pageParams: any[] }>({
     queryKey: ['allContinueWatching'],
     queryFn: async ({ pageParam = 1 }) => {
-      const response = await fetchApi(`/api/continue-watching/all?page=${pageParam}&limit=10`)
+      const response = await fetchApi(`/api/continue-watching/all?page=${pageParam}&limit=14`)
       return response
     },
     initialPageParam: 1,

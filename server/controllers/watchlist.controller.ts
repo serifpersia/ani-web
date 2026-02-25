@@ -45,7 +45,7 @@ interface CombinedContinueWatchingShow {
 }
 
 export class WatchlistController {
-  constructor(private provider: AllAnimeProvider) {}
+  constructor(private provider: AllAnimeProvider) { }
 
   private async getContinueWatchingData(
     db: any
@@ -185,8 +185,9 @@ export class WatchlistController {
 
   getContinueWatching = async (req: Request, res: Response) => {
     try {
+      const limit = parseInt(req.query.limit as string) || 10
       const data = await this.getContinueWatchingData(req.db)
-      res.json(data.data.slice(0, 10))
+      res.json(data.data.slice(0, limit))
     } catch {
       res.status(500).json({ error: 'DB error' })
     }

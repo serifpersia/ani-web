@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useCallback } from 'react'
-import { useQueryClient, useMutation, useInfiniteQuery } from '@tanstack/react-query'
+import { useQueryClient, useMutation } from '@tanstack/react-query'
 import AnimeSection from '../components/anime/AnimeSection'
 import Top10List from '../components/anime/Top10List'
 import Schedule from '../components/anime/Schedule'
@@ -11,6 +11,7 @@ import useIsMobile from '../hooks/useIsMobile'
 const Home: React.FC = () => {
   const queryClient = useQueryClient()
   const isMobile = useIsMobile()
+  const isTablet = useIsMobile(1024)
   const observerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -18,7 +19,7 @@ const Home: React.FC = () => {
   }, [])
 
   const { data: latest, isLoading: loadingLatest } = useLatestReleases()
-  const { data: cwList } = useContinueWatching(6)
+  const { data: cwList } = useContinueWatching(15)
   const {
     data: seasonPages,
     fetchNextPage,
@@ -72,15 +73,21 @@ const Home: React.FC = () => {
     <div style={{ paddingBottom: '2rem' }}>
       <div
         style={{
-          display: 'flex',
+          display: isTablet ? 'flex' : 'grid',
+          gridTemplateColumns: isTablet ? undefined : '1fr 320px',
+          flexDirection: isTablet ? 'column' : undefined,
           gap: '2rem',
           padding: isMobile ? '1rem' : '1.5rem',
-          alignItems: 'flex-start',
-          flexWrap: 'wrap',
+          alignItems: isTablet ? undefined : 'start',
         }}
       >
-        {}
-        <div style={{ flex: '1', minWidth: '0' }}>
+        {isTablet && (
+          <section>
+            <Top10List title="Top 10 Popular" />
+          </section>
+        )}
+
+        <div style={{ minWidth: '0' }}>
           <div style={{ minHeight: cwList && cwList.length > 0 ? '280px' : '0' }}>
             {cwList && cwList.length > 0 && (
               <AnimeSection
@@ -93,7 +100,16 @@ const Home: React.FC = () => {
             )}
           </div>
 
-          <div style={{ minHeight: '800px' }}>
+        </div>
+
+        {!isTablet && (
+          <aside>
+            <Top10List title="Top 10 Popular" />
+          </aside>
+        )}
+
+        <section style={{ gridColumn: isTablet ? undefined : '1 / -1' }}>
+          <div style={{ minHeight: '800px', marginBottom: '2rem' }}>
             <AnimeSection
               title="Latest Releases"
               animeList={latest || []}
@@ -101,30 +117,15 @@ const Home: React.FC = () => {
             />
           </div>
 
-          <section>
-            <div className="section-title">Current Season</div>
-            <div className="grid-container">
-              {currentSeason.map((anime) => (
-                <AnimeCard key={anime._id} anime={anime} />
-              ))}
-              {(loadingSeason || isFetchingNextPage) && <SkeletonGrid count={6} />}
-            </div>
-            <div ref={observerRef} style={{ height: '20px' }} />
-          </section>
-        </div>
-
-        {}
-        {!isMobile && (
-          <aside
-            style={{
-              width: '320px',
-              flexShrink: 0,
-              marginTop: '0',
-            }}
-          >
-            <Top10List title="Top 10 Popular" />
-          </aside>
-        )}
+          <div className="section-title">Current Season</div>
+          <div className="grid-container">
+            {currentSeason.map((anime) => (
+              <AnimeCard key={anime._id} anime={anime} />
+            ))}
+            {(loadingSeason || isFetchingNextPage) && <SkeletonGrid count={6} />}
+          </div>
+          <div ref={observerRef} style={{ height: '20px' }} />
+        </section>
       </div>
 
       <Schedule />

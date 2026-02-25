@@ -94,10 +94,10 @@ const Top10List: React.FC<Top10ListProps> = ({ title }) => {
             <Link to={`/player/${item._id}`} key={item._id} className={styles.item}>
               <div className={styles.rank}>#{i + 1}</div>
               <img
-                src={fixThumbnailUrl(item.thumbnail, 50, 70)}
+                src={fixThumbnailUrl(item.thumbnail, 130, 182)}
                 alt={item.name}
-                width="50"
-                height="70"
+                width="130"
+                height="182"
                 className={styles.poster}
                 loading="lazy"
                 onError={(e) => {

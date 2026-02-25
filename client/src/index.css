@@ -367,20 +367,21 @@ main {
 
 .grid-container {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: var(--space-6);
   width: 100%;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .grid-container {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: var(--space-4);
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   .grid-container {
     grid-template-columns: 1fr;
+    gap: var(--space-4);
   }
 }

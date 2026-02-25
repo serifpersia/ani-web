@@ -302,7 +302,7 @@ export class AllAnimeProvider implements Provider {
   async getLatestReleases(): Promise<Show[]> {
     const variables = {
       search: { sortBy: 'Latest_Update', allowAdult: false },
-      limit: 10,
+      limit: 14,
       page: 1,
       translationType: 'sub',
       countryOrigin: 'JP',
@@ -445,24 +445,24 @@ export class AllAnimeProvider implements Provider {
               if (clockData.links && clockData.links.length > 0) {
                 videoLinks = clockData.links[0].hls
                   ? await (async (u: string, h: Record<string, string>) => {
-                      const { data: d } = await axios.get(u, { headers: h, timeout: 10000 })
-                      const l = d.split('\n')
-                      const q: VideoLink[] = []
-                      for (let i = 0; i < l.length; i++) {
-                        if (l[i].startsWith('#EXT-X-STREAM-INF')) {
-                          const rM = l[i].match(/RESOLUTION=\d+x(\d+)/)
-                          q.push({
-                            resolutionStr: rM ? `${rM[1]}p` : 'Auto',
-                            link: new URL(l[i + 1], u).href,
-                            hls: true,
-                            headers: h,
-                          })
-                        }
+                    const { data: d } = await axios.get(u, { headers: h, timeout: 10000 })
+                    const l = d.split('\n')
+                    const q: VideoLink[] = []
+                    for (let i = 0; i < l.length; i++) {
+                      if (l[i].startsWith('#EXT-X-STREAM-INF')) {
+                        const rM = l[i].match(/RESOLUTION=\d+x(\d+)/)
+                        q.push({
+                          resolutionStr: rM ? `${rM[1]}p` : 'Auto',
+                          link: new URL(l[i + 1], u).href,
+                          hls: true,
+                          headers: h,
+                        })
                       }
-                      return q.length > 0
-                        ? q
-                        : [{ resolutionStr: 'auto', link: u, hls: true, headers: h }]
-                    })(clockData.links[0].link, clockData.links[0].headers)
+                    }
+                    return q.length > 0
+                      ? q
+                      : [{ resolutionStr: 'auto', link: u, hls: true, headers: h }]
+                  })(clockData.links[0].link, clockData.links[0].headers)
                   : clockData.links
                 subtitles = clockData.links[0].subtitles || []
               }
