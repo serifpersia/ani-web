@@ -95,7 +95,8 @@ export interface PlayerState {
   inWatchlist: boolean
   videoSources: VideoSource[]
   selectedSource: VideoSource | null
-  selectedLink: VideoLink | null
+  selectedLink: null | VideoLink
+  forceNativePlayer: boolean
   isAutoplayEnabled: boolean
   showResumeModal: boolean
   resumeTime: number

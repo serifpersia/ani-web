@@ -388,6 +388,7 @@ const Player: React.FC = () => {
   if (!state.loadingShowData && !state.showMeta.name) return <p>Show not found.</p>
 
   const isVideoLoading = state.loadingShowData || state.loadingVideo
+  const showNativePlayer = state.forceNativePlayer || isMobile
 
   return (
     <div className={layoutStyles.playerPageLayout}>
@@ -451,7 +452,7 @@ const Player: React.FC = () => {
             )
           ) : (
             <>
-              {!isVideoLoading && !isMobile && (
+              {!isVideoLoading && !showNativePlayer && (
                 <PlayerControls
                   player={player}
                   isAutoplayEnabled={state.isAutoplayEnabled}
@@ -473,8 +474,8 @@ const Player: React.FC = () => {
               {!isVideoLoading && (
                 <video
                   ref={refs.videoRef}
-                  controls={isMobile}
-                  onClick={!isMobile ? actions.togglePlay : undefined}
+                  controls={showNativePlayer}
+                  onClick={!showNativePlayer ? actions.togglePlay : undefined}
                   onPlay={actions.onPlay}
                   onPause={actions.onPause}
                   onLoadedMetadata={actions.onLoadedMetadata}
@@ -494,20 +495,43 @@ const Player: React.FC = () => {
             <div className={styles.spinner}></div>
           </div>
         ) : (
-          <SourceSelector
-            videoSources={state.videoSources}
-            selectedSource={state.selectedSource}
-            onSourceChange={(source) => {
-              const bestLink = source.links.sort(
-                (a: VideoLink, b: VideoLink) =>
-                  (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
-              )[0]
-              dispatch({
-                type: 'SET_STATE',
-                payload: { selectedSource: source, selectedLink: bestLink },
-              })
-            }}
-          />
+          <>
+            <SourceSelector
+              videoSources={state.videoSources}
+              selectedSource={state.selectedSource}
+              onSourceChange={(source) => {
+                const bestLink = source.links.sort(
+                  (a: VideoLink, b: VideoLink) =>
+                    (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
+                )[0]
+                dispatch({
+                  type: 'SET_STATE',
+                  payload: { selectedSource: source, selectedLink: bestLink },
+                })
+              }}
+            />
+            {showNativePlayer && state.selectedSource && state.selectedSource.links.length > 1 && (
+              <div className={styles.sourceSelectionContainer} style={{ marginTop: '1rem' }}>
+                <h4>Resolution</h4>
+                <div className={styles.sourceButtons}>
+                  {state.selectedSource.links
+                    .sort(
+                      (a: VideoLink, b: VideoLink) =>
+                        (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
+                    )
+                    .map((link) => (
+                      <button
+                        key={link.resolutionStr}
+                        className={`${styles.sourceButton} ${state.selectedLink?.resolutionStr === link.resolutionStr ? styles.active : ''}`}
+                        onClick={() => dispatch({ type: 'SET_STATE', payload: { selectedLink: link } })}
+                      >
+                        {link.resolutionStr}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         <div className={layoutStyles.playerInfoContainer}>
@@ -557,6 +581,23 @@ const Player: React.FC = () => {
                   />
                   <span>DUB</span>
                 </div>
+                {window.innerWidth >= 768 && (
+                  <div className={styles.toggleContainer}>
+                    <span>Native</span>
+                    <ToggleSwitch
+                      id="native-player-switch"
+                      isChecked={state.forceNativePlayer}
+                      onChange={(e) => {
+                        const checked = e.target.checked
+                        dispatch({
+                          type: 'SET_STATE',
+                          payload: { forceNativePlayer: checked },
+                        })
+                        localStorage.setItem('forceNativePlayer', checked.toString())
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>
