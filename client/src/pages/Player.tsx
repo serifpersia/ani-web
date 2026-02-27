@@ -1,9 +1,9 @@
-import React, { useRef, useEffect, useMemo, useCallback } from 'react'
+import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import styles from './Player.module.css'
 import layoutStyles from './PlayerPageLayout.module.css'
 import ToggleSwitch from '../components/common/ToggleSwitch'
-import { FaCheck, FaPlus, FaChevronDown, FaChevronUp } from 'react-icons/fa'
+import { FaCheck, FaPlus, FaChevronDown, FaChevronUp, FaBackward, FaForward } from 'react-icons/fa'
 import { fixThumbnailUrl } from '../lib/utils'
 import ResumeModal from '../components/common/ResumeModal'
 import useIsMobile from '../hooks/useIsMobile'
@@ -62,6 +62,47 @@ const Player: React.FC = () => {
   const isMobile = useIsMobile()
   const wasFullscreenRef = useRef(false)
   const rafIdRef = useRef<number | null>(null)
+
+  const [skipIndicator, setSkipIndicator] = useState<{ side: 'left' | 'right'; visible: boolean } | null>(null)
+  const clickCountRef = useRef(0)
+  const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  const handlePlayerClick = useCallback(
+    (e: React.MouseEvent) => {
+      actions.setShowControls(true)
+
+      const container = refs.playerContainerRef.current
+      if (!container) return
+
+      const { clientX } = e
+      const { left, width } = container.getBoundingClientRect()
+      const relativeX = clientX - left
+
+      clickCountRef.current += 1
+
+      if (clickTimerRef.current) {
+        clearTimeout(clickTimerRef.current)
+      }
+
+      clickTimerRef.current = setTimeout(() => {
+        if (clickCountRef.current === 2) {
+          if (relativeX < width * 0.3) {
+            actions.seek(-15)
+            setSkipIndicator({ side: 'left', visible: true })
+            setTimeout(() => setSkipIndicator(null), 600)
+          } else if (relativeX > width * 0.7) {
+            actions.seek(15)
+            setSkipIndicator({ side: 'right', visible: true })
+            setTimeout(() => setSkipIndicator(null), 600)
+          } else {
+            actions.toggleFullscreen()
+          }
+        }
+        clickCountRef.current = 0
+      }, 300)
+    },
+    [actions, refs.playerContainerRef]
+  )
 
   useEffect(() => {
     const videoElement = refs.videoRef.current
@@ -418,8 +459,21 @@ const Player: React.FC = () => {
         <div
           ref={refs.playerContainerRef}
           className={`${styles.videoContainer} ${layoutStyles.videoPlayerWrapper} ${player.state.isFullscreen ? styles.fullscreenActive : ''}`}
-          onDoubleClick={actions.toggleFullscreen}
+          onClick={handlePlayerClick}
         >
+          {skipIndicator && (
+            <div
+              className={`${styles.skipIndicatorContainer} ${skipIndicator.side === 'left' ? styles.leftSkip : styles.rightSkip} `}
+            >
+              <div className={styles.skipBubble}>
+                <div className={styles.skipIcon}>
+                  {skipIndicator.side === 'left' ? <FaBackward /> : <FaForward />}
+                </div>
+                <div className={styles.skipText}>15s</div>
+              </div>
+            </div>
+          )}
+
           {isVideoLoading && (
             <div className={styles.loadingOverlay}>
               <div className={styles.loadingDots}>
@@ -475,7 +529,6 @@ const Player: React.FC = () => {
                 <video
                   ref={refs.videoRef}
                   controls={showNativePlayer}
-                  onClick={!showNativePlayer ? actions.togglePlay : undefined}
                   onPlay={actions.onPlay}
                   onPause={actions.onPause}
                   onLoadedMetadata={actions.onLoadedMetadata}

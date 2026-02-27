@@ -16,7 +16,9 @@ export function createDataRouter(apiCache: NodeCache, provider: AllAnimeProvider
 
       const originalJson = res.json.bind(res)
       res.json = (data: any) => {
-        apiCache.set(cacheKey, data)
+        if (data && Array.isArray(data) && data.length > 0) {
+          apiCache.set(cacheKey, data)
+        }
         return originalJson(data)
       }
       next()
@@ -33,7 +35,9 @@ export function createDataRouter(apiCache: NodeCache, provider: AllAnimeProvider
 
       const originalJson = res.json.bind(res)
       res.json = (data: any) => {
-        apiCache.set(cacheKey, data)
+        if (data && Array.isArray(data) && data.length > 0) {
+          apiCache.set(cacheKey, data)
+        }
         return originalJson(data)
       }
       next()
@@ -50,7 +54,9 @@ export function createDataRouter(apiCache: NodeCache, provider: AllAnimeProvider
 
       const originalJson = res.json.bind(res)
       res.json = (data: any) => {
-        apiCache.set(cacheKey, data, 300)
+        if (data && Array.isArray(data) && data.length > 0) {
+          apiCache.set(cacheKey, data, 300)
+        }
         return originalJson(data)
       }
       next()
@@ -67,7 +73,9 @@ export function createDataRouter(apiCache: NodeCache, provider: AllAnimeProvider
 
       const originalJson = res.json.bind(res)
       res.json = (data: any) => {
-        apiCache.set(cacheKey, data, 1800)
+        if (data && Array.isArray(data) && data.length > 0) {
+          apiCache.set(cacheKey, data, 1800)
+        }
         return originalJson(data)
       }
       next()

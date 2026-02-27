@@ -11,8 +11,6 @@ import {
   FaExpand,
   FaCompress,
   FaCog,
-  FaChevronDown,
-  FaChevronUp,
 } from 'react-icons/fa'
 import { MdReplay10, MdForward10 } from 'react-icons/md'
 import type { VideoSource, VideoLink, SkipInterval } from '../../types/player'
@@ -39,7 +37,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   selectedSource,
   selectedLink,
   onSourceChange,
-  loadingVideo,
   skipIntervals,
 }) => {
   const { state, refs, actions } = player
@@ -137,7 +134,23 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     <div
       className={`${styles.controlsOverlay} ${!state.showControls && !showSettings ? styles.hidden : ''} `}
       onDoubleClick={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          actions.setShowControls(true)
+        }
+      }}
     >
+      <button
+        className={styles.centerPlayPause}
+        onClick={(e) => {
+          e.stopPropagation()
+          actions.togglePlay()
+        }}
+        aria-label={state.isPlaying ? 'Pause' : 'Play'}
+      >
+        {state.isPlaying ? <FaPause /> : <FaPlay />}
+      </button>
+
       <div className={styles.bottomControls}>
         <div
           className={`${styles.progressBarContainer} ${state.isScrubbing ? styles.scrubbing : ''} `}

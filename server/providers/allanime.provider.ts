@@ -150,28 +150,55 @@ export class AllAnimeProvider implements Provider {
     extensions?: Record<string, unknown>
   ): Promise<Show[]> {
     const params: { [key: string]: string } = { variables: JSON.stringify(variables) }
-    if (extensions) {
-      params.extensions = JSON.stringify(extensions)
-    } else {
-      params.query = `
+    const fullQuery = `
             query ($search: SearchInput, $limit: Int, $page: Int, $translationType: VaildTranslationTypeEnumType, $countryOrigin: VaildCountryOriginEnumType) {
               shows(search: $search, limit: $limit, page: $page, translationType: $translationType, countryOrigin: $countryOrigin) {
                 edges { _id name nativeName englishName thumbnail description type availableEpisodesDetail }
               }
             }`
+
+    if (extensions) {
+      params.extensions = JSON.stringify(extensions)
+    } else {
+      params.query = fullQuery
     }
 
-    const response = await axios.get(API_ENDPOINT, {
-      headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-      params,
-      timeout: 15000,
-    })
+    try {
+      const response = await axios.get(API_ENDPOINT, {
+        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+        params,
+        timeout: 15000,
+      })
 
-    const shows = response.data?.data?.shows?.edges || []
-    return shows.map((show: Show) => ({
-      ...show,
-      thumbnail: this.deobfuscateUrl(show.thumbnail || ''),
-    }))
+      if (response.data.errors && response.data.errors[0]?.message === 'PersistedQueryNotFound') {
+        throw new Error('PersistedQueryNotFound')
+      }
+
+      const shows = response.data?.data?.shows?.edges || []
+      return shows.map((show: Show) => ({
+        ...show,
+        thumbnail: this.deobfuscateUrl(show.thumbnail || ''),
+      }))
+    } catch (error: any) {
+      if (error.message === 'PersistedQueryNotFound' && extensions) {
+        logger.info('Search hash expired, falling back to full query')
+        const fallbackParams = {
+          variables: JSON.stringify(variables),
+          query: fullQuery,
+        }
+        const response = await axios.get(API_ENDPOINT, {
+          headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+          params: fallbackParams,
+          timeout: 15000,
+        })
+        const shows = response.data?.data?.shows?.edges || []
+        return shows.map((show: Show) => ({
+          ...show,
+          thumbnail: this.deobfuscateUrl(show.thumbnail || ''),
+        }))
+      }
+      throw error
+    }
   }
 
   async search(options: SearchOptions): Promise<Show[]> {
@@ -212,7 +239,7 @@ export class AllAnimeProvider implements Provider {
     const extensions = {
       persistedQuery: {
         version: 1,
-        sha256Hash: '06327bc10dd682e1ee7e07b6db9c16e9ad2fd56c1b769e47513128cd5c9fc77a',
+        sha256Hash: 'a24c500a1b765c68ae1d8dd85174931f661c71369c89b92b88b75a725afc471c',
       },
     }
     return this._fetchShows(variables, extensions)
@@ -245,20 +272,59 @@ export class AllAnimeProvider implements Provider {
     const extensions = {
       persistedQuery: {
         version: 1,
-        sha256Hash: '1fc9651b0d4c3b9dfd2fa6e1d50b8f4d11ce37f988c23b8ee20f82159f7c1147',
+        sha256Hash: '60f50b84bb545fa25ee7f7c8c0adbf8f5cea40f7b1ef8501cbbff70e38589489',
       },
     }
-    const response = await axios.get(API_ENDPOINT, {
-      headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-      params: { variables: JSON.stringify(variables), extensions: JSON.stringify(extensions) },
-      timeout: 15000,
-    })
 
-    const recommendations = response.data?.data?.queryPopular?.recommendations || []
-    return recommendations.map((rec: { anyCard: Show }) => {
-      const card = rec.anyCard
-      return { ...card, thumbnail: this.deobfuscateUrl(card.thumbnail || '') }
-    })
+    try {
+      const response = await axios.get(API_ENDPOINT, {
+        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+        params: { variables: JSON.stringify(variables), extensions: JSON.stringify(extensions) },
+        timeout: 15000,
+      })
+
+      if (response.data.errors && response.data.errors[0]?.message === 'PersistedQueryNotFound') {
+        throw new Error('PersistedQueryNotFound')
+      }
+
+      const recommendations = response.data?.data?.queryPopular?.recommendations || []
+      return recommendations.map((rec: { anyCard: Show }) => {
+        const card = rec.anyCard
+        return { ...card, thumbnail: this.deobfuscateUrl(card.thumbnail || '') }
+      })
+    } catch (error: any) {
+      if (error.message === 'PersistedQueryNotFound') {
+        logger.info('Popular hash expired, falling back to full query')
+        const fullQuery = `
+          query ($type: VaildPopularTypeEnumType!, $size: Int!, $dateRange: Int, $page: Int, $allowAdult: Boolean, $allowUnknown: Boolean) {
+            queryPopular(type: $type, size: $size, dateRange: $dateRange, page: $page, allowAdult: $allowAdult, allowUnknown: $allowUnknown) {
+              recommendations {
+                anyCard {
+                  _id
+                  name
+                  nativeName
+                  englishName
+                  thumbnail
+                  type
+                  availableEpisodesDetail
+                }
+              }
+            }
+          }
+        `
+        const response = await axios.get(API_ENDPOINT, {
+          headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+          params: { query: fullQuery, variables: JSON.stringify(variables) },
+          timeout: 15000,
+        })
+        const recommendations = response.data?.data?.queryPopular?.recommendations || []
+        return recommendations.map((rec: { anyCard: Show }) => {
+          const card = rec.anyCard
+          return { ...card, thumbnail: this.deobfuscateUrl(card.thumbnail || '') }
+        })
+      }
+      throw error
+    }
   }
 
   async getSchedule(date: Date): Promise<Show[]> {
