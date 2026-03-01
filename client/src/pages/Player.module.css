@@ -90,8 +90,7 @@
   justify-content: center;
   align-items: center;
   z-index: 10;
-  background: transparent;
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .loadingDots {
@@ -231,7 +230,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  background: rgba(15, 15, 17, 0.75);
+  background: rgba(15, 15, 17, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 20px;
   padding: 16px 24px;
@@ -280,6 +279,8 @@
   background: linear-gradient(90deg, var(--accent) 0%, var(--accent-light) 100%);
   z-index: 2;
   box-shadow: 0 0 15px var(--accent-glow);
+  transition: width 0.3s linear;
+  will-change: width;
 }
 
 .bufferedBar {
@@ -296,8 +297,9 @@
   background-color: white;
   border-radius: 50%;
   z-index: 3;
-  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), left 0.3s linear;
   box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2);
+  will-change: left;
 }
 
 .progressBarContainer:hover .thumb,
@@ -519,8 +521,7 @@
   position: absolute;
   bottom: 50px;
   right: 0;
-  background: rgba(15, 15, 15, 0.95);
-  backdrop-filter: blur(12px);
+  background: rgba(15, 15, 15, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: white;
   padding: 1rem;
@@ -649,7 +650,6 @@
   flex-direction: column;
   gap: 1rem;
   background: var(--glass-bg);
-  backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
   padding: 1.5rem;
   border-radius: var(--radius-lg);
@@ -698,7 +698,6 @@
 
 .detailsBox {
   background: var(--glass-bg);
-  backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
   padding: 1.5rem;
   border-radius: var(--radius-lg);

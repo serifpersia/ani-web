@@ -100,6 +100,7 @@ const Top10List: React.FC<Top10ListProps> = ({ title }) => {
                 height="182"
                 className={styles.poster}
                 loading="lazy"
+                decoding="async"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement
                   target.src = '/placeholder.svg'

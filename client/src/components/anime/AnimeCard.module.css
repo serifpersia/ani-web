@@ -6,6 +6,8 @@
     transform var(--transition-base),
     z-index var(--transition-fast);
   will-change: transform;
+  content-visibility: auto;
+  contain-intrinsic-size: 150px 280px;
 }
 
 .cardWrapper:hover {
@@ -56,7 +58,7 @@
 }
 
 .cardWrapper:hover .posterImg {
-  transform: scale(1.08);
+  transform: scale(1.08) translateZ(0);
 }
 
 .info {

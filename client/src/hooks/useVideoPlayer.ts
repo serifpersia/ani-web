@@ -273,7 +273,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
     const video = videoRef.current
     if (!video) return
     const time = video.currentTime || 0
-    if (!isScrubbing) {
+    if (!isScrubbing && Math.floor(time) !== Math.floor(currentTime)) {
       setCurrentTime(time)
     }
 

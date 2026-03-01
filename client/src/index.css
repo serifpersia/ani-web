@@ -28,7 +28,7 @@
   --border-accent: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.3);
   --border: var(--border-primary);
 
-  --glass-bg: rgba(20, 20, 22, 0.7);
+  --glass-bg: rgba(20, 20, 22, 0.95);
   --glass-border: var(--border-primary);
   --glass-highlight: rgba(255, 255, 255, 0.05);
   --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.36);
@@ -170,16 +170,13 @@ a {
 
 .glass-panel {
   background: var(--glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
 }
 
 .glass-card {
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 100%);
   border: 1px solid var(--glass-border);
-  backdrop-filter: blur(10px);
 }
 
 .btn-primary {
