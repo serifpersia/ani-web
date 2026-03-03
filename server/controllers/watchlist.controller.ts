@@ -45,7 +45,7 @@ interface CombinedContinueWatchingShow {
 }
 
 export class WatchlistController {
-  constructor(private provider: AllAnimeProvider) { }
+  constructor(private provider: AllAnimeProvider) {}
 
   private async getContinueWatchingData(
     db: any

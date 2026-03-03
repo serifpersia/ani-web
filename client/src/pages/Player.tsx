@@ -63,7 +63,10 @@ const Player: React.FC = () => {
   const wasFullscreenRef = useRef(false)
   const rafIdRef = useRef<number | null>(null)
 
-  const [skipIndicator, setSkipIndicator] = useState<{ side: 'left' | 'right'; visible: boolean } | null>(null)
+  const [skipIndicator, setSkipIndicator] = useState<{
+    side: 'left' | 'right'
+    visible: boolean
+  } | null>(null)
   const clickCountRef = useRef(0)
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -381,7 +384,7 @@ const Player: React.FC = () => {
             cue.snapToLines = false
             const pos = Math.max(0, Math.min(100, 100 - player.state.subtitlePosition))
             cue.line = pos
-          } catch (e) { }
+          } catch (e) {}
         })
       }
     }
@@ -576,7 +579,9 @@ const Player: React.FC = () => {
                       <button
                         key={link.resolutionStr}
                         className={`${styles.sourceButton} ${state.selectedLink?.resolutionStr === link.resolutionStr ? styles.active : ''}`}
-                        onClick={() => dispatch({ type: 'SET_STATE', payload: { selectedLink: link } })}
+                        onClick={() =>
+                          dispatch({ type: 'SET_STATE', payload: { selectedLink: link } })
+                        }
                       >
                         {link.resolutionStr}
                       </button>
@@ -594,7 +599,7 @@ const Player: React.FC = () => {
                 src={fixThumbnailUrl(state.showMeta.thumbnail || '')}
                 alt={displayTitle}
                 onError={(e) => {
-                  ; (e.target as HTMLImageElement).src = '/placeholder.svg'
+                  ;(e.target as HTMLImageElement).src = '/placeholder.svg'
                 }}
               />
             </div>

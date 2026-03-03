@@ -116,6 +116,28 @@ export class AllAnimeProvider implements Provider {
     this.cache = cache
   }
 
+  private deobfuscateStreamUrl(obfuscatedUrl: string): string {
+    if (!obfuscatedUrl) return ''
+    if (!obfuscatedUrl.startsWith('--')) return obfuscatedUrl
+
+    const sliced = obfuscatedUrl.slice(2)
+    let deobfuscated = ''
+    for (let i = 0; i < sliced.length; i += 2) {
+      const chunk = sliced.substring(i, i + 2)
+      deobfuscated += DEOBFUSCATION_MAP[chunk] || chunk
+    }
+
+    // Normalize any accidental double slashes
+    deobfuscated = deobfuscated.replace(/([^:]\/)\/+/g, '$1')
+
+    // AllAnime stream URLs are relative to the main domain
+    if (deobfuscated.startsWith('/')) {
+      return `${API_BASE_URL}${deobfuscated}`
+    }
+
+    return deobfuscated
+  }
+
   public deobfuscateUrl(obfuscatedUrl: string): string {
     if (!obfuscatedUrl) return ''
     let finalUrl = obfuscatedUrl
@@ -465,7 +487,7 @@ export class AllAnimeProvider implements Provider {
       timeout: 15000,
     })
 
-    const sourceUrls = data.data.episode.sourceUrls
+    const sourceUrls = data.data.episode?.sourceUrls
     if (!Array.isArray(sourceUrls)) return null
 
     const supportedSources = [
@@ -480,101 +502,158 @@ export class AllAnimeProvider implements Provider {
       'Mp4',
       'Ok',
     ]
-    const sources = sourceUrls
+
+    const filteredSources = sourceUrls
       .filter((s: { sourceName: string }) => supportedSources.includes(s.sourceName))
-      .sort((a: { priority: number }, b: { priority: number }) => b.priority - a.priority)
+      .sort(
+        (a: { priority?: number }, b: { priority?: number }) =>
+          (b.priority || 0) - (a.priority || 0)
+      )
 
-    const sourcePromises = sources.map(
-      async (source: { sourceName: string; sourceUrl: string; type: string }) => {
-        try {
-          if (['Yt-mp4', 'S-mp4', 'Luf-Mp4', 'wixmp', 'Default'].includes(source.sourceName)) {
-            if (!source.sourceUrl.startsWith('--')) return null
+    const processedSources: VideoSource[] = []
 
-            let videoLinks: VideoLink[] = []
-            let subtitles: SubtitleTrack[] = []
+    for (const source of filteredSources as {
+      sourceName: string
+      sourceUrl: string
+      type?: string
+      priority?: number
+    }[]) {
+      try {
+        if (['Yt-mp4', 'S-mp4', 'Luf-Mp4', 'wixmp', 'Default'].includes(source.sourceName)) {
+          if (!source.sourceUrl.startsWith('--')) continue
 
-            const decryptedUrl = ((s: string) => {
-              let d = ''
-              for (let i = 0; i < s.length; i += 2)
-                d += DEOBFUSCATION_MAP[s.substring(i, i + 2)] || s.substring(i, i + 2)
-              return d.includes('/clock') && !d.includes('.json')
-                ? d.replace('/clock', '/clock.json')
-                : d
-            })(source.sourceUrl.substring(2)).replace(/([^:]\/)\/+/g, '$1')
+          let videoLinks: VideoLink[] = []
+          let subtitles: SubtitleTrack[] = []
 
-            if (decryptedUrl.includes('/clock.json')) {
-              const finalUrl = new URL(decryptedUrl, API_BASE_URL).href
-              const { data: clockData } = await axios.get(finalUrl, {
-                headers: { Referer: REFERER, 'User-Agent': USER_AGENT },
-                timeout: 10000,
-              })
-              if (clockData.links && clockData.links.length > 0) {
-                videoLinks = clockData.links[0].hls
-                  ? await (async (u: string, h: Record<string, string>) => {
-                    const { data: d } = await axios.get(u, { headers: h, timeout: 10000 })
-                    const l = d.split('\n')
-                    const q: VideoLink[] = []
-                    for (let i = 0; i < l.length; i++) {
-                      if (l[i].startsWith('#EXT-X-STREAM-INF')) {
-                        const rM = l[i].match(/RESOLUTION=\d+x(\d+)/)
-                        q.push({
-                          resolutionStr: rM ? `${rM[1]}p` : 'Auto',
-                          link: new URL(l[i + 1], u).href,
-                          hls: true,
-                          headers: h,
-                        })
-                      }
+          let decryptedUrl = this.deobfuscateStreamUrl(source.sourceUrl)
+
+          if (decryptedUrl.includes('/clock') && !decryptedUrl.includes('.json')) {
+            decryptedUrl = decryptedUrl.replace('/clock', '/clock.json')
+          }
+
+          if (decryptedUrl.includes('/clock.json')) {
+            const finalUrl = decryptedUrl.startsWith('http')
+              ? decryptedUrl
+              : new URL(decryptedUrl, API_BASE_URL).href
+
+            let clockData: any = null
+            for (let retry = 0; retry < 2; retry++) {
+              try {
+                const resp = await axios.get(finalUrl, {
+                  headers: { Referer: REFERER, 'User-Agent': USER_AGENT },
+                  timeout: 10000,
+                })
+                clockData = resp.data
+                if (clockData && clockData !== 'error') break
+              } catch (e) {
+                if (retry === 1)
+                  logger.error({ err: e, sourceName: source.sourceName }, 'Clock.json fetch failed')
+              }
+            }
+
+            if (clockData && Array.isArray(clockData.links) && clockData.links.length > 0) {
+              const linkData = clockData.links[0]
+              if (linkData.hls) {
+                try {
+                  const hlsResp = await axios.get(linkData.link, {
+                    headers: linkData.headers || { Referer: REFERER },
+                    responseType: 'text',
+                    timeout: 10000,
+                  })
+                  const lines = (hlsResp.data as string).split('\n')
+                  for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].startsWith('#EXT-X-STREAM-INF')) {
+                      const resMatch = lines[i].match(/RESOLUTION=\d+x(\d+)/)
+                      videoLinks.push({
+                        resolutionStr: resMatch ? `${resMatch[1]}p` : 'Auto',
+                        link: new URL(lines[i + 1], linkData.link).href,
+                        hls: true,
+                        headers: linkData.headers || { Referer: REFERER },
+                      })
                     }
-                    return q.length > 0
-                      ? q
-                      : [{ resolutionStr: 'auto', link: u, hls: true, headers: h }]
-                  })(clockData.links[0].link, clockData.links[0].headers)
-                  : clockData.links
-                subtitles = clockData.links[0].subtitles || []
+                  }
+                } catch (e) {
+                  logger.error(
+                    { err: e, sourceName: source.sourceName },
+                    'Failed to parse HLS master playlist'
+                  )
+                }
+
+                if (videoLinks.length === 0) {
+                  videoLinks.push({
+                    resolutionStr: 'Auto',
+                    link: linkData.link,
+                    hls: true,
+                    headers: linkData.headers || { Referer: REFERER },
+                  })
+                }
+              } else if (Array.isArray(clockData.links)) {
+                videoLinks = clockData.links.map((l: any) => ({
+                  resolutionStr: l.resolutionStr || 'Default',
+                  link:
+                    l.link && typeof l.link === 'string' && l.link.startsWith('/')
+                      ? `https://wp.youtube-anime.com${l.link}`
+                      : l.link,
+                  hls: !!l.hls,
+                  headers: l.headers || { Referer: REFERER },
+                }))
               }
-            } else {
-              let finalLink = decryptedUrl
-              if (finalLink.startsWith('/')) finalLink = new URL(finalLink, API_BASE_URL).href
-              videoLinks.push({
-                link: finalLink,
-                resolutionStr: 'default',
-                hls: finalLink.includes('.m3u8'),
-                headers: { Referer: REFERER },
-              })
-            }
-            if (videoLinks.length > 0)
-              return { sourceName: source.sourceName, links: videoLinks, subtitles, type: 'player' }
-          }
-          if (source.sourceName === 'Fm-Hls') {
-            if (source.type === 'iframe') {
-              return {
-                sourceName: source.sourceName,
-                links: [{ resolutionStr: 'iframe', link: source.sourceUrl, hls: false }],
-                type: 'iframe',
+
+              if (Array.isArray(linkData.subtitles)) {
+                subtitles = linkData.subtitles.map((s: any) => ({
+                  language: s.lang || s.language || 'en',
+                  label: s.label || 'Subtitle',
+                  url:
+                    s.src && typeof s.src === 'string' && s.src.startsWith('/')
+                      ? `https://wp.youtube-anime.com${s.src}`
+                      : s.src || s.url,
+                }))
               }
             }
           }
 
-          if (['Vg', 'Sw', 'Mp4', 'Ok'].includes(source.sourceName) && source.type === 'iframe') {
-            return {
-              sourceName: source.sourceName,
-              links: [{ resolutionStr: 'iframe', link: source.sourceUrl, hls: false }],
-              type: 'iframe',
-            }
+          // Fallback if clock.json failed or provided no links
+          if (videoLinks.length === 0) {
+            const fallbackUrl = decryptedUrl
+            videoLinks.push({
+              resolutionStr: 'Default',
+              link: fallbackUrl,
+              hls: fallbackUrl.includes('.m3u8'),
+              headers: { Referer: REFERER },
+            })
           }
 
-          return null
-        } catch (e) {
-          logger.error({ err: e, sourceName: source.sourceName }, `Failed to process source`)
-          return null
+          processedSources.push({
+            sourceName: source.sourceName,
+            links: videoLinks,
+            subtitles,
+            type: 'player',
+          })
+        } else {
+          // Handle iframe-like sources and Fm-Hls
+          processedSources.push({
+            sourceName: source.sourceName,
+            links: [
+              {
+                resolutionStr: 'iframe',
+                link: source.sourceUrl,
+                hls: false,
+              },
+            ],
+            type:
+              source.type === 'iframe' ||
+              source.sourceName === 'Fm-Hls' ||
+              ['Vg', 'Sw', 'Ok'].includes(source.sourceName)
+                ? 'iframe'
+                : 'player',
+          })
         }
+      } catch (e) {
+        logger.error({ err: e, sourceName: source.sourceName }, `Failed to process source`)
       }
-    )
+    }
 
-    const results = await Promise.allSettled(sourcePromises)
-    return results
-      .map((result) => (result.status === 'fulfilled' ? result.value : null))
-      .filter(Boolean) as VideoSource[]
+    return processedSources
   }
 
   async getShowDetails(showId: string): Promise<ShowDetails> {

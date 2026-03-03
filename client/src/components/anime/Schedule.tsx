@@ -104,7 +104,11 @@ const Schedule: React.FC = () => {
           No episodes scheduled for this day.
         </p>
       ) : (
-        <div key={selectedDate} className="grid-container" style={{ animation: 'fadeIn var(--transition-slow)' }}>
+        <div
+          key={selectedDate}
+          className="grid-container"
+          style={{ animation: 'fadeIn var(--transition-slow)' }}
+        >
           {scheduleData.map((anime) => (
             <AnimeCard key={anime._id} anime={anime} continueWatching={false} />
           ))}

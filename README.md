@@ -13,8 +13,7 @@
 
 ## Prerequisites
 
-*   **Node.js**: Version 16 or higher ([Download](https://nodejs.org/)).
-
+- **Node.js**: Version 16 or higher ([Download](https://nodejs.org/)).
 
 ## Quick Start
 
@@ -51,6 +50,7 @@ This will delete the application files and remove the `ani-web` command from you
 If you want to work with the source code, you can clone the repository and build the project manually.
 
 1.  **Clone the Repository:**
+
     ```bash
     git clone https://github.com/serifpersia/ani-web.git
     cd ani-web
@@ -62,15 +62,18 @@ If you want to work with the source code, you can clone the repository and build
     To manually build run `npm install` then `npm run build`.
 
     **On Linux/macOS:**
+
     ```bash
     chmod +x run.sh
     ./run.sh
     ```
 
     **On Windows:**
+
     ```bat
     run.bat
     ```
 
 ## License
+
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.

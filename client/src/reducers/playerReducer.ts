@@ -3,10 +3,10 @@ import type { PlayerState } from '../types/player'
 export type Action =
   | { type: 'SET_STATE'; payload: Partial<PlayerState> }
   | {
-    type: 'SET_LOADING'
-    key: 'loadingShowData' | 'loadingVideo' | 'loadingDetails'
-    value: boolean
-  }
+      type: 'SET_LOADING'
+      key: 'loadingShowData' | 'loadingVideo' | 'loadingDetails'
+      value: boolean
+    }
   | { type: 'SET_ERROR'; payload: string }
   | { type: 'SHOW_DATA_SUCCESS'; payload: Partial<PlayerState> }
   | { type: 'VIDEO_DATA_SUCCESS'; payload: Partial<PlayerState> }

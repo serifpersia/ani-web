@@ -8,7 +8,10 @@ export class ProxyController {
     if (!url) return res.status(400).send('URL required')
 
     try {
-      const headers: Record<string, string> = { 'User-Agent': 'Mozilla/5.0' }
+      const headers: Record<string, string> = {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      }
       if (referer) headers['Referer'] = referer as string
       if (req.headers.range) headers['Range'] = req.headers.range
 
@@ -23,7 +26,10 @@ export class ProxyController {
               : l
           )
           .join('\n')
-        res.set('Content-Type', 'application/vnd.apple.mpegurl').send(rewritten)
+        res
+          .set('Content-Type', 'application/vnd.apple.mpegurl')
+          .set('Access-Control-Allow-Origin', '*')
+          .send(rewritten)
       } else {
         const resp = await axios({
           method: 'get',
@@ -32,7 +38,24 @@ export class ProxyController {
           headers,
         })
         res.status(resp.status)
-        Object.keys(resp.headers).forEach((k) => res.set(k, resp.headers[k]))
+
+        const forwardHeaders = [
+          'content-type',
+          'content-length',
+          'content-range',
+          'accept-ranges',
+          'cache-control',
+          'last-modified',
+          'etag',
+        ]
+
+        Object.keys(resp.headers).forEach((k) => {
+          if (forwardHeaders.includes(k.toLowerCase())) {
+            res.set(k, resp.headers[k] as string)
+          }
+        })
+        res.set('Access-Control-Allow-Origin', '*')
+
         resp.data.pipe(res)
       }
     } catch (e) {
