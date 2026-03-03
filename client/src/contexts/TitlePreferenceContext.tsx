@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react'
 export type TitlePreferenceContextType = {
   titlePreference: 'name' | 'nativeName' | 'englishName'
@@ -26,7 +27,7 @@ export const TitlePreferenceProvider: React.FC<TitlePreferenceProviderProps> = (
         if (response.ok) {
           const data = await response.json()
           if (data.value) {
-            setTitlePreference(data.value as 'english' | 'native')
+            setTitlePreference(data.value as 'name' | 'nativeName' | 'englishName')
           }
         }
       } catch (err) {

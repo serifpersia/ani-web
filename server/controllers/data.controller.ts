@@ -14,7 +14,7 @@ export class DataController {
     try {
       const data = await this.provider.getPopular(timeframe)
       res.set('Cache-Control', 'public, max-age=300').json(data)
-    } catch (error) {
+    } catch {
       res.status(500).send('Error')
     }
   }
@@ -23,7 +23,7 @@ export class DataController {
     try {
       const data = await this.provider.getSchedule(new Date(req.params.date + 'T00:00:00.000Z'))
       res.set('Cache-Control', 'public, max-age=300').json(data)
-    } catch (error) {
+    } catch {
       res.status(500).send('Error')
     }
   }
@@ -46,7 +46,7 @@ export class DataController {
         await this.provider.getStreamUrls(
           req.query.showId as string,
           req.query.episodeNumber as string,
-          req.query.mode as any
+          req.query.mode as 'sub' | 'dub'
         )
       )
     } catch {
@@ -56,7 +56,9 @@ export class DataController {
 
   getEpisodes = async (req: Request, res: Response) => {
     try {
-      res.json(await this.provider.getEpisodes(req.query.showId as string, req.query.mode as any))
+      res.json(
+        await this.provider.getEpisodes(req.query.showId as string, req.query.mode as 'sub' | 'dub')
+      )
     } catch {
       res.status(500).send('Error')
     }

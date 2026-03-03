@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import logger from '../logger'
 import { AllAnimeProvider } from '../providers/allanime.provider'
 import { performWriteTransaction } from '../sync'
+import type { Database } from 'sqlite3'
 
 interface WatchedEpisode {
   episodeNumber: string
@@ -44,44 +45,54 @@ interface CombinedContinueWatchingShow {
   newEpisodesCount?: number
 }
 
+interface WatchlistRow {
+  id: string
+  name: string
+  thumbnail: string
+  status: string
+  nativeName?: string
+  englishName?: string
+  [key: string]: unknown
+}
+
 export class WatchlistController {
   constructor(private provider: AllAnimeProvider) {}
 
   private async getContinueWatchingData(
-    db: any
+    db: Database
   ): Promise<{ data: CombinedContinueWatchingShow[]; total: number }> {
     const inProgressQuery = `
-        SELECT
-        sm.id as _id, sm.id, sm.name, sm.thumbnail, sm.nativeName, sm.englishName,
-        we.episodeNumber, we.currentTime, we.duration
-        FROM shows_meta sm
-        JOIN (
-            SELECT *, ROW_NUMBER() OVER(PARTITION BY showId ORDER BY watchedAt DESC) as rn
-            FROM watched_episodes
-            WHERE (currentTime / duration) BETWEEN 0.05 AND 0.95
-        ) we ON sm.id = we.showId
-        WHERE we.rn = 1
-        ORDER BY we.watchedAt DESC;
-        `
+    SELECT
+    sm.id as _id, sm.id, sm.name, sm.thumbnail, sm.nativeName, sm.englishName,
+    we.episodeNumber, we.currentTime, we.duration
+    FROM shows_meta sm
+    JOIN (
+      SELECT *, ROW_NUMBER() OVER(PARTITION BY showId ORDER BY watchedAt DESC) as rn
+      FROM watched_episodes
+      WHERE (currentTime / duration) BETWEEN 0.05 AND 0.95
+    ) we ON sm.id = we.showId
+    WHERE we.rn = 1
+    ORDER BY we.watchedAt DESC;
+    `
     const inProgressShows: ContinueWatchingShow[] = await new Promise((resolve, reject) => {
-      db.all(inProgressQuery, [], (err: any, rows: ContinueWatchingShow[]) => {
+      db.all(inProgressQuery, [], (err: Error | null, rows: unknown) => {
         if (err) reject(err)
-        else resolve(rows)
+        else resolve(rows as ContinueWatchingShow[])
       })
     })
 
     const watchingShowsQuery = `
-        SELECT
-        w.id, w.name, w.thumbnail, w.nativeName, w.englishName,
-        (SELECT MAX(we.watchedAt) FROM watched_episodes we WHERE we.showId = w.id) as lastWatchedAt
-        FROM watchlist w
-        WHERE w.status = 'Watching'
-        ORDER BY lastWatchedAt DESC;
-        `
+    SELECT
+    w.id, w.name, w.thumbnail, w.nativeName, w.englishName,
+    (SELECT MAX(we.watchedAt) FROM watched_episodes we WHERE we.showId = w.id) as lastWatchedAt
+    FROM watchlist w
+    WHERE w.status = 'Watching'
+    ORDER BY lastWatchedAt DESC;
+    `
     const watchingShows: WatchingShow[] = await new Promise((resolve, reject) => {
-      db.all(watchingShowsQuery, [], (err: any, rows: WatchingShow[]) => {
+      db.all(watchingShowsQuery, [], (err: Error | null, rows: unknown) => {
         if (err) reject(err)
-        else resolve(rows)
+        else resolve(rows as WatchingShow[])
       })
     })
 
@@ -96,9 +107,9 @@ export class WatchlistController {
             db.all(
               'SELECT * FROM watched_episodes WHERE showId = ?',
               [show.id],
-              (err: any, rows: WatchedEpisode[]) => {
+              (err: Error | null, rows: unknown) => {
                 if (err) reject(err)
-                else resolve(rows)
+                else resolve(rows as WatchedEpisode[])
               }
             )
           }),
@@ -296,18 +307,25 @@ export class WatchlistController {
     query += ' ORDER BY rowid DESC LIMIT ? OFFSET ?'
     params.push(limit, offset)
 
-    req.db.all(query, params, (err: any, rows: any[]) => {
+    req.db.all(query, params, (err: Error | null, rows: unknown[]) => {
       if (err) return res.status(500).json({ error: 'DB error', details: err.message })
 
-      req.db.get(countQuery, params.slice(0, -2), (countErr: any, countRow: { total: number }) => {
-        if (countErr) return res.status(500).json({ error: 'DB error', details: countErr.message })
-        res.json({
-          data: rows.map((row) => ({ ...row, _id: row.id })),
-          total: countRow.total,
-          page,
-          limit,
-        })
-      })
+      const watchlistRows = rows as WatchlistRow[]
+
+      req.db.get(
+        countQuery,
+        params.slice(0, -2),
+        (countErr: Error | null, countRow: { total: number }) => {
+          if (countErr)
+            return res.status(500).json({ error: 'DB error', details: countErr.message })
+          res.json({
+            data: watchlistRows.map((row) => ({ ...row, _id: row.id })),
+            total: countRow.total,
+            page,
+            limit,
+          })
+        }
+      )
     })
   }
 
@@ -315,7 +333,8 @@ export class WatchlistController {
     req.db.get(
       'SELECT EXISTS(SELECT 1 FROM watchlist WHERE id = ?) as inWatchlist',
       [req.params.showId],
-      (err: any, row: { inWatchlist: number }) => res.json({ inWatchlist: !!row.inWatchlist })
+      (err: Error | null, row: { inWatchlist: number }) =>
+        res.json({ inWatchlist: !!row.inWatchlist })
     )
   }
 
@@ -323,7 +342,8 @@ export class WatchlistController {
     req.db.get(
       'SELECT currentTime, duration FROM watched_episodes WHERE showId = ? AND episodeNumber = ?',
       [req.params.showId, req.params.episodeNumber],
-      (err: any, row: any) => res.json(row || { currentTime: 0, duration: 0 })
+      (err: Error | null, row: { currentTime: number; duration: number }) =>
+        res.json(row || { currentTime: 0, duration: 0 })
     )
   }
 
@@ -331,7 +351,7 @@ export class WatchlistController {
     req.db.all(
       `SELECT episodeNumber FROM watched_episodes WHERE showId = ?`,
       [req.params.showId],
-      (err: any, rows: { episodeNumber: string }[]) =>
+      (err: Error | null, rows: { episodeNumber: string }[]) =>
         res.json(rows ? rows.map((r) => r.episodeNumber) : [])
     )
   }

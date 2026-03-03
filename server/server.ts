@@ -125,7 +125,9 @@ async function main() {
   if (CONFIG.IS_DEV && fs.existsSync(dbPath)) {
     try {
       fs.unlinkSync(dbPath)
-    } catch {}
+    } catch {
+      // Ignore error
+    }
   }
 
   db = await initializeDatabase(dbPath)

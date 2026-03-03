@@ -55,7 +55,10 @@ const Watchlist: React.FC = () => {
     isFetchingNextPage: isFetchingNextWL,
   } = useInfiniteWatchlist(filterBy)
 
-  const list = isCW ? cwData?.pages || [] : wlData?.pages || []
+  const list = useMemo(() => {
+    return isCW ? cwData?.pages || [] : wlData?.pages || []
+  }, [isCW, cwData, wlData])
+
   const isLoading = isCW ? loadingCW : loadingWL
   const error = isCW ? errorCW : errorWL
 
@@ -116,7 +119,11 @@ const Watchlist: React.FC = () => {
 
   const handleRemove = (id: string, name: string) => {
     if (skipConfirm) {
-      isCW ? removeCw.mutate(id) : removeWl.mutate(id)
+      if (isCW) {
+        removeCw.mutate(id)
+      } else {
+        removeWl.mutate(id)
+      }
     } else {
       setItemToRemove({ id, name })
     }
@@ -124,7 +131,11 @@ const Watchlist: React.FC = () => {
 
   const confirmRemove = (opts: { rememberPreference?: boolean }) => {
     if (!itemToRemove) return
-    isCW ? removeCw.mutate(itemToRemove.id) : removeWl.mutate(itemToRemove.id)
+    if (isCW) {
+      removeCw.mutate(itemToRemove.id)
+    } else {
+      removeWl.mutate(itemToRemove.id)
+    }
     if (opts.rememberPreference)
       updateSetting.mutate({ key: 'skipRemoveConfirmation', value: true })
     setItemToRemove(null)

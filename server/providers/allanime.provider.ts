@@ -108,6 +108,24 @@ const DEOBFUSCATION_MAP: { [key: string]: string } = {
   '1d': '%',
 }
 
+interface RawClockLink {
+  link: string
+  hls?: boolean
+  resolutionStr?: string
+  headers?: Record<string, string>
+  subtitles?: {
+    lang?: string
+    language?: string
+    label?: string
+    src?: string
+    url?: string
+  }[]
+}
+
+interface RawClockData {
+  links: RawClockLink[]
+}
+
 export class AllAnimeProvider implements Provider {
   name = 'AllAnime'
   private cache: NodeCache
@@ -173,11 +191,11 @@ export class AllAnimeProvider implements Provider {
   ): Promise<Show[]> {
     const params: { [key: string]: string } = { variables: JSON.stringify(variables) }
     const fullQuery = `
-            query ($search: SearchInput, $limit: Int, $page: Int, $translationType: VaildTranslationTypeEnumType, $countryOrigin: VaildCountryOriginEnumType) {
-              shows(search: $search, limit: $limit, page: $page, translationType: $translationType, countryOrigin: $countryOrigin) {
-                edges { _id name nativeName englishName thumbnail description type availableEpisodesDetail }
-              }
-            }`
+      query ($search: SearchInput, $limit: Int, $page: Int, $translationType: VaildTranslationTypeEnumType, $countryOrigin: VaildCountryOriginEnumType) {
+        shows(search: $search, limit: $limit, page: $page, translationType: $translationType, countryOrigin: $countryOrigin) {
+          edges { _id name nativeName englishName thumbnail description type availableEpisodesDetail }
+        }
+      }`
 
     if (extensions) {
       params.extensions = JSON.stringify(extensions)
@@ -201,8 +219,9 @@ export class AllAnimeProvider implements Provider {
         ...show,
         thumbnail: this.deobfuscateUrl(show.thumbnail || ''),
       }))
-    } catch (error: any) {
-      if (error.message === 'PersistedQueryNotFound' && extensions) {
+    } catch (error: unknown) {
+      const err = error as { message?: string }
+      if (err.message === 'PersistedQueryNotFound' && extensions) {
         logger.info('Search hash expired, falling back to full query')
         const fallbackParams = {
           variables: JSON.stringify(variables),
@@ -314,8 +333,9 @@ export class AllAnimeProvider implements Provider {
         const card = rec.anyCard
         return { ...card, thumbnail: this.deobfuscateUrl(card.thumbnail || '') }
       })
-    } catch (error: any) {
-      if (error.message === 'PersistedQueryNotFound') {
+    } catch (error: unknown) {
+      const err = error as { message?: string }
+      if (err.message === 'PersistedQueryNotFound') {
         logger.info('Popular hash expired, falling back to full query')
         const fullQuery = `
           query ($type: VaildPopularTypeEnumType!, $size: Int!, $dateRange: Int, $page: Int, $allowAdult: Boolean, $allowUnknown: Boolean) {
@@ -333,7 +353,7 @@ export class AllAnimeProvider implements Provider {
               }
             }
           }
-        `
+          `
         const response = await axios.get(API_ENDPOINT, {
           headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
           params: { query: fullQuery, variables: JSON.stringify(variables) },
@@ -536,7 +556,7 @@ export class AllAnimeProvider implements Provider {
               ? decryptedUrl
               : new URL(decryptedUrl, API_BASE_URL).href
 
-            let clockData: any = null
+            let clockData: RawClockData | null = null
             for (let retry = 0; retry < 2; retry++) {
               try {
                 const resp = await axios.get(finalUrl, {
@@ -544,7 +564,7 @@ export class AllAnimeProvider implements Provider {
                   timeout: 10000,
                 })
                 clockData = resp.data
-                if (clockData && clockData !== 'error') break
+                if (clockData && clockData !== ('error' as unknown)) break
               } catch (e) {
                 if (retry === 1)
                   logger.error({ err: e, sourceName: source.sourceName }, 'Clock.json fetch failed')
@@ -588,7 +608,7 @@ export class AllAnimeProvider implements Provider {
                   })
                 }
               } else if (Array.isArray(clockData.links)) {
-                videoLinks = clockData.links.map((l: any) => ({
+                videoLinks = clockData.links.map((l: RawClockLink) => ({
                   resolutionStr: l.resolutionStr || 'Default',
                   link:
                     l.link && typeof l.link === 'string' && l.link.startsWith('/')
@@ -600,13 +620,13 @@ export class AllAnimeProvider implements Provider {
               }
 
               if (Array.isArray(linkData.subtitles)) {
-                subtitles = linkData.subtitles.map((s: any) => ({
+                subtitles = linkData.subtitles.map((s) => ({
                   language: s.lang || s.language || 'en',
                   label: s.label || 'Subtitle',
                   url:
                     s.src && typeof s.src === 'string' && s.src.startsWith('/')
                       ? `https://wp.youtube-anime.com${s.src}`
-                      : s.src || s.url,
+                      : s.src || s.url || '',
                 }))
               }
             }

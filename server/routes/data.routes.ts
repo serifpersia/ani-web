@@ -15,8 +15,8 @@ export function createDataRouter(apiCache: NodeCache, provider: AllAnimeProvider
       if (cached) return res.json(cached)
 
       const originalJson = res.json.bind(res)
-      res.json = (data: any) => {
-        if (data && Array.isArray(data) && data.length > 0) {
+      res.json = (data: unknown) => {
+        if (Array.isArray(data) && data.length > 0) {
           apiCache.set(cacheKey, data)
         }
         return originalJson(data)
@@ -34,8 +34,8 @@ export function createDataRouter(apiCache: NodeCache, provider: AllAnimeProvider
       if (cached) return res.json(cached)
 
       const originalJson = res.json.bind(res)
-      res.json = (data: any) => {
-        if (data && Array.isArray(data) && data.length > 0) {
+      res.json = (data: unknown) => {
+        if (Array.isArray(data) && data.length > 0) {
           apiCache.set(cacheKey, data)
         }
         return originalJson(data)
@@ -53,8 +53,8 @@ export function createDataRouter(apiCache: NodeCache, provider: AllAnimeProvider
       if (cached) return res.json(cached)
 
       const originalJson = res.json.bind(res)
-      res.json = (data: any) => {
-        if (data && Array.isArray(data) && data.length > 0) {
+      res.json = (data: unknown) => {
+        if (Array.isArray(data) && data.length > 0) {
           apiCache.set(cacheKey, data, 300)
         }
         return originalJson(data)
@@ -72,8 +72,8 @@ export function createDataRouter(apiCache: NodeCache, provider: AllAnimeProvider
       if (cached) return res.json(cached)
 
       const originalJson = res.json.bind(res)
-      res.json = (data: any) => {
-        if (data && Array.isArray(data) && data.length > 0) {
+      res.json = (data: unknown) => {
+        if (Array.isArray(data) && data.length > 0) {
           apiCache.set(cacheKey, data, 1800)
         }
         return originalJson(data)
@@ -91,7 +91,7 @@ export function createDataRouter(apiCache: NodeCache, provider: AllAnimeProvider
       if (cached) return res.json(cached)
 
       const originalJson = res.json.bind(res)
-      res.json = (data: any) => {
+      res.json = (data: unknown) => {
         if (data) apiCache.set(cacheKey, data, 3600)
         return originalJson(data)
       }

@@ -9,7 +9,18 @@ interface Anime {
   id: string
   name: string
   thumbnail: string
-  [key: string]: any
+  nativeName?: string
+  englishName?: string
+  type?: string
+  episodeNumber?: number
+  currentTime?: number
+  duration?: number
+  nextEpisodeToWatch?: string
+  newEpisodesCount?: number
+  availableEpisodesDetail?: {
+    sub?: string[]
+    dub?: string[]
+  }
 }
 
 interface AnimeSectionProps {

@@ -1,3 +1,8 @@
+// ... (Previous imports and setup)
+// Find the formatTime function (around line 125) and ensure correct deps in surrounding hooks if any.
+// The warning was likely in 'onTimeUpdate' or similar.
+// I will provide the FULL corrected file to be safe.
+
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import type { SkipInterval, SubtitleTrack } from '../types/player'
 
@@ -273,8 +278,11 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
     const video = videoRef.current
     if (!video) return
     const time = video.currentTime || 0
-    if (!isScrubbing && Math.floor(time) !== Math.floor(currentTime)) {
-      setCurrentTime(time)
+    if (!isScrubbing) {
+      setCurrentTime((prev) => {
+        if (Math.floor(time) !== Math.floor(prev)) return time
+        return prev
+      })
     }
 
     const now = Date.now()

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
-import SearchableSelect from '../components/common/SearchableSelect'
+// import SearchableSelect from '../components/common/SearchableSelect'
 import ErrorMessage from '../components/common/ErrorMessage'
 import { useSearchAnime } from '../hooks/useAnimeData'
 import styles from './Search.module.css'
@@ -82,7 +82,7 @@ const Search: React.FC = () => {
     }
     window.addEventListener('scroll', onScroll)
     return () => window.removeEventListener('scroll', onScroll)
-  }, [hasNextPage, isFetchingNextPage])
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   const years = ['ALL', ...Array.from({ length: 2025 - 1980 }, (_, i) => (2025 - i).toString())]
 

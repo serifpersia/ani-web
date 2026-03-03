@@ -2,6 +2,34 @@ import { Request, Response } from 'express'
 import { AllAnimeProvider } from '../providers/allanime.provider'
 import logger from '../logger'
 
+interface CoreStats {
+  totalSeconds: number
+  totalEpisodes: number
+  completedCount: number
+  totalWatchlist: number
+}
+
+interface ActivityDay {
+  day: string
+  count: number
+}
+
+interface HourlyStat {
+  hour: string
+  count: number
+}
+
+interface SeasonalStat {
+  month: string
+  seconds: number
+}
+
+interface DroppedShow {
+  id: string
+  name: string
+  lastActivity: string
+}
+
 export class InsightsController {
   constructor(private provider: AllAnimeProvider) {}
 
@@ -10,57 +38,68 @@ export class InsightsController {
 
     try {
       const coreStatsQuery = `
-                SELECT 
-                    (SELECT SUM(currentTime) FROM watched_episodes) as totalSeconds,
-                    (SELECT COUNT(*) FROM watched_episodes) as totalEpisodes,
-                    (SELECT COUNT(*) FROM watchlist WHERE status = 'Completed') as completedCount,
-                    (SELECT COUNT(*) FROM watchlist) as totalWatchlist
-            `
-      const core: any = await new Promise((resolve, reject) => {
-        db.get(coreStatsQuery, (err: any, row: any) => (err ? reject(err) : resolve(row || {})))
+      SELECT
+      (SELECT SUM(currentTime) FROM watched_episodes) as totalSeconds,
+      (SELECT COUNT(*) FROM watched_episodes) as totalEpisodes,
+      (SELECT COUNT(*) FROM watchlist WHERE status = 'Completed') as completedCount,
+      (SELECT COUNT(*) FROM watchlist) as totalWatchlist
+      `
+      const core = await new Promise<CoreStats>((resolve, reject) => {
+        db.get(coreStatsQuery, (err: Error | null, row: unknown) =>
+          err ? reject(err) : resolve((row as CoreStats) || ({} as CoreStats))
+        )
       })
 
       const activityGridQuery = `
-                SELECT date(watchedAt) as day, COUNT(*) as count
-                FROM watched_episodes
-                WHERE watchedAt >= date('now', '-365 days')
-                GROUP BY day
-            `
-      const activityGrid: any[] = await new Promise((resolve, reject) => {
-        db.all(activityGridQuery, (err: any, rows: any) =>
-          err ? reject(err) : resolve(rows || [])
+      SELECT date(watchedAt) as day, COUNT(*) as count
+      FROM watched_episodes
+      WHERE watchedAt >= date('now', '-365 days')
+      GROUP BY day
+      `
+      const activityGrid = await new Promise<ActivityDay[]>((resolve, reject) => {
+        db.all(activityGridQuery, (err: Error | null, rows: unknown) =>
+          err ? reject(err) : resolve((rows as ActivityDay[]) || [])
         )
       })
 
       const hourlyDistQuery = `
-                SELECT strftime('%H', watchedAt) as hour, COUNT(*) as count
-                FROM watched_episodes
-                GROUP BY hour
-            `
-      const hourlyDist: any[] = await new Promise((resolve, reject) => {
-        db.all(hourlyDistQuery, (err: any, rows: any) => (err ? reject(err) : resolve(rows || [])))
+      SELECT strftime('%H', watchedAt) as hour, COUNT(*) as count
+      FROM watched_episodes
+      GROUP BY hour
+      `
+      const hourlyDist = await new Promise<HourlyStat[]>((resolve, reject) => {
+        db.all(hourlyDistQuery, (err: Error | null, rows: unknown) =>
+          err ? reject(err) : resolve((rows as HourlyStat[]) || [])
+        )
       })
 
       const bingeFactor =
         activityGrid.length > 0 ? Math.max(...activityGrid.map((a) => a.count)) : 0
 
       const seasonalityQuery = `
-                SELECT strftime('%m', watchedAt) as month, SUM(currentTime) as seconds
-                FROM watched_episodes
-                GROUP BY month
-            `
-      const seasonality: any[] = await new Promise((resolve, reject) => {
-        db.all(seasonalityQuery, (err: any, rows: any) => (err ? reject(err) : resolve(rows || [])))
-      })
-
-      const allWatches: any[] = await new Promise((resolve, reject) => {
-        db.all(
-          'SELECT watchedAt, currentTime FROM watched_episodes ORDER BY watchedAt ASC',
-          (err: any, rows: any) => (err ? reject(err) : resolve(rows || []))
+      SELECT strftime('%m', watchedAt) as month, SUM(currentTime) as seconds
+      FROM watched_episodes
+      GROUP BY month
+      `
+      const seasonality = await new Promise<SeasonalStat[]>((resolve, reject) => {
+        db.all(seasonalityQuery, (err: Error | null, rows: unknown) =>
+          err ? reject(err) : resolve((rows as SeasonalStat[]) || [])
         )
       })
 
-      let sessions: number[] = []
+      const allWatches = await new Promise<{ watchedAt: string; currentTime: number }[]>(
+        (resolve, reject) => {
+          db.all(
+            'SELECT watchedAt, currentTime FROM watched_episodes ORDER BY watchedAt ASC',
+            (err: Error | null, rows: unknown) =>
+              err
+                ? reject(err)
+                : resolve((rows as { watchedAt: string; currentTime: number }[]) || [])
+          )
+        }
+      )
+
+      const sessions: number[] = []
       if (allWatches.length > 0) {
         let currentSessionSeconds = allWatches[0].currentTime
         for (let i = 1; i < allWatches.length; i++) {
@@ -81,13 +120,17 @@ export class InsightsController {
           : 0
 
       const watchedShowsQuery = `
-                SELECT DISTINCT sm.id, sm.genres, sm.popularityScore
-                FROM shows_meta sm
-                JOIN watched_episodes we ON sm.id = we.showId
-            `
-      const watchedShows: any[] = await new Promise((resolve, reject) => {
-        db.all(watchedShowsQuery, (err: any, rows: any) =>
-          err ? reject(err) : resolve(rows || [])
+      SELECT DISTINCT sm.id, sm.genres, sm.popularityScore
+      FROM shows_meta sm
+      JOIN watched_episodes we ON sm.id = we.showId
+      `
+      const watchedShows = await new Promise<
+        { id: string; genres: string; popularityScore: number }[]
+      >((resolve, reject) => {
+        db.all(watchedShowsQuery, (err: Error | null, rows: unknown) =>
+          err
+            ? reject(err)
+            : resolve((rows as { id: string; genres: string; popularityScore: number }[]) || [])
         )
       })
 
@@ -125,29 +168,31 @@ export class InsightsController {
       const persona = personaMap[topGenre || ''] || 'Anime Enthusiast'
 
       const droppedWarningQuery = `
-                SELECT w.id, w.name, MAX(we.watchedAt) as lastActivity
-                FROM watchlist w
-                JOIN watched_episodes we ON w.id = we.showId
-                WHERE w.status = 'Watching'
-                GROUP BY w.id
-                HAVING lastActivity < date('now', '-90 days')
-            `
-      const droppedWarning: any[] = await new Promise((resolve, reject) => {
-        db.all(droppedWarningQuery, (err: any, rows: any) =>
-          err ? reject(err) : resolve(rows || [])
+      SELECT w.id, w.name, MAX(we.watchedAt) as lastActivity
+      FROM watchlist w
+      JOIN watched_episodes we ON w.id = we.showId
+      WHERE w.status = 'Watching'
+      GROUP BY w.id
+      HAVING lastActivity < date('now', '-90 days')
+      `
+      const droppedWarning = await new Promise<DroppedShow[]>((resolve, reject) => {
+        db.all(droppedWarningQuery, (err: Error | null, rows: unknown) =>
+          err ? reject(err) : resolve((rows as DroppedShow[]) || [])
         )
       })
 
       const velocityQuery = `
-                SELECT 
-                    (julianday(MAX(we.watchedAt)) - julianday(MIN(we.watchedAt))) as daysToFinish
-                FROM watchlist w
-                JOIN watched_episodes we ON w.id = we.showId
-                WHERE w.status = 'Completed'
-                GROUP BY w.id
-            `
-      const velocities: any[] = await new Promise((resolve, reject) => {
-        db.all(velocityQuery, (err: any, rows: any) => (err ? reject(err) : resolve(rows || [])))
+      SELECT
+      (julianday(MAX(we.watchedAt)) - julianday(MIN(we.watchedAt))) as daysToFinish
+      FROM watchlist w
+      JOIN watched_episodes we ON w.id = we.showId
+      WHERE w.status = 'Completed'
+      GROUP BY w.id
+      `
+      const velocities = await new Promise<{ daysToFinish: number }[]>((resolve, reject) => {
+        db.all(velocityQuery, (err: Error | null, rows: unknown) =>
+          err ? reject(err) : resolve((rows as { daysToFinish: number }[]) || [])
+        )
       })
       const avgCompletionDays =
         velocities.length > 0

@@ -8,14 +8,25 @@ import type {
   SkipInterval,
   PlayerState,
 } from '../types/player'
-import { playerReducer, initialState } from '../reducers/playerReducer'
+import { playerReducer, initialState, type Action } from '../reducers/playerReducer'
 
 interface UsePlayerDataReturn {
   state: PlayerState
-  dispatch: React.Dispatch<any>
+  dispatch: React.Dispatch<Action>
   toggleWatchlist: () => Promise<void>
   setPreferredSource: (sourceName: string) => Promise<void>
   handleToggleDetails: () => Promise<void>
+}
+
+interface RawSkipInterval {
+  skip_id?: string
+  skip_type?: string
+  interval?: {
+    start_time: number
+    end_time: number
+  }
+  start_time?: number
+  end_time?: number
 }
 
 export const usePlayerData = (
@@ -131,7 +142,7 @@ export const usePlayerData = (
     }
 
     fetchDetails()
-  }, [showId, state.loadingShowData, state.showMeta.genres])
+  }, [showId, state.loadingShowData, state.showMeta])
 
   useEffect(() => {
     if (!showId || !state.currentEpisode) return
@@ -204,13 +215,13 @@ export const usePlayerData = (
 
         const skipIntervals: SkipInterval[] = Array.isArray(rawSkips)
           ? rawSkips
-              .map((item: any) => ({
-                skip_id: item.skip_id,
-                skip_type: item.skip_type,
+              .map((item: RawSkipInterval) => ({
+                skip_id: item.skip_id || '',
+                skip_type: item.skip_type || '',
                 start_time: item.interval?.start_time ?? item.start_time ?? 0,
                 end_time: item.interval?.end_time ?? item.end_time ?? 0,
               }))
-              .filter((i) => i.end_time > 0)
+              .filter((i: SkipInterval) => i.end_time > 0)
           : []
 
         dispatch({

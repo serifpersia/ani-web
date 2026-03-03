@@ -58,13 +58,14 @@ const Home: React.FC = () => {
       { threshold: 0.1 }
     )
 
-    if (observerRef.current) {
-      observer.observe(observerRef.current)
+    const currentRef = observerRef.current
+    if (currentRef) {
+      observer.observe(currentRef)
     }
 
     return () => {
-      if (observerRef.current) {
-        observer.unobserve(observerRef.current)
+      if (currentRef) {
+        observer.unobserve(currentRef)
       }
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])

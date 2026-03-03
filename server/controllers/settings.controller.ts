@@ -6,6 +6,7 @@ import logger from '../logger'
 import path from 'path'
 import fs from 'fs'
 import { CONFIG } from '../config'
+import type { Database } from 'sqlite3'
 
 interface MalAnimeItem {
   series_title: string[]
@@ -23,8 +24,10 @@ export class SettingsController {
   constructor(private provider: AllAnimeProvider) {}
 
   getSettings = (req: Request, res: Response) => {
-    req.db.get('SELECT value FROM settings WHERE key = ?', [req.query.key], (err: any, row: any) =>
-      res.json({ value: row ? row.value : null })
+    req.db.get(
+      'SELECT value FROM settings WHERE key = ?',
+      [req.query.key],
+      (err: Error | null, row: { value: string }) => res.json({ value: row ? row.value : null })
     )
   }
 
@@ -50,7 +53,9 @@ export class SettingsController {
     fs.copyFile(dbPath, backupPath, (err) => {
       if (err) return res.status(500).json({ error: 'Backup failed' })
       res.download(backupPath, 'ani-web-backup.db', () => {
-        fs.unlink(backupPath, () => {})
+        fs.unlink(backupPath, () => {
+          // Ignore error
+        })
       })
     })
   }
@@ -58,8 +63,8 @@ export class SettingsController {
   restoreDatabase = (
     req: Request,
     res: Response,
-    db: any,
-    initializeDatabase: (path: string) => Promise<any>
+    db: Database,
+    initializeDatabase: (path: string) => Promise<Database>
   ) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
 
@@ -67,10 +72,12 @@ export class SettingsController {
     const tempPath = path.join(CONFIG.ROOT, `restore_temp.db`)
     const dbPath = path.join(CONFIG.ROOT, dbName)
 
-    db.close((err: any) => {
+    db.close((err: Error | null) => {
       if (err) return res.status(500).json({ error: 'Failed to close database.' })
       fs.rename(tempPath, dbPath, (err) => {
-        initializeDatabase(dbPath).then((newDb) => (db = newDb))
+        initializeDatabase(dbPath).then((newDb) => {
+          req.db = newDb // Update the request db reference if needed
+        })
         if (err) return res.status(500).json({ error: 'Failed to replace database file.' })
         res.json({ success: true, message: 'Database restored.' })
       })

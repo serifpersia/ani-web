@@ -365,13 +365,13 @@ const Player: React.FC = () => {
     const fontSize = `${player.state.subtitleFontSize}rem`
 
     styleTag.textContent = `
-    video::cue {
-      font-size: ${fontSize} !important;
-      background-color: rgba(0, 0, 0, 0.5) !important;
-      color: white !important;
-      text-shadow: 0 0 4px black;
-    }
-    `
+  video::cue {
+    font-size: ${fontSize} !important;
+    background-color: rgba(0, 0, 0, 0.5) !important;
+    color: white !important;
+    text-shadow: 0 0 4px black;
+  }
+  `
 
     const video = refs.videoRef.current
     if (!video) return
@@ -379,12 +379,15 @@ const Player: React.FC = () => {
     const updateCuePosition = () => {
       const activeTrack = Array.from(video.textTracks).find((t) => t.mode === 'showing')
       if (activeTrack && activeTrack.cues) {
-        Array.from(activeTrack.cues).forEach((cue: any) => {
+        Array.from(activeTrack.cues).forEach((cue: unknown) => {
           try {
-            cue.snapToLines = false
+            const vttCue = cue as { snapToLines?: boolean; line?: number }
+            vttCue.snapToLines = false
             const pos = Math.max(0, Math.min(100, 100 - player.state.subtitlePosition))
-            cue.line = pos
-          } catch (e) {}
+            vttCue.line = pos
+          } catch (e) {
+            // Ignore error
+          }
         })
       }
     }
@@ -687,7 +690,6 @@ const Player: React.FC = () => {
                         <span>{state.showMeta.mediaTypes[0].name}</span>
                       </div>
                     )}
-                    {/* ... rest of the details ... */}
                     {state.showMeta.status && (
                       <div className={styles.detailItem}>
                         <strong>Status</strong>

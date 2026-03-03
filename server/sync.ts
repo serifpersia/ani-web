@@ -152,7 +152,9 @@ export async function syncDownOnBoot(
         log.error({ err }, 'Sync down failed. Restoring backup.')
         try {
           await fs.copyFile(backupPath, dbPath)
-        } catch {}
+        } catch {
+          // Ignore
+        }
         return true
       }
     } else {
@@ -303,8 +305,10 @@ export function initializeDatabase(dbPath: string): Promise<Database> {
       db.run(`CREATE INDEX IF NOT EXISTS idx_watchlist_status ON watchlist(status)`)
 
       const addCol = (tbl: string, col: string, type: string) => {
-        db.all(`PRAGMA table_info(${tbl})`, (e: Error | null, r: any[]) => {
-          if (!r.some((c) => c.name === col)) db.run(`ALTER TABLE ${tbl} ADD COLUMN ${col} ${type}`)
+        db.all(`PRAGMA table_info(${tbl})`, (e: Error | null, r: unknown) => {
+          const columns = r as { name: string }[]
+          if (!columns.some((c) => c.name === col))
+            db.run(`ALTER TABLE ${tbl} ADD COLUMN ${col} ${type}`)
         })
       }
       addCol('watchlist', 'nativeName', 'TEXT')
