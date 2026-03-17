@@ -58,9 +58,7 @@ interface WatchlistRow {
 export class WatchlistController {
   constructor(private provider: AllAnimeProvider) {}
 
-  private async getContinueWatchingData(
-    db: Database
-  ): Promise<{ data: CombinedContinueWatchingShow[]; total: number }> {
+  private async getInProgressShowsData(db: Database): Promise<CombinedContinueWatchingShow[]> {
     const inProgressQuery = `
     SELECT
     sm.id as _id, sm.id, sm.name, sm.thumbnail, sm.nativeName, sm.englishName,
@@ -81,6 +79,13 @@ export class WatchlistController {
       })
     })
 
+    return inProgressShows.map((show) => ({
+      ...show,
+      thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
+    }))
+  }
+
+  private async getUpNextShowsData(db: Database): Promise<CombinedContinueWatchingShow[]> {
     const watchingShowsQuery = `
     SELECT
     w.id, w.name, w.thumbnail, w.nativeName, w.englishName,
@@ -96,82 +101,92 @@ export class WatchlistController {
       })
     })
 
+    const results = await Promise.allSettled(
+      watchingShows.map(async (show) => {
+        try {
+          const [epDetails, watchedEpisodesResult] = await Promise.all([
+            this.provider.getEpisodes(show.id, 'sub'),
+            new Promise<WatchedEpisode[]>((resolve, reject) => {
+              db.all(
+                'SELECT * FROM watched_episodes WHERE showId = ?',
+                [show.id],
+                (err: Error | null, rows: unknown) => {
+                  if (err) reject(err)
+                  else resolve(rows as WatchedEpisode[])
+                }
+              )
+            }),
+          ])
+
+          const allEps = epDetails?.episodes?.sort((a, b) => parseFloat(a) - parseFloat(b)) || []
+          const watchedEpsMap = new Map(
+            watchedEpisodesResult.map((r) => [r.episodeNumber.toString(), r])
+          )
+
+          const unwatchedEps = allEps.filter((ep) => !watchedEpsMap.has(ep))
+
+          if (unwatchedEps.length > 0) {
+            return {
+              type: 'upNext',
+              show: {
+                _id: show.id,
+                id: show.id,
+                name: show.name,
+                thumbnail: show.thumbnail,
+                nativeName: show.nativeName,
+                englishName: show.englishName,
+                nextEpisodeToWatch: unwatchedEps[0],
+                newEpisodesCount: unwatchedEps.length,
+              },
+            }
+          } else if (watchedEpsMap.size > 0) {
+            const lastWatchedEpisodeNumber = Math.max(
+              ...Array.from(watchedEpsMap.keys()).map((e) => parseFloat(e as string))
+            )
+            const lastWatchedEpisodeDetails = watchedEpsMap.get(lastWatchedEpisodeNumber.toString())
+
+            if (lastWatchedEpisodeDetails) {
+              return {
+                type: 'fullyWatched',
+                show: {
+                  _id: show.id,
+                  id: show.id,
+                  name: show.name,
+                  thumbnail: show.thumbnail,
+                  nativeName: show.nativeName,
+                  englishName: show.englishName,
+                  episodeNumber: lastWatchedEpisodeNumber,
+                  currentTime: lastWatchedEpisodeDetails.currentTime,
+                  duration: lastWatchedEpisodeDetails.duration,
+                },
+              }
+            }
+          }
+          return null
+        } catch (e) {
+          logger.error({ err: e, showId: show.id }, 'Error processing show for Up Next list')
+          return null
+        }
+      })
+    )
+
     const upNextShows: CombinedContinueWatchingShow[] = []
     const fullyWatchedShows: CombinedContinueWatchingShow[] = []
 
-    for (const show of watchingShows) {
-      try {
-        const [epDetails, watchedEpisodesResult] = await Promise.all([
-          this.provider.getEpisodes(show.id, 'sub'),
-          new Promise<WatchedEpisode[]>((resolve, reject) => {
-            db.all(
-              'SELECT * FROM watched_episodes WHERE showId = ?',
-              [show.id],
-              (err: Error | null, rows: unknown) => {
-                if (err) reject(err)
-                else resolve(rows as WatchedEpisode[])
-              }
-            )
-          }),
-        ])
-
-        const allEps = epDetails?.episodes?.sort((a, b) => parseFloat(a) - parseFloat(b)) || []
-        const watchedEpsMap = new Map(
-          watchedEpisodesResult.map((r) => [r.episodeNumber.toString(), r])
-        )
-
-        const unwatchedEps = allEps.filter((ep) => !watchedEpsMap.has(ep))
-
-        if (unwatchedEps.length > 0) {
-          upNextShows.push({
-            _id: show.id,
-            id: show.id,
-            name: show.name,
-            thumbnail: show.thumbnail,
-            nativeName: show.nativeName,
-            englishName: show.englishName,
-            nextEpisodeToWatch: unwatchedEps[0],
-            newEpisodesCount: unwatchedEps.length,
-          })
-        } else if (watchedEpsMap.size > 0) {
-          const lastWatchedEpisodeNumber = Math.max(
-            ...Array.from(watchedEpsMap.keys()).map((e) => parseFloat(e as string))
-          )
-          const lastWatchedEpisodeDetails = watchedEpsMap.get(lastWatchedEpisodeNumber.toString())
-
-          if (lastWatchedEpisodeDetails) {
-            fullyWatchedShows.push({
-              _id: show.id,
-              id: show.id,
-              name: show.name,
-              thumbnail: show.thumbnail,
-              nativeName: show.nativeName,
-              englishName: show.englishName,
-              episodeNumber: lastWatchedEpisodeNumber,
-              currentTime: lastWatchedEpisodeDetails.currentTime,
-              duration: lastWatchedEpisodeDetails.duration,
-            })
-          }
+    results.forEach((result) => {
+      if (result.status === 'fulfilled' && result.value) {
+        if (result.value.type === 'upNext') {
+          upNextShows.push(result.value.show as CombinedContinueWatchingShow)
+        } else if (result.value.type === 'fullyWatched') {
+          fullyWatchedShows.push(result.value.show as CombinedContinueWatchingShow)
         }
-      } catch (e) {
-        logger.error({ err: e, showId: show.id }, 'Error processing show for Up Next list')
       }
-    }
+    })
 
     const combinedList: CombinedContinueWatchingShow[] = []
     const seenShowIds = new Set<string>()
 
     for (const show of upNextShows) {
-      if (!seenShowIds.has(show.id)) {
-        combinedList.push({
-          ...show,
-          thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
-        })
-        seenShowIds.add(show.id)
-      }
-    }
-
-    for (const show of inProgressShows) {
       if (!seenShowIds.has(show.id)) {
         combinedList.push({
           ...show,
@@ -191,14 +206,61 @@ export class WatchlistController {
       }
     }
 
-    return { data: combinedList, total: combinedList.length }
+    return combinedList
+  }
+
+  getContinueWatchingFast = async (req: Request, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 10
+      const data = await this.getInProgressShowsData(req.db)
+      res.json(data.slice(0, limit))
+    } catch {
+      res.status(500).json({ error: 'DB error' })
+    }
+  }
+
+  getContinueWatchingUpNext = async (req: Request, res: Response) => {
+    try {
+      const data = await this.getUpNextShowsData(req.db)
+      res.json(data)
+    } catch {
+      res.status(500).json({ error: 'DB error' })
+    }
   }
 
   getContinueWatching = async (req: Request, res: Response) => {
     try {
       const limit = parseInt(req.query.limit as string) || 10
-      const data = await this.getContinueWatchingData(req.db)
-      res.json(data.data.slice(0, limit))
+      const [inProgress, upNext] = await Promise.all([
+        this.getInProgressShowsData(req.db),
+        this.getUpNextShowsData(req.db),
+      ])
+
+      const combinedList: CombinedContinueWatchingShow[] = []
+      const seenShowIds = new Set<string>()
+
+      for (const show of upNext) {
+        if (show.nextEpisodeToWatch && !seenShowIds.has(show.id)) {
+          combinedList.push(show)
+          seenShowIds.add(show.id)
+        }
+      }
+
+      for (const show of inProgress) {
+        if (!seenShowIds.has(show.id)) {
+          combinedList.push(show)
+          seenShowIds.add(show.id)
+        }
+      }
+
+      for (const show of upNext) {
+        if (!show.nextEpisodeToWatch && !seenShowIds.has(show.id)) {
+          combinedList.push(show)
+          seenShowIds.add(show.id)
+        }
+      }
+
+      res.json(combinedList.slice(0, limit))
     } catch {
       res.status(500).json({ error: 'DB error' })
     }
@@ -209,11 +271,38 @@ export class WatchlistController {
       const page = parseInt(req.query.page as string) || 1
       const limit = parseInt(req.query.limit as string) || 10
       const offset = (page - 1) * limit
-      const { data: allData, total } = await this.getContinueWatchingData(req.db)
+      const [inProgress, upNext] = await Promise.all([
+        this.getInProgressShowsData(req.db),
+        this.getUpNextShowsData(req.db),
+      ])
+
+      const combinedList: CombinedContinueWatchingShow[] = []
+      const seenShowIds = new Set<string>()
+
+      for (const show of upNext) {
+        if (show.nextEpisodeToWatch && !seenShowIds.has(show.id)) {
+          combinedList.push(show)
+          seenShowIds.add(show.id)
+        }
+      }
+
+      for (const show of inProgress) {
+        if (!seenShowIds.has(show.id)) {
+          combinedList.push(show)
+          seenShowIds.add(show.id)
+        }
+      }
+
+      for (const show of upNext) {
+        if (!show.nextEpisodeToWatch && !seenShowIds.has(show.id)) {
+          combinedList.push(show)
+          seenShowIds.add(show.id)
+        }
+      }
 
       res.json({
-        data: allData.slice(offset, offset + limit),
-        total,
+        data: combinedList.slice(offset, offset + limit),
+        total: combinedList.length,
         page,
         limit,
       })

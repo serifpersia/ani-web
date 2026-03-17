@@ -7,6 +7,8 @@ export function createWatchlistRouter(provider: AllAnimeProvider): Router {
   const controller = new WatchlistController(provider)
 
   router.get('/continue-watching', controller.getContinueWatching)
+  router.get('/continue-watching/fast', controller.getContinueWatchingFast)
+  router.get('/continue-watching/up-next', controller.getContinueWatchingUpNext)
   router.get('/continue-watching/all', controller.getAllContinueWatching)
   router.post('/continue-watching/remove', controller.removeContinueWatching)
   router.post('/update-progress', controller.updateProgress)

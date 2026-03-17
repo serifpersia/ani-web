@@ -46,6 +46,22 @@ export const useCurrentSeason = () => {
   })
 }
 
+export const useContinueWatchingFast = (limit?: number) => {
+  const url = limit ? `/api/continue-watching/fast?limit=${limit}` : '/api/continue-watching/fast'
+  return useQuery<Anime[]>({
+    queryKey: ['continueWatchingFast', { limit }],
+    queryFn: () => fetchApi(url),
+  })
+}
+
+export const useContinueWatchingUpNext = () => {
+  const url = '/api/continue-watching/up-next'
+  return useQuery<Anime[]>({
+    queryKey: ['continueWatchingUpNext'],
+    queryFn: () => fetchApi(url),
+  })
+}
+
 export const useContinueWatching = (limit?: number) => {
   const url = limit ? `/api/continue-watching?limit=${limit}` : '/api/continue-watching'
   return useQuery<Anime[]>({

@@ -5,7 +5,12 @@ import Top10List from '../components/anime/Top10List'
 import Schedule from '../components/anime/Schedule'
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
-import { useLatestReleases, useCurrentSeason, useContinueWatching } from '../hooks/useAnimeData'
+import {
+  useLatestReleases,
+  useCurrentSeason,
+  useContinueWatchingFast,
+  useContinueWatchingUpNext,
+} from '../hooks/useAnimeData'
 import useIsMobile from '../hooks/useIsMobile'
 
 const Home: React.FC = () => {
@@ -19,7 +24,42 @@ const Home: React.FC = () => {
   }, [])
 
   const { data: latest, isLoading: loadingLatest } = useLatestReleases()
-  const { data: cwList } = useContinueWatching(15)
+  const { data: cwFast } = useContinueWatchingFast(15)
+  const { data: cwUpNext } = useContinueWatchingUpNext()
+
+  const cwList = useMemo(() => {
+    const combined: typeof cwFast = []
+    const seen = new Set<string>()
+
+    if (cwUpNext) {
+      for (const show of cwUpNext) {
+        if (show.nextEpisodeToWatch && !seen.has(show.id)) {
+          combined.push(show)
+          seen.add(show.id)
+        }
+      }
+    }
+
+    if (cwFast) {
+      for (const show of cwFast) {
+        if (!seen.has(show.id)) {
+          combined.push(show)
+          seen.add(show.id)
+        }
+      }
+    }
+
+    if (cwUpNext) {
+      for (const show of cwUpNext) {
+        if (!show.nextEpisodeToWatch && !seen.has(show.id)) {
+          combined.push(show)
+          seen.add(show.id)
+        }
+      }
+    }
+
+    return combined.length > 0 ? combined : cwFast || []
+  }, [cwFast, cwUpNext])
   const {
     data: seasonPages,
     fetchNextPage,
@@ -38,7 +78,10 @@ const Home: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
       })
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['continueWatching'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
+      queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
+    },
   })
 
   const handleRemove = useCallback(
