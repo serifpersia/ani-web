@@ -28,10 +28,8 @@ const Player: React.FC = () => {
   const { id: showId, episodeNumber } = useParams<{ id: string; episodeNumber?: string }>()
   const navigate = useNavigate()
 
-  const { state, dispatch, toggleWatchlist, handleToggleDetails } = usePlayerData(
-    showId,
-    episodeNumber
-  )
+  const { state, dispatch, toggleWatchlist, setPreferredSource, handleToggleDetails } =
+    usePlayerData(showId, episodeNumber)
 
   const memoizedShowMeta = useMemo(() => {
     if (!state.showMeta.name) return undefined
@@ -62,6 +60,7 @@ const Player: React.FC = () => {
   const isMobile = useIsMobile()
   const wasFullscreenRef = useRef(false)
   const rafIdRef = useRef<number | null>(null)
+  const seekToTimeRef = useRef<number>(0)
 
   const [skipIndicator, setSkipIndicator] = useState<{
     side: 'left' | 'right'
@@ -128,6 +127,7 @@ const Player: React.FC = () => {
     if (!state.selectedSource || !state.selectedLink) return
 
     if (state.selectedSource.type === 'iframe') {
+      seekToTimeRef.current = 0
       return
     }
 
@@ -152,6 +152,16 @@ const Player: React.FC = () => {
       })
       actions.setAvailableSubtitles(state.selectedSource.subtitles)
     }
+
+    const targetTime = seekToTimeRef.current
+    seekToTimeRef.current = 0
+
+    const handleLoaded = () => {
+      if (targetTime > 0) {
+        videoElement.currentTime = targetTime
+      }
+    }
+    videoElement.addEventListener('loadedmetadata', handleLoaded, { once: true })
 
     if (state.selectedLink.hls) {
       import('hls.js/dist/hls.light.mjs').then((module) => {
@@ -185,6 +195,7 @@ const Player: React.FC = () => {
     })
 
     return () => {
+      videoElement.removeEventListener('loadedmetadata', handleLoaded)
       if (hlsInstance.current) {
         hlsInstance.current.destroy()
       }
@@ -520,12 +531,16 @@ const Player: React.FC = () => {
                   videoSources={state.videoSources}
                   selectedSource={state.selectedSource}
                   selectedLink={state.selectedLink}
-                  onSourceChange={(source, link) =>
+                  onSourceChange={(source, link) => {
+                    if (refs.videoRef.current && !isNaN(refs.videoRef.current.currentTime)) {
+                      seekToTimeRef.current = refs.videoRef.current.currentTime
+                    }
+                    setPreferredSource(source.sourceName)
                     dispatch({
                       type: 'SET_STATE',
                       payload: { selectedSource: source, selectedLink: link },
                     })
-                  }
+                  }}
                   loadingVideo={state.loadingVideo}
                   skipIntervals={state.skipIntervals}
                 />
@@ -559,10 +574,14 @@ const Player: React.FC = () => {
               videoSources={state.videoSources}
               selectedSource={state.selectedSource}
               onSourceChange={(source) => {
+                if (refs.videoRef.current && !isNaN(refs.videoRef.current.currentTime)) {
+                  seekToTimeRef.current = refs.videoRef.current.currentTime
+                }
                 const bestLink = source.links.sort(
                   (a: VideoLink, b: VideoLink) =>
                     (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
                 )[0]
+                setPreferredSource(source.sourceName)
                 dispatch({
                   type: 'SET_STATE',
                   payload: { selectedSource: source, selectedLink: bestLink },
