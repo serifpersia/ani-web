@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   FaClock,
@@ -64,19 +64,48 @@ const Insights: React.FC = () => {
     },
   })
 
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+
+  const availableYears = useMemo(() => {
+    if (!data?.activityGrid) return [new Date().getFullYear()]
+    const years = new Set(data.activityGrid.map((d) => parseInt(d.day.split('-')[0])))
+    years.add(new Date().getFullYear())
+    return Array.from(years).sort((a, b) => b - a)
+  }, [data])
+
   const heatmapData = useMemo(() => {
     if (!data?.activityGrid) return []
     const daysMap = new Map(data.activityGrid.map((d) => [d.day, d.count]))
     const result = []
-    const today = new Date()
-    for (let i = 364; i >= 0; i--) {
-      const d = new Date(today)
-      d.setDate(d.getDate() - i)
-      const dateStr = d.toISOString().split('T')[0]
-      result.push({ date: dateStr, count: daysMap.get(dateStr) || 0 })
+    
+    const startDate = new Date(selectedYear, 0, 1)
+    const endDate = new Date(selectedYear, 11, 31)
+    
+    const startOffset = startDate.getDay()
+    const current = new Date(startDate)
+    current.setDate(current.getDate() - startOffset)
+    
+    while (current <= endDate || current.getDay() !== 0) {
+      if (current > endDate && current.getDay() === 0) break
+      
+      const year = current.getFullYear()
+      const month = String(current.getMonth() + 1).padStart(2, '0')
+      const day = String(current.getDate()).padStart(2, '0')
+      const dateStr = `${year}-${month}-${day}`
+      
+      const isOutOfRange = current < startDate || current > endDate
+      
+      result.push({
+        date: dateStr,
+        count: isOutOfRange ? 0 : (daysMap.get(dateStr) || 0),
+        month: current.getMonth(),
+        isOutOfRange
+      })
+      current.setDate(current.getDate() + 1)
     }
     return result
-  }, [data])
+  }, [data, selectedYear])
 
   const maxSeasonal = useMemo(() => {
     if (!data?.seasonality?.length) return 0
@@ -176,51 +205,95 @@ const Insights: React.FC = () => {
       <div className={styles.wideSection}>
         <div className={styles.sectionHeader}>
           <h3>Activity</h3>
-          <div className={styles.heatLegend}>
-            <span>Less</span>
-            <div className={`${styles.heatBox} ${styles.level0}`} />
-            <div className={`${styles.heatBox} ${styles.level1}`} />
-            <div className={`${styles.heatBox} ${styles.level2}`} />
-            <div className={`${styles.heatBox} ${styles.level3}`} />
-            <div className={`${styles.heatBox} ${styles.level4}`} />
-            <span>More</span>
+          <div className={styles.customDropdownContainer}>
+            <button 
+              className={styles.dropdownToggle}
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
+            >
+              {selectedYear}
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 5 6 8 9 5"></polyline></svg>
+            </button>
+            {isDropdownOpen && (
+              <div className={styles.dropdownMenu}>
+                {availableYears.map((year) => (
+                  <button
+                    key={year}
+                    className={`${styles.dropdownItem} ${year === selectedYear ? styles.activeItem : ''}`}
+                    onClick={() => {
+                      setSelectedYear(year)
+                      setIsDropdownOpen(false)
+                    }}
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-        <div className={styles.heatmapWrapper}>
-          <div className={styles.heatmapMonthLabels}>
-            {(() => {
-              const labels: React.ReactElement[] = []
-              let lastMonth = -1
-              heatmapData.forEach((d, i) => {
-                const date = new Date(d.date)
-                const month = date.getMonth()
-                if (month !== lastMonth && i % 7 === 0) {
-                  labels.push(
-                    <span key={i} style={{ gridColumn: Math.floor(i / 7) + 1 }}>
-                      {date.toLocaleString('default', { month: 'short' })}
-                    </span>
-                  )
-                  lastMonth = month
-                }
-              })
-              return labels
-            })()}
+        <div className={styles.heatmapLayout}>
+          <div className={styles.dayLabels}>
+            <span style={{ gridRow: 2 }}>Mon</span>
+            <span style={{ gridRow: 4 }}>Wed</span>
+            <span style={{ gridRow: 6 }}>Fri</span>
           </div>
-          <div className={styles.heatmapGrid}>
-            {heatmapData.map((d, i) => {
-              let level = 0
-              if (d.count > 0) level = 1
-              if (d.count > 2) level = 2
-              if (d.count > 5) level = 3
-              if (d.count > 10) level = 4
-              return (
-                <div
-                  key={i}
-                  className={`${styles.heatBox} ${styles[`level${level}`]}`}
-                  title={`${d.count} episodes on ${d.date}`}
-                />
-              )
-            })}
+          <div className={styles.heatmapWrapper}>
+            <div className={styles.heatmapMonthLabels}>
+              {(() => {
+                const labels: React.ReactElement[] = []
+                let lastMonth = -1
+                heatmapData.forEach((d, i) => {
+                  if (d.month !== lastMonth && !d.isOutOfRange) {
+                    const weekIdx = Math.floor(i / 7) + 1
+                    labels.push(
+                      <span 
+                        key={i} 
+                        style={{ 
+                          gridColumn: weekIdx,
+                          width: '18px',
+                          display: 'inline-block',
+                          overflow: 'visible',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {new Date(0, d.month).toLocaleString('default', { month: 'short' })}
+                      </span>
+                    )
+                    lastMonth = d.month
+                  }
+                })
+                return labels
+              })()}
+            </div>
+            <div className={styles.heatmapGrid}>
+              {heatmapData.map((d, i) => {
+                let level = 0
+                if (d.count > 0 && !d.isOutOfRange) level = 1
+                if (d.count > 2 && !d.isOutOfRange) level = 2
+                if (d.count > 5 && !d.isOutOfRange) level = 3
+                if (d.count > 10 && !d.isOutOfRange) level = 4
+
+                return (
+                  <div
+                    key={i}
+                    className={`${styles.heatBox} ${styles[`level${level}`]} ${d.isOutOfRange ? styles.hiddenBox : ''}`}
+                    title={d.isOutOfRange ? '' : `${d.count} episodes on ${d.date}`}
+                  />
+                )
+              })}
+            </div>
+            <div className={styles.heatmapFooter}>
+              <div className={styles.heatLegend}>
+                <span>Less</span>
+                <div className={`${styles.heatBox} ${styles.level0}`} />
+                <div className={`${styles.heatBox} ${styles.level1}`} />
+                <div className={`${styles.heatBox} ${styles.level2}`} />
+                <div className={`${styles.heatBox} ${styles.level3}`} />
+                <div className={`${styles.heatBox} ${styles.level4}`} />
+                <span>More</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -260,7 +333,7 @@ const Insights: React.FC = () => {
             <div className={styles.popTrack}>
               <div
                 className={styles.popThumb}
-                style={{ left: `${Math.max(0, Math.min(100, data.popularityScore))}%` }}
+                style={{ left: `${Math.max(0, Math.min(100, 100 - (data.popularityScore * 10)))}%` }}
               />
             </div>
             <div className={styles.popLabels}>
@@ -269,8 +342,8 @@ const Insights: React.FC = () => {
             </div>
           </div>
           <p className={styles.popDescription}>
-            Your taste score is <strong>{data.popularityScore}</strong>.
-            {data.popularityScore < 50
+            Your taste score is <strong>{data.popularityScore}/10</strong>.
+            {data.popularityScore >= 5
               ? ' You follow the big hits!'
               : " You're a connoisseur of the obscure!"}
           </p>

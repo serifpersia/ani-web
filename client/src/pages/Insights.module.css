@@ -144,9 +144,104 @@
   color: var(--text-muted);
 }
 
+.heatmapFooter {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-4);
+  padding-right: var(--space-2);
+}
+
+.dayLabels {
+  display: grid;
+  grid-template-rows: repeat(7, 14px);
+  gap: 4px;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  align-items: center;
+  padding-right: 6px;
+  margin-top: 24px; /* align accurately beneath the month labels */
+}
+
 .heatmapWrapper {
   overflow-x: auto;
-  padding: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  max-width: 100%;
+}
+
+.heatmapLayout {
+  display: flex;
+  gap: var(--space-6);
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.customDropdownContainer {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdownToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.dropdownToggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent);
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: rgba(15, 15, 20, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  min-width: 100%;
+  z-index: 50;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dropdownItem {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  text-align: right;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.dropdownItem:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.dropdownItem.activeItem {
+  background: var(--accent);
+  color: white;
 }
 
 .heatmapMonthLabels {
@@ -165,7 +260,6 @@
   grid-template-rows: repeat(7, 14px);
   gap: 4px;
   width: fit-content;
-  min-width: 100%;
 }
 
 .heatBox {
@@ -179,6 +273,11 @@
     filter 0.15s;
 }
 
+.heatBox.hiddenBox {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .heatBox:hover {
   transform: scale(1.5);
   z-index: 10;
@@ -186,8 +285,8 @@
 }
 
 .level0 {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .level1 {
@@ -218,6 +317,15 @@
 }
 
 @media (max-width: 768px) {
+  .heatmapLayout {
+    flex-direction: column-reverse;
+  }
+  .yearSelector {
+    flex-direction: row;
+    overflow-x: auto;
+    width: 100%;
+    padding-bottom: var(--space-2);
+  }
   .chartsContainer {
     grid-template-columns: 1fr;
   }

@@ -53,7 +53,6 @@ export class InsightsController {
       const activityGridQuery = `
       SELECT date(watchedAt) as day, COUNT(*) as count
       FROM watched_episodes
-      WHERE watchedAt >= date('now', '-365 days')
       GROUP BY day
       `
       const activityGrid = await new Promise<ActivityDay[]>((resolve, reject) => {
