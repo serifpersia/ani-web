@@ -189,7 +189,7 @@ export class AllAnimeProvider implements Provider {
     variables: Record<string, unknown>,
     extensions?: Record<string, unknown>
   ): Promise<Show[]> {
-    const params: { [key: string]: string } = { variables: JSON.stringify(variables) }
+    const body: Record<string, unknown> = { variables }
     const fullQuery = `
       query ($search: SearchInput, $limit: Int, $page: Int, $translationType: VaildTranslationTypeEnumType, $countryOrigin: VaildCountryOriginEnumType) {
         shows(search: $search, limit: $limit, page: $page, translationType: $translationType, countryOrigin: $countryOrigin) {
@@ -198,15 +198,14 @@ export class AllAnimeProvider implements Provider {
       }`
 
     if (extensions) {
-      params.extensions = JSON.stringify(extensions)
+      body.extensions = extensions
     } else {
-      params.query = fullQuery
+      body.query = fullQuery
     }
 
     try {
-      const response = await axios.get(API_ENDPOINT, {
+      const response = await axios.post(API_ENDPOINT, body, {
         headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-        params,
         timeout: 15000,
       })
 
@@ -223,13 +222,11 @@ export class AllAnimeProvider implements Provider {
       const err = error as { message?: string }
       if (err.message === 'PersistedQueryNotFound' && extensions) {
         logger.info('Search hash expired, falling back to full query')
-        const fallbackParams = {
-          variables: JSON.stringify(variables),
+        const response = await axios.post(API_ENDPOINT, {
+          variables,
           query: fullQuery,
-        }
-        const response = await axios.get(API_ENDPOINT, {
+        }, {
           headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-          params: fallbackParams,
           timeout: 15000,
         })
         const shows = response.data?.data?.shows?.edges || []
@@ -318,9 +315,8 @@ export class AllAnimeProvider implements Provider {
     }
 
     try {
-      const response = await axios.get(API_ENDPOINT, {
+      const response = await axios.post(API_ENDPOINT, { variables, extensions }, {
         headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-        params: { variables: JSON.stringify(variables), extensions: JSON.stringify(extensions) },
         timeout: 15000,
       })
 
@@ -354,9 +350,8 @@ export class AllAnimeProvider implements Provider {
             }
           }
           `
-        const response = await axios.get(API_ENDPOINT, {
+        const response = await axios.post(API_ENDPOINT, { query: fullQuery, variables }, {
           headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-          params: { query: fullQuery, variables: JSON.stringify(variables) },
           timeout: 15000,
         })
         const recommendations = response.data?.data?.queryPopular?.recommendations || []
@@ -419,12 +414,11 @@ export class AllAnimeProvider implements Provider {
   }
 
   async getShowMeta(showId: string): Promise<Partial<Show> | null> {
-    const response = await axios.get(API_ENDPOINT, {
+    const response = await axios.post(API_ENDPOINT, {
+      query: `query($showId: String!) { show(_id: $showId) { name, thumbnail, nativeName, englishName, availableEpisodesDetail, score } }`,
+      variables: { showId },
+    }, {
       headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-      params: {
-        query: `query($showId: String!) { show(_id: $showId) { name, thumbnail, nativeName, englishName, availableEpisodesDetail, score } }`,
-        variables: JSON.stringify({ showId }),
-      },
       timeout: 15000,
     })
     const show = response.data.data.show
@@ -448,12 +442,11 @@ export class AllAnimeProvider implements Provider {
       return cachedData
     }
 
-    const response = await axios.get(API_ENDPOINT, {
+    const response = await axios.post(API_ENDPOINT, {
+      query: `query($showId: String!) { show(_id: $showId) { availableEpisodesDetail, description } }`,
+      variables: { showId },
+    }, {
       headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-      params: {
-        query: `query($showId: String!) { show(_id: $showId) { availableEpisodesDetail, description } }`,
-        variables: JSON.stringify({ showId }),
-      },
       timeout: 15000,
     })
     const showData = response.data.data.show
@@ -470,12 +463,11 @@ export class AllAnimeProvider implements Provider {
 
   async getSkipTimes(showId: string, episodeNumber: string): Promise<SkipIntervals> {
     try {
-      const malIdResponse = await axios.get(API_ENDPOINT, {
+      const malIdResponse = await axios.post(API_ENDPOINT, {
+        query: `query($showId: String!) { show(_id: $showId) { malId } }`,
+        variables: { showId },
+      }, {
         headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-        params: {
-          query: `query($showId: String!) { show(_id: $showId) { malId } }`,
-          variables: JSON.stringify({ showId }),
-        },
         timeout: 10000,
       })
       const malId = malIdResponse.data?.data?.show?.malId
@@ -498,12 +490,11 @@ export class AllAnimeProvider implements Provider {
     episodeNumber: string,
     mode: 'sub' | 'dub'
   ): Promise<VideoSource[] | null> {
-    const { data } = await axios.get(API_ENDPOINT, {
+    const { data } = await axios.post(API_ENDPOINT, {
+      query: `query($showId: String!, $translationType: VaildTranslationTypeEnumType!, $episodeString: String!) { episode(showId: $showId, translationType: $translationType, episodeString: $episodeString) { sourceUrls } }`,
+      variables: { showId, translationType: mode, episodeString: episodeNumber },
+    }, {
       headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-      params: {
-        query: `query($showId: String!, $translationType: VaildTranslationTypeEnumType!, $episodeString: String!) { episode(showId: $showId, translationType: $translationType, episodeString: $episodeString) { sourceUrls } }`,
-        variables: JSON.stringify({ showId, translationType: mode, episodeString: episodeNumber }),
-      },
       timeout: 15000,
     })
 
@@ -678,9 +669,8 @@ export class AllAnimeProvider implements Provider {
 
   async getShowDetails(showId: string): Promise<ShowDetails> {
     const metaQuery = `query($showId: String!) { show(_id: $showId) { name } }`
-    const metaResponse = await axios.get(API_ENDPOINT, {
+    const metaResponse = await axios.post(API_ENDPOINT, { query: metaQuery, variables: { showId } }, {
       headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-      params: { query: metaQuery, variables: JSON.stringify({ showId }) },
       timeout: 10000,
     })
     const showName = metaResponse.data?.data?.show?.name
