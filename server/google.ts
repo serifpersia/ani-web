@@ -19,6 +19,20 @@ export class GoogleDriveService {
       CONFIG.GOOGLE_REDIRECT_URI
     )
 
+    this.client.on('tokens', (tokens) => {
+      try {
+        let existing = {}
+        if (fs.existsSync(CONFIG.TOKEN_PATH)) {
+          existing = JSON.parse(fs.readFileSync(CONFIG.TOKEN_PATH, 'utf-8'))
+        }
+        const merged = { ...existing, ...tokens }
+        fs.writeFileSync(CONFIG.TOKEN_PATH, JSON.stringify(merged))
+        this.client.setCredentials(merged)
+      } catch (err) {
+        logger.error({ err }, 'Failed to save refreshed tokens')
+      }
+    })
+
     this.drive = google.drive({ version: 'v3', auth: this.client })
     this.loadTokens()
   }
