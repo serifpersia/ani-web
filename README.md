@@ -13,7 +13,7 @@
 
 ## Prerequisites
 
-- **Node.js**: Version 16 or higher ([Download](https://nodejs.org/)).
+- **Node.js**: Version 20 or higher ([Download](https://nodejs.org/)).
 
 ## Quick Start
 
