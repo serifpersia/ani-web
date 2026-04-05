@@ -1,15 +1,15 @@
 import { Request, Response } from 'express'
 import logger from '../logger'
 import { googleDriveService } from '../google'
-import sqlite3 from 'sqlite3'
+import { DatabaseWrapper } from '../db'
 import { initializeDatabase, syncDownOnBoot, initSyncProvider } from '../sync'
 import { CONFIG } from '../config'
 import path from 'path'
 
 export class AuthController {
-  private runSyncSequence: (db: sqlite3.Database) => Promise<void>
+  private runSyncSequence: (db: DatabaseWrapper) => Promise<void>
 
-  constructor(runSyncSequence: (db: sqlite3.Database) => Promise<void>) {
+  constructor(runSyncSequence: (db: DatabaseWrapper) => Promise<void>) {
     this.runSyncSequence = runSyncSequence
   }
 

@@ -3,12 +3,12 @@ import { SettingsController } from '../controllers/settings.controller'
 import { AllAnimeProvider } from '../providers/allanime.provider'
 import multer from 'multer'
 import { CONFIG } from '../config'
-import type { Database } from 'sqlite3'
+import { DatabaseWrapper } from '../db'
 
 export function createSettingsRouter(
   provider: AllAnimeProvider,
-  db: Database,
-  initializeDatabase: (path: string) => Promise<Database>
+  db: DatabaseWrapper,
+  initializeDatabase: (path: string) => Promise<DatabaseWrapper>
 ): Router {
   const router = Router()
   const controller = new SettingsController(provider)

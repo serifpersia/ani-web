@@ -6,7 +6,7 @@ import logger from '../logger'
 import path from 'path'
 import fs from 'fs'
 import { CONFIG } from '../config'
-import type { Database } from 'sqlite3'
+import { DatabaseWrapper } from '../db'
 
 interface MalAnimeItem {
   series_title: string[]
@@ -63,8 +63,8 @@ export class SettingsController {
   restoreDatabase = (
     req: Request,
     res: Response,
-    db: Database,
-    initializeDatabase: (path: string) => Promise<Database>
+    db: DatabaseWrapper,
+    initializeDatabase: (path: string) => Promise<DatabaseWrapper>
   ) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
 

@@ -2,7 +2,7 @@ import { Request, Response } from 'express'
 import logger from '../logger'
 import { AllAnimeProvider } from '../providers/allanime.provider'
 import { performWriteTransaction } from '../sync'
-import type { Database } from 'sqlite3'
+import { DatabaseWrapper } from '../db'
 
 interface WatchedEpisode {
   episodeNumber: string
@@ -58,7 +58,7 @@ interface WatchlistRow {
 export class WatchlistController {
   constructor(private provider: AllAnimeProvider) {}
 
-  private async getInProgressShowsData(db: Database): Promise<CombinedContinueWatchingShow[]> {
+  private async getInProgressShowsData(db: DatabaseWrapper): Promise<CombinedContinueWatchingShow[]> {
     const inProgressQuery = `
     SELECT
     sm.id as _id, sm.id, sm.name, sm.thumbnail, sm.nativeName, sm.englishName,
@@ -85,7 +85,7 @@ export class WatchlistController {
     }))
   }
 
-  private async getUpNextShowsData(db: Database): Promise<CombinedContinueWatchingShow[]> {
+  private async getUpNextShowsData(db: DatabaseWrapper): Promise<CombinedContinueWatchingShow[]> {
     const watchingShowsQuery = `
     SELECT
     w.id, w.name, w.thumbnail, w.nativeName, w.englishName,

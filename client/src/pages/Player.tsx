@@ -164,17 +164,25 @@ const Player: React.FC = () => {
     videoElement.addEventListener('loadedmetadata', handleLoaded, { once: true })
 
     if (state.selectedLink.hls) {
-      import('hls.js/dist/hls.light.mjs').then((module) => {
-        const Hls = module.default
-        if (Hls.isSupported()) {
-          const hls = new Hls()
-          hlsInstance.current = hls
-          hls.loadSource(proxiedUrl)
-          hls.attachMedia(videoElement)
-        } else {
-          videoElement.src = proxiedUrl
-        }
-      })
+      const canPlayNativeHls =
+        videoElement.canPlayType('application/vnd.apple.mpegurl') ||
+        videoElement.canPlayType('application/x-mpegURL')
+
+      if (canPlayNativeHls) {
+        videoElement.src = proxiedUrl
+      } else {
+        import('hls.js/dist/hls.light.mjs').then((module) => {
+          const Hls = module.default
+          if (Hls.isSupported()) {
+            const hls = new Hls()
+            hlsInstance.current = hls
+            hls.loadSource(proxiedUrl)
+            hls.attachMedia(videoElement)
+          } else {
+            videoElement.src = proxiedUrl
+          }
+        })
+      }
     } else {
       videoElement.src = proxiedUrl
     }

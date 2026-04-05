@@ -1,8 +1,8 @@
 import { Router } from 'express'
 import { AuthController } from '../controllers/auth.controller'
-import sqlite3 from 'sqlite3'
+import { DatabaseWrapper } from '../db'
 
-export function createAuthRouter(runSyncSequence: (db: sqlite3.Database) => Promise<void>): Router {
+export function createAuthRouter(runSyncSequence: (db: DatabaseWrapper) => Promise<void>): Router {
   const router = Router()
   const controller = new AuthController(runSyncSequence)
 

@@ -1,11 +1,10 @@
 import * as fs from 'fs/promises'
 import path from 'path'
-import type { Database } from 'sqlite3'
-import sqlite3 from 'sqlite3'
 import logger from './logger'
 import { googleDriveService } from './google'
 import { rcloneService } from './rclone'
 import { CONFIG } from './config'
+import { DatabaseWrapper } from './db'
 
 const log = logger.child({ module: 'Sync' })
 
@@ -64,28 +63,28 @@ async function getRemoteVersion(
   return { version: 0 }
 }
 
-async function getLocalVersion(db: Database): Promise<number> {
+async function getLocalVersion(db: DatabaseWrapper): Promise<number> {
   return new Promise((resolve) => {
     db.get(
       'SELECT value FROM sync_metadata WHERE key = ?',
       ['db_version'],
-      (err, row: { value: number }) => {
+      (err: Error | null, row: { value: number }) => {
         resolve(row ? row.value : 0)
       }
     )
   })
 }
 
-async function isLocalDbEmpty(db: Database): Promise<boolean> {
+async function isLocalDbEmpty(db: DatabaseWrapper): Promise<boolean> {
   return new Promise((resolve) => {
-    db.get('SELECT COUNT(*) as count FROM watchlist', (err, row: { count: number }) => {
+    db.get('SELECT COUNT(*) as count FROM watchlist', (err: Error | null, row: { count: number }) => {
       if (err) resolve(true)
       else resolve(row.count === 0)
     })
   })
 }
 
-async function getSyncMetadata(db: Database): Promise<{ localVersion: number; isDirty: boolean }> {
+async function getSyncMetadata(db: DatabaseWrapper): Promise<{ localVersion: number; isDirty: boolean }> {
   return new Promise((resolve, reject) => {
     db.all(
       'SELECT key, value FROM sync_metadata',
@@ -108,7 +107,7 @@ async function getSyncMetadata(db: Database): Promise<{ localVersion: number; is
 }
 
 export async function syncDownOnBoot(
-  db: Database,
+  db: DatabaseWrapper,
   dbPath: string,
   remoteFolderName: string,
   closeMainDb: () => Promise<void>
@@ -170,7 +169,7 @@ export async function syncDownOnBoot(
 }
 
 export async function syncUp(
-  db: Database,
+  db: DatabaseWrapper,
   dbPath: string,
   remoteFolderName: string
 ): Promise<void> {
@@ -246,8 +245,8 @@ export async function syncUp(
 }
 
 export async function performWriteTransaction(
-  db: Database,
-  runnable: (tx: Database) => void
+  db: DatabaseWrapper,
+  runnable: (tx: DatabaseWrapper) => void
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     db.serialize(() => {
@@ -272,54 +271,51 @@ export async function performWriteTransaction(
   })
 }
 
-export function initializeDatabase(dbPath: string): Promise<Database> {
-  return new Promise((resolve, reject) => {
-    const db = new sqlite3.Database(dbPath, (err: Error | null) => {
-      if (err) {
-        log.error({ err }, 'Database opening error')
-        return reject(err)
-      }
-    })
+export async function initializeDatabase(dbPath: string): Promise<DatabaseWrapper> {
+  try {
+    const db = await DatabaseWrapper.create(dbPath)
     db.configure('busyTimeout', 5000)
-    db.serialize(() => {
-      db.run(
-        `CREATE TABLE IF NOT EXISTS watchlist (id TEXT NOT NULL, name TEXT, thumbnail TEXT, status TEXT, nativeName TEXT, englishName TEXT, PRIMARY KEY (id))`
-      )
-      db.run(
-        `CREATE TABLE IF NOT EXISTS watched_episodes (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, watchedAt DATETIME DEFAULT CURRENT_TIMESTAMP, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, PRIMARY KEY (showId, episodeNumber))`
-      )
-      db.run(
-        `CREATE TABLE IF NOT EXISTS settings (key TEXT NOT NULL, value TEXT, PRIMARY KEY (key))`
-      )
-      db.run(
-        `CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT, nativeName TEXT, englishName TEXT, episodeCount INTEGER, genres TEXT, popularityScore INTEGER)`
-      )
-      db.run(`CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`)
-      db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`)
-      db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('last_synced_version', 0)`)
-      db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('is_dirty', 0)`)
-      db.run(`CREATE INDEX IF NOT EXISTS idx_watched_episodes_showId ON watched_episodes(showId)`)
-      db.run(
-        `CREATE INDEX IF NOT EXISTS idx_watched_episodes_watchedAt ON watched_episodes(watchedAt)`
-      )
-      db.run(`CREATE INDEX IF NOT EXISTS idx_watchlist_status ON watchlist(status)`)
 
-      const addCol = (tbl: string, col: string, type: string) => {
-        db.all(`PRAGMA table_info(${tbl})`, (e: Error | null, r: unknown) => {
-          const columns = r as { name: string }[]
-          if (!columns.some((c) => c.name === col))
-            db.run(`ALTER TABLE ${tbl} ADD COLUMN ${col} ${type}`)
-        })
-      }
-      addCol('watchlist', 'nativeName', 'TEXT')
-      addCol('watchlist', 'englishName', 'TEXT')
-      addCol('shows_meta', 'nativeName', 'TEXT')
-      addCol('shows_meta', 'englishName', 'TEXT')
-      addCol('shows_meta', 'episodeCount', 'INTEGER')
-      addCol('shows_meta', 'genres', 'TEXT')
-      addCol('shows_meta', 'popularityScore', 'INTEGER')
+    db.run(
+      `CREATE TABLE IF NOT EXISTS watchlist (id TEXT NOT NULL, name TEXT, thumbnail TEXT, status TEXT, nativeName TEXT, englishName TEXT, PRIMARY KEY (id))`
+    )
+    db.run(
+      `CREATE TABLE IF NOT EXISTS watched_episodes (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, watchedAt DATETIME DEFAULT CURRENT_TIMESTAMP, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, PRIMARY KEY (showId, episodeNumber))`
+    )
+    db.run(
+      `CREATE TABLE IF NOT EXISTS settings (key TEXT NOT NULL, value TEXT, PRIMARY KEY (key))`
+    )
+    db.run(
+      `CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT, nativeName TEXT, englishName TEXT, episodeCount INTEGER, genres TEXT, popularityScore INTEGER)`
+    )
+    db.run(`CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`)
+    db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`)
+    db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('last_synced_version', 0)`)
+    db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('is_dirty', 0)`)
+    db.run(`CREATE INDEX IF NOT EXISTS idx_watched_episodes_showId ON watched_episodes(showId)`)
+    db.run(
+      `CREATE INDEX IF NOT EXISTS idx_watched_episodes_watchedAt ON watched_episodes(watchedAt)`
+    )
+    db.run(`CREATE INDEX IF NOT EXISTS idx_watchlist_status ON watchlist(status)`)
 
-      resolve(db)
-    })
-  })
+    const addCol = (tbl: string, col: string, type: string) => {
+      db.all(`PRAGMA table_info(${tbl})`, (e: Error | null, r: unknown) => {
+        const columns = r as { name: string }[]
+        if (!columns.some((c) => c.name === col))
+          db.run(`ALTER TABLE ${tbl} ADD COLUMN ${col} ${type}`)
+      })
+    }
+    addCol('watchlist', 'nativeName', 'TEXT')
+    addCol('watchlist', 'englishName', 'TEXT')
+    addCol('shows_meta', 'nativeName', 'TEXT')
+    addCol('shows_meta', 'englishName', 'TEXT')
+    addCol('shows_meta', 'episodeCount', 'INTEGER')
+    addCol('shows_meta', 'genres', 'TEXT')
+    addCol('shows_meta', 'popularityScore', 'INTEGER')
+
+    return db
+  } catch (err) {
+    log.error({ err }, 'Database opening error')
+    throw err
+  }
 }

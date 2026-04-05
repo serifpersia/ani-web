@@ -6,7 +6,7 @@ import axios from 'axios'
 import axiosRetry from 'axios-retry'
 import NodeCache from 'node-cache'
 import fs from 'fs'
-import sqlite3 from 'sqlite3'
+import { DatabaseWrapper } from './db'
 import chokidar from 'chokidar'
 import logger from './logger'
 import { AllAnimeProvider } from './providers/allanime.provider'
@@ -23,7 +23,7 @@ import { createInsightsRouter } from './routes/insights.routes'
 
 declare module 'express-serve-static-core' {
   interface Request {
-    db: sqlite3.Database
+    db: DatabaseWrapper
   }
 }
 
@@ -31,10 +31,10 @@ const app = express()
 const apiCache = new NodeCache({ stdTTL: 3600 })
 const provider = new AllAnimeProvider(apiCache)
 
-let db: sqlite3.Database
+let db: DatabaseWrapper
 let isShuttingDown = false
 
-async function runSyncSequence(database: sqlite3.Database) {
+async function runSyncSequence(database: DatabaseWrapper) {
   const dbName = CONFIG.IS_DEV ? CONFIG.DB_NAME_DEV : CONFIG.DB_NAME_PROD
   const dbPath = path.join(CONFIG.ROOT, dbName)
   const remoteFolder = CONFIG.IS_DEV ? CONFIG.REMOTE_FOLDER_DEV : CONFIG.REMOTE_FOLDER_PROD
