@@ -532,7 +532,6 @@ export class AllAnimeProvider implements Provider {
     const supportedSources = [
       'Yt-mp4',
       'S-mp4',
-      'Luf-Mp4',
       'wixmp',
       'Default',
       'Fm-Hls',
@@ -558,7 +557,7 @@ export class AllAnimeProvider implements Provider {
       priority?: number
     }[]) {
       try {
-        if (['Yt-mp4', 'S-mp4', 'Luf-Mp4', 'wixmp', 'Default'].includes(source.sourceName)) {
+        if (['Yt-mp4', 'S-mp4', 'wixmp', 'Default'].includes(source.sourceName)) {
           if (!source.sourceUrl.startsWith('--')) continue
 
           let videoLinks: VideoLink[] = []
