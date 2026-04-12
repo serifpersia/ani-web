@@ -77,14 +77,19 @@ async function getLocalVersion(db: DatabaseWrapper): Promise<number> {
 
 async function isLocalDbEmpty(db: DatabaseWrapper): Promise<boolean> {
   return new Promise((resolve) => {
-    db.get('SELECT COUNT(*) as count FROM watchlist', (err: Error | null, row: { count: number }) => {
-      if (err) resolve(true)
-      else resolve(row.count === 0)
-    })
+    db.get(
+      'SELECT COUNT(*) as count FROM watchlist',
+      (err: Error | null, row: { count: number }) => {
+        if (err) resolve(true)
+        else resolve(row.count === 0)
+      }
+    )
   })
 }
 
-async function getSyncMetadata(db: DatabaseWrapper): Promise<{ localVersion: number; isDirty: boolean }> {
+async function getSyncMetadata(
+  db: DatabaseWrapper
+): Promise<{ localVersion: number; isDirty: boolean }> {
   return new Promise((resolve, reject) => {
     db.all(
       'SELECT key, value FROM sync_metadata',
@@ -282,11 +287,15 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     db.run(
       `CREATE TABLE IF NOT EXISTS watched_episodes (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, watchedAt DATETIME DEFAULT CURRENT_TIMESTAMP, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, PRIMARY KEY (showId, episodeNumber))`
     )
+    db.run(`CREATE TABLE IF NOT EXISTS settings (key TEXT NOT NULL, value TEXT, PRIMARY KEY (key))`)
     db.run(
-      `CREATE TABLE IF NOT EXISTS settings (key TEXT NOT NULL, value TEXT, PRIMARY KEY (key))`
+      `CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT, nativeName TEXT, englishName TEXT, episodeCount INTEGER, status TEXT, genres TEXT, popularityScore INTEGER)`
     )
     db.run(
-      `CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT, nativeName TEXT, englishName TEXT, episodeCount INTEGER, genres TEXT, popularityScore INTEGER)`
+      `CREATE TABLE IF NOT EXISTS dismissed_notifications (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, dismissedAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (showId, episodeNumber))`
+    )
+    db.run(
+      `CREATE TABLE IF NOT EXISTS discovered_notifications (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, discoveredAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (showId, episodeNumber))`
     )
     db.run(`CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`)
     db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`)
@@ -310,6 +319,7 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     addCol('shows_meta', 'nativeName', 'TEXT')
     addCol('shows_meta', 'englishName', 'TEXT')
     addCol('shows_meta', 'episodeCount', 'INTEGER')
+    addCol('shows_meta', 'status', 'TEXT')
     addCol('shows_meta', 'genres', 'TEXT')
     addCol('shows_meta', 'popularityScore', 'INTEGER')
 

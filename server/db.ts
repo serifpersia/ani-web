@@ -1,4 +1,4 @@
-import initSqlJs, { Database as SqlJsDatabase } from 'sql.js'
+import initSqlJs, { Database as SqlJsDatabase, BindParams } from 'sql.js'
 import fs from 'fs'
 import path from 'path'
 import logger from './logger'
@@ -49,7 +49,7 @@ export class DatabaseWrapper {
     }
   }
 
-  public configure(option: string, value: any) {
+  public configure(option: string, value: unknown) {
     // No-op for sql.js compatibility layer
   }
 
@@ -73,17 +73,17 @@ export class DatabaseWrapper {
 
   public run(
     query: string,
-    params?: any[] | ((err: Error | null) => void),
+    params?: unknown[] | ((err: Error | null) => void),
     cb?: (err: Error | null) => void
   ) {
     if (typeof params === 'function') {
-      cb = params as any
+      cb = params as (err: Error | null) => void
       params = []
     }
     try {
       if (params && Array.isArray(params) && params.length > 0) {
         const stmt = this.db.prepare(query)
-        stmt.run(params)
+        stmt.run(params as unknown as BindParams)
         stmt.free()
       } else {
         this.db.run(query)
@@ -95,48 +95,48 @@ export class DatabaseWrapper {
     }
   }
 
-  public get(
+  public get<T = unknown>(
     query: string,
-    params?: any[] | ((err: Error | null, row: any) => void),
-    cb?: (err: Error | null, row: any) => void
+    params?: unknown[] | ((err: Error | null, row: T) => void),
+    cb?: (err: Error | null, row: T) => void
   ) {
     if (typeof params === 'function') {
-      cb = params as any
+      cb = params as (err: Error | null, row: T) => void
       params = []
     }
     try {
       const stmt = this.db.prepare(query)
       if (params && Array.isArray(params) && params.length > 0) {
-        stmt.bind(params)
+        stmt.bind(params as unknown as BindParams)
       }
-      let res: any = null
+      let res: T | null = null
       if (stmt.step()) {
-        res = stmt.getAsObject()
+        res = stmt.getAsObject() as T
       }
       stmt.free()
-      if (cb) cb(null, res)
+      if (cb) cb(null, res as T)
     } catch (e) {
-      if (cb) cb(e as Error, null)
+      if (cb) cb(e as Error, null as unknown as T)
     }
   }
 
-  public all(
+  public all<T = unknown>(
     query: string,
-    params?: any[] | ((err: Error | null, rows: any[]) => void),
-    cb?: (err: Error | null, rows: any[]) => void
+    params?: unknown[] | ((err: Error | null, rows: T[]) => void),
+    cb?: (err: Error | null, rows: T[]) => void
   ) {
     if (typeof params === 'function') {
-      cb = params as any
+      cb = params as (err: Error | null, rows: T[]) => void
       params = []
     }
     try {
       const stmt = this.db.prepare(query)
       if (params && Array.isArray(params) && params.length > 0) {
-        stmt.bind(params)
+        stmt.bind(params as unknown as BindParams) // will see if this complains
       }
-      const res: any[] = []
+      const res: T[] = []
       while (stmt.step()) {
-        res.push(stmt.getAsObject())
+        res.push(stmt.getAsObject() as T)
       }
       stmt.free()
       if (cb) cb(null, res)
@@ -147,14 +147,13 @@ export class DatabaseWrapper {
 
   public prepare(query: string) {
     const stmt = this.db.prepare(query)
-    const self = this
 
     return {
-      run: function (...args: any[]) {
-        stmt.run(args)
-        self.scheduleSave()
+      run: (...args: unknown[]) => {
+        stmt.run(args as unknown as BindParams)
+        this.scheduleSave()
       },
-      finalize: function () {
+      finalize: () => {
         stmt.free()
       },
     }

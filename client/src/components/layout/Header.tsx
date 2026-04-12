@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FaBars, FaSearch, FaGoogle } from 'react-icons/fa'
+import NotificationBell from './NotificationBell'
 import Logo from '../common/Logo'
 import { useSidebar } from '../../hooks/useSidebar'
 import styles from './Header.module.css'
@@ -122,6 +123,8 @@ const Header: React.FC = () => {
           />
           <FaSearch className={styles.searchIcon} />
         </form>
+
+        <NotificationBell />
 
         {user ? (
           <Link to="/settings" className={styles.profileBtn} aria-label="View Profile">

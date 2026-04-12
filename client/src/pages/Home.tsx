@@ -5,19 +5,28 @@ import Top10List from '../components/anime/Top10List'
 import Schedule from '../components/anime/Schedule'
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
+import RemoveConfirmationModal from '../components/common/RemoveConfirmationModal'
 import {
   useLatestReleases,
   useCurrentSeason,
   useContinueWatchingFast,
   useContinueWatchingUpNext,
+  useRemoveFromWatchlist,
 } from '../hooks/useAnimeData'
+import { useSetting } from '../hooks/useSettings'
 import useIsMobile from '../hooks/useIsMobile'
+import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 
 const Home: React.FC = () => {
   const queryClient = useQueryClient()
   const isMobile = useIsMobile()
   const isTablet = useIsMobile(1024)
   const observerRef = useRef<HTMLDivElement>(null)
+
+  const { titlePreference } = useTitlePreference()
+  const [itemToRemove, setItemToRemove] = React.useState<{ id: string; name: string } | null>(null)
+  const { data: skipConfirm } = useSetting('skipRemoveConfirmation')
+  const removeWatchlistMutation = useRemoveFromWatchlist()
 
   useEffect(() => {
     document.title = 'Home - ani-web'
@@ -86,9 +95,27 @@ const Home: React.FC = () => {
 
   const handleRemove = useCallback(
     (id: string) => {
-      removeCw.mutate(id)
+      if (skipConfirm === 'true' || skipConfirm === true) {
+        removeCw.mutate(id)
+      } else {
+        const show = cwList?.find((s) => String(s.id) === String(id))
+        if (show) {
+          const displayTitle = (show[titlePreference as keyof typeof show] as string) || show.name
+          setItemToRemove({ id, name: displayTitle })
+        }
+      }
     },
-    [removeCw]
+    [removeCw, cwList, titlePreference, skipConfirm]
+  )
+
+  const handleConfirmRemove = useCallback(
+    (options: { removeFromWatchlist?: boolean }) => {
+      if (!itemToRemove) return
+      removeCw.mutate(itemToRemove.id)
+      if (options.removeFromWatchlist) removeWatchlistMutation.mutate(itemToRemove.id)
+      setItemToRemove(null)
+    },
+    [itemToRemove, removeCw, removeWatchlistMutation]
   )
 
   useEffect(() => {
@@ -172,6 +199,14 @@ const Home: React.FC = () => {
       </div>
 
       <Schedule />
+
+      <RemoveConfirmationModal
+        isOpen={!!itemToRemove}
+        onClose={() => setItemToRemove(null)}
+        onConfirm={handleConfirmRemove}
+        animeName={itemToRemove?.name || ''}
+        scenario="continueWatching"
+      />
     </div>
   )
 }

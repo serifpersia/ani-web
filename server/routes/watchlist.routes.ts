@@ -8,7 +8,6 @@ export function createWatchlistRouter(provider: AllAnimeProvider): Router {
 
   router.get('/continue-watching', controller.getContinueWatching)
   router.get('/continue-watching/fast', controller.getContinueWatchingFast)
-  router.get('/continue-watching/up-next', controller.getContinueWatchingUpNext)
   router.get('/continue-watching/all', controller.getAllContinueWatching)
   router.post('/continue-watching/remove', controller.removeContinueWatching)
   router.post('/update-progress', controller.updateProgress)
@@ -19,6 +18,9 @@ export function createWatchlistRouter(provider: AllAnimeProvider): Router {
   router.post('/watchlist/status', controller.updateWatchlistStatus)
   router.get('/episode-progress/:showId/:episodeNumber', controller.getEpisodeProgress)
   router.get('/watched-episodes/:showId', controller.getWatchedEpisodes)
+  router.get('/notifications', controller.getNotifications)
+  router.post('/notifications/dismiss', controller.dismissNotification)
+  router.post('/notifications/clear-all', controller.clearAllNotifications)
 
   return router
 }

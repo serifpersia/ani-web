@@ -84,7 +84,11 @@ const Search: React.FC = () => {
     return () => window.removeEventListener('scroll', onScroll)
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
-  const years = ['ALL', ...Array.from({ length: 2025 - 1980 }, (_, i) => (2025 - i).toString())]
+  const currentYear = new Date().getFullYear()
+  const years = [
+    'ALL',
+    ...Array.from({ length: currentYear - 1980 + 1 }, (_, i) => (currentYear - i).toString()),
+  ]
 
   return (
     <div className="page-container">

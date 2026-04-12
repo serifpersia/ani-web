@@ -8,6 +8,7 @@ interface WatchedEpisode {
   episodeNumber: string
   currentTime: number
   duration: number
+  watchedAt: string
 }
 
 interface ContinueWatchingShow {
@@ -41,6 +42,7 @@ interface CombinedContinueWatchingShow {
   episodeNumber?: string | number
   currentTime?: number
   duration?: number
+  episodeCount?: number
   nextEpisodeToWatch?: string
   newEpisodesCount?: number
 }
@@ -58,171 +60,71 @@ interface WatchlistRow {
 export class WatchlistController {
   constructor(private provider: AllAnimeProvider) {}
 
-  private async getInProgressShowsData(db: DatabaseWrapper): Promise<CombinedContinueWatchingShow[]> {
-    const inProgressQuery = `
-    SELECT
-    sm.id as _id, sm.id, sm.name, sm.thumbnail, sm.nativeName, sm.englishName,
-    we.episodeNumber, we.currentTime, we.duration
-    FROM shows_meta sm
-    JOIN (
+  private async getContinueWatchingData(
+    db: DatabaseWrapper
+  ): Promise<CombinedContinueWatchingShow[]> {
+    const query = `
+    SELECT 
+    w.id as _id, 
+    w.id as id, 
+    w.name as name, 
+    w.thumbnail as thumbnail, 
+    w.nativeName as nativeName, 
+    w.englishName as englishName,
+    sm.episodeCount,
+    (SELECT COUNT(DISTINCT episodeNumber) FROM watched_episodes WHERE showId = w.id) as watchedCount,
+    we.episodeNumber, we.currentTime, we.duration, we.watchedAt
+    FROM (
       SELECT *, ROW_NUMBER() OVER(PARTITION BY showId ORDER BY watchedAt DESC) as rn
       FROM watched_episodes
-      WHERE (currentTime / duration) BETWEEN 0.05 AND 0.95
-    ) we ON sm.id = we.showId
-    WHERE we.rn = 1
+    ) we
+    JOIN watchlist w ON we.showId = w.id
+    LEFT JOIN shows_meta sm ON we.showId = sm.id
+    WHERE we.rn = 1 AND w.status = 'Watching'
     ORDER BY we.watchedAt DESC;
     `
-    const inProgressShows: ContinueWatchingShow[] = await new Promise((resolve, reject) => {
-      db.all(inProgressQuery, [], (err: Error | null, rows: unknown) => {
+    const rows: CombinedContinueWatchingShow[] = await new Promise((resolve, reject) => {
+      db.all(query, [], (err: Error | null, rows: unknown) => {
         if (err) reject(err)
-        else resolve(rows as ContinueWatchingShow[])
+        else resolve(rows as CombinedContinueWatchingShow[])
       })
     })
 
-    return inProgressShows.map((show) => ({
-      ...show,
-      thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
-    }))
-  }
+    const enrichedRows = await Promise.all(
+      rows.map(async (show) => {
+        let epCount = show.episodeCount
 
-  private async getUpNextShowsData(db: DatabaseWrapper): Promise<CombinedContinueWatchingShow[]> {
-    const watchingShowsQuery = `
-    SELECT
-    w.id, w.name, w.thumbnail, w.nativeName, w.englishName,
-    (SELECT MAX(we.watchedAt) FROM watched_episodes we WHERE we.showId = w.id) as lastWatchedAt
-    FROM watchlist w
-    WHERE w.status = 'Watching'
-    ORDER BY lastWatchedAt DESC;
-    `
-    const watchingShows: WatchingShow[] = await new Promise((resolve, reject) => {
-      db.all(watchingShowsQuery, [], (err: Error | null, rows: unknown) => {
-        if (err) reject(err)
-        else resolve(rows as WatchingShow[])
-      })
-    })
+        // If we don't have the total episode count cached, try to fetch it
+        if (!epCount) {
+          try {
+            const epDetails = await this.provider.getEpisodes(show.id, 'sub')
+            if (epDetails && epDetails.episodes) {
+              epCount = epDetails.episodes.length
 
-    const results = await Promise.allSettled(
-      watchingShows.map(async (show) => {
-        try {
-          const [epDetails, watchedEpisodesResult] = await Promise.all([
-            this.provider.getEpisodes(show.id, 'sub'),
-            new Promise<WatchedEpisode[]>((resolve, reject) => {
-              db.all(
-                'SELECT * FROM watched_episodes WHERE showId = ?',
-                [show.id],
-                (err: Error | null, rows: unknown) => {
-                  if (err) reject(err)
-                  else resolve(rows as WatchedEpisode[])
-                }
-              )
-            }),
-          ])
-
-          const allEps = epDetails?.episodes?.sort((a, b) => parseFloat(a) - parseFloat(b)) || []
-          const watchedEpsMap = new Map(
-            watchedEpisodesResult.map((r) => [r.episodeNumber.toString(), r])
-          )
-
-          const unwatchedEps = allEps.filter((ep) => !watchedEpsMap.has(ep))
-
-          if (unwatchedEps.length > 0) {
-            return {
-              type: 'upNext',
-              show: {
-                _id: show.id,
-                id: show.id,
-                name: show.name,
-                thumbnail: show.thumbnail,
-                nativeName: show.nativeName,
-                englishName: show.englishName,
-                nextEpisodeToWatch: unwatchedEps[0],
-                newEpisodesCount: unwatchedEps.length,
-              },
+              // Asynchronously cache it back to the database for future speed
+              db.run('UPDATE shows_meta SET episodeCount = ? WHERE id = ?', [epCount, show.id])
             }
-          } else if (watchedEpsMap.size > 0) {
-            const lastWatchedEpisodeNumber = Math.max(
-              ...Array.from(watchedEpsMap.keys()).map((e) => parseFloat(e as string))
-            )
-            const lastWatchedEpisodeDetails = watchedEpsMap.get(lastWatchedEpisodeNumber.toString())
-
-            if (lastWatchedEpisodeDetails) {
-              return {
-                type: 'fullyWatched',
-                show: {
-                  _id: show.id,
-                  id: show.id,
-                  name: show.name,
-                  thumbnail: show.thumbnail,
-                  nativeName: show.nativeName,
-                  englishName: show.englishName,
-                  episodeNumber: lastWatchedEpisodeNumber,
-                  currentTime: lastWatchedEpisodeDetails.currentTime,
-                  duration: lastWatchedEpisodeDetails.duration,
-                },
-              }
-            }
+          } catch (e) {
+            logger.error({ err: e, showId: show.id }, 'Failed to fetch episode count')
           }
-          return null
-        } catch (e) {
-          logger.error({ err: e, showId: show.id }, 'Error processing show for Up Next list')
-          return null
+        }
+
+        return {
+          ...show,
+          episodeCount: epCount,
+          thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
         }
       })
     )
 
-    const upNextShows: CombinedContinueWatchingShow[] = []
-    const fullyWatchedShows: CombinedContinueWatchingShow[] = []
-
-    results.forEach((result) => {
-      if (result.status === 'fulfilled' && result.value) {
-        if (result.value.type === 'upNext') {
-          upNextShows.push(result.value.show as CombinedContinueWatchingShow)
-        } else if (result.value.type === 'fullyWatched') {
-          fullyWatchedShows.push(result.value.show as CombinedContinueWatchingShow)
-        }
-      }
-    })
-
-    const combinedList: CombinedContinueWatchingShow[] = []
-    const seenShowIds = new Set<string>()
-
-    for (const show of upNextShows) {
-      if (!seenShowIds.has(show.id)) {
-        combinedList.push({
-          ...show,
-          thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
-        })
-        seenShowIds.add(show.id)
-      }
-    }
-
-    for (const show of fullyWatchedShows) {
-      if (!seenShowIds.has(show.id)) {
-        combinedList.push({
-          ...show,
-          thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
-        })
-        seenShowIds.add(show.id)
-      }
-    }
-
-    return combinedList
+    return enrichedRows
   }
 
   getContinueWatchingFast = async (req: Request, res: Response) => {
     try {
       const limit = parseInt(req.query.limit as string) || 10
-      const data = await this.getInProgressShowsData(req.db)
+      const data = await this.getContinueWatchingData(req.db)
       res.json(data.slice(0, limit))
-    } catch {
-      res.status(500).json({ error: 'DB error' })
-    }
-  }
-
-  getContinueWatchingUpNext = async (req: Request, res: Response) => {
-    try {
-      const data = await this.getUpNextShowsData(req.db)
-      res.json(data)
     } catch {
       res.status(500).json({ error: 'DB error' })
     }
@@ -231,36 +133,8 @@ export class WatchlistController {
   getContinueWatching = async (req: Request, res: Response) => {
     try {
       const limit = parseInt(req.query.limit as string) || 10
-      const [inProgress, upNext] = await Promise.all([
-        this.getInProgressShowsData(req.db),
-        this.getUpNextShowsData(req.db),
-      ])
-
-      const combinedList: CombinedContinueWatchingShow[] = []
-      const seenShowIds = new Set<string>()
-
-      for (const show of upNext) {
-        if (show.nextEpisodeToWatch && !seenShowIds.has(show.id)) {
-          combinedList.push(show)
-          seenShowIds.add(show.id)
-        }
-      }
-
-      for (const show of inProgress) {
-        if (!seenShowIds.has(show.id)) {
-          combinedList.push(show)
-          seenShowIds.add(show.id)
-        }
-      }
-
-      for (const show of upNext) {
-        if (!show.nextEpisodeToWatch && !seenShowIds.has(show.id)) {
-          combinedList.push(show)
-          seenShowIds.add(show.id)
-        }
-      }
-
-      res.json(combinedList.slice(0, limit))
+      const data = await this.getContinueWatchingData(req.db)
+      res.json(data.slice(0, limit))
     } catch {
       res.status(500).json({ error: 'DB error' })
     }
@@ -271,38 +145,11 @@ export class WatchlistController {
       const page = parseInt(req.query.page as string) || 1
       const limit = parseInt(req.query.limit as string) || 10
       const offset = (page - 1) * limit
-      const [inProgress, upNext] = await Promise.all([
-        this.getInProgressShowsData(req.db),
-        this.getUpNextShowsData(req.db),
-      ])
-
-      const combinedList: CombinedContinueWatchingShow[] = []
-      const seenShowIds = new Set<string>()
-
-      for (const show of upNext) {
-        if (show.nextEpisodeToWatch && !seenShowIds.has(show.id)) {
-          combinedList.push(show)
-          seenShowIds.add(show.id)
-        }
-      }
-
-      for (const show of inProgress) {
-        if (!seenShowIds.has(show.id)) {
-          combinedList.push(show)
-          seenShowIds.add(show.id)
-        }
-      }
-
-      for (const show of upNext) {
-        if (!show.nextEpisodeToWatch && !seenShowIds.has(show.id)) {
-          combinedList.push(show)
-          seenShowIds.add(show.id)
-        }
-      }
+      const data = await this.getContinueWatchingData(req.db)
 
       res.json({
-        data: combinedList.slice(offset, offset + limit),
-        total: combinedList.length,
+        data: data.slice(offset, offset + limit),
+        total: data.length,
         page,
         limit,
       })
@@ -326,9 +173,10 @@ export class WatchlistController {
     } = req.body
     try {
       const genresStr = Array.isArray(genres) ? JSON.stringify(genres) : genres
+      const { status, episodeCount } = req.body // Destructure optional new fields
       await performWriteTransaction(req.db, (tx) => {
         tx.run(
-          'INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName, genres, popularityScore) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          'INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName, genres, popularityScore, status, episodeCount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
             showId,
             showName,
@@ -337,8 +185,17 @@ export class WatchlistController {
             englishName,
             genresStr,
             popularityScore,
+            status,
+            episodeCount,
           ]
         )
+
+        if (status) {
+          tx.run('UPDATE shows_meta SET status = ? WHERE id = ?', [status, showId])
+        }
+        if (episodeCount) {
+          tx.run('UPDATE shows_meta SET episodeCount = ? WHERE id = ?', [episodeCount, showId])
+        }
 
         if (genresStr) {
           tx.run('UPDATE shows_meta SET genres = ? WHERE id = ? AND genres IS NULL', [
@@ -370,6 +227,8 @@ export class WatchlistController {
     try {
       await performWriteTransaction(req.db, (tx) => {
         tx.run('DELETE FROM watched_episodes WHERE showId = ?', [showId])
+        tx.run('DELETE FROM dismissed_notifications WHERE showId = ?', [showId])
+        tx.run('DELETE FROM discovered_notifications WHERE showId = ?', [showId])
       })
       res.json({ success: true })
     } catch {
@@ -472,6 +331,9 @@ export class WatchlistController {
     try {
       await performWriteTransaction(req.db, (tx) => {
         tx.run('DELETE FROM watchlist WHERE id = ?', [id])
+        tx.run('DELETE FROM watched_episodes WHERE showId = ?', [id])
+        tx.run('DELETE FROM dismissed_notifications WHERE showId = ?', [id])
+        tx.run('DELETE FROM discovered_notifications WHERE showId = ?', [id])
       })
       res.json({ success: true })
     } catch {
@@ -484,6 +346,178 @@ export class WatchlistController {
     try {
       await performWriteTransaction(req.db, (tx) => {
         tx.run('UPDATE watchlist SET status = ? WHERE id = ?', [status, id])
+      })
+      res.json({ success: true })
+    } catch {
+      res.status(500).json({ error: 'DB error' })
+    }
+  }
+
+  getNotifications = async (req: Request, res: Response) => {
+    try {
+      const db = req.db
+      const watchingShows: { id: string; name: string; thumbnail: string }[] = await new Promise(
+        (resolve, reject) => {
+          db.all(
+            "SELECT id, name, thumbnail FROM watchlist WHERE status = 'Watching'",
+            (err: Error | null, rows: unknown) => {
+              if (err) reject(err)
+              else resolve((rows as { id: string; name: string; thumbnail: string }[]) || [])
+            }
+          )
+        }
+      )
+
+      const notifications: {
+        showId: string
+        name: string
+        thumbnail: string
+        episodeNumber: string
+        id: string
+      }[] = []
+
+      await Promise.all(
+        watchingShows.map(async (show) => {
+          try {
+            const [epDetails, watchedEps, dismissedEps, showMeta, discoveredEps] =
+              await Promise.all([
+                this.provider.getEpisodes(show.id, 'sub'),
+                new Promise<{ episodeNumber: number | string }[]>((resolve, reject) => {
+                  db.all(
+                    'SELECT episodeNumber FROM watched_episodes WHERE showId = ?',
+                    [show.id],
+                    (err, rows) => {
+                      if (err) reject(err)
+                      else resolve((rows as { episodeNumber: number | string }[]) || [])
+                    }
+                  )
+                }),
+                new Promise<{ episodeNumber: number | string }[]>((resolve, reject) => {
+                  db.all(
+                    'SELECT episodeNumber FROM dismissed_notifications WHERE showId = ?',
+                    [show.id],
+                    (err, rows) => {
+                      if (err) reject(err)
+                      else resolve((rows as { episodeNumber: number | string }[]) || [])
+                    }
+                  )
+                }),
+                new Promise<{ status: string }>((resolve) => {
+                  db.get('SELECT status FROM shows_meta WHERE id = ?', [show.id], (err, row) =>
+                    resolve(row as { status: string })
+                  )
+                }),
+                new Promise<{ episodeNumber: number | string }[]>((resolve, reject) => {
+                  db.all(
+                    'SELECT episodeNumber FROM discovered_notifications WHERE showId = ?',
+                    [show.id],
+                    (err, rows) => {
+                      if (err) reject(err)
+                      else resolve((rows as { episodeNumber: number | string }[]) || [])
+                    }
+                  )
+                }),
+              ])
+
+            if (!epDetails || !epDetails.episodes || epDetails.episodes.length === 0) return
+
+            // Only notify for ongoing shows
+            if (
+              showMeta &&
+              showMeta.status &&
+              !['Ongoing', 'Releasing', 'Currently Airing'].includes(showMeta.status)
+            ) {
+              return
+            }
+
+            const watchedSet = new Set(watchedEps.map((e) => e.episodeNumber.toString()))
+            const dismissedSet = new Set(dismissedEps.map((e) => e.episodeNumber.toString()))
+            const discoveredSet = new Set(discoveredEps.map((e) => e.episodeNumber.toString()))
+
+            const maxWatched = Math.max(0, ...Array.from(watchedSet).map((e) => parseFloat(e)))
+            const episodes = epDetails.episodes
+            const sortedEpisodes = [...episodes].sort((a, b) => parseFloat(a) - parseFloat(b))
+            const latestAvailable = sortedEpisodes[sortedEpisodes.length - 1]
+
+            // Mark the latest available as discovered if it's new and hasn't been watched/dismissed/discovered
+            if (
+              parseFloat(latestAvailable) > maxWatched &&
+              !watchedSet.has(latestAvailable.toString()) &&
+              !dismissedSet.has(latestAvailable.toString()) &&
+              !discoveredSet.has(latestAvailable.toString())
+            ) {
+              await new Promise<void>((resolve, reject) => {
+                db.run(
+                  'INSERT OR IGNORE INTO discovered_notifications (showId, episodeNumber) VALUES (?, ?)',
+                  [show.id, latestAvailable.toString()],
+                  (err) => {
+                    if (err) reject(err)
+                    else {
+                      discoveredSet.add(latestAvailable.toString())
+                      resolve()
+                    }
+                  }
+                )
+              })
+            }
+
+            // Return all discovered notifications that are still valid (not watched/dismissed)
+            Array.from(discoveredSet).forEach((epStr: string) => {
+              const epNum = parseFloat(epStr)
+              if (epNum > maxWatched && !watchedSet.has(epStr) && !dismissedSet.has(epStr)) {
+                notifications.push({
+                  showId: show.id,
+                  name: show.name,
+                  thumbnail: this.provider.deobfuscateUrl(show.thumbnail),
+                  episodeNumber: epStr,
+                  id: `${show.id}-${epStr}`,
+                })
+              }
+            })
+          } catch (e) {
+            logger.error({ err: e, showId: show.id }, 'Failed to fetch notifications for show')
+          }
+        })
+      )
+
+      res.json(
+        notifications.sort((a, b) => parseFloat(b.episodeNumber) - parseFloat(a.episodeNumber))
+      )
+    } catch (e) {
+      logger.error({ err: e }, 'Get notifications failed')
+      res.status(500).json({ error: 'Failed to fetch notifications' })
+    }
+  }
+
+  dismissNotification = async (req: Request, res: Response) => {
+    const { showId, episodeNumber } = req.body
+    try {
+      await performWriteTransaction(req.db, (tx) => {
+        tx.run(
+          'INSERT OR IGNORE INTO dismissed_notifications (showId, episodeNumber) VALUES (?, ?)',
+          [showId, episodeNumber]
+        )
+      })
+      res.json({ success: true })
+    } catch {
+      res.status(500).json({ error: 'DB error' })
+    }
+  }
+
+  clearAllNotifications = async (req: Request, res: Response) => {
+    const { showId } = req.body
+    try {
+      await performWriteTransaction(req.db, (tx) => {
+        if (showId) {
+          tx.run(
+            'INSERT OR IGNORE INTO dismissed_notifications (showId, episodeNumber) SELECT showId, episodeNumber FROM discovered_notifications WHERE showId = ?',
+            [showId]
+          )
+        } else {
+          tx.run(
+            'INSERT OR IGNORE INTO dismissed_notifications (showId, episodeNumber) SELECT showId, episodeNumber FROM discovered_notifications'
+          )
+        }
       })
       res.json({ success: true })
     } catch {

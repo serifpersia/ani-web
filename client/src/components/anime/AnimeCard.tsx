@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom'
 import { FaMicrophone, FaClosedCaptioning, FaTimes } from 'react-icons/fa'
 
 import AnimeInfoPopup from './AnimeInfoPopup'
-import RemoveConfirmationModal from '../common/RemoveConfirmationModal'
-import { useRemoveFromWatchlist } from '../../hooks/useAnimeData'
 import { fixThumbnailUrl, formatTime } from '../../lib/utils'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 import styles from './AnimeCard.module.css'
@@ -23,6 +21,8 @@ interface Anime {
   duration?: number
   nextEpisodeToWatch?: string
   newEpisodesCount?: number
+  watchedCount?: number
+  episodeCount?: number
   availableEpisodesDetail?: {
     sub?: string[]
     dub?: string[]
@@ -40,42 +40,38 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
   ({ anime, continueWatching = false, onRemove, isLCP = false }) => {
     const isMobile = useIsMobile()
     const { titlePreference } = useTitlePreference()
-    const [showRemoveModal, setShowRemoveModal] = useState(false)
     const [showPopup, setShowPopup] = useState(false)
     const [popupPosition, setPopupPosition] = useState<'left' | 'right'>('right')
 
     const cardRef = useRef<HTMLDivElement>(null)
     const hoverTimeout = useRef<NodeJS.Timeout | null>(null)
-    const removeWatchlistMutation = useRemoveFromWatchlist()
 
-    const isUpNext = (anime.newEpisodesCount || 0) > 0
+    const hasNewEpisodes = (anime.newEpisodesCount || 0) > 0
     const hasProgress = (anime.currentTime || 0) > 0 && (anime.duration || 0) > 0
 
     const displayTitle = anime[titlePreference] || anime.name
 
-    const linkTarget = isUpNext
-      ? `/player/${anime._id}/${anime.nextEpisodeToWatch}`
-      : hasProgress || continueWatching
-        ? `/player/${anime._id}/${anime.episodeNumber}`
-        : `/player/${anime._id}`
+    const progressRatio = (anime.currentTime || 0) / (anime.duration || 1)
+
+    const linkTarget = continueWatching
+      ? `/player/${anime._id}/${anime.episodeNumber}`
+      : progressRatio > 0.9 && hasNewEpisodes
+        ? `/player/${anime._id}/${anime.nextEpisodeToWatch}`
+        : hasProgress
+          ? `/player/${anime._id}/${anime.episodeNumber}`
+          : `/player/${anime._id}`
 
     const progressPercent = hasProgress
       ? ((anime.currentTime || 0) / (anime.duration || 1)) * 100
       : 0
 
-    const handleRemoveClick = useCallback((e: React.MouseEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      setShowRemoveModal(true)
-    }, [])
-
-    const handleConfirmRemove = useCallback(
-      (options: { removeFromWatchlist?: boolean }) => {
+    const handleRemoveClick = useCallback(
+      (e: React.MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
         if (onRemove) onRemove(anime.id)
-        if (options.removeFromWatchlist) removeWatchlistMutation.mutate(anime.id)
-        setShowRemoveModal(false)
       },
-      [onRemove, removeWatchlistMutation, anime.id]
+      [onRemove, anime.id]
     )
 
     const handleMouseEnter = () => {
@@ -93,6 +89,14 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     }
 
     const [isLoaded, setIsLoaded] = useState(false)
+
+    // Calculate episode progress string
+    const progressString =
+      anime.watchedCount !== undefined && anime.episodeCount
+        ? `EP ${anime.watchedCount} / ${anime.episodeCount}`
+        : continueWatching
+          ? `EP ${anime.episodeNumber}`
+          : null
 
     return (
       <div
@@ -119,15 +123,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
               <>
                 <div className={styles.typeBadge}>{anime.type || 'TV'}</div>
 
-                {isUpNext && <div className={styles.newBadge}>+{anime.newEpisodesCount} NEW</div>}
-
-                {(isUpNext || continueWatching) && (
-                  <div className={styles.epBadge}>
-                    {isUpNext
-                      ? `Next: EP ${anime.nextEpisodeToWatch}`
-                      : `EP ${anime.episodeNumber}`}
-                  </div>
-                )}
+                {progressString && <div className={styles.epBadge}>{progressString}</div>}
               </>
             )}
 
@@ -146,16 +142,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             {isMobile && (
               <div className={styles.mobileBadges}>
                 <span className={styles.mobileType}>{anime.type || 'TV'}</span>
-                {(isUpNext || continueWatching) && (
-                  <span className={styles.mobileEp}>
-                    {isUpNext
-                      ? `Next: EP ${anime.nextEpisodeToWatch}`
-                      : `EP ${anime.episodeNumber}`}
-                  </span>
-                )}
-                {isUpNext && (
-                  <span className={styles.mobileNew}>+{anime.newEpisodesCount} NEW</span>
-                )}
+                {progressString && <span className={styles.mobileEp}>{progressString}</span>}
               </div>
             )}
 
@@ -191,14 +178,6 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
           animeId={anime._id}
           isVisible={showPopup && !isMobile}
           position={popupPosition}
-        />
-
-        <RemoveConfirmationModal
-          isOpen={showRemoveModal}
-          onClose={() => setShowRemoveModal(false)}
-          onConfirm={handleConfirmRemove}
-          animeName={displayTitle}
-          scenario="continueWatching"
         />
       </div>
     )

@@ -18,6 +18,7 @@ export interface Anime {
     sub?: string[]
     dub?: string[]
   }
+  episodeCount?: number
 }
 
 const fetchApi = async (url: string) => {
@@ -171,6 +172,61 @@ export const useRemoveFromWatchlist = () => {
     },
     onError: (error) => {
       toast.error(`Failed to remove: ${error.message}`)
+    },
+  })
+}
+
+export interface Notification {
+  showId: string
+  name: string
+  thumbnail: string
+  episodeNumber: string
+  id: string
+}
+
+export const useNotifications = (enabled: boolean = true) => {
+  return useQuery<Notification[]>({
+    queryKey: ['notifications'],
+    queryFn: () => fetchApi('/api/notifications'),
+    enabled,
+    refetchInterval: 120000, // Refetch every 2 minutes
+  })
+}
+
+export const useDismissNotification = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ showId, episodeNumber }: { showId: string; episodeNumber: string }) => {
+      const response = await fetch(`/api/notifications/dismiss`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ showId, episodeNumber }),
+      })
+      if (!response.ok) {
+        throw new Error('Failed to dismiss notification')
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    },
+  })
+}
+
+export const useClearAllNotifications = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (showId?: string) => {
+      const response = await fetch(`/api/notifications/clear-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ showId }),
+      })
+      if (!response.ok) {
+        throw new Error('Failed to clear notifications')
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] })
     },
   })
 }
