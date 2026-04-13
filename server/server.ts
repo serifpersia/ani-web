@@ -90,14 +90,13 @@ app.use(
   '/api/auth',
   createAuthRouter((database) => runSyncSequence(database))
 )
-app.use(
-  '/api/settings',
-  createAuthRouter((database) => runSyncSequence(database))
-)
 app.use('/api', createWatchlistRouter(provider))
 app.use('/api', createDataRouter(apiCache, provider))
 app.use('/api', createProxyRouter())
 app.use('/api', createInsightsRouter(provider))
+// Settings router uses a lazy db getter so it can be registered at startup;
+// the actual db reference is resolved at request time from req.db
+app.use('/api', createSettingsRouter(provider, () => db, initializeDatabase))
 
 if (!CONFIG.IS_DEV) {
   const frontendPath = path.resolve(CONFIG.ROOT, '../client/dist')
@@ -132,8 +131,6 @@ async function main() {
 
   db = await initializeDatabase(dbPath)
   logger.info(`Database initialized at ${dbPath}`)
-
-  app.use('/api', createSettingsRouter(provider, db, initializeDatabase))
 
   await runSyncSequence(db)
 

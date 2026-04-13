@@ -1,7 +1,35 @@
-import { Router } from 'express'
+import { Router, Request, Response, NextFunction } from 'express'
 import { DataController } from '../controllers/data.controller'
 import { AllAnimeProvider } from '../providers/allanime.provider'
 import NodeCache from 'node-cache'
+
+/** Creates a middleware that checks the cache before passing to the handler,
+ *  and intercepts res.json to cache successful responses. */
+function makeCacheMiddleware(
+  cache: NodeCache,
+  keyFn: (req: Request) => string,
+  ttl?: number,
+  validate: (data: unknown) => boolean = (d) => Array.isArray(d) && d.length > 0
+) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const cacheKey = keyFn(req)
+    const cached = cache.get(cacheKey)
+    if (cached) return res.json(cached)
+
+    const originalJson = res.json.bind(res)
+    res.json = (data: unknown) => {
+      if (validate(data)) {
+        if (ttl !== undefined) {
+          cache.set(cacheKey, data, ttl)
+        } else {
+          cache.set(cacheKey, data)
+        }
+      }
+      return originalJson(data)
+    }
+    next()
+  }
+}
 
 export function createDataRouter(apiCache: NodeCache, provider: AllAnimeProvider): Router {
   const router = Router()
@@ -9,94 +37,31 @@ export function createDataRouter(apiCache: NodeCache, provider: AllAnimeProvider
 
   router.get(
     '/popular/:timeframe',
-    (req, res, next) => {
-      const cacheKey = `popular-${(req.params.timeframe as string).toLowerCase()}`
-      const cached = apiCache.get(cacheKey)
-      if (cached) return res.json(cached)
-
-      const originalJson = res.json.bind(res)
-      res.json = (data: unknown) => {
-        if (Array.isArray(data) && data.length > 0) {
-          apiCache.set(cacheKey, data)
-        }
-        return originalJson(data)
-      }
-      next()
-    },
+    makeCacheMiddleware(apiCache, (req) => `popular-${(req.params.timeframe as string).toLowerCase()}`),
     controller.getPopular
   )
 
   router.get(
     '/schedule/:date',
-    (req, res, next) => {
-      const cacheKey = `schedule-${req.params.date}`
-      const cached = apiCache.get(cacheKey)
-      if (cached) return res.json(cached)
-
-      const originalJson = res.json.bind(res)
-      res.json = (data: unknown) => {
-        if (Array.isArray(data) && data.length > 0) {
-          apiCache.set(cacheKey, data)
-        }
-        return originalJson(data)
-      }
-      next()
-    },
+    makeCacheMiddleware(apiCache, (req) => `schedule-${req.params.date}`),
     controller.getSchedule
   )
 
   router.get(
     '/latest-releases',
-    (req, res, next) => {
-      const cacheKey = 'latest-releases'
-      const cached = apiCache.get(cacheKey)
-      if (cached) return res.json(cached)
-
-      const originalJson = res.json.bind(res)
-      res.json = (data: unknown) => {
-        if (Array.isArray(data) && data.length > 0) {
-          apiCache.set(cacheKey, data, 300)
-        }
-        return originalJson(data)
-      }
-      next()
-    },
+    makeCacheMiddleware(apiCache, () => 'latest-releases', 300),
     controller.getLatestReleases
   )
 
   router.get(
     '/search',
-    (req, res, next) => {
-      const cacheKey = `search-${JSON.stringify(req.query)}`
-      const cached = apiCache.get(cacheKey)
-      if (cached) return res.json(cached)
-
-      const originalJson = res.json.bind(res)
-      res.json = (data: unknown) => {
-        if (Array.isArray(data) && data.length > 0) {
-          apiCache.set(cacheKey, data, 1800)
-        }
-        return originalJson(data)
-      }
-      next()
-    },
+    makeCacheMiddleware(apiCache, (req) => `search-${JSON.stringify(req.query)}`, 1800),
     controller.search
   )
 
   router.get(
     '/show-meta/:id',
-    (req, res, next) => {
-      const cacheKey = `meta-${req.params.id}`
-      const cached = apiCache.get(cacheKey)
-      if (cached) return res.json(cached)
-
-      const originalJson = res.json.bind(res)
-      res.json = (data: unknown) => {
-        if (data) apiCache.set(cacheKey, data, 3600)
-        return originalJson(data)
-      }
-      next()
-    },
+    makeCacheMiddleware(apiCache, (req) => `meta-${req.params.id}`, 3600, (d) => !!d),
     controller.getShowMeta
   )
 

@@ -123,8 +123,34 @@ export class WatchlistController {
   getContinueWatchingFast = async (req: Request, res: Response) => {
     try {
       const limit = parseInt(req.query.limit as string) || 10
-      const data = await this.getContinueWatchingData(req.db)
-      res.json(data.slice(0, limit))
+      // Fast path: query DB directly, skip external provider.getEpisodes() calls entirely.
+      // Returns stale episodeCount from cache but responds in ~1ms instead of seconds.
+      const rows: CombinedContinueWatchingShow[] = await new Promise((resolve, reject) => {
+        req.db.all(
+          `SELECT
+            w.id as _id, w.id as id, w.name, w.thumbnail, w.nativeName, w.englishName,
+            sm.episodeCount,
+            we.episodeNumber, we.currentTime, we.duration, we.watchedAt
+          FROM (
+            SELECT *, ROW_NUMBER() OVER(PARTITION BY showId ORDER BY watchedAt DESC) as rn
+            FROM watched_episodes
+          ) we
+          JOIN watchlist w ON we.showId = w.id
+          LEFT JOIN shows_meta sm ON we.showId = sm.id
+          WHERE we.rn = 1 AND w.status = 'Watching'
+          ORDER BY we.watchedAt DESC
+          LIMIT ?`,
+          [limit],
+          (err: Error | null, rows: unknown) => {
+            if (err) reject(err)
+            else resolve(rows as CombinedContinueWatchingShow[])
+          }
+        )
+      })
+      res.json(rows.map((show) => ({
+        ...show,
+        thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
+      })))
     } catch {
       res.status(500).json({ error: 'DB error' })
     }
@@ -376,8 +402,12 @@ export class WatchlistController {
         id: string
       }[] = []
 
-      await Promise.all(
-        watchingShows.map(async (show) => {
+      // Concurrency-limited: process max 5 shows at a time to avoid hammering the external API
+      const BATCH_SIZE = 5
+      for (let i = 0; i < watchingShows.length; i += BATCH_SIZE) {
+        const batch = watchingShows.slice(i, i + BATCH_SIZE)
+        await Promise.all(
+          batch.map(async (show) => {
           try {
             const [epDetails, watchedEps, dismissedEps, showMeta, discoveredEps] =
               await Promise.all([
@@ -477,8 +507,9 @@ export class WatchlistController {
           } catch (e) {
             logger.error({ err: e, showId: show.id }, 'Failed to fetch notifications for show')
           }
-        })
-      )
+          })
+        )
+      } // end for batch loop
 
       res.json(
         notifications.sort((a, b) => parseFloat(b.episodeNumber) - parseFloat(a.episodeNumber))

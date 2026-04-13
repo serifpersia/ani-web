@@ -7,6 +7,7 @@ import { CONFIG } from './config'
 export class GoogleDriveService {
   private client: OAuth2Client
   private drive
+  private oauth2Client: ReturnType<typeof google.oauth2> | null = null
 
   constructor() {
     if (!CONFIG.GOOGLE_CLIENT_ID) {
@@ -69,9 +70,11 @@ export class GoogleDriveService {
 
   public async getUserProfile() {
     if (!this.isAuthenticated()) return null
-    const oauth2 = google.oauth2({ version: 'v2', auth: this.client })
+    if (!this.oauth2Client) {
+      this.oauth2Client = google.oauth2({ version: 'v2', auth: this.client })
+    }
     try {
-      const res = await oauth2.userinfo.get()
+      const res = await this.oauth2Client.userinfo.get()
       return res.data
     } catch (error) {
       logger.error({ err: error }, 'Failed to fetch user profile')
@@ -84,6 +87,7 @@ export class GoogleDriveService {
       fs.unlinkSync(CONFIG.TOKEN_PATH)
     }
     this.client.setCredentials({})
+    this.oauth2Client = null
   }
 
   public async ensureFolder(folderName: string): Promise<string> {

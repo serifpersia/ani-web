@@ -184,7 +184,7 @@ export async function syncUp(
   isSyncing = true
   try {
     const { localVersion, isDirty } = await getSyncMetadata(db)
-    if (!isDirty) return
+    if (!isDirty) return // isSyncing reset in finally block
 
     log.info(`--> Syncing up (Local v${localVersion})...`)
 

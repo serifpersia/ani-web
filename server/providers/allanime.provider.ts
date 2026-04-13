@@ -134,16 +134,21 @@ export class AllAnimeProvider implements Provider {
     this.cache = cache
   }
 
+  /** Shared hex-pair decode — converts obfuscated hex pairs using DEOBFUSCATION_MAP */
+  private _hexDecode(obfuscatedBody: string): string {
+    let result = ''
+    for (let i = 0; i < obfuscatedBody.length; i += 2) {
+      const chunk = obfuscatedBody.substring(i, i + 2)
+      result += DEOBFUSCATION_MAP[chunk] || chunk
+    }
+    return result
+  }
+
   private deobfuscateStreamUrl(obfuscatedUrl: string): string {
     if (!obfuscatedUrl) return ''
     if (!obfuscatedUrl.startsWith('--')) return obfuscatedUrl
 
-    const sliced = obfuscatedUrl.slice(2)
-    let deobfuscated = ''
-    for (let i = 0; i < sliced.length; i += 2) {
-      const chunk = sliced.substring(i, i + 2)
-      deobfuscated += DEOBFUSCATION_MAP[chunk] || chunk
-    }
+    let deobfuscated = this._hexDecode(obfuscatedUrl.slice(2))
 
     // Normalize any accidental double slashes
     deobfuscated = deobfuscated.replace(/([^:]\/)\/+/g, '$1')
@@ -166,12 +171,7 @@ export class AllAnimeProvider implements Provider {
         'https://wp.youtube-anime.com/s4.anilist.co'
       )
     } else if (obfuscatedUrl.startsWith('--')) {
-      obfuscatedUrl = obfuscatedUrl.slice(2)
-      let deobfuscated = ''
-      for (let i = 0; i < obfuscatedUrl.length; i += 2) {
-        const chunk = obfuscatedUrl.substring(i, i + 2)
-        deobfuscated += DEOBFUSCATION_MAP[chunk] || chunk
-      }
+      const deobfuscated = this._hexDecode(obfuscatedUrl.slice(2))
       if (deobfuscated.startsWith('/')) {
         finalUrl = `https://wp.youtube-anime.com${deobfuscated}`
       } else {
