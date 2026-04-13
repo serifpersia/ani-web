@@ -129,10 +129,13 @@ const Watchlist: React.FC = () => {
     }
   }
 
-  const confirmRemove = (opts: { rememberPreference?: boolean }) => {
+  const confirmRemove = (opts: { removeFromWatchlist?: boolean; rememberPreference?: boolean }) => {
     if (!itemToRemove) return
     if (isCW) {
       removeCw.mutate(itemToRemove.id)
+      if (opts.removeFromWatchlist) {
+        removeWl.mutate(itemToRemove.id)
+      }
     } else {
       removeWl.mutate(itemToRemove.id)
     }
