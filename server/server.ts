@@ -96,7 +96,10 @@ app.use('/api', createProxyRouter())
 app.use('/api', createInsightsRouter(provider))
 // Settings router uses a lazy db getter so it can be registered at startup;
 // the actual db reference is resolved at request time from req.db
-app.use('/api', createSettingsRouter(provider, () => db, initializeDatabase))
+app.use(
+  '/api',
+  createSettingsRouter(provider, () => db, initializeDatabase)
+)
 
 if (!CONFIG.IS_DEV) {
   const frontendPath = path.resolve(CONFIG.ROOT, '../client/dist')

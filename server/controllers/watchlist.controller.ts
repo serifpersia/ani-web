@@ -147,10 +147,12 @@ export class WatchlistController {
           }
         )
       })
-      res.json(rows.map((show) => ({
-        ...show,
-        thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
-      })))
+      res.json(
+        rows.map((show) => ({
+          ...show,
+          thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
+        }))
+      )
     } catch {
       res.status(500).json({ error: 'DB error' })
     }
@@ -408,105 +410,105 @@ export class WatchlistController {
         const batch = watchingShows.slice(i, i + BATCH_SIZE)
         await Promise.all(
           batch.map(async (show) => {
-          try {
-            const [epDetails, watchedEps, dismissedEps, showMeta, discoveredEps] =
-              await Promise.all([
-                this.provider.getEpisodes(show.id, 'sub'),
-                new Promise<{ episodeNumber: number | string }[]>((resolve, reject) => {
-                  db.all(
-                    'SELECT episodeNumber FROM watched_episodes WHERE showId = ?',
-                    [show.id],
-                    (err, rows) => {
+            try {
+              const [epDetails, watchedEps, dismissedEps, showMeta, discoveredEps] =
+                await Promise.all([
+                  this.provider.getEpisodes(show.id, 'sub'),
+                  new Promise<{ episodeNumber: number | string }[]>((resolve, reject) => {
+                    db.all(
+                      'SELECT episodeNumber FROM watched_episodes WHERE showId = ?',
+                      [show.id],
+                      (err, rows) => {
+                        if (err) reject(err)
+                        else resolve((rows as { episodeNumber: number | string }[]) || [])
+                      }
+                    )
+                  }),
+                  new Promise<{ episodeNumber: number | string }[]>((resolve, reject) => {
+                    db.all(
+                      'SELECT episodeNumber FROM dismissed_notifications WHERE showId = ?',
+                      [show.id],
+                      (err, rows) => {
+                        if (err) reject(err)
+                        else resolve((rows as { episodeNumber: number | string }[]) || [])
+                      }
+                    )
+                  }),
+                  new Promise<{ status: string }>((resolve) => {
+                    db.get('SELECT status FROM shows_meta WHERE id = ?', [show.id], (err, row) =>
+                      resolve(row as { status: string })
+                    )
+                  }),
+                  new Promise<{ episodeNumber: number | string }[]>((resolve, reject) => {
+                    db.all(
+                      'SELECT episodeNumber FROM discovered_notifications WHERE showId = ?',
+                      [show.id],
+                      (err, rows) => {
+                        if (err) reject(err)
+                        else resolve((rows as { episodeNumber: number | string }[]) || [])
+                      }
+                    )
+                  }),
+                ])
+
+              if (!epDetails || !epDetails.episodes || epDetails.episodes.length === 0) return
+
+              // Only notify for ongoing shows
+              if (
+                showMeta &&
+                showMeta.status &&
+                !['Ongoing', 'Releasing', 'Currently Airing'].includes(showMeta.status)
+              ) {
+                return
+              }
+
+              const watchedSet = new Set(watchedEps.map((e) => e.episodeNumber.toString()))
+              const dismissedSet = new Set(dismissedEps.map((e) => e.episodeNumber.toString()))
+              const discoveredSet = new Set(discoveredEps.map((e) => e.episodeNumber.toString()))
+
+              const maxWatched = Math.max(0, ...Array.from(watchedSet).map((e) => parseFloat(e)))
+              const episodes = epDetails.episodes
+              const sortedEpisodes = [...episodes].sort((a, b) => parseFloat(a) - parseFloat(b))
+              const latestAvailable = sortedEpisodes[sortedEpisodes.length - 1]
+
+              // Mark the latest available as discovered if it's new and hasn't been watched/dismissed/discovered
+              if (
+                parseFloat(latestAvailable) > maxWatched &&
+                !watchedSet.has(latestAvailable.toString()) &&
+                !dismissedSet.has(latestAvailable.toString()) &&
+                !discoveredSet.has(latestAvailable.toString())
+              ) {
+                await new Promise<void>((resolve, reject) => {
+                  db.run(
+                    'INSERT OR IGNORE INTO discovered_notifications (showId, episodeNumber) VALUES (?, ?)',
+                    [show.id, latestAvailable.toString()],
+                    (err) => {
                       if (err) reject(err)
-                      else resolve((rows as { episodeNumber: number | string }[]) || [])
+                      else {
+                        discoveredSet.add(latestAvailable.toString())
+                        resolve()
+                      }
                     }
                   )
-                }),
-                new Promise<{ episodeNumber: number | string }[]>((resolve, reject) => {
-                  db.all(
-                    'SELECT episodeNumber FROM dismissed_notifications WHERE showId = ?',
-                    [show.id],
-                    (err, rows) => {
-                      if (err) reject(err)
-                      else resolve((rows as { episodeNumber: number | string }[]) || [])
-                    }
-                  )
-                }),
-                new Promise<{ status: string }>((resolve) => {
-                  db.get('SELECT status FROM shows_meta WHERE id = ?', [show.id], (err, row) =>
-                    resolve(row as { status: string })
-                  )
-                }),
-                new Promise<{ episodeNumber: number | string }[]>((resolve, reject) => {
-                  db.all(
-                    'SELECT episodeNumber FROM discovered_notifications WHERE showId = ?',
-                    [show.id],
-                    (err, rows) => {
-                      if (err) reject(err)
-                      else resolve((rows as { episodeNumber: number | string }[]) || [])
-                    }
-                  )
-                }),
-              ])
-
-            if (!epDetails || !epDetails.episodes || epDetails.episodes.length === 0) return
-
-            // Only notify for ongoing shows
-            if (
-              showMeta &&
-              showMeta.status &&
-              !['Ongoing', 'Releasing', 'Currently Airing'].includes(showMeta.status)
-            ) {
-              return
-            }
-
-            const watchedSet = new Set(watchedEps.map((e) => e.episodeNumber.toString()))
-            const dismissedSet = new Set(dismissedEps.map((e) => e.episodeNumber.toString()))
-            const discoveredSet = new Set(discoveredEps.map((e) => e.episodeNumber.toString()))
-
-            const maxWatched = Math.max(0, ...Array.from(watchedSet).map((e) => parseFloat(e)))
-            const episodes = epDetails.episodes
-            const sortedEpisodes = [...episodes].sort((a, b) => parseFloat(a) - parseFloat(b))
-            const latestAvailable = sortedEpisodes[sortedEpisodes.length - 1]
-
-            // Mark the latest available as discovered if it's new and hasn't been watched/dismissed/discovered
-            if (
-              parseFloat(latestAvailable) > maxWatched &&
-              !watchedSet.has(latestAvailable.toString()) &&
-              !dismissedSet.has(latestAvailable.toString()) &&
-              !discoveredSet.has(latestAvailable.toString())
-            ) {
-              await new Promise<void>((resolve, reject) => {
-                db.run(
-                  'INSERT OR IGNORE INTO discovered_notifications (showId, episodeNumber) VALUES (?, ?)',
-                  [show.id, latestAvailable.toString()],
-                  (err) => {
-                    if (err) reject(err)
-                    else {
-                      discoveredSet.add(latestAvailable.toString())
-                      resolve()
-                    }
-                  }
-                )
-              })
-            }
-
-            // Return all discovered notifications that are still valid (not watched/dismissed)
-            Array.from(discoveredSet).forEach((epStr: string) => {
-              const epNum = parseFloat(epStr)
-              if (epNum > maxWatched && !watchedSet.has(epStr) && !dismissedSet.has(epStr)) {
-                notifications.push({
-                  showId: show.id,
-                  name: show.name,
-                  thumbnail: this.provider.deobfuscateUrl(show.thumbnail),
-                  episodeNumber: epStr,
-                  id: `${show.id}-${epStr}`,
                 })
               }
-            })
-          } catch (e) {
-            logger.error({ err: e, showId: show.id }, 'Failed to fetch notifications for show')
-          }
+
+              // Return all discovered notifications that are still valid (not watched/dismissed)
+              Array.from(discoveredSet).forEach((epStr: string) => {
+                const epNum = parseFloat(epStr)
+                if (epNum > maxWatched && !watchedSet.has(epStr) && !dismissedSet.has(epStr)) {
+                  notifications.push({
+                    showId: show.id,
+                    name: show.name,
+                    thumbnail: this.provider.deobfuscateUrl(show.thumbnail),
+                    episodeNumber: epStr,
+                    id: `${show.id}-${epStr}`,
+                  })
+                }
+              })
+            } catch (e) {
+              logger.error({ err: e, showId: show.id }, 'Failed to fetch notifications for show')
+            }
           })
         )
       } // end for batch loop

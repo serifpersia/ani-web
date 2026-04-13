@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useCallback } from 'react'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
+import { FaHistory } from 'react-icons/fa'
 import AnimeSection from '../components/anime/AnimeSection'
 import Top10List from '../components/anime/Top10List'
 import Schedule from '../components/anime/Schedule'
@@ -33,8 +34,9 @@ const Home: React.FC = () => {
   }, [])
 
   const { data: latest, isLoading: loadingLatest } = useLatestReleases()
-  const { data: cwFast } = useContinueWatchingFast(15)
-  const { data: cwUpNext } = useContinueWatchingUpNext()
+  const { data: cwFast, isLoading: loadingFast } = useContinueWatchingFast(15)
+  const { data: cwUpNext, isLoading: loadingUpNext } = useContinueWatchingUpNext()
+  const loadingCw = loadingFast || loadingUpNext
 
   const cwList = useMemo(() => {
     const combined: typeof cwFast = []
@@ -159,17 +161,58 @@ const Home: React.FC = () => {
         )}
 
         <div style={{ minWidth: '0' }}>
-          <div style={{ minHeight: cwList && cwList.length > 0 ? '280px' : '0' }}>
-            {cwList && cwList.length > 0 && (
-              <AnimeSection
-                title="Continue Watching"
-                animeList={cwList}
-                continueWatching
-                onRemove={handleRemove}
-                showSeeMore
-              />
-            )}
-          </div>
+          <AnimeSection
+            title="Continue Watching"
+            animeList={cwList || []}
+            continueWatching
+            onRemove={handleRemove}
+            showSeeMore={cwList !== undefined && cwList.length > 0}
+            loading={loadingFast}
+            emptyState={
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '4rem 2rem',
+                  backgroundColor: 'var(--bg-secondary)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-secondary)',
+                  textAlign: 'center',
+                  gap: '1rem',
+                  width: '100%',
+                  minHeight: '280px',
+                }}
+              >
+                <FaHistory
+                  size={40}
+                  style={{ color: 'var(--accent)', opacity: 0.6, marginBottom: '0.5rem' }}
+                />
+                <div>
+                  <h3
+                    style={{
+                      fontSize: '1.2rem',
+                      fontWeight: 'var(--font-weight-semibold)',
+                      marginBottom: '0.4rem',
+                      color: 'var(--text-primary)',
+                    }}
+                  >
+                    Nothing is here...
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: '0.9rem',
+                      color: 'var(--text-secondary)',
+                      maxWidth: '300px',
+                    }}
+                  >
+                    You haven't watched anything yet. Start exploring and watch something first!
+                  </p>
+                </div>
+              </div>
+            }
+          />
         </div>
 
         {!isTablet && (

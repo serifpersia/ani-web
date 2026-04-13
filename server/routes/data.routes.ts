@@ -37,7 +37,10 @@ export function createDataRouter(apiCache: NodeCache, provider: AllAnimeProvider
 
   router.get(
     '/popular/:timeframe',
-    makeCacheMiddleware(apiCache, (req) => `popular-${(req.params.timeframe as string).toLowerCase()}`),
+    makeCacheMiddleware(
+      apiCache,
+      (req) => `popular-${(req.params.timeframe as string).toLowerCase()}`
+    ),
     controller.getPopular
   )
 
@@ -61,7 +64,12 @@ export function createDataRouter(apiCache: NodeCache, provider: AllAnimeProvider
 
   router.get(
     '/show-meta/:id',
-    makeCacheMiddleware(apiCache, (req) => `meta-${req.params.id}`, 3600, (d) => !!d),
+    makeCacheMiddleware(
+      apiCache,
+      (req) => `meta-${req.params.id}`,
+      3600,
+      (d) => !!d
+    ),
     controller.getShowMeta
   )
 

@@ -38,48 +38,59 @@ export class InsightsController {
 
     try {
       // Run all independent DB queries in parallel for maximum throughput
-      const [core, activityGrid, hourlyDist, seasonality, allWatches, watchedShows, droppedWarning, velocities] =
-        await Promise.all([
-          new Promise<CoreStats>((resolve, reject) => {
-            db.get(
-              `SELECT
+      const [
+        core,
+        activityGrid,
+        hourlyDist,
+        seasonality,
+        allWatches,
+        watchedShows,
+        droppedWarning,
+        velocities,
+      ] = await Promise.all([
+        new Promise<CoreStats>((resolve, reject) => {
+          db.get(
+            `SELECT
               (SELECT SUM(currentTime) FROM watched_episodes) as totalSeconds,
               (SELECT COUNT(*) FROM watched_episodes) as totalEpisodes,
               (SELECT COUNT(*) FROM watchlist WHERE status = 'Completed') as completedCount,
               (SELECT COUNT(*) FROM watchlist) as totalWatchlist`,
-              (err: Error | null, row: unknown) =>
-                err ? reject(err) : resolve((row as CoreStats) || ({} as CoreStats))
-            )
-          }),
-          new Promise<ActivityDay[]>((resolve, reject) => {
-            db.all(
-              `SELECT date(watchedAt) as day, COUNT(*) as count FROM watched_episodes GROUP BY day`,
-              (err: Error | null, rows: unknown) =>
-                err ? reject(err) : resolve((rows as ActivityDay[]) || [])
-            )
-          }),
-          new Promise<HourlyStat[]>((resolve, reject) => {
-            db.all(
-              `SELECT strftime('%H', watchedAt) as hour, COUNT(*) as count FROM watched_episodes GROUP BY hour`,
-              (err: Error | null, rows: unknown) =>
-                err ? reject(err) : resolve((rows as HourlyStat[]) || [])
-            )
-          }),
-          new Promise<SeasonalStat[]>((resolve, reject) => {
-            db.all(
-              `SELECT strftime('%m', watchedAt) as month, SUM(currentTime) as seconds FROM watched_episodes GROUP BY month`,
-              (err: Error | null, rows: unknown) =>
-                err ? reject(err) : resolve((rows as SeasonalStat[]) || [])
-            )
-          }),
-          new Promise<{ watchedAt: string; currentTime: number }[]>((resolve, reject) => {
-            db.all(
-              'SELECT watchedAt, currentTime FROM watched_episodes ORDER BY watchedAt ASC',
-              (err: Error | null, rows: unknown) =>
-                err ? reject(err) : resolve((rows as { watchedAt: string; currentTime: number }[]) || [])
-            )
-          }),
-          new Promise<{ id: string; genres: string; popularityScore: number }[]>((resolve, reject) => {
+            (err: Error | null, row: unknown) =>
+              err ? reject(err) : resolve((row as CoreStats) || ({} as CoreStats))
+          )
+        }),
+        new Promise<ActivityDay[]>((resolve, reject) => {
+          db.all(
+            `SELECT date(watchedAt) as day, COUNT(*) as count FROM watched_episodes GROUP BY day`,
+            (err: Error | null, rows: unknown) =>
+              err ? reject(err) : resolve((rows as ActivityDay[]) || [])
+          )
+        }),
+        new Promise<HourlyStat[]>((resolve, reject) => {
+          db.all(
+            `SELECT strftime('%H', watchedAt) as hour, COUNT(*) as count FROM watched_episodes GROUP BY hour`,
+            (err: Error | null, rows: unknown) =>
+              err ? reject(err) : resolve((rows as HourlyStat[]) || [])
+          )
+        }),
+        new Promise<SeasonalStat[]>((resolve, reject) => {
+          db.all(
+            `SELECT strftime('%m', watchedAt) as month, SUM(currentTime) as seconds FROM watched_episodes GROUP BY month`,
+            (err: Error | null, rows: unknown) =>
+              err ? reject(err) : resolve((rows as SeasonalStat[]) || [])
+          )
+        }),
+        new Promise<{ watchedAt: string; currentTime: number }[]>((resolve, reject) => {
+          db.all(
+            'SELECT watchedAt, currentTime FROM watched_episodes ORDER BY watchedAt ASC',
+            (err: Error | null, rows: unknown) =>
+              err
+                ? reject(err)
+                : resolve((rows as { watchedAt: string; currentTime: number }[]) || [])
+          )
+        }),
+        new Promise<{ id: string; genres: string; popularityScore: number }[]>(
+          (resolve, reject) => {
             db.all(
               `SELECT DISTINCT sm.id, sm.genres, sm.popularityScore
               FROM shows_meta sm
@@ -87,34 +98,37 @@ export class InsightsController {
               (err: Error | null, rows: unknown) =>
                 err
                   ? reject(err)
-                  : resolve((rows as { id: string; genres: string; popularityScore: number }[]) || [])
+                  : resolve(
+                      (rows as { id: string; genres: string; popularityScore: number }[]) || []
+                    )
             )
-          }),
-          new Promise<DroppedShow[]>((resolve, reject) => {
-            db.all(
-              `SELECT w.id, w.name, MAX(we.watchedAt) as lastActivity
+          }
+        ),
+        new Promise<DroppedShow[]>((resolve, reject) => {
+          db.all(
+            `SELECT w.id, w.name, MAX(we.watchedAt) as lastActivity
               FROM watchlist w
               JOIN watched_episodes we ON w.id = we.showId
               WHERE w.status = 'Watching'
               GROUP BY w.id
               HAVING lastActivity < date('now', '-90 days')`,
-              (err: Error | null, rows: unknown) =>
-                err ? reject(err) : resolve((rows as DroppedShow[]) || [])
-            )
-          }),
-          new Promise<{ daysToFinish: number }[]>((resolve, reject) => {
-            db.all(
-              `SELECT
+            (err: Error | null, rows: unknown) =>
+              err ? reject(err) : resolve((rows as DroppedShow[]) || [])
+          )
+        }),
+        new Promise<{ daysToFinish: number }[]>((resolve, reject) => {
+          db.all(
+            `SELECT
               (julianday(MAX(we.watchedAt)) - julianday(MIN(we.watchedAt))) as daysToFinish
               FROM watchlist w
               JOIN watched_episodes we ON w.id = we.showId
               WHERE w.status = 'Completed'
               GROUP BY w.id`,
-              (err: Error | null, rows: unknown) =>
-                err ? reject(err) : resolve((rows as { daysToFinish: number }[]) || [])
-            )
-          }),
-        ])
+            (err: Error | null, rows: unknown) =>
+              err ? reject(err) : resolve((rows as { daysToFinish: number }[]) || [])
+          )
+        }),
+      ])
 
       const bingeFactor =
         activityGrid.length > 0 ? Math.max(...activityGrid.map((a) => a.count)) : 0

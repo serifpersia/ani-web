@@ -30,6 +30,7 @@ interface AnimeSectionProps {
   onRemove?: (id: string) => void
   loading?: boolean
   showSeeMore?: boolean
+  emptyState?: React.ReactNode
 }
 
 const AnimeSection: React.FC<AnimeSectionProps> = ({
@@ -39,8 +40,9 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
   onRemove,
   loading,
   showSeeMore,
+  emptyState,
 }) => {
-  if (!loading && animeList.length === 0) return null
+  if (!loading && animeList.length === 0 && !emptyState) return null
 
   return (
     <section style={{ marginBottom: '2.5rem' }}>
@@ -60,9 +62,9 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
       </div>
 
       <div className="grid-container">
-        {loading ? (
+        {(loading && animeList.length === 0) ? (
           <SkeletonGrid count={6} />
-        ) : (
+        ) : animeList.length > 0 ? (
           animeList.map((anime, index) => (
             <AnimeCard
               key={anime._id}
@@ -72,7 +74,9 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
               isLCP={index < 4 && title === 'Latest Releases'}
             />
           ))
-        )}
+        ) : !loading ? (
+          <div style={{ gridColumn: '1 / -1' }}>{emptyState}</div>
+        ) : null}
       </div>
     </section>
   )
