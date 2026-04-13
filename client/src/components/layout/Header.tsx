@@ -24,6 +24,7 @@ const Header: React.FC = () => {
   const { toggleSidebar } = useSidebar()
   const [query, setQuery] = useState('')
   const [visible, setVisible] = useState(true)
+  const [isSearchFocused, setIsSearchFocused] = useState(false)
   const [showConfigModal, setShowConfigModal] = useState(false)
   const navigate = useNavigate()
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -45,7 +46,7 @@ const Header: React.FC = () => {
       }
 
       hideTimerRef.current = setTimeout(() => {
-        if (window.scrollY > 100) {
+        if (window.scrollY > 100 && !isSearchFocused) {
           setVisible(false)
         }
       }, HIDE_DELAY_MS)
@@ -58,7 +59,7 @@ const Header: React.FC = () => {
         clearTimeout(hideTimerRef.current)
       }
     }
-  }, [])
+  }, [isSearchFocused])
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -120,6 +121,8 @@ const Header: React.FC = () => {
             placeholder="Search anime..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => setIsSearchFocused(false)}
           />
           <FaSearch className={styles.searchIcon} />
         </form>
