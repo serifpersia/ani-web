@@ -128,7 +128,12 @@ const Header: React.FC = () => {
 
         {user ? (
           <Link to="/settings" className={styles.profileBtn} aria-label="View Profile">
-            <img src={user.picture} alt="Profile" className={styles.profileImg} />
+            <img
+              src={user.picture}
+              alt="Profile"
+              className={styles.profileImg}
+              referrerPolicy="no-referrer"
+            />
           </Link>
         ) : (
           <button
