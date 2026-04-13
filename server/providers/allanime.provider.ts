@@ -539,6 +539,7 @@ export class AllAnimeProvider implements Provider {
       'Sw',
       'Mp4',
       'Ok',
+      'Uni',
     ]
 
     const filteredSources = sourceUrls
@@ -681,7 +682,7 @@ export class AllAnimeProvider implements Provider {
             type:
               source.type === 'iframe' ||
               source.sourceName === 'Fm-Hls' ||
-              ['Vg', 'Sw', 'Ok'].includes(source.sourceName)
+              ['Vg', 'Sw', 'Ok', 'Uni'].includes(source.sourceName)
                 ? 'iframe'
                 : 'player',
           })
