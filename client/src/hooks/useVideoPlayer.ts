@@ -104,6 +104,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
           englishName: englishName,
           genres: genres?.map((g) => g.name),
           popularityScore,
+          type: showMeta?.type,
         }),
       }).catch((err) => console.error('Failed to update progress:', err))
     },
@@ -116,6 +117,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
       showMeta?.names?.english,
       showMeta?.genres,
       showMeta?.score,
+      showMeta?.type,
     ]
   )
 
@@ -335,6 +337,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
         englishName: englishName,
         genres: genres?.map((g) => g.name),
         popularityScore,
+        type: showMeta?.type,
       }),
     }).catch((err) => console.error('Failed to send final progress:', err))
   }, [
@@ -346,6 +349,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
     showMeta?.names?.english,
     showMeta?.genres,
     showMeta?.score,
+    showMeta?.type,
   ])
 
   const onEnded = useCallback(() => {

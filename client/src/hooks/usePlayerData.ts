@@ -254,16 +254,19 @@ export const usePlayerData = (
 
     try {
       const endpoint = wasIn ? '/api/watchlist/remove' : '/api/watchlist/add'
+      const payload = {
+        id: showId,
+        name: state.showMeta.name || state.showMeta.names?.romaji,
+        thumbnail: state.showMeta.thumbnail,
+        nativeName: state.showMeta.names?.native,
+        englishName: state.showMeta.names?.english,
+        type: state.showMeta.type,
+      }
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: showId,
-          name: state.showMeta.name,
-          thumbnail: state.showMeta.thumbnail,
-          nativeName: state.showMeta.names?.native,
-          englishName: state.showMeta.names?.english,
-        }),
+        body: JSON.stringify(payload),
       })
       if (!response.ok) throw new Error('Watchlist update failed')
       toast.success(wasIn ? 'Removed from watchlist' : 'Added to watchlist')

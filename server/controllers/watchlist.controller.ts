@@ -30,6 +30,8 @@ interface WatchingShow {
   nativeName?: string
   englishName?: string
   lastWatchedAt: string | null
+  type?: string
+  smType?: string
 }
 
 interface CombinedContinueWatchingShow {
@@ -46,6 +48,8 @@ interface CombinedContinueWatchingShow {
   watchedCount?: number
   nextEpisodeToWatch?: string
   newEpisodesCount?: number
+  type?: string
+  smType?: string
 }
 
 interface WatchlistRow {
@@ -55,6 +59,7 @@ interface WatchlistRow {
   status: string
   nativeName?: string
   englishName?: string
+  type?: string
   [key: string]: unknown
 }
 
@@ -72,7 +77,9 @@ export class WatchlistController {
     w.thumbnail as thumbnail, 
     w.nativeName as nativeName, 
     w.englishName as englishName,
+    w.type as type,
     sm.episodeCount,
+    sm.type as smType,
     (SELECT COUNT(DISTINCT episodeNumber) FROM watched_episodes WHERE showId = w.id) as watchedCount,
     we.episodeNumber, we.currentTime, we.duration, we.watchedAt
     FROM (
@@ -113,15 +120,37 @@ export class WatchlistController {
         return {
           ...show,
           episodeCount: epCount,
+          type: show.type || show.smType,
           thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
         }
       })
     )
 
+    // Second pass: asynchronously fetch and update missing metadata (type)
+    // We do this in the background without blocking the response
+    setImmediate(async () => {
+      for (const show of enrichedRows) {
+        if (!show.type) {
+          try {
+            const meta = await this.provider.getShowMeta(show.id)
+            if (meta && meta.type) {
+              db.run('UPDATE shows_meta SET type = ? WHERE id = ?', [meta.type, show.id])
+              db.run('UPDATE watchlist SET type = ? WHERE id = ?', [meta.type, show.id])
+              db.saveNow() // Save immediately after lazy update
+            }
+          } catch (e) {
+            logger.error({ err: e, showId: show.id }, 'Lazy migration error for type')
+          }
+        }
+      }
+    })
+
     return enrichedRows
   }
 
-  private async getInProgressShowsData(db: DatabaseWrapper): Promise<CombinedContinueWatchingShow[]> {
+  private async getInProgressShowsData(
+    db: DatabaseWrapper
+  ): Promise<CombinedContinueWatchingShow[]> {
     const query = `
     SELECT 
     w.id as _id, 
@@ -130,7 +159,9 @@ export class WatchlistController {
     w.thumbnail as thumbnail, 
     w.nativeName as nativeName, 
     w.englishName as englishName,
+    w.type as type,
     sm.episodeCount,
+    sm.type as smType,
     (SELECT COUNT(DISTINCT episodeNumber) FROM watched_episodes WHERE showId = w.id) as watchedCount,
     we.episodeNumber, we.currentTime, we.duration, we.watchedAt
     FROM (
@@ -159,7 +190,7 @@ export class WatchlistController {
     const watchingShows: (WatchingShow & { episodeCount?: number })[] = await new Promise(
       (resolve, reject) => {
         db.all(
-          `SELECT w.id, w.name, w.thumbnail, w.nativeName, w.englishName, sm.episodeCount
+          `SELECT w.id, w.name, w.thumbnail, w.nativeName, w.englishName, w.type, sm.episodeCount, sm.type as smType
            FROM watchlist w
            LEFT JOIN shows_meta sm ON w.id = sm.id
            WHERE w.status = 'Watching'`,
@@ -208,6 +239,7 @@ export class WatchlistController {
                 thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
                 nativeName: show.nativeName,
                 englishName: show.englishName,
+                type: show.type || show.smType,
                 nextEpisodeToWatch: unwatchedEps[0],
                 newEpisodesCount: unwatchedEps.length,
                 episodeCount: allEps.length,
@@ -243,8 +275,8 @@ export class WatchlistController {
       const rows: CombinedContinueWatchingShow[] = await new Promise((resolve, reject) => {
         req.db.all(
           `SELECT
-            w.id as _id, w.id as id, w.name, w.thumbnail, w.nativeName, w.englishName,
-            sm.episodeCount,
+            w.id as _id, w.id as id, w.name, w.thumbnail, w.nativeName, w.englishName, w.type,
+            sm.episodeCount, sm.type as smType,
             (SELECT COUNT(DISTINCT episodeNumber) FROM watched_episodes WHERE showId = w.id) as watchedCount,
             we.episodeNumber, we.currentTime, we.duration, we.watchedAt
           FROM (
@@ -266,6 +298,7 @@ export class WatchlistController {
       res.json(
         rows.map((show) => ({
           ...show,
+          type: show.type || show.smType,
           thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
         }))
       )
@@ -323,13 +356,15 @@ export class WatchlistController {
       englishName,
       genres,
       popularityScore,
+      type,
     } = req.body
     try {
       const genresStr = Array.isArray(genres) ? JSON.stringify(genres) : genres
       const { status, episodeCount } = req.body // Destructure optional new fields
+
       await performWriteTransaction(req.db, (tx) => {
         tx.run(
-          'INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName, genres, popularityScore, status, episodeCount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName, genres, popularityScore, status, episodeCount, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
             showId,
             showName,
@@ -340,6 +375,7 @@ export class WatchlistController {
             popularityScore,
             status,
             episodeCount,
+            type,
           ]
         )
 
@@ -362,15 +398,21 @@ export class WatchlistController {
             showId,
           ])
         }
+        if (type) {
+          tx.run('UPDATE shows_meta SET type = ? WHERE id = ?', [type, showId])
+        }
 
         tx.run(
           `INSERT OR REPLACE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)`,
           [showId, episodeNumber, currentTime, duration]
         )
       })
+
+      // Use debounced save for progress updates to improve performance
+      req.db.scheduleSave()
       res.json({ success: true })
     } catch (error) {
-      logger.error({ err: error }, 'Update progress failed')
+      logger.error({ err: error, showId }, 'Update progress failed')
       res.status(500).json({ error: 'DB error' })
     }
   }
@@ -425,6 +467,24 @@ export class WatchlistController {
             page,
             limit,
           })
+
+          // Asynchronously update missing types for the returned rows
+          setImmediate(async () => {
+            for (const row of watchlistRows) {
+              if (!row.type) {
+                try {
+                  const meta = await this.provider.getShowMeta(row.id)
+                  if (meta && meta.type) {
+                    req.db.run('UPDATE watchlist SET type = ? WHERE id = ?', [meta.type, row.id])
+                    req.db.run('UPDATE shows_meta SET type = ? WHERE id = ?', [meta.type, row.id])
+                    req.db.saveNow() // Save immediately after lazy update
+                  }
+                } catch (e) {
+                  logger.error({ err: e, showId: row.id }, 'Watchlist lazy migration error')
+                }
+              }
+            }
+          })
         }
       )
     })
@@ -458,11 +518,28 @@ export class WatchlistController {
   }
 
   addToWatchlist = async (req: Request, res: Response) => {
-    const { id, name, thumbnail, status, nativeName, englishName } = req.body
+    const { id, status, nativeName, englishName } = req.body
+    let { name, thumbnail, type } = req.body
+
+    // Improved ID Resolution: Fetch metadata for ANY show to ensure we have the correct 'type'
+    // and other details, not just for slugs.
+    if (id && !id.startsWith('show_')) {
+      try {
+        const meta = await this.provider.getShowMeta(id)
+        if (meta && meta.type) {
+          if (!type || type === 'TV') type = meta.type
+          if (meta.name && !name) name = meta.name
+          if (meta.thumbnail && !thumbnail) thumbnail = meta.thumbnail
+        }
+      } catch (e) {
+        logger.warn({ id, err: e }, 'Failed to fetch metadata, proceeding with provided data')
+      }
+    }
+
     try {
       await performWriteTransaction(req.db, (tx) => {
         tx.run(
-          'INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status, nativeName, englishName) VALUES (?, ?, ?, ?, ?, ?)',
+          'INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status, nativeName, englishName, type) VALUES (?, ?, ?, ?, ?, ?, ?)',
           [
             id,
             name,
@@ -470,11 +547,16 @@ export class WatchlistController {
             status || 'Watching',
             nativeName,
             englishName,
+            type || 'TV',
           ]
         )
       })
+
+      // Force immediate save to disk
+      await req.db.saveNow()
       res.json({ success: true })
-    } catch {
+    } catch (error) {
+      logger.error({ err: error, id, name, payload: req.body }, 'Add to watchlist failed')
       res.status(500).json({ error: 'DB error' })
     }
   }

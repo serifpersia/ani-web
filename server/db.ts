@@ -33,19 +33,23 @@ export class DatabaseWrapper {
     return new DatabaseWrapper(dbPath, db)
   }
 
-  private scheduleSave() {
+  public scheduleSave() {
     if (this.saveTimeout) clearTimeout(this.saveTimeout)
     this.saveTimeout = setTimeout(() => {
       this.saveNow()
     }, 500)
   }
 
-  public saveNow() {
+  public async saveNow(retryCount = 0) {
     try {
       const data = this.db.export()
-      fs.writeFileSync(this.dbPath, Buffer.from(data))
+      await fs.promises.writeFile(this.dbPath, Buffer.from(data))
     } catch (err) {
-      logger.error({ err }, 'Failed to save database to disk')
+      if (retryCount < 3) {
+        setTimeout(() => this.saveNow(retryCount + 1), 100)
+      } else {
+        logger.error({ err }, 'Failed to save database to disk after 3 retries')
+      }
     }
   }
 
@@ -71,6 +75,10 @@ export class DatabaseWrapper {
     }
   }
 
+  private sanitizeParams(params: unknown[]): BindParams {
+    return params.map((p) => (p === undefined ? null : p)) as unknown as BindParams
+  }
+
   public run(
     query: string,
     params?: unknown[] | ((err: Error | null) => void),
@@ -82,15 +90,14 @@ export class DatabaseWrapper {
     }
     try {
       if (params && Array.isArray(params) && params.length > 0) {
-        const stmt = this.db.prepare(query)
-        stmt.run(params as unknown as BindParams)
-        stmt.free()
+        this.db.run(query, this.sanitizeParams(params))
       } else {
         this.db.run(query)
       }
       this.scheduleSave()
       if (cb) cb(null)
     } catch (e) {
+      logger.error({ err: e, query, params }, 'SQL Execution Error (run)')
       if (cb) cb(e as Error)
     }
   }
@@ -107,7 +114,7 @@ export class DatabaseWrapper {
     try {
       const stmt = this.db.prepare(query)
       if (params && Array.isArray(params) && params.length > 0) {
-        stmt.bind(params as unknown as BindParams)
+        stmt.bind(this.sanitizeParams(params))
       }
       let res: T | null = null
       if (stmt.step()) {
@@ -132,7 +139,7 @@ export class DatabaseWrapper {
     try {
       const stmt = this.db.prepare(query)
       if (params && Array.isArray(params) && params.length > 0) {
-        stmt.bind(params as unknown as BindParams) // will see if this complains
+        stmt.bind(this.sanitizeParams(params))
       }
       const res: T[] = []
       while (stmt.step()) {
