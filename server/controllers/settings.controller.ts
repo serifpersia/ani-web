@@ -36,7 +36,7 @@ export class SettingsController {
       await performWriteTransaction(req.db, (tx) => {
         tx.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [
           req.body.key,
-          req.body.value,
+          String(req.body.value),
         ])
       })
       res.json({ success: true })

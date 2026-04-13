@@ -136,7 +136,7 @@ export class WatchlistController {
             if (meta && meta.type) {
               db.run('UPDATE shows_meta SET type = ? WHERE id = ?', [meta.type, show.id])
               db.run('UPDATE watchlist SET type = ? WHERE id = ?', [meta.type, show.id])
-              db.saveNow() // Save immediately after lazy update
+              db.scheduleSave() // Uses debounced save instead of blocking loop
             }
           } catch (e) {
             logger.error({ err: e, showId: show.id }, 'Lazy migration error for type')
@@ -202,58 +202,65 @@ export class WatchlistController {
       }
     )
 
-    const results = await Promise.allSettled(
-      watchingShows.map(async (show) => {
-        try {
-          // If we have cached episodeCount, we can avoid provider call if we only need "fast" results,
-          // but "Up Next" usually needs current available episodes from the provider.
-          // For now, let's keep it similar to the working state but optimized.
-          const [epDetails, watchedEpisodesResult] = await Promise.all([
-            this.provider.getEpisodes(show.id, 'sub'),
-            new Promise<WatchedEpisode[]>((resolve, reject) => {
-              db.all(
-                'SELECT * FROM watched_episodes WHERE showId = ?',
-                [show.id],
-                (err: Error | null, rows: unknown) => {
-                  if (err) reject(err)
-                  else resolve(rows as WatchedEpisode[])
-                }
-              )
-            }),
-          ])
+    const results: PromiseSettledResult<{
+      type: string
+      show: CombinedContinueWatchingShow
+    } | null>[] = []
+    const BATCH_SIZE = 5
 
-          const allEps = epDetails?.episodes?.sort((a, b) => parseFloat(a) - parseFloat(b)) || []
-          const watchedEpsMap = new Map(
-            watchedEpisodesResult.map((r) => [r.episodeNumber.toString(), r])
-          )
+    for (let i = 0; i < watchingShows.length; i += BATCH_SIZE) {
+      const batch = watchingShows.slice(i, i + BATCH_SIZE)
+      const batchResults = await Promise.allSettled(
+        batch.map(async (show) => {
+          try {
+            const [epDetails, watchedEpisodesResult] = await Promise.all([
+              this.provider.getEpisodes(show.id, 'sub'),
+              new Promise<WatchedEpisode[]>((resolve, reject) => {
+                db.all(
+                  'SELECT * FROM watched_episodes WHERE showId = ?',
+                  [show.id],
+                  (err: Error | null, rows: unknown) => {
+                    if (err) reject(err)
+                    else resolve(rows as WatchedEpisode[])
+                  }
+                )
+              }),
+            ])
 
-          const unwatchedEps = allEps.filter((ep) => !watchedEpsMap.has(ep))
+            const allEps = epDetails?.episodes?.sort((a, b) => parseFloat(a) - parseFloat(b)) || []
+            const watchedEpsMap = new Map(
+              watchedEpisodesResult.map((r) => [r.episodeNumber.toString(), r])
+            )
 
-          if (unwatchedEps.length > 0) {
-            return {
-              type: 'upNext',
-              show: {
-                _id: show.id,
-                id: show.id,
-                name: show.name,
-                thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
-                nativeName: show.nativeName,
-                englishName: show.englishName,
-                type: show.type || show.smType,
-                nextEpisodeToWatch: unwatchedEps[0],
-                newEpisodesCount: unwatchedEps.length,
-                episodeCount: allEps.length,
-                watchedCount: watchedEpsMap.size,
-              },
+            const unwatchedEps = allEps.filter((ep) => !watchedEpsMap.has(ep))
+
+            if (unwatchedEps.length > 0) {
+              return {
+                type: 'upNext',
+                show: {
+                  _id: show.id,
+                  id: show.id,
+                  name: show.name,
+                  thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
+                  nativeName: show.nativeName,
+                  englishName: show.englishName,
+                  type: show.type || show.smType,
+                  nextEpisodeToWatch: unwatchedEps[0],
+                  newEpisodesCount: unwatchedEps.length,
+                  episodeCount: allEps.length,
+                  watchedCount: watchedEpsMap.size,
+                },
+              }
             }
+            return null
+          } catch (e) {
+            logger.error({ err: e, showId: show.id }, 'Error processing show for Up Next list')
+            return null
           }
-          return null
-        } catch (e) {
-          logger.error({ err: e, showId: show.id }, 'Error processing show for Up Next list')
-          return null
-        }
-      })
-    )
+        })
+      )
+      results.push(...batchResults)
+    }
 
     const upNextShows: CombinedContinueWatchingShow[] = []
     results.forEach((result) => {
@@ -408,7 +415,6 @@ export class WatchlistController {
         )
       })
 
-      // Use debounced save for progress updates to improve performance
       req.db.scheduleSave()
       res.json({ success: true })
     } catch (error) {
@@ -477,7 +483,7 @@ export class WatchlistController {
                   if (meta && meta.type) {
                     req.db.run('UPDATE watchlist SET type = ? WHERE id = ?', [meta.type, row.id])
                     req.db.run('UPDATE shows_meta SET type = ? WHERE id = ?', [meta.type, row.id])
-                    req.db.saveNow() // Save immediately after lazy update
+                    req.db.scheduleSave() // Uses debounced save instead of blocking loop
                   }
                 } catch (e) {
                   logger.error({ err: e, showId: row.id }, 'Watchlist lazy migration error')
@@ -521,8 +527,6 @@ export class WatchlistController {
     const { id, status, nativeName, englishName } = req.body
     let { name, thumbnail, type } = req.body
 
-    // Improved ID Resolution: Fetch metadata for ANY show to ensure we have the correct 'type'
-    // and other details, not just for slugs.
     if (id && !id.startsWith('show_')) {
       try {
         const meta = await this.provider.getShowMeta(id)
@@ -552,7 +556,6 @@ export class WatchlistController {
         )
       })
 
-      // Force immediate save to disk
       await req.db.saveNow()
       res.json({ success: true })
     } catch (error) {
@@ -611,7 +614,6 @@ export class WatchlistController {
         id: string
       }[] = []
 
-      // Concurrency-limited: process max 5 shows at a time to avoid hammering the external API
       const BATCH_SIZE = 5
       for (let i = 0; i < watchingShows.length; i += BATCH_SIZE) {
         const batch = watchingShows.slice(i, i + BATCH_SIZE)
@@ -678,7 +680,6 @@ export class WatchlistController {
               const sortedEpisodes = [...episodes].sort((a, b) => parseFloat(a) - parseFloat(b))
               const latestAvailable = sortedEpisodes[sortedEpisodes.length - 1]
 
-              // Mark the latest available as discovered if it's new and hasn't been watched/dismissed/discovered
               if (
                 parseFloat(latestAvailable) > maxWatched &&
                 !watchedSet.has(latestAvailable.toString()) &&
@@ -700,7 +701,6 @@ export class WatchlistController {
                 })
               }
 
-              // Return all discovered notifications that are still valid (not watched/dismissed)
               Array.from(discoveredSet).forEach((epStr: string) => {
                 const epNum = parseFloat(epStr)
                 if (epNum > maxWatched && !watchedSet.has(epStr) && !dismissedSet.has(epStr)) {

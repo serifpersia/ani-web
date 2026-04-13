@@ -118,7 +118,7 @@ const Watchlist: React.FC = () => {
   }, [list, sortBy])
 
   const handleRemove = (id: string, name: string) => {
-    const shouldSkip = String(skipConfirm) === 'true' || skipConfirm === 1 || skipConfirm === true
+    const shouldSkip = String(skipConfirm) === 'true' || String(skipConfirm) === '1'
     if (shouldSkip) {
       if (isCW) {
         removeCw.mutate(id)

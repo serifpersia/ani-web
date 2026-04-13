@@ -91,7 +91,7 @@ const Home: React.FC = () => {
 
   const handleRemove = useCallback(
     (id: string) => {
-      const shouldSkip = String(skipConfirm) === 'true' || skipConfirm === 1 || skipConfirm === true
+      const shouldSkip = String(skipConfirm) === 'true' || String(skipConfirm) === '1'
       if (shouldSkip) {
         removeCw.mutate(id)
       } else {

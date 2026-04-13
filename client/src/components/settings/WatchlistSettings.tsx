@@ -12,7 +12,7 @@ const WatchlistSettings: React.FC = () => {
       try {
         const response = await fetch('/api/settings?key=skipRemoveConfirmation')
         const data = await response.json()
-        if (data.value == true) {
+        if (String(data.value) === 'true' || String(data.value) === '1') {
           setSkipConfirmation(true)
         } else {
           setSkipConfirmation(false)
