@@ -6,6 +6,78 @@
   gap: var(--space-4);
 }
 
+.nav-arrows {
+  display: flex;
+  gap: 10px;
+}
+
+.nav-button {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
+  color: var(--text-primary);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-button:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.carousel-container {
+  position: relative;
+  width: 100%;
+}
+
+.carousel {
+  display: flex;
+  gap: 15px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: none; /* Hide scrollbar for Firefox */
+  padding-bottom: 10px;
+}
+
+.carousel::-webkit-scrollbar {
+  display: none; /* Hide scrollbar for Chrome/Safari */
+}
+
+.carousel-card {
+  flex: 0 0 calc((100% - (6 * 15px)) / 7); /* Show exactly 7 cards */
+  min-width: 150px;
+}
+
+@media (max-width: 1200px) {
+  .carousel-card {
+    flex: 0 0 calc((100% - (5 * 15px)) / 6);
+  }
+}
+
+@media (max-width: 1024px) {
+  .carousel-card {
+    flex: 0 0 calc((100% - (4 * 15px)) / 5);
+  }
+}
+
+@media (max-width: 768px) {
+  .carousel-card {
+    flex: 0 0 calc((100% - (2 * 15px)) / 3);
+  }
+}
+
+@media (max-width: 480px) {
+  .carousel-card {
+    flex: 0 0 calc((100% - (1 * 15px)) / 2);
+  }
+}
+
 .see-more-button {
   background-color: var(--accent);
   color: white;

@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useCallback } from 'react'
+import React, { useEffect, useMemo, useCallback, useRef } from 'react'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
-import { FaHistory } from 'react-icons/fa'
+import { FaHistory, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import AnimeSection from '../components/anime/AnimeSection'
 import Top10List from '../components/anime/Top10List'
 import Schedule from '../components/anime/Schedule'
@@ -9,7 +9,7 @@ import SkeletonGrid from '../components/common/SkeletonGrid'
 import RemoveConfirmationModal from '../components/common/RemoveConfirmationModal'
 import {
   useLatestReleases,
-  useCurrentSeason,
+  usePaginatedCurrentSeason,
   useContinueWatchingFast,
   useContinueWatchingUpNext,
   useRemoveFromWatchlist,
@@ -22,7 +22,8 @@ const Home: React.FC = () => {
   const queryClient = useQueryClient()
   const isMobile = useIsMobile()
   const isTablet = useIsMobile(1024)
-  const observerRef = useRef<HTMLDivElement>(null)
+  const [page, setPage] = React.useState(1)
+  const seasonalRef = useRef<HTMLDivElement>(null)
 
   const { titlePreference } = useTitlePreference()
   const [itemToRemove, setItemToRemove] = React.useState<{ id: string; name: string } | null>(null)
@@ -71,15 +72,8 @@ const Home: React.FC = () => {
 
     return combined.length > 0 ? combined : cwFast || []
   }, [cwFast, cwUpNext])
-  const {
-    data: seasonPages,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading: loadingSeason,
-  } = useCurrentSeason()
 
-  const currentSeason = useMemo(() => seasonPages?.pages.flat() || [], [seasonPages])
+  const { data: currentSeason, isLoading: loadingSeason } = usePaginatedCurrentSeason(page)
 
   const removeCw = useMutation({
     mutationFn: async (showId: string) => {
@@ -119,28 +113,6 @@ const Home: React.FC = () => {
     },
     [itemToRemove, removeCw, removeWatchlistMutation]
   )
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
-          fetchNextPage()
-        }
-      },
-      { threshold: 0.1 }
-    )
-
-    const currentRef = observerRef.current
-    if (currentRef) {
-      observer.observe(currentRef)
-    }
-
-    return () => {
-      if (currentRef) {
-        observer.unobserve(currentRef)
-      }
-    }
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   return (
     <div style={{ paddingBottom: '2rem' }}>
@@ -222,22 +194,118 @@ const Home: React.FC = () => {
         )}
 
         <section style={{ gridColumn: isTablet ? undefined : '1 / -1' }}>
-          <div style={{ minHeight: '800px', marginBottom: '2rem' }}>
+          <div style={{ marginBottom: '2rem' }}>
             <AnimeSection
               title="Latest Releases"
               animeList={latest || []}
               loading={loadingLatest}
+              carousel
             />
           </div>
 
-          <div className="section-title">Current Season</div>
-          <div className="grid-container">
-            {currentSeason.map((anime) => (
-              <AnimeCard key={anime._id} anime={anime} />
-            ))}
-            {(loadingSeason || isFetchingNextPage) && <SkeletonGrid count={6} />}
+          <div
+            className="section-header"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 'var(--space-6)',
+            }}
+            ref={seasonalRef}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div className="section-title" style={{ marginBottom: 0 }}>
+                Current Season
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '10px',
+                  alignItems: 'center',
+                  background: 'var(--bg-secondary)',
+                  padding: '4px 8px',
+                  borderRadius: '20px',
+                  border: '1px solid var(--border-secondary)',
+                }}
+              >
+                <button
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px',
+                    opacity: page === 1 ? 0.3 : 1,
+                  }}
+                  onClick={() => {
+                    if (page > 1) {
+                      setPage((p) => p - 1)
+                      if (seasonalRef.current) {
+                        const y =
+                          seasonalRef.current.getBoundingClientRect().top + window.scrollY - 80
+                        window.scrollTo({ top: y, behavior: 'smooth' })
+                      }
+                    }
+                  }}
+                  disabled={page === 1}
+                >
+                  <FaChevronLeft size={14} />
+                </button>
+                <span
+                  style={{
+                    fontSize: '0.85rem',
+                    fontWeight: 'var(--font-weight-bold)',
+                    minWidth: '20px',
+                    textAlign: 'center',
+                  }}
+                >
+                  {page}
+                </span>
+                <button
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px',
+                    opacity: !currentSeason || currentSeason.length < 14 ? 0.3 : 1,
+                  }}
+                  onClick={() => {
+                    if (currentSeason && currentSeason.length >= 14) {
+                      setPage((p) => p + 1)
+                      if (seasonalRef.current) {
+                        const y =
+                          seasonalRef.current.getBoundingClientRect().top + window.scrollY - 80
+                        window.scrollTo({ top: y, behavior: 'smooth' })
+                      }
+                    }
+                  }}
+                  disabled={!currentSeason || currentSeason.length < 14}
+                >
+                  <FaChevronRight size={14} />
+                </button>
+              </div>
+            </div>
           </div>
-          <div ref={observerRef} style={{ height: '20px' }} />
+
+          <div
+            className="grid-container"
+            style={{
+              minHeight: '300px',
+              alignContent: 'start',
+              gridTemplateColumns: isTablet ? undefined : 'repeat(7, 1fr)',
+            }}
+          >
+            {loadingSeason ? (
+              <SkeletonGrid count={14} />
+            ) : (
+              currentSeason?.map((anime) => <AnimeCard key={anime._id} anime={anime} />)
+            )}
+          </div>
         </section>
       </div>
 

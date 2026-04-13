@@ -49,6 +49,13 @@ export const useCurrentSeason = () => {
   })
 }
 
+export const usePaginatedCurrentSeason = (page: number) => {
+  return useQuery<Anime[]>({
+    queryKey: ['currentSeason', page],
+    queryFn: () => fetchApi(`/api/seasonal?page=${page}`),
+  })
+}
+
 export const useContinueWatchingFast = (limit?: number) => {
   const url = limit ? `/api/continue-watching/fast?limit=${limit}` : '/api/continue-watching/fast'
   return useQuery<Anime[]>({

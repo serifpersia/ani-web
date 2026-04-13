@@ -403,7 +403,7 @@ export class AllAnimeProvider implements Provider {
     const year = new Date().getFullYear()
     const variables = {
       search: { year, season, sortBy: 'Latest_Update', allowAdult: false },
-      limit: 25,
+      limit: 14,
       page: page,
       translationType: 'sub',
       countryOrigin: 'JP',

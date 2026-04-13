@@ -76,7 +76,11 @@ export function createDataRouter(apiCache: NodeCache, provider: AllAnimeProvider
   router.get('/skip-times/:showId/:episodeNumber', controller.getSkipTimes)
   router.get('/video', controller.getVideo)
   router.get('/episodes', controller.getEpisodes)
-  router.get('/seasonal', controller.getSeasonal)
+  router.get(
+    '/seasonal',
+    makeCacheMiddleware(apiCache, (req) => `seasonal-14-${req.query.page || 1}`, 1800),
+    controller.getSeasonal
+  )
   router.get('/show-details/:id', controller.getShowDetails)
   router.get('/allmanga-details/:id', controller.getAllmangaDetails)
   router.get('/genres-and-tags', controller.getGenresAndTags)
