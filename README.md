@@ -43,7 +43,7 @@ Based on a lightweight architecture, ani-web includes:
 
 ### ⚡ Quick Install
 
-We provide automated installation scripts to get you up and running in seconds.
+Use provided run scripts to get you up and running in seconds.
 
 #### Windows
 Open a **PowerShell** terminal and run:
@@ -107,12 +107,13 @@ run.bat
 The core aim of this project is to provide a streamlined, automated interface to extract publicly accessible content from the internet. All media served through this application is hosted by external, non-affiliated third-party sources.
 
 <details>
-<summary><b>⚖️ Click to read the full Legal Disclaimer & DMCA info</b></summary>
+<summary><b> Click to read the full Legal Disclaimer & DMCA info</b></summary>
 <br>
 
 * **The Browser Analogy:** Think of `ani-web` as a specialized web browser. While a standard web browser makes hundreds of requests to download a site's HTML, CSS, ads, and trackers, this project simply makes requests specifically targeted at the media content served by those sites.
 * **User Responsibility:** A browser is merely a tool, and the legality of its use depends entirely on the user. This software is provided "as-is", and it is to be used at the user's own risk, in accordance with their local laws and government regulations. The developer is not responsible for what users choose to access.
 * **DMCA & Copyright:** Because `ani-web` operates entirely via client-side access mechanisms and hosts absolutely zero content, any DMCA takedown notices or copyright infringement claims must be directed to the external, third-party services that actually host the files. 
+</details>
 
 ## License
 
