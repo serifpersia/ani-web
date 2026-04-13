@@ -17,6 +17,8 @@ interface Anime {
   episodeNumber?: number
   currentTime?: number
   duration?: number
+  watchedCount?: number
+  episodeCount?: number
   nextEpisodeToWatch?: string
   newEpisodesCount?: number
   availableEpisodesDetail?: {
