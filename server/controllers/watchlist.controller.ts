@@ -43,6 +43,7 @@ interface CombinedContinueWatchingShow {
   currentTime?: number
   duration?: number
   episodeCount?: number
+  watchedCount?: number
   nextEpisodeToWatch?: string
   newEpisodesCount?: number
 }
@@ -120,6 +121,120 @@ export class WatchlistController {
     return enrichedRows
   }
 
+  private async getInProgressShowsData(db: DatabaseWrapper): Promise<CombinedContinueWatchingShow[]> {
+    const query = `
+    SELECT 
+    w.id as _id, 
+    w.id as id, 
+    w.name as name, 
+    w.thumbnail as thumbnail, 
+    w.nativeName as nativeName, 
+    w.englishName as englishName,
+    sm.episodeCount,
+    (SELECT COUNT(DISTINCT episodeNumber) FROM watched_episodes WHERE showId = w.id) as watchedCount,
+    we.episodeNumber, we.currentTime, we.duration, we.watchedAt
+    FROM (
+      SELECT *, ROW_NUMBER() OVER(PARTITION BY showId ORDER BY watchedAt DESC) as rn
+      FROM watched_episodes
+    ) we
+    JOIN watchlist w ON we.showId = w.id
+    LEFT JOIN shows_meta sm ON we.showId = sm.id
+    WHERE we.rn = 1 AND w.status = 'Watching'
+    ORDER BY we.watchedAt DESC;
+    `
+    const rows: CombinedContinueWatchingShow[] = await new Promise((resolve, reject) => {
+      db.all(query, [], (err: Error | null, rows: unknown) => {
+        if (err) reject(err)
+        else resolve(rows as CombinedContinueWatchingShow[])
+      })
+    })
+
+    return rows.map((show) => ({
+      ...show,
+      thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
+    }))
+  }
+
+  private async getUpNextShowsData(db: DatabaseWrapper): Promise<CombinedContinueWatchingShow[]> {
+    const watchingShows: (WatchingShow & { episodeCount?: number })[] = await new Promise(
+      (resolve, reject) => {
+        db.all(
+          `SELECT w.id, w.name, w.thumbnail, w.nativeName, w.englishName, sm.episodeCount
+           FROM watchlist w
+           LEFT JOIN shows_meta sm ON w.id = sm.id
+           WHERE w.status = 'Watching'`,
+          (err: Error | null, rows: unknown) => {
+            if (err) reject(err)
+            else resolve(rows as (WatchingShow & { episodeCount?: number })[])
+          }
+        )
+      }
+    )
+
+    const results = await Promise.allSettled(
+      watchingShows.map(async (show) => {
+        try {
+          // If we have cached episodeCount, we can avoid provider call if we only need "fast" results,
+          // but "Up Next" usually needs current available episodes from the provider.
+          // For now, let's keep it similar to the working state but optimized.
+          const [epDetails, watchedEpisodesResult] = await Promise.all([
+            this.provider.getEpisodes(show.id, 'sub'),
+            new Promise<WatchedEpisode[]>((resolve, reject) => {
+              db.all(
+                'SELECT * FROM watched_episodes WHERE showId = ?',
+                [show.id],
+                (err: Error | null, rows: unknown) => {
+                  if (err) reject(err)
+                  else resolve(rows as WatchedEpisode[])
+                }
+              )
+            }),
+          ])
+
+          const allEps = epDetails?.episodes?.sort((a, b) => parseFloat(a) - parseFloat(b)) || []
+          const watchedEpsMap = new Map(
+            watchedEpisodesResult.map((r) => [r.episodeNumber.toString(), r])
+          )
+
+          const unwatchedEps = allEps.filter((ep) => !watchedEpsMap.has(ep))
+
+          if (unwatchedEps.length > 0) {
+            return {
+              type: 'upNext',
+              show: {
+                _id: show.id,
+                id: show.id,
+                name: show.name,
+                thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
+                nativeName: show.nativeName,
+                englishName: show.englishName,
+                nextEpisodeToWatch: unwatchedEps[0],
+                newEpisodesCount: unwatchedEps.length,
+                episodeCount: allEps.length,
+                watchedCount: watchedEpsMap.size,
+              },
+            }
+          }
+          return null
+        } catch (e) {
+          logger.error({ err: e, showId: show.id }, 'Error processing show for Up Next list')
+          return null
+        }
+      })
+    )
+
+    const upNextShows: CombinedContinueWatchingShow[] = []
+    results.forEach((result) => {
+      if (result.status === 'fulfilled' && result.value) {
+        if (result.value.type === 'upNext') {
+          upNextShows.push(result.value.show as CombinedContinueWatchingShow)
+        }
+      }
+    })
+
+    return upNextShows
+  }
+
   getContinueWatchingFast = async (req: Request, res: Response) => {
     try {
       const limit = parseInt(req.query.limit as string) || 10
@@ -130,6 +245,7 @@ export class WatchlistController {
           `SELECT
             w.id as _id, w.id as id, w.name, w.thumbnail, w.nativeName, w.englishName,
             sm.episodeCount,
+            (SELECT COUNT(DISTINCT episodeNumber) FROM watched_episodes WHERE showId = w.id) as watchedCount,
             we.episodeNumber, we.currentTime, we.duration, we.watchedAt
           FROM (
             SELECT *, ROW_NUMBER() OVER(PARTITION BY showId ORDER BY watchedAt DESC) as rn
@@ -153,6 +269,15 @@ export class WatchlistController {
           thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
         }))
       )
+    } catch {
+      res.status(500).json({ error: 'DB error' })
+    }
+  }
+
+  getContinueWatchingUpNext = async (req: Request, res: Response) => {
+    try {
+      const data = await this.getUpNextShowsData(req.db)
+      res.json(data)
     } catch {
       res.status(500).json({ error: 'DB error' })
     }

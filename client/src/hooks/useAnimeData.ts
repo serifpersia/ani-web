@@ -13,6 +13,7 @@ export interface Anime {
   episodeNumber?: number
   currentTime?: number
   duration?: number
+  watchedCount?: number
   nextEpisodeToWatch?: string
   availableEpisodesDetail?: {
     sub?: string[]

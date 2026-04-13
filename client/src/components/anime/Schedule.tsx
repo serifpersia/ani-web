@@ -13,6 +13,8 @@ interface Anime {
   episodeNumber?: number
   currentTime?: number
   duration?: number
+  watchedCount?: number
+  episodeCount?: number
   availableEpisodesDetail?: {
     sub?: string[]
     dub?: string[]
