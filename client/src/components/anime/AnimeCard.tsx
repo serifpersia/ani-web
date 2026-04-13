@@ -55,8 +55,12 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
 
     const progressRatio = (anime.currentTime || 0) / (anime.duration || 1)
 
+    const episodeToPlay = anime.episodeNumber ?? anime.nextEpisodeToWatch
+
     const linkTarget = continueWatching
-      ? `/player/${anime._id}/${anime.episodeNumber}`
+      ? episodeToPlay
+        ? `/player/${anime._id}/${episodeToPlay}`
+        : `/player/${anime._id}`
       : progressRatio > 0.9 && hasNewEpisodes
         ? `/player/${anime._id}/${anime.nextEpisodeToWatch}`
         : hasProgress
@@ -96,8 +100,8 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     const progressString =
       anime.watchedCount !== undefined && anime.episodeCount
         ? `EP ${anime.watchedCount} / ${anime.episodeCount}`
-        : continueWatching
-          ? `EP ${anime.episodeNumber}`
+        : continueWatching && episodeToPlay
+          ? `EP ${episodeToPlay}`
           : null
 
     return (

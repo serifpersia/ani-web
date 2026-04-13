@@ -14,7 +14,7 @@ import {
   useContinueWatchingUpNext,
   useRemoveFromWatchlist,
 } from '../hooks/useAnimeData'
-import { useSetting } from '../hooks/useSettings'
+
 import useIsMobile from '../hooks/useIsMobile'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 
@@ -27,7 +27,6 @@ const Home: React.FC = () => {
 
   const { titlePreference } = useTitlePreference()
   const [itemToRemove, setItemToRemove] = React.useState<{ id: string; name: string } | null>(null)
-  const { data: skipConfirm } = useSetting('skipRemoveConfirmation')
   const removeWatchlistMutation = useRemoveFromWatchlist()
 
   useEffect(() => {
@@ -43,27 +42,16 @@ const Home: React.FC = () => {
     const combined: typeof cwFast = []
     const seen = new Set<string>()
 
-    if (cwUpNext) {
-      for (const show of cwUpNext) {
-        if (show.nextEpisodeToWatch && !seen.has(show.id)) {
-          combined.push(show)
-          seen.add(show.id)
-        }
-      }
-    }
-
     if (cwFast) {
       for (const show of cwFast) {
-        if (!seen.has(show.id)) {
-          combined.push(show)
-          seen.add(show.id)
-        }
+        combined.push(show)
+        seen.add(show.id)
       }
     }
 
     if (cwUpNext) {
       for (const show of cwUpNext) {
-        if (!show.nextEpisodeToWatch && !seen.has(show.id)) {
+        if (!seen.has(show.id)) {
           combined.push(show)
           seen.add(show.id)
         }
@@ -91,18 +79,13 @@ const Home: React.FC = () => {
 
   const handleRemove = useCallback(
     (id: string) => {
-      const shouldSkip = String(skipConfirm) === 'true' || String(skipConfirm) === '1'
-      if (shouldSkip) {
-        removeCw.mutate(id)
-      } else {
-        const show = cwList?.find((s) => String(s.id) === String(id))
-        if (show) {
-          const displayTitle = (show[titlePreference as keyof typeof show] as string) || show.name
-          setItemToRemove({ id, name: displayTitle })
-        }
+      const show = cwList?.find((s) => String(s.id) === String(id))
+      if (show) {
+        const displayTitle = (show[titlePreference as keyof typeof show] as string) || show.name
+        setItemToRemove({ id, name: displayTitle })
       }
     },
-    [removeCw, cwList, titlePreference, skipConfirm]
+    [cwList, titlePreference]
   )
 
   const handleConfirmRemove = useCallback(
