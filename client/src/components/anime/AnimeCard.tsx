@@ -27,6 +27,8 @@ interface Anime {
     sub?: string[]
     dub?: string[]
   }
+  isAdult?: boolean
+  rating?: string
 }
 
 interface AnimeCardProps {
@@ -132,6 +134,11 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
                 <FaTimes size={10} />
               </button>
             )}
+
+            {(anime.isAdult ||
+              anime.rating === 'R+' ||
+              anime.rating === 'Rx' ||
+              anime.rating?.includes('17+')) && <div className={styles.adultBadge}>18+</div>}
           </div>
 
           <div className={styles.info}>

@@ -12,6 +12,8 @@ export interface Show {
     dub?: string[]
   }
   score?: number
+  isAdult?: boolean
+  rating?: string
 }
 
 export interface VideoLink {

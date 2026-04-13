@@ -193,7 +193,7 @@ export class AllAnimeProvider implements Provider {
     const fullQuery = `
       query ($search: SearchInput, $limit: Int, $page: Int, $translationType: VaildTranslationTypeEnumType, $countryOrigin: VaildCountryOriginEnumType) {
         shows(search: $search, limit: $limit, page: $page, translationType: $translationType, countryOrigin: $countryOrigin) {
-          edges { _id name nativeName englishName thumbnail description type availableEpisodesDetail }
+          edges { _id name nativeName englishName thumbnail description type availableEpisodesDetail isAdult rating }
         }
       }`
 
@@ -278,13 +278,7 @@ export class AllAnimeProvider implements Provider {
       translationType: translation && translation !== 'ALL' ? translation : 'sub',
       countryOrigin: country && country !== 'ALL' ? country : 'ALL',
     }
-    const extensions = {
-      persistedQuery: {
-        version: 1,
-        sha256Hash: 'a24c500a1b765c68ae1d8dd85174931f661c71369c89b92b88b75a725afc471c',
-      },
-    }
-    return this._fetchShows(variables, extensions)
+    return this._fetchShows(variables)
   }
 
   async getPopular(timeframe: 'daily' | 'weekly' | 'monthly' | 'all'): Promise<Show[]> {
@@ -353,6 +347,8 @@ export class AllAnimeProvider implements Provider {
                   thumbnail
                   type
                   availableEpisodesDetail
+                  isAdult
+                  rating
                 }
               }
             }
@@ -429,7 +425,7 @@ export class AllAnimeProvider implements Provider {
     const response = await axios.post(
       API_ENDPOINT,
       {
-        query: `query($showId: String!) { show(_id: $showId) { name, thumbnail, nativeName, englishName, availableEpisodesDetail, score } }`,
+        query: `query($showId: String!) { show(_id: $showId) { name, thumbnail, nativeName, englishName, availableEpisodesDetail, score, isAdult } }`,
         variables: { showId },
       },
       {
@@ -446,6 +442,7 @@ export class AllAnimeProvider implements Provider {
         englishName: show.englishName,
         availableEpisodesDetail: show.availableEpisodesDetail,
         score: show.score,
+        isAdult: show.isAdult,
       }
     }
     return null

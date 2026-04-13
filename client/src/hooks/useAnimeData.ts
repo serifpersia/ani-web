@@ -19,6 +19,8 @@ export interface Anime {
     dub?: string[]
   }
   episodeCount?: number
+  isAdult?: boolean
+  rating?: string
 }
 
 const fetchApi = async (url: string) => {
