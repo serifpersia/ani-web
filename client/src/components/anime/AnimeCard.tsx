@@ -97,9 +97,17 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     const [isLoaded, setIsLoaded] = useState(false)
 
     // Calculate episode progress string
+    const displayEpisodeCount = (() => {
+      const epCount = anime.episodeCount ?? 0
+      const watched = anime.watchedCount ?? 0
+      if (epCount && epCount >= watched) return epCount
+      if (watched > 0) return watched
+      return epCount || undefined
+    })()
+
     const progressString =
-      anime.watchedCount !== undefined && anime.episodeCount
-        ? `EP ${anime.watchedCount} / ${anime.episodeCount}`
+      anime.watchedCount !== undefined && (displayEpisodeCount || anime.watchedCount)
+        ? `EP ${anime.watchedCount} / ${displayEpisodeCount ?? anime.watchedCount}`
         : continueWatching && episodeToPlay
           ? `EP ${episodeToPlay}`
           : null

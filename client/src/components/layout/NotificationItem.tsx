@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { FaTimes } from 'react-icons/fa'
 import { fixThumbnailUrl } from '../../lib/utils'
 import type { Notification } from '../../hooks/useAnimeData'
+import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 import { useDismissNotification } from '../../hooks/useAnimeData'
 import styles from './Notification.module.css'
 
@@ -29,6 +30,14 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => 
     })
   }
 
+  const { titlePreference } = useTitlePreference()
+  const displayTitle =
+    titlePreference === 'nativeName'
+      ? notification.nativeName || notification.name
+      : titlePreference === 'englishName'
+        ? notification.englishName || notification.name
+        : notification.name
+
   return (
     <Link
       to={`/player/${notification.showId}/${notification.episodeNumber}`}
@@ -41,7 +50,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => 
         className={styles.thumbnail}
       />
       <div className={styles.itemInfo}>
-        <span className={styles.itemTitle}>{notification.name}</span>
+        <span className={styles.itemTitle}>{displayTitle}</span>
         <span className={styles.itemMeta}>New Episode {notification.episodeNumber}</span>
       </div>
       <button

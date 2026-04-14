@@ -189,6 +189,8 @@ export const useRemoveFromWatchlist = () => {
 export interface Notification {
   showId: string
   name: string
+  nativeName?: string
+  englishName?: string
   thumbnail: string
   episodeNumber: string
   id: string

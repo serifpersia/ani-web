@@ -102,8 +102,11 @@ export class WatchlistController {
       rows.map(async (show) => {
         let epCount = show.episodeCount
 
-        // If we don't have the total episode count cached, try to fetch it
-        if (!epCount) {
+        // If we don't have the total episode count cached, or the cached total
+        // is less-than-or-equal to the number of watched episodes, re-fetch
+        // episode details from the provider to get an accurate total.
+        const watchedCount = (show.watchedCount as unknown as number) || 0
+        if (!epCount || (watchedCount > 0 && epCount <= watchedCount)) {
           try {
             const epDetails = await this.provider.getEpisodes(show.id, 'sub')
             if (epDetails && epDetails.episodes) {
@@ -302,13 +305,37 @@ export class WatchlistController {
           }
         )
       })
-      res.json(
-        rows.map((show) => ({
-          ...show,
-          type: show.type || show.smType,
-          thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
-        }))
+      // For fast responses we still need to guard against stale or missing
+      // episode counts. For any show where the cached episodeCount is missing
+      // or less-than-or-equal to the watchedCount, refresh from the provider.
+      const refreshed = await Promise.all(
+        rows.map(async (show) => {
+          let epCount = show.episodeCount
+          const watchedCount = (show.watchedCount as unknown as number) || 0
+          if (!epCount || (watchedCount > 0 && epCount <= watchedCount)) {
+            try {
+              const epDetails = await this.provider.getEpisodes(show.id, 'sub')
+              if (epDetails && epDetails.episodes) {
+                epCount = epDetails.episodes.length
+                req.db.run('UPDATE shows_meta SET episodeCount = ? WHERE id = ?', [
+                  epCount,
+                  show.id,
+                ])
+              }
+            } catch (e) {
+              logger.error({ err: e, showId: show.id }, 'Failed to refresh episode count (fast)')
+            }
+          }
+          return {
+            ...show,
+            episodeCount: epCount,
+            type: show.type || show.smType,
+            thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
+          }
+        })
       )
+
+      res.json(refreshed)
     } catch {
       res.status(500).json({ error: 'DB error' })
     }
@@ -594,21 +621,36 @@ export class WatchlistController {
   getNotifications = async (req: Request, res: Response) => {
     try {
       const db = req.db
-      const watchingShows: { id: string; name: string; thumbnail: string }[] = await new Promise(
-        (resolve, reject) => {
-          db.all(
-            "SELECT id, name, thumbnail FROM watchlist WHERE status = 'Watching'",
-            (err: Error | null, rows: unknown) => {
-              if (err) reject(err)
-              else resolve((rows as { id: string; name: string; thumbnail: string }[]) || [])
-            }
-          )
-        }
-      )
+      const watchingShows: {
+        id: string
+        name: string
+        thumbnail: string
+        nativeName?: string
+        englishName?: string
+      }[] = await new Promise((resolve, reject) => {
+        db.all(
+          "SELECT id, name, thumbnail, nativeName, englishName FROM watchlist WHERE status = 'Watching'",
+          (err: Error | null, rows: unknown) => {
+            if (err) reject(err)
+            else
+              resolve(
+                (rows as {
+                  id: string
+                  name: string
+                  thumbnail: string
+                  nativeName?: string
+                  englishName?: string
+                }[]) || []
+              )
+          }
+        )
+      })
 
       const notifications: {
         showId: string
         name: string
+        nativeName?: string
+        englishName?: string
         thumbnail: string
         episodeNumber: string
         id: string
@@ -707,6 +749,8 @@ export class WatchlistController {
                   notifications.push({
                     showId: show.id,
                     name: show.name,
+                    nativeName: show.nativeName,
+                    englishName: show.englishName,
                     thumbnail: this.provider.deobfuscateUrl(show.thumbnail),
                     episodeNumber: epStr,
                     id: `${show.id}-${epStr}`,
