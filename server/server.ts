@@ -72,7 +72,7 @@ axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay })
 
 app.use(
   compression({
-    level: 6,
+    level: 2,
     threshold: 1024,
     filter: (req, res) => {
       if (req.headers['x-no-compression']) {

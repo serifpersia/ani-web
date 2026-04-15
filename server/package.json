@@ -6,7 +6,7 @@
     "node": ">=22.5.0"
   },
   "scripts": {
-    "start": "node dist/server.js",
+    "start": "node --max-old-space-size=256 dist/server.js",
     "dev": "nodemon --watch \"**/*.ts\" --exec \"ts-node server.ts --dev\"",
     "build": "npx tsc",
     "format": "prettier --write .",
