@@ -65,7 +65,7 @@ const GoogleAuthSettings: React.FC = () => {
       await Promise.all([
         fetchUser(),
         fetchConfigStatus(),
-        fetch('/api/settings/google-auth')
+        fetch('/api/auth/google-auth')
           .then((res) => res.json())
           .then((data) => {
             setClientId(data.clientId || '')
@@ -94,7 +94,7 @@ const GoogleAuthSettings: React.FC = () => {
 
   const handleSave = async () => {
     try {
-      const res = await fetch('/api/settings/google-auth', {
+      const res = await fetch('/api/auth/google-auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId, clientSecret }),
@@ -125,7 +125,7 @@ const GoogleAuthSettings: React.FC = () => {
     setClientId('')
     setClientSecret('')
     try {
-      const res = await fetch('/api/settings/google-auth', {
+      const res = await fetch('/api/auth/google-auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId: '', clientSecret: '' }),
