@@ -142,9 +142,16 @@ const Player: React.FC = () => {
         track.kind = 'subtitles'
         track.label = sub.label
         track.srclang = sub.lang
-        if (sub.src) {
-          track.src = `/api/subtitle-proxy?url=${encodeURIComponent(sub.src)}`
+
+        const subSrc = sub.src ?? sub.url
+        if (subSrc) {
+          let subUrl = `/api/subtitle-proxy?url=${encodeURIComponent(subSrc)}`
+          if (state.selectedLink?.headers?.Referer) {
+            subUrl += `&referer=${encodeURIComponent(state.selectedLink.headers.Referer)}`
+          }
+          track.src = subUrl
         }
+
         if (sub.lang === 'en' || sub.label === 'English') {
           track.default = true
         }
@@ -174,7 +181,13 @@ const Player: React.FC = () => {
         import('hls.js/dist/hls.light.mjs').then((module) => {
           const Hls = module.default
           if (Hls.isSupported()) {
-            const hls = new Hls()
+            const hls = new Hls({
+              maxBufferLength: 30,
+              maxMaxBufferLength: 60,
+              maxBufferSize: 60 * 1000 * 1000, // 60MB
+              startLevel: -1,
+              enableWorker: true,
+            })
             hlsInstance.current = hls
             hls.loadSource(proxiedUrl)
             hls.attachMedia(videoElement)
@@ -366,11 +379,23 @@ const Player: React.FC = () => {
       )
       const trackToActivate = englishTrack || player.state.availableSubtitles[0]
       setActiveSubtitleTrack(trackToActivate.lang || trackToActivate.label)
-      player.state.availableSubtitles.forEach(
-        (t) => (t.mode = t === trackToActivate ? 'showing' : 'hidden')
-      )
+
+      const video = refs.videoRef.current
+      if (video) {
+        Array.from(video.textTracks).forEach((t) => {
+          t.mode =
+            t.language === trackToActivate.lang || t.label === trackToActivate.label
+              ? 'showing'
+              : 'hidden'
+        })
+      }
     }
-  }, [player.state.activeSubtitleTrack, player.state.availableSubtitles, setActiveSubtitleTrack])
+  }, [
+    player.state.activeSubtitleTrack,
+    player.state.availableSubtitles,
+    setActiveSubtitleTrack,
+    refs.videoRef,
+  ])
 
   useEffect(() => {
     const styleId = 'dynamic-subtitle-styles'
@@ -581,6 +606,14 @@ const Player: React.FC = () => {
             <SourceSelector
               videoSources={state.videoSources}
               selectedSource={state.selectedSource}
+              selectedProvider={state.selectedProvider}
+              onProviderChange={(newProvider) => {
+                dispatch({
+                  type: 'SET_STATE',
+                  payload: { selectedProvider: newProvider },
+                })
+                localStorage.setItem('preferredProvider', newProvider)
+              }}
               onSourceChange={(source) => {
                 if (refs.videoRef.current && !isNaN(refs.videoRef.current.currentTime)) {
                   seekToTimeRef.current = refs.videoRef.current.currentTime

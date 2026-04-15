@@ -83,6 +83,13 @@ const PlayerSettings: React.FC<PlayerSettingsProps> = ({
 
   const renderSubtitles = () => (
     <div className={styles.menuContent}>
+      <button
+        className={`${styles.menuItem} ${activeSubtitleTrack === 'off' ? styles.selected : ''} `}
+        onClick={() => onSubtitleChange('off')}
+      >
+        <span>Off</span>
+        {activeSubtitleTrack === 'off' && <FaCheck size={12} />}
+      </button>
       {subtitles.map((sub) => (
         <button
           key={sub.label}
@@ -106,7 +113,9 @@ const PlayerSettings: React.FC<PlayerSettingsProps> = ({
           max="10"
           step="0.5"
           value={subtitleSettings.fontSize}
-          onChange={(e) => onSubtitleSettingsChange('fontSize', parseFloat(e.target.value))}
+          onInput={(e) =>
+            onSubtitleSettingsChange('fontSize', parseFloat((e.target as HTMLInputElement).value))
+          }
         />
       </div>
       <div className={styles.sliderGroup}>
@@ -117,7 +126,9 @@ const PlayerSettings: React.FC<PlayerSettingsProps> = ({
           max="50"
           step="1"
           value={subtitleSettings.position}
-          onChange={(e) => onSubtitleSettingsChange('position', parseInt(e.target.value))}
+          onInput={(e) =>
+            onSubtitleSettingsChange('position', parseInt((e.target as HTMLInputElement).value))
+          }
         />
       </div>
     </div>

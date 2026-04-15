@@ -155,10 +155,22 @@ export const usePlayerData = (
       })
 
       try {
+        let providerShowId = showId
+        if (state.selectedProvider === 'hianime' && state.showMeta.name) {
+          // Search for HiAnime ID if we don't have it (we use the name from AllAnime)
+          const searchResponse = await fetch(
+            `/api/search?query=${encodeURIComponent(state.showMeta.name)}&provider=hianime`
+          )
+          const searchResults = await searchResponse.json()
+          if (searchResults && searchResults.length > 0) {
+            providerShowId = searchResults[0].id
+          }
+        }
+
         const [sourcesResponse, progressResponse, preferredSourceResponse, skipTimesResponse] =
           await Promise.all([
             fetch(
-              `/api/video?showId=${showId}&episodeNumber=${state.currentEpisode}&mode=${state.currentMode}`
+              `/api/video?showId=${providerShowId}&episodeNumber=${state.currentEpisode}&mode=${state.currentMode}&provider=${state.selectedProvider}`
             ),
             fetch(`/api/episode-progress/${showId}/${state.currentEpisode}`, {
               headers: { 'Content-Type': 'application/json' },
@@ -245,7 +257,7 @@ export const usePlayerData = (
     }
 
     fetchVideoSources()
-  }, [showId, state.currentEpisode, state.currentMode])
+  }, [showId, state.currentEpisode, state.currentMode, state.selectedProvider, state.showMeta.name])
 
   const toggleWatchlist = useCallback(async () => {
     if (!state.showMeta || !showId) return

@@ -64,6 +64,7 @@ export interface VideoLink {
 
 export interface SubtitleTrack {
   src?: string
+  url?: string
   lang: string
   label: string
   mode?: 'showing' | 'hidden' | 'disabled'
@@ -101,6 +102,7 @@ export interface PlayerState {
   showResumeModal: boolean
   resumeTime: number
   skipIntervals: SkipInterval[]
+  selectedProvider: 'allanime' | 'hianime'
   loadingShowData: boolean
   loadingVideo: boolean
   loadingDetails: boolean

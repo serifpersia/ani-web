@@ -120,7 +120,9 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     actions.setActiveSubtitleTrack(trackId)
     Array.from(refs.videoRef.current.textTracks).forEach((track) => {
       track.mode =
-        trackId !== null && (track.language === trackId || track.label === trackId)
+        trackId !== null &&
+        trackId !== 'off' &&
+        (track.language === trackId || track.label === trackId)
           ? 'showing'
           : 'hidden'
     })
@@ -379,6 +381,9 @@ export default React.memo(PlayerControls, (prevProps, nextProps) => {
     prevProps.player.state.isMuted === nextProps.player.state.isMuted &&
     prevProps.player.state.isFullscreen === nextProps.player.state.isFullscreen &&
     prevProps.player.state.showControls === nextProps.player.state.showControls &&
-    prevProps.player.state.currentSkipInterval === nextProps.player.state.currentSkipInterval
+    prevProps.player.state.currentSkipInterval === nextProps.player.state.currentSkipInterval &&
+    prevProps.player.state.subtitleFontSize === nextProps.player.state.subtitleFontSize &&
+    prevProps.player.state.subtitlePosition === nextProps.player.state.subtitlePosition &&
+    prevProps.player.state.activeSubtitleTrack === nextProps.player.state.activeSubtitleTrack
   )
 })

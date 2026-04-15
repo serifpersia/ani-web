@@ -679,6 +679,35 @@
   width: 100%;
 }
 
+.providerSelectContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.providerSelect {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  outline: none;
+  cursor: pointer;
+  width: fit-content;
+  min-width: 150px;
+}
+
+.providerSelect:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border);
+}
+
+.providerSelect option {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
 .sourceSelectionContainer h4 {
   margin: 0;
   color: var(--text-secondary);

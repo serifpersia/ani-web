@@ -10,6 +10,7 @@ import { DatabaseWrapper } from './db'
 import chokidar from 'chokidar'
 import logger from './logger'
 import { AllAnimeProvider } from './providers/allanime.provider'
+import { HiAnimeProvider } from './providers/hianime.provider'
 import { googleDriveService } from './google'
 import { CONFIG } from './config'
 import { initializeDatabase, syncDownOnBoot, syncUp, initSyncProvider } from './sync'
@@ -29,7 +30,12 @@ declare module 'express-serve-static-core' {
 
 const app = express()
 const apiCache = new NodeCache({ stdTTL: 3600 })
-const provider = new AllAnimeProvider(apiCache)
+const allAnimeProvider = new AllAnimeProvider(apiCache)
+const hiAnimeProvider = new HiAnimeProvider(apiCache)
+const providers = {
+  allanime: allAnimeProvider,
+  hianime: hiAnimeProvider,
+}
 
 let db: DatabaseWrapper
 let isShuttingDown = false
@@ -90,13 +96,13 @@ app.use(
   '/api/auth',
   createAuthRouter((database) => runSyncSequence(database))
 )
-app.use('/api', createWatchlistRouter(provider))
-app.use('/api', createDataRouter(apiCache, provider))
+app.use('/api', createWatchlistRouter(allAnimeProvider))
+app.use('/api', createDataRouter(apiCache, providers))
 app.use('/api', createProxyRouter())
-app.use('/api', createInsightsRouter(provider))
+app.use('/api', createInsightsRouter(allAnimeProvider))
 app.use(
   '/api',
-  createSettingsRouter(provider, () => db, initializeDatabase)
+  createSettingsRouter(allAnimeProvider, () => db, initializeDatabase)
 )
 
 if (!CONFIG.IS_DEV) {

@@ -28,6 +28,8 @@ export const initialState: PlayerState = {
   showResumeModal: false,
   resumeTime: 0,
   skipIntervals: [],
+  selectedProvider:
+    (localStorage.getItem('preferredProvider') as 'allanime' | 'hianime') || 'allanime',
   loadingShowData: true,
   loadingVideo: false,
   loadingDetails: false,

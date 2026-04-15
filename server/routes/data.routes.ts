@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express'
 import { DataController } from '../controllers/data.controller'
-import { AllAnimeProvider } from '../providers/allanime.provider'
+import { Provider } from '../providers/provider.interface'
 import NodeCache from 'node-cache'
 
 /** Creates a middleware that checks the cache before passing to the handler,
@@ -31,9 +31,12 @@ function makeCacheMiddleware(
   }
 }
 
-export function createDataRouter(apiCache: NodeCache, provider: AllAnimeProvider): Router {
+export function createDataRouter(
+  apiCache: NodeCache,
+  providers: { [key: string]: Provider }
+): Router {
   const router = Router()
-  const controller = new DataController(provider)
+  const controller = new DataController(providers)
 
   router.get(
     '/popular/:timeframe',

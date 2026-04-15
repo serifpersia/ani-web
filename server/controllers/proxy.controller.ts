@@ -1,11 +1,29 @@
 import { Request, Response } from 'express'
 import axios from 'axios'
 import path from 'path'
+import http from 'http'
+import https from 'https'
+import NodeCache from 'node-cache'
+
+const proxyCache = new NodeCache({ stdTTL: 30, checkperiod: 60 })
+
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 100 })
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 100 })
+
+const axiosInstance = axios.create({
+  httpAgent,
+  httpsAgent,
+  timeout: 30000,
+})
 
 export class ProxyController {
   handleProxy = async (req: Request, res: Response) => {
     const { url, referer } = req.query
     if (!url) return res.status(400).send('URL required')
+
+    const urlStr = url as string
+    const refererStr = (referer as string) || ''
+    const cacheKey = `m3u8-${urlStr}-${refererStr}`
 
     const abortController = new AbortController()
     req.on('close', () => {
@@ -17,35 +35,55 @@ export class ProxyController {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       }
-      if (referer) headers['Referer'] = referer as string
+      if (referer) headers['Referer'] = refererStr
       if (req.headers.range) headers['Range'] = req.headers.range
 
-      if ((url as string).includes('.m3u8')) {
-        const resp = await axios.get(url as string, {
+      if (urlStr.includes('.m3u8')) {
+        const cached = proxyCache.get<string>(cacheKey)
+        if (cached) {
+          return res
+            .set('Content-Type', 'application/vnd.apple.mpegurl')
+            .set('Access-Control-Allow-Origin', '*')
+            .send(cached)
+        }
+
+        const resp = await axiosInstance.get(urlStr, {
           headers,
           responseType: 'text',
           signal: abortController.signal,
         })
-        const baseUrl = new URL(url as string)
+
+        const baseUrl = new URL(urlStr)
         const rewritten = resp.data
           .split('\n')
-          .map((l: string) =>
-            l.trim() && !l.startsWith('#')
-              ? `/api/proxy?url=${encodeURIComponent(new URL(l, baseUrl).href)}&referer=${encodeURIComponent((referer as string) || '')}`
-              : l
-          )
+          .map((l: string) => {
+            const line = l.trim()
+            if (!line) return l
+
+            if (line.startsWith('#')) {
+              return line.replace(/URI="([^"]+)"/g, (match, uri) => {
+                const fullUri = new URL(uri, baseUrl).href
+                return `URI="/api/proxy?url=${encodeURIComponent(fullUri)}&referer=${encodeURIComponent(refererStr)}"`
+              })
+            }
+
+            const fullUrl = new URL(line, baseUrl).href
+            return `/api/proxy?url=${encodeURIComponent(fullUrl)}&referer=${encodeURIComponent(refererStr)}`
+          })
           .join('\n')
+
+        proxyCache.set(cacheKey, rewritten)
+
         res
           .set('Content-Type', 'application/vnd.apple.mpegurl')
           .set('Access-Control-Allow-Origin', '*')
           .send(rewritten)
       } else {
-        const resp = await axios({
+        const resp = await axiosInstance({
           method: 'get',
-          url: url as string,
+          url: urlStr,
           responseType: 'stream',
           headers,
-          timeout: 30000,
           signal: abortController.signal,
         })
         res.status(resp.status)
@@ -82,10 +120,19 @@ export class ProxyController {
   }
 
   handleSubtitleProxy = async (req: Request, res: Response) => {
+    const { url, referer } = req.query
+    if (!url) return res.status(400).send('URL required')
+
     try {
-      const response = await axios.get(req.query.url as string, {
+      const headers: Record<string, string> = {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      }
+      if (referer) headers['Referer'] = referer as string
+
+      const response = await axiosInstance.get(url as string, {
+        headers,
         responseType: 'text',
-        timeout: 10000,
       })
       res.set('Content-Type', 'text/vtt; charset=utf-8').send(response.data)
     } catch (e) {
