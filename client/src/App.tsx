@@ -16,6 +16,7 @@ const Insights = lazy(() => import('./pages/Insights'))
 import { useSidebar } from './hooks/useSidebar'
 import { Toaster } from 'react-hot-toast'
 import TopProgressBar from './components/common/TopProgressBar'
+import ErrorBoundary from './components/common/ErrorBoundary'
 
 function App() {
   const { isOpen, setIsOpen } = useSidebar()
@@ -72,18 +73,20 @@ function App() {
       <Header />
       <Sidebar />
       <main>
-        <Suspense fallback={<TopProgressBar />}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/watchlist/:filter?" element={<Watchlist />} />
-            <Route path="/search" element={<Search />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/mal" element={<MAL />} />
-            <Route path="/insights" element={<Insights />} />
-            <Route path="/player/:id" element={<Player />} />
-            <Route path="/player/:id/:episodeNumber" element={<Player />} />
-          </Routes>
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={<TopProgressBar />}>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/watchlist/:filter?" element={<Watchlist />} />
+              <Route path="/search" element={<Search />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/mal" element={<MAL />} />
+              <Route path="/insights" element={<Insights />} />
+              <Route path="/player/:id" element={<Player />} />
+              <Route path="/player/:id/:episodeNumber" element={<Player />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
       </main>
       <Footer />
       <ScrollToTopButton />

@@ -180,9 +180,21 @@
   right: 0;
   bottom: 0;
   opacity: 1;
-  transition: opacity 0.3s ease-out;
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 50;
   pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.35) 0%,
+    rgba(0, 0, 0, 0.2) 15%,
+    transparent 40%,
+    transparent 60%,
+    rgba(0, 0, 0, 0.2) 85%,
+    rgba(0, 0, 0, 0.35) 100%
+  );
   will-change: opacity;
 }
 
@@ -204,17 +216,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(15, 15, 17, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 50%;
   color: white;
-  width: 80px;
-  height: 80px;
-  font-size: 2.5rem;
+  width: 90px;
+  height: 90px;
+  font-size: 2.8rem;
   cursor: pointer;
   padding-left: 6px;
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: none;
   will-change: transform;
 }
 
@@ -234,10 +248,12 @@
   flex-direction: column;
   gap: 0;
   background: rgba(15, 15, 17, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
   padding: 16px 24px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: none;
 }
 
 .progressBarContainer {

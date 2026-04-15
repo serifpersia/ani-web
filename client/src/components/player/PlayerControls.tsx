@@ -42,6 +42,42 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   const { state, refs, actions } = player
   const [showSettings, setShowSettings] = useState(false)
 
+  // Local state for frequently changing values to prevent global re-renders
+  const [currentTime, setCurrentTime] = useState(0)
+  const [buffered, setBuffered] = useState(0)
+
+  // Listen to video events directly
+  useEffect(() => {
+    const video = refs.videoRef.current
+    if (!video) return
+
+    const handleTimeUpdate = () => {
+      if (!state.isScrubbing) {
+        setCurrentTime(video.currentTime)
+      }
+    }
+
+    const handleProgress = () => {
+      if (video.buffered.length > 0) {
+        setBuffered(video.buffered.end(video.buffered.length - 1))
+      }
+    }
+
+    // Initialize values
+    setCurrentTime(video.currentTime)
+    if (video.buffered.length > 0) {
+      setBuffered(video.buffered.end(video.buffered.length - 1))
+    }
+
+    video.addEventListener('timeupdate', handleTimeUpdate)
+    video.addEventListener('progress', handleProgress)
+
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate)
+      video.removeEventListener('progress', handleProgress)
+    }
+  }, [refs.videoRef, state.isScrubbing])
+
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!refs.videoRef.current) return
     const newVolume = parseFloat(e.target.value)
@@ -110,7 +146,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
       const percent = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
       const scrubTime = percent * state.duration
       refs.videoRef.current.currentTime = scrubTime
-      actions.setCurrentTime(scrubTime)
+      setCurrentTime(scrubTime)
       actions.setHoverTime({ time: scrubTime, position: e.clientX - rect.left })
     }
     const handleDocumentMouseUp = () => {
@@ -176,15 +212,15 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
             )}
             <div
               className={styles.bufferedBar}
-              style={{ width: `${(state.buffered / state.duration) * 100 || 0}% ` }}
+              style={{ width: `${(buffered / state.duration) * 100 || 0}% ` }}
             ></div>
             <div
               className={styles.watchedBar}
-              style={{ width: `${(state.currentTime / state.duration) * 100 || 0}% ` }}
+              style={{ width: `${(currentTime / state.duration) * 100 || 0}% ` }}
             ></div>
             <div
               className={styles.thumb}
-              style={{ left: `${(state.currentTime / state.duration) * 100 || 0}% ` }}
+              style={{ left: `${(currentTime / state.duration) * 100 || 0}% ` }}
               onMouseDown={handleThumbMouseDown}
             ></div>
 
@@ -231,7 +267,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
             </div>
 
             <span className={styles.timeDisplay}>
-              {actions.formatTime(state.currentTime)} / {actions.formatTime(state.duration)}
+              {actions.formatTime(currentTime)} / {actions.formatTime(state.duration)}
             </span>
 
             {state.currentSkipInterval && !state.isAutoSkipEnabled && (
@@ -338,11 +374,11 @@ export default React.memo(PlayerControls, (prevProps, nextProps) => {
     prevProps.selectedSource?.sourceName === nextProps.selectedSource?.sourceName &&
     prevProps.selectedLink?.link === nextProps.selectedLink?.link &&
     prevProps.player.state.isPlaying === nextProps.player.state.isPlaying &&
-    prevProps.player.state.currentTime === nextProps.player.state.currentTime &&
     prevProps.player.state.duration === nextProps.player.state.duration &&
     prevProps.player.state.volume === nextProps.player.state.volume &&
     prevProps.player.state.isMuted === nextProps.player.state.isMuted &&
     prevProps.player.state.isFullscreen === nextProps.player.state.isFullscreen &&
-    prevProps.player.state.showControls === nextProps.player.state.showControls
+    prevProps.player.state.showControls === nextProps.player.state.showControls &&
+    prevProps.player.state.currentSkipInterval === nextProps.player.state.currentSkipInterval
   )
 })

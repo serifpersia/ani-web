@@ -25,6 +25,7 @@ const Settings: React.FC = () => {
         document.body.appendChild(a)
         a.click()
         a.remove()
+        window.URL.revokeObjectURL(url)
         setStatusMessage('Database backup successful!')
       } else {
         const errorData = await response.json()

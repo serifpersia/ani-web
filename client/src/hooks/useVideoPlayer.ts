@@ -16,6 +16,7 @@ interface VideoPlayerProps {
     names?: { native?: string; english?: string }
     genres?: { name: string }[]
     score?: number
+    type?: string
   }
 }
 
@@ -32,9 +33,9 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
   const [isMuted, setIsMuted] = useState(false)
   const [volume, setVolume] = useState(1)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [currentTime, setCurrentTime] = useState(0)
+  // Removed currentTime and buffered from state to prevent global re-renders
+  // These are now handled locally in PlayerControls.tsx
   const [duration, setDuration] = useState(0)
-  const [buffered, setBuffered] = useState(0)
   const [showControls, setShowControls] = useState(true)
   const [isScrubbing, setIsScrubbing] = useState(false)
   const [hoverTime, setHoverTime] = useState<{ time: number; position: number | null }>({
@@ -272,23 +273,16 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
     }
   }, [])
   const onProgress = useCallback(() => {
-    if (videoRef.current && videoRef.current.buffered.length > 0) {
-      setBuffered(videoRef.current.buffered.end(videoRef.current.buffered.length - 1))
-    }
+    // Buffering state is now handled locally in PlayerControls.tsx
   }, [])
   const onTimeUpdate = useCallback(() => {
     const video = videoRef.current
     if (!video) return
     const time = video.currentTime || 0
-    if (!isScrubbing) {
-      setCurrentTime((prev) => {
-        if (Math.floor(time) !== Math.floor(prev)) return time
-        return prev
-      })
-    }
 
+    // Throttled progress update to the backend (every 30 seconds instead of 5)
     const now = Date.now()
-    if (now - lastThrottledUpdateTime.current > 5000) {
+    if (now - lastThrottledUpdateTime.current > 30000) {
       lastThrottledUpdateTime.current = now
       sendProgressUpdate()
     }
@@ -301,7 +295,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
       video.currentTime = activeSkip.end_time
       setCurrentSkipInterval(null)
     }
-  }, [isScrubbing, skipIntervals, isAutoSkipEnabled, sendProgressUpdate])
+  }, [skipIntervals, isAutoSkipEnabled, sendProgressUpdate])
 
   const reportFinalProgress = useCallback(() => {
     const video = videoRef.current
@@ -406,7 +400,6 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
       setIsFullscreen,
       onWaiting,
       onPlaying,
-      setCurrentTime,
       sendProgressUpdate,
     }),
     [
@@ -424,7 +417,6 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
       setIsFullscreen,
       onWaiting,
       onPlaying,
-      setCurrentTime,
       sendProgressUpdate,
     ]
   )
@@ -436,9 +428,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
       isMuted,
       volume,
       isFullscreen,
-      currentTime,
       duration,
-      buffered,
       showControls,
       isScrubbing,
       hoverTime,
