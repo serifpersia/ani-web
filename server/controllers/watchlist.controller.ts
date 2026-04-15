@@ -63,6 +63,9 @@ interface WatchlistRow {
   [key: string]: unknown
 }
 
+// Memory cache to prevent overlapping background API requests
+const activeTypeFetches = new Set<string>()
+
 export class WatchlistController {
   constructor(private provider: AllAnimeProvider) {}
 
@@ -101,18 +104,12 @@ export class WatchlistController {
     const enrichedRows = await Promise.all(
       rows.map(async (show) => {
         let epCount = show.episodeCount
-
-        // If we don't have the total episode count cached, or the cached total
-        // is less-than-or-equal to the number of watched episodes, re-fetch
-        // episode details from the provider to get an accurate total.
         const watchedCount = (show.watchedCount as unknown as number) || 0
         if (!epCount || (watchedCount > 0 && epCount <= watchedCount)) {
           try {
             const epDetails = await this.provider.getEpisodes(show.id, 'sub')
             if (epDetails && epDetails.episodes) {
               epCount = epDetails.episodes.length
-
-              // Asynchronously cache it back to the database for future speed
               db.run('UPDATE shows_meta SET episodeCount = ? WHERE id = ?', [epCount, show.id])
             }
           } catch (e) {
@@ -129,20 +126,22 @@ export class WatchlistController {
       })
     )
 
-    // Second pass: asynchronously fetch and update missing metadata (type)
-    // We do this in the background without blocking the response
+    // Background job: Fetch missing types (Optimized to prevent overlapping)
     setImmediate(async () => {
       for (const show of enrichedRows) {
-        if (!show.type) {
+        if (!show.type && !activeTypeFetches.has(show.id)) {
+          activeTypeFetches.add(show.id)
           try {
             const meta = await this.provider.getShowMeta(show.id)
             if (meta && meta.type) {
               db.run('UPDATE shows_meta SET type = ? WHERE id = ?', [meta.type, show.id])
               db.run('UPDATE watchlist SET type = ? WHERE id = ?', [meta.type, show.id])
-              db.scheduleSave() // Uses debounced save instead of blocking loop
+              db.scheduleSave()
             }
           } catch (e) {
             logger.error({ err: e, showId: show.id }, 'Lazy migration error for type')
+          } finally {
+            activeTypeFetches.delete(show.id)
           }
         }
       }
@@ -280,8 +279,6 @@ export class WatchlistController {
   getContinueWatchingFast = async (req: Request, res: Response) => {
     try {
       const limit = parseInt(req.query.limit as string) || 10
-      // Fast path: query DB directly, skip external provider.getEpisodes() calls entirely.
-      // Returns stale episodeCount from cache but responds in ~1ms instead of seconds.
       const rows: CombinedContinueWatchingShow[] = await new Promise((resolve, reject) => {
         req.db.all(
           `SELECT
@@ -305,9 +302,6 @@ export class WatchlistController {
           }
         )
       })
-      // For fast responses we still need to guard against stale or missing
-      // episode counts. For any show where the cached episodeCount is missing
-      // or less-than-or-equal to the watchedCount, refresh from the provider.
       const refreshed = await Promise.all(
         rows.map(async (show) => {
           let epCount = show.episodeCount
@@ -391,50 +385,41 @@ export class WatchlistController {
       genres,
       popularityScore,
       type,
+      status,
+      episodeCount,
     } = req.body
+
     try {
       const genresStr = Array.isArray(genres) ? JSON.stringify(genres) : genres
-      const { status, episodeCount } = req.body // Destructure optional new fields
 
       await performWriteTransaction(req.db, (tx) => {
+        // Optimized: Reduced 7 DB statements down to a single UPSERT
         tx.run(
-          'INSERT OR IGNORE INTO shows_meta (id, name, thumbnail, nativeName, englishName, genres, popularityScore, status, episodeCount, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          `INSERT INTO shows_meta (id, name, thumbnail, nativeName, englishName, genres, popularityScore, status, episodeCount, type) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             name = COALESCE(EXCLUDED.name, shows_meta.name),
+             thumbnail = COALESCE(EXCLUDED.thumbnail, shows_meta.thumbnail),
+             nativeName = COALESCE(EXCLUDED.nativeName, shows_meta.nativeName),
+             englishName = COALESCE(EXCLUDED.englishName, shows_meta.englishName),
+             genres = COALESCE(EXCLUDED.genres, shows_meta.genres),
+             popularityScore = COALESCE(EXCLUDED.popularityScore, shows_meta.popularityScore),
+             status = COALESCE(EXCLUDED.status, shows_meta.status),
+             episodeCount = COALESCE(EXCLUDED.episodeCount, shows_meta.episodeCount),
+             type = COALESCE(EXCLUDED.type, shows_meta.type)`,
           [
             showId,
             showName,
             this.provider.deobfuscateUrl(showThumbnail),
             nativeName,
             englishName,
-            genresStr,
-            popularityScore,
-            status,
-            episodeCount,
-            type,
+            genresStr || null,
+            popularityScore !== undefined ? popularityScore : null,
+            status || null,
+            episodeCount || null,
+            type || null,
           ]
         )
-
-        if (status) {
-          tx.run('UPDATE shows_meta SET status = ? WHERE id = ?', [status, showId])
-        }
-        if (episodeCount) {
-          tx.run('UPDATE shows_meta SET episodeCount = ? WHERE id = ?', [episodeCount, showId])
-        }
-
-        if (genresStr) {
-          tx.run('UPDATE shows_meta SET genres = ? WHERE id = ? AND genres IS NULL', [
-            genresStr,
-            showId,
-          ])
-        }
-        if (popularityScore !== undefined && popularityScore !== null) {
-          tx.run('UPDATE shows_meta SET popularityScore = ? WHERE id = ?', [
-            popularityScore,
-            showId,
-          ])
-        }
-        if (type) {
-          tx.run('UPDATE shows_meta SET type = ? WHERE id = ?', [type, showId])
-        }
 
         tx.run(
           `INSERT OR REPLACE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)`,
@@ -501,19 +486,21 @@ export class WatchlistController {
             limit,
           })
 
-          // Asynchronously update missing types for the returned rows
           setImmediate(async () => {
             for (const row of watchlistRows) {
-              if (!row.type) {
+              if (!row.type && !activeTypeFetches.has(row.id)) {
+                activeTypeFetches.add(row.id)
                 try {
                   const meta = await this.provider.getShowMeta(row.id)
                   if (meta && meta.type) {
                     req.db.run('UPDATE watchlist SET type = ? WHERE id = ?', [meta.type, row.id])
                     req.db.run('UPDATE shows_meta SET type = ? WHERE id = ?', [meta.type, row.id])
-                    req.db.scheduleSave() // Uses debounced save instead of blocking loop
+                    req.db.scheduleSave()
                   }
                 } catch (e) {
                   logger.error({ err: e, showId: row.id }, 'Watchlist lazy migration error')
+                } finally {
+                  activeTypeFetches.delete(row.id)
                 }
               }
             }
@@ -710,7 +697,6 @@ export class WatchlistController {
 
               if (!epDetails || !epDetails.episodes || epDetails.episodes.length === 0) return
 
-              // Only notify for ongoing shows
               if (
                 showMeta &&
                 showMeta.status &&
@@ -768,7 +754,7 @@ export class WatchlistController {
             }
           })
         )
-      } // end for batch loop
+      }
 
       res.json(
         notifications.sort((a, b) => parseFloat(b.episodeNumber) - parseFloat(a.episodeNumber))

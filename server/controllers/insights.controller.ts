@@ -37,7 +37,6 @@ export class InsightsController {
     const db = req.db
 
     try {
-      // Run all independent DB queries in parallel for maximum throughput
       const [
         core,
         activityGrid,
@@ -133,7 +132,6 @@ export class InsightsController {
       const bingeFactor =
         activityGrid.length > 0 ? Math.max(...activityGrid.map((a) => a.count)) : 0
 
-      // Compute session durations from the raw watch history
       const sessions: number[] = []
       if (allWatches.length > 0) {
         let currentSessionSeconds = allWatches[0].currentTime
@@ -154,7 +152,6 @@ export class InsightsController {
           ? Math.round(sessions.reduce((a, b) => a + b, 0) / sessions.length / 60)
           : 0
 
-      // Compute genre counts and popularity from the parallel-fetched watchedShows
       const genreCounts: Record<string, number> = {}
       let totalPopScore = 0
       let popCount = 0
@@ -162,13 +159,20 @@ export class InsightsController {
       for (const show of watchedShows) {
         let genres: string[] = []
         if (show.genres) {
-          try {
+          // Optimized: Bypass expensive try/catch error traps for simple arrays
+          if (show.genres.startsWith('[')) {
             genres = JSON.parse(show.genres)
-          } catch {
+          } else {
             genres = show.genres.split(',').map((g: string) => g.trim())
           }
         }
-        genres.forEach((g) => (genreCounts[g] = (genreCounts[g] || 0) + 1))
+
+        // Use a standard for-loop to iterate faster
+        for (let i = 0; i < genres.length; i++) {
+          const g = genres[i]
+          genreCounts[g] = (genreCounts[g] || 0) + 1
+        }
+
         if (show.popularityScore) {
           totalPopScore += show.popularityScore
           popCount++
