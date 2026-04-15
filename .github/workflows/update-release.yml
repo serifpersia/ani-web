@@ -60,12 +60,16 @@ jobs:
           cp server/package.json server/package-lock.json release-package/server/
           cp package.json package-lock.json release-package/
           cp LICENSE README.md release-package/
+          
+          # ---> Added orchestrator.js to the release zip <---
+          cp orchestrator.js release-package/
 
+          # ---> Updated generated scripts to use the orchestrator <---
           echo "#!/bin/bash" > release-package/run.sh
-          echo "node server/dist/server.js" >> release-package/run.sh
+          echo "node orchestrator.js prod" >> release-package/run.sh
 
           echo "@echo off" > release-package/run.bat
-          echo "node server/dist/server.js" >> release-package/run.bat
+          echo "node orchestrator.js prod" >> release-package/run.bat
 
           chmod +x release-package/run.sh
 
