@@ -45,19 +45,20 @@ export class SettingsController {
     }
   }
 
-  backupDatabase = (_req: Request, res: Response) => {
-    const dbName = CONFIG.IS_DEV ? CONFIG.DB_NAME_DEV : CONFIG.DB_NAME_PROD
-    const dbPath = path.join(CONFIG.ROOT, dbName)
+  backupDatabase = (req: Request, res: Response) => {
     const backupPath = path.join(CONFIG.ROOT, 'ani-web-backup.db')
 
-    fs.copyFile(dbPath, backupPath, (err) => {
-      if (err) return res.status(500).json({ error: 'Backup failed' })
+    try {
+      req.db.backup(backupPath)
       res.download(backupPath, 'ani-web-backup.db', () => {
         fs.unlink(backupPath, () => {
           // Ignore error
         })
       })
-    })
+    } catch (err) {
+      logger.error({ err }, 'Manual backup failed')
+      return res.status(500).json({ error: 'Backup failed' })
+    }
   }
 
   restoreDatabase = (

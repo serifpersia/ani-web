@@ -7,6 +7,11 @@ export class ProxyController {
     const { url, referer } = req.query
     if (!url) return res.status(400).send('URL required')
 
+    const abortController = new AbortController()
+    req.on('close', () => {
+      abortController.abort()
+    })
+
     try {
       const headers: Record<string, string> = {
         'User-Agent':
@@ -16,7 +21,11 @@ export class ProxyController {
       if (req.headers.range) headers['Range'] = req.headers.range
 
       if ((url as string).includes('.m3u8')) {
-        const resp = await axios.get(url as string, { headers, responseType: 'text' })
+        const resp = await axios.get(url as string, {
+          headers,
+          responseType: 'text',
+          signal: abortController.signal,
+        })
         const baseUrl = new URL(url as string)
         const rewritten = resp.data
           .split('\n')
@@ -37,6 +46,7 @@ export class ProxyController {
           responseType: 'stream',
           headers,
           timeout: 30000,
+          signal: abortController.signal,
         })
         res.status(resp.status)
 
@@ -64,6 +74,9 @@ export class ProxyController {
         resp.data.pipe(res)
       }
     } catch (e) {
+      if (axios.isCancel(e)) {
+        return
+      }
       if (!res.headersSent) res.status(500).send('Proxy error')
     }
   }
@@ -85,15 +98,34 @@ export class ProxyController {
     const { url } = req.query
     if (!url) return res.status(400).send('URL required')
 
+    const abortController = new AbortController()
+    req.on('close', () => {
+      abortController.abort()
+    })
+
     try {
+      const targetUrl = url as string
+      let refererValue = 'https://allanime.day'
+
+      if (targetUrl.includes('anilist.co')) {
+        refererValue = 'https://anilist.co/'
+      } else if (targetUrl.includes('gogocdn.net')) {
+        refererValue = 'https://gogoanime.lu/'
+      } else if (targetUrl.includes('wp.youtube-anime.com')) {
+        refererValue = 'https://allanime.day/'
+      }
+
       const imageResponse = await axios({
         method: 'get',
-        url: url as string,
-        responseType: 'stream', // Changed from arraybuffer to stream
+        url: targetUrl,
+        responseType: 'stream',
         headers: {
-          Referer: 'https://allanime.day',
-          'User-Agent': 'Mozilla/5.0',
+          Referer: refererValue,
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         },
+        timeout: 30000,
+        signal: abortController.signal,
       })
 
       res.set('Cache-Control', 'public, max-age=604800, immutable')
@@ -101,6 +133,9 @@ export class ProxyController {
       // Pipe directly to response instead of loading into memory
       imageResponse.data.pipe(res)
     } catch (e) {
+      if (axios.isCancel(e)) {
+        return
+      }
       // Serve placeholder if proxy fails
       res.status(200).sendFile(path.join(__dirname, '..', '..', 'client/public/placeholder.svg'))
     }

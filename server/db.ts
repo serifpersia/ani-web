@@ -9,6 +9,13 @@ export class DatabaseWrapper {
   private db: DatabaseSync
   private dbPath: string
 
+  /**
+   * NOTE: Node 22's DatabaseSync is 100% synchronous.
+   * While this wrapper provides callback/Promise interfaces to maintain compatibility
+   * with asynchronous drivers, calls to this database will block the Node.js event
+   * loop while executing. This is typically fine for local/single-user apps,
+   * but heavy queries could impact concurrent tasks like video streaming.
+   */
   constructor(dbPath: string, db: DatabaseSync) {
     this.dbPath = dbPath
     this.db = db
@@ -136,6 +143,19 @@ export class DatabaseWrapper {
       finalize: () => {
         // No-op
       },
+    }
+  }
+
+  /**
+   * Performs a safe backup of the live database using VACUUM INTO.
+   * This is safe even when WAL mode is enabled.
+   */
+  public backup(backupPath: string) {
+    try {
+      this.db.exec(`VACUUM INTO '${backupPath}'`)
+    } catch (e) {
+      logger.error({ err: e, backupPath }, 'Database backup failed via VACUUM INTO')
+      throw e
     }
   }
 }

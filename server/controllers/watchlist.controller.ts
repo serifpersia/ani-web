@@ -195,7 +195,14 @@ export class WatchlistController {
           `SELECT w.id, w.name, w.thumbnail, w.nativeName, w.englishName, w.type, sm.episodeCount, sm.type as smType
            FROM watchlist w
            LEFT JOIN shows_meta sm ON w.id = sm.id
-           WHERE w.status = 'Watching'`,
+           LEFT JOIN (
+              SELECT showId, MAX(watchedAt) as lastActivity 
+              FROM watched_episodes 
+              GROUP BY showId
+           ) we ON w.id = we.showId
+           WHERE w.status = 'Watching'
+           ORDER BY we.lastActivity DESC
+           LIMIT 15`,
           (err: Error | null, rows: unknown) => {
             if (err) reject(err)
             else resolve(rows as (WatchingShow & { episodeCount?: number })[])

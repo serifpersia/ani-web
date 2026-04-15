@@ -24,39 +24,49 @@ export const fixThumbnailUrl = (
     return thumbnailCache.get(cacheKey)!
   }
 
-  let finalUrl: string
+  // Determine the base transformed URL
+  let transformedUrl: string
   if (optimizedUrl.startsWith('https://ytimgf.youtube-anime.com/images/')) {
-    finalUrl = optimizedUrl.replace(
+    transformedUrl = optimizedUrl.replace(
       'https://ytimgf.youtube-anime.com/images/',
       'https://wp.youtube-anime.com/aln.youtube-anime.com/'
     )
   } else if (optimizedUrl.startsWith('https://cdnimg.xyz')) {
-    finalUrl = `https://wp.youtube-anime.com/${optimizedUrl.substring('https://'.length)}`
+    transformedUrl = `https://wp.youtube-anime.com/${optimizedUrl.substring('https://'.length)}`
   } else if (optimizedUrl.startsWith('https://aln.youtube-anime.com')) {
-    finalUrl = optimizedUrl.replace(
+    transformedUrl = optimizedUrl.replace(
       'https://aln.youtube-anime.com/',
       'https://wp.youtube-anime.com/aln.youtube-anime.com/images/'
     )
   } else if (optimizedUrl.startsWith('__Show__')) {
-    finalUrl = `https://wp.youtube-anime.com/aln.youtube-anime.com/images/${optimizedUrl}`
+    transformedUrl = `https://wp.youtube-anime.com/aln.youtube-anime.com/images/${optimizedUrl}`
   } else if (optimizedUrl.startsWith('mcovers')) {
-    finalUrl = `https://wp.youtube-anime.com/aln.youtube-anime.com/${optimizedUrl}`
+    transformedUrl = `https://wp.youtube-anime.com/aln.youtube-anime.com/${optimizedUrl}`
   } else if (optimizedUrl.startsWith('https://gogocdn.net')) {
-    finalUrl = `https://wp.youtube-anime.com/${optimizedUrl.substring('https://'.length)}`
+    transformedUrl = `https://wp.youtube-anime.com/${optimizedUrl.substring('https://'.length)}`
   } else if (optimizedUrl.startsWith('http')) {
-    finalUrl = `/api/image-proxy?url=${encodeURIComponent(optimizedUrl)}`
+    transformedUrl = optimizedUrl
   } else if (optimizedUrl.startsWith('images2')) {
-    finalUrl = `https://wp.youtube-anime.com/aln.youtube-anime.com/${optimizedUrl}`
+    transformedUrl = `https://wp.youtube-anime.com/aln.youtube-anime.com/${optimizedUrl}`
   } else {
-    finalUrl = `https://wp.youtube-anime.com/aln.youtube-anime.com/images/${optimizedUrl}`
+    transformedUrl = `https://wp.youtube-anime.com/aln.youtube-anime.com/images/${optimizedUrl}`
   }
 
+  // Always use local proxy for absolute URLs to ensure consistent Referer/CORS in all environments
+  let finalUrl: string
+  if (transformedUrl.startsWith('http')) {
+    finalUrl = `/api/image-proxy?url=${encodeURIComponent(transformedUrl)}`
+  } else {
+    finalUrl = transformedUrl
+  }
+
+  // Append size parameters
   if (width || height) {
     const separator = finalUrl.includes('?') ? '&' : '?'
     if (width) finalUrl += `${separator}w=${width}`
     if (height) finalUrl += `&h=${height}`
-  } else if (!finalUrl.includes('image-proxy')) {
-    finalUrl += finalUrl.includes('?') ? '&w=300' : '?w=300'
+  } else if (finalUrl.includes('image-proxy')) {
+    finalUrl += '&w=300'
   }
 
   thumbnailCache.set(cacheKey, finalUrl)
