@@ -29,16 +29,16 @@
   background-color: transparent;
   border: 1px solid transparent;
   color: var(--text-primary);
-  font-size: 1.3rem;
-  padding: var(--space-3);
+  font-size: 1.4rem;
+  padding: var(--space-2);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all var(--transition-base);
-  min-height: 40px;
-  min-width: 40px;
+  min-height: 48px;
+  min-width: 48px;
 }
 
 .hamburgerBtn:hover {
@@ -70,10 +70,10 @@
   padding: var(--space-2) var(--space-4) var(--space-2) var(--space-4);
   border-radius: var(--radius-full);
   width: 250px;
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-md);
   font-family: inherit;
   transition: all var(--transition-base);
-  min-height: 40px;
+  min-height: 48px;
 }
 
 .searchInput::placeholder {
@@ -102,8 +102,8 @@
 }
 
 .profileBtn {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   overflow: hidden;
   border: 2px solid var(--border-primary);
@@ -144,7 +144,7 @@
   font-family: inherit;
   transition: all var(--transition-base);
   cursor: pointer;
-  min-height: 40px;
+  min-height: 48px;
 }
 
 .signInBtn:hover {
@@ -163,20 +163,43 @@
 
 @media (max-width: 768px) {
   .header {
+    --header-height: 70px;
     padding: 0 var(--space-4);
     gap: var(--space-4);
   }
 
+  .logo {
+    --logo-height: 55px;
+  }
+
   .leftSection {
-    gap: var(--space-4);
+    gap: var(--space-3);
+  }
+
+  .hamburgerBtn {
+    min-height: 40px;
+    min-width: 40px;
+    font-size: 1.2rem;
   }
 
   .searchInput {
     width: 160px;
+    min-height: 40px;
+    font-size: var(--font-size-sm);
   }
 
   .searchInput:focus {
     width: 200px;
+  }
+
+  .profileBtn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .signInBtn {
+    min-height: 36px;
+    padding: var(--space-2) var(--space-4);
   }
 
   .signInText {

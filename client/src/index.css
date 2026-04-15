@@ -64,7 +64,7 @@
   --transition-base: 0.3s var(--ease-smooth);
   --transition-slow: 0.5s var(--ease-smooth);
 
-  --header-height: 80px;
+  --header-height: 90px;
   --max-width: 1600px;
 }
 
