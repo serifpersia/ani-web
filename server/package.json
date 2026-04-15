@@ -4,7 +4,7 @@
   "type": "commonjs",
   "scripts": {
     "start": "node dist/server.js",
-    "dev": "nodemon --watch \"**/*.ts\" --exec \"ts-node --transpile-only server.ts --dev\"",
+    "dev": "nodemon --watch \"**/*.ts\" --exec \"ts-node server.ts --dev\"",
     "build": "npx tsc",
     "format": "prettier --write .",
     "lint": "eslint ."

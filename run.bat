@@ -42,7 +42,7 @@ echo --^> Installing all dependencies...
 call npm install
 echo.
 echo --^> Starting Development Server...
-call npm run dev
+node orchestrator.js dev
 goto end
 
 :execute_prod
@@ -75,9 +75,8 @@ cd ..
 
 echo.
 echo --^> Starting application in production mode...
-call npm run start --prefix server
+node orchestrator.js prod
 goto end
 
 :end
-pause
 endlocal

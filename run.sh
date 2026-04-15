@@ -37,7 +37,7 @@ if [ "$choice" == "1" ]; then
     npm install
     echo
     echo "--> Starting Development Server..."
-    npm run dev
+    node orchestrator.js dev
 
 elif [ "$choice" == "2" ]; then
     echo -e "\033[1;32mRunning in PRODUCTION mode... \033[0m"
@@ -66,5 +66,5 @@ elif [ "$choice" == "2" ]; then
 
     echo
     echo "--> Starting application in production mode..."
-    npm run start --prefix server
+    node orchestrator.js prod
 fi

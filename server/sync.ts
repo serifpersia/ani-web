@@ -122,16 +122,17 @@ export async function syncDownOnBoot(
   isSyncing = true
 
   try {
-    log.info(`--> Initial sync check (${activeProvider})...`)
+    console.log(`[SYNC_START] Initial sync check (${activeProvider})`)
 
     const localVersion = await getLocalVersion(db)
     const isEmpty = await isLocalDbEmpty(db)
     const { version: remoteVersion } = await getRemoteVersion(remoteFolderName)
 
+    console.log('[SYNC_END]')
     log.info(`Sync Check: Local v${localVersion} (Empty: ${isEmpty}) vs Remote v${remoteVersion}`)
 
     if (remoteVersion > localVersion || (isEmpty && remoteVersion > 0)) {
-      log.info(`Downloading remote database (Remote v${remoteVersion})...`)
+      console.log(`[SYNC_START] Downloading remote database (Remote v${remoteVersion})`)
 
       await closeMainDb()
       const backupPath = `${dbPath}.bak`
@@ -150,9 +151,11 @@ export async function syncDownOnBoot(
         }
 
         await fs.unlink(backupPath)
+        console.log('[SYNC_END]')
         log.info('Sync down complete.')
         return true
       } catch (err) {
+        console.log('[SYNC_END]')
         log.error({ err }, 'Sync down failed. Restoring backup.')
         try {
           await fs.copyFile(backupPath, dbPath)
@@ -166,6 +169,7 @@ export async function syncDownOnBoot(
       return false
     }
   } catch (err) {
+    console.log('[SYNC_END]')
     log.error({ err }, 'Sync boot error.')
     return false
   } finally {
@@ -184,12 +188,13 @@ export async function syncUp(
   isSyncing = true
   try {
     const { localVersion, isDirty } = await getSyncMetadata(db)
-    if (!isDirty) return // isSyncing reset in finally block
+    if (!isDirty) return
 
-    log.info(`--> Syncing up (Local v${localVersion})...`)
+    console.log(`[SYNC_START] Syncing up (Local v${localVersion})`)
 
     const { version: remoteVersion, fileId: manifestId } = await getRemoteVersion(remoteFolderName)
     if (remoteVersion > localVersion) {
+      console.log('[SYNC_END]')
       log.error(`CONFLICT: Remote v${remoteVersion} > Local v${localVersion}. Aborting upload.`)
       return
     }
@@ -241,8 +246,10 @@ export async function syncUp(
       })
     })
 
-    log.info('<-- Sync up complete.')
+    console.log('[SYNC_END]')
+    log.info('Sync up complete.')
   } catch (err) {
+    console.log('[SYNC_END]')
     log.error({ err }, 'Sync up failed.')
   } finally {
     isSyncing = false
@@ -281,87 +288,21 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     const db = await DatabaseWrapper.create(dbPath)
     db.configure('busyTimeout', 5000)
 
-    // Use skipSave for all DDL to avoid scheduling 15+ intermediate disk writes
     const initOpts = { skipSave: true } as const
 
-    db.run(
-      `CREATE TABLE IF NOT EXISTS watchlist (id TEXT NOT NULL, name TEXT, thumbnail TEXT, status TEXT, nativeName TEXT, englishName TEXT, type TEXT, PRIMARY KEY (id))`,
-      undefined,
-      undefined,
-      initOpts
-    )
-    db.run(
-      `CREATE TABLE IF NOT EXISTS watched_episodes (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, watchedAt DATETIME DEFAULT CURRENT_TIMESTAMP, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, PRIMARY KEY (showId, episodeNumber))`,
-      undefined,
-      undefined,
-      initOpts
-    )
-    db.run(
-      `CREATE TABLE IF NOT EXISTS settings (key TEXT NOT NULL, value TEXT, PRIMARY KEY (key))`,
-      undefined,
-      undefined,
-      initOpts
-    )
-    db.run(
-      `CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT, nativeName TEXT, englishName TEXT, episodeCount INTEGER, status TEXT, genres TEXT, popularityScore INTEGER, type TEXT)`,
-      undefined,
-      undefined,
-      initOpts
-    )
-    db.run(
-      `CREATE TABLE IF NOT EXISTS dismissed_notifications (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, dismissedAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (showId, episodeNumber))`,
-      undefined,
-      undefined,
-      initOpts
-    )
-    db.run(
-      `CREATE TABLE IF NOT EXISTS discovered_notifications (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, discoveredAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (showId, episodeNumber))`,
-      undefined,
-      undefined,
-      initOpts
-    )
-    db.run(
-      `CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`,
-      undefined,
-      undefined,
-      initOpts
-    )
-    db.run(
-      `INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`,
-      undefined,
-      undefined,
-      initOpts
-    )
-    db.run(
-      `INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('last_synced_version', 0)`,
-      undefined,
-      undefined,
-      initOpts
-    )
-    db.run(
-      `INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('is_dirty', 0)`,
-      undefined,
-      undefined,
-      initOpts
-    )
-    db.run(
-      `CREATE INDEX IF NOT EXISTS idx_watched_episodes_showId ON watched_episodes(showId)`,
-      undefined,
-      undefined,
-      initOpts
-    )
-    db.run(
-      `CREATE INDEX IF NOT EXISTS idx_watched_episodes_watchedAt ON watched_episodes(watchedAt)`,
-      undefined,
-      undefined,
-      initOpts
-    )
-    db.run(
-      `CREATE INDEX IF NOT EXISTS idx_watchlist_status ON watchlist(status)`,
-      undefined,
-      undefined,
-      initOpts
-    )
+    db.run(`CREATE TABLE IF NOT EXISTS watchlist (id TEXT NOT NULL, name TEXT, thumbnail TEXT, status TEXT, nativeName TEXT, englishName TEXT, type TEXT, PRIMARY KEY (id))`, undefined, undefined, initOpts)
+    db.run(`CREATE TABLE IF NOT EXISTS watched_episodes (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, watchedAt DATETIME DEFAULT CURRENT_TIMESTAMP, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, PRIMARY KEY (showId, episodeNumber))`, undefined, undefined, initOpts)
+    db.run(`CREATE TABLE IF NOT EXISTS settings (key TEXT NOT NULL, value TEXT, PRIMARY KEY (key))`, undefined, undefined, initOpts)
+    db.run(`CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT, nativeName TEXT, englishName TEXT, episodeCount INTEGER, status TEXT, genres TEXT, popularityScore INTEGER, type TEXT)`, undefined, undefined, initOpts)
+    db.run(`CREATE TABLE IF NOT EXISTS dismissed_notifications (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, dismissedAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (showId, episodeNumber))`, undefined, undefined, initOpts)
+    db.run(`CREATE TABLE IF NOT EXISTS discovered_notifications (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, discoveredAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (showId, episodeNumber))`, undefined, undefined, initOpts)
+    db.run(`CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`, undefined, undefined, initOpts)
+    db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`, undefined, undefined, initOpts)
+    db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('last_synced_version', 0)`, undefined, undefined, initOpts)
+    db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('is_dirty', 0)`, undefined, undefined, initOpts)
+    db.run(`CREATE INDEX IF NOT EXISTS idx_watched_episodes_showId ON watched_episodes(showId)`, undefined, undefined, initOpts)
+    db.run(`CREATE INDEX IF NOT EXISTS idx_watched_episodes_watchedAt ON watched_episodes(watchedAt)`, undefined, undefined, initOpts)
+    db.run(`CREATE INDEX IF NOT EXISTS idx_watchlist_status ON watchlist(status)`, undefined, undefined, initOpts)
 
     const addCol = (tbl: string, col: string, type: string) => {
       db.all(`PRAGMA table_info(${tbl})`, (e: Error | null, r: unknown) => {
@@ -370,6 +311,7 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
           db.run(`ALTER TABLE ${tbl} ADD COLUMN ${col} ${type}`, undefined, undefined, initOpts)
       })
     }
+
     addCol('watchlist', 'nativeName', 'TEXT')
     addCol('watchlist', 'englishName', 'TEXT')
     addCol('shows_meta', 'nativeName', 'TEXT')
@@ -378,11 +320,9 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     addCol('shows_meta', 'status', 'TEXT')
     addCol('shows_meta', 'genres', 'TEXT')
     addCol('shows_meta', 'popularityScore', 'INTEGER')
-
     addCol('watchlist', 'type', 'TEXT')
     addCol('shows_meta', 'type', 'TEXT')
 
-    // Single flush after all schema setup is complete
     await db.saveNow()
 
     return db

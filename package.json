@@ -6,14 +6,14 @@
   "scripts": {
     "postinstall": "npm install --prefix client && npm install --prefix server",
     "build": "npm run build --prefix client && npm run build --prefix server",
-    "start": "concurrently \"npm run start --prefix server\" \"npm run start --prefix client\"",
+    "start": "node orchestrator.js prod",
+    "dev": "node orchestrator.js dev",
     "client": "npm start --prefix client",
     "server": "npm start --prefix server",
-    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
-    "preview": "concurrently \"npm run start --prefix server\" \"npm run preview --prefix client\"",
+    "preview": "node orchestrator.js prod",
     "lighthouse": "npm run lighthouse --prefix client",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "lint": "concurrently \"npm run lint --prefix client\" \"npm run lint --prefix server\"",
+    "lint": "npm run lint --prefix client && npm run lint --prefix server",
     "format": "prettier --write ."
   },
   "keywords": [
@@ -25,9 +25,6 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
-  "dependencies": {
-    "concurrently": "^9.2.1"
-  },
   "devDependencies": {
     "eslint": "^9.17.0",
     "prettier": "^3.4.2"

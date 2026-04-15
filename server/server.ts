@@ -94,8 +94,6 @@ app.use('/api', createWatchlistRouter(provider))
 app.use('/api', createDataRouter(apiCache, provider))
 app.use('/api', createProxyRouter())
 app.use('/api', createInsightsRouter(provider))
-// Settings router uses a lazy db getter so it can be registered at startup;
-// the actual db reference is resolved at request time from req.db
 app.use(
   '/api',
   createSettingsRouter(provider, () => db, initializeDatabase)
@@ -148,19 +146,31 @@ async function main() {
   const shutdown = async () => {
     if (isShuttingDown) return
     isShuttingDown = true
-    console.log('\nServer shutting down. Syncing...')
     clearTimeout(debounceTimer)
     try {
       await syncUp(db, dbPath, remoteFolder)
-      console.log('Sync complete.')
     } catch (e) {
       console.error('Sync failed:', e)
     }
-    db.close(() => process.exit(0))
+    db.close(() => {
+      console.log('[SERVER_EXIT]')
+      // Short delay ensuring orchestrator catches the stdout before exit
+      setTimeout(() => process.exit(0), 100)
+    })
   }
 
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
+
+  // Internal endpoint called by Orchestrator for graceful shutdown
+  app.post('/api/internal/shutdown', (req, res) => {
+    if (req.ip === '::1' || req.ip === '127.0.0.1' || req.ip === '::ffff:127.0.0.1') {
+      res.send('Shutting down');
+      shutdown();
+    } else {
+      res.status(403).send('Forbidden');
+    }
+  })
 
   app.listen(CONFIG.PORT, () => {
     logger.info(`Server running on http://localhost:${CONFIG.PORT}`)
