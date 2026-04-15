@@ -60,7 +60,7 @@ jobs:
           cp server/package.json server/package-lock.json release-package/server/
           cp package.json package-lock.json release-package/
           cp LICENSE README.md release-package/
-          
+
           # ---> Added orchestrator.js to the release zip <---
           cp orchestrator.js release-package/
 

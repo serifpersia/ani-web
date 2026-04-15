@@ -290,19 +290,84 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
 
     const initOpts = { skipSave: true } as const
 
-    db.run(`CREATE TABLE IF NOT EXISTS watchlist (id TEXT NOT NULL, name TEXT, thumbnail TEXT, status TEXT, nativeName TEXT, englishName TEXT, type TEXT, PRIMARY KEY (id))`, undefined, undefined, initOpts)
-    db.run(`CREATE TABLE IF NOT EXISTS watched_episodes (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, watchedAt DATETIME DEFAULT CURRENT_TIMESTAMP, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, PRIMARY KEY (showId, episodeNumber))`, undefined, undefined, initOpts)
-    db.run(`CREATE TABLE IF NOT EXISTS settings (key TEXT NOT NULL, value TEXT, PRIMARY KEY (key))`, undefined, undefined, initOpts)
-    db.run(`CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT, nativeName TEXT, englishName TEXT, episodeCount INTEGER, status TEXT, genres TEXT, popularityScore INTEGER, type TEXT)`, undefined, undefined, initOpts)
-    db.run(`CREATE TABLE IF NOT EXISTS dismissed_notifications (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, dismissedAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (showId, episodeNumber))`, undefined, undefined, initOpts)
-    db.run(`CREATE TABLE IF NOT EXISTS discovered_notifications (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, discoveredAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (showId, episodeNumber))`, undefined, undefined, initOpts)
-    db.run(`CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`, undefined, undefined, initOpts)
-    db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`, undefined, undefined, initOpts)
-    db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('last_synced_version', 0)`, undefined, undefined, initOpts)
-    db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('is_dirty', 0)`, undefined, undefined, initOpts)
-    db.run(`CREATE INDEX IF NOT EXISTS idx_watched_episodes_showId ON watched_episodes(showId)`, undefined, undefined, initOpts)
-    db.run(`CREATE INDEX IF NOT EXISTS idx_watched_episodes_watchedAt ON watched_episodes(watchedAt)`, undefined, undefined, initOpts)
-    db.run(`CREATE INDEX IF NOT EXISTS idx_watchlist_status ON watchlist(status)`, undefined, undefined, initOpts)
+    db.run(
+      `CREATE TABLE IF NOT EXISTS watchlist (id TEXT NOT NULL, name TEXT, thumbnail TEXT, status TEXT, nativeName TEXT, englishName TEXT, type TEXT, PRIMARY KEY (id))`,
+      undefined,
+      undefined,
+      initOpts
+    )
+    db.run(
+      `CREATE TABLE IF NOT EXISTS watched_episodes (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, watchedAt DATETIME DEFAULT CURRENT_TIMESTAMP, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, PRIMARY KEY (showId, episodeNumber))`,
+      undefined,
+      undefined,
+      initOpts
+    )
+    db.run(
+      `CREATE TABLE IF NOT EXISTS settings (key TEXT NOT NULL, value TEXT, PRIMARY KEY (key))`,
+      undefined,
+      undefined,
+      initOpts
+    )
+    db.run(
+      `CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT, nativeName TEXT, englishName TEXT, episodeCount INTEGER, status TEXT, genres TEXT, popularityScore INTEGER, type TEXT)`,
+      undefined,
+      undefined,
+      initOpts
+    )
+    db.run(
+      `CREATE TABLE IF NOT EXISTS dismissed_notifications (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, dismissedAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (showId, episodeNumber))`,
+      undefined,
+      undefined,
+      initOpts
+    )
+    db.run(
+      `CREATE TABLE IF NOT EXISTS discovered_notifications (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, discoveredAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (showId, episodeNumber))`,
+      undefined,
+      undefined,
+      initOpts
+    )
+    db.run(
+      `CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`,
+      undefined,
+      undefined,
+      initOpts
+    )
+    db.run(
+      `INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`,
+      undefined,
+      undefined,
+      initOpts
+    )
+    db.run(
+      `INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('last_synced_version', 0)`,
+      undefined,
+      undefined,
+      initOpts
+    )
+    db.run(
+      `INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('is_dirty', 0)`,
+      undefined,
+      undefined,
+      initOpts
+    )
+    db.run(
+      `CREATE INDEX IF NOT EXISTS idx_watched_episodes_showId ON watched_episodes(showId)`,
+      undefined,
+      undefined,
+      initOpts
+    )
+    db.run(
+      `CREATE INDEX IF NOT EXISTS idx_watched_episodes_watchedAt ON watched_episodes(watchedAt)`,
+      undefined,
+      undefined,
+      initOpts
+    )
+    db.run(
+      `CREATE INDEX IF NOT EXISTS idx_watchlist_status ON watchlist(status)`,
+      undefined,
+      undefined,
+      initOpts
+    )
 
     const addCol = (tbl: string, col: string, type: string) => {
       db.all(`PRAGMA table_info(${tbl})`, (e: Error | null, r: unknown) => {

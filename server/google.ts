@@ -127,14 +127,14 @@ export class GoogleDriveService {
     if (!this.isAuthenticated()) return null
 
     // Escape single quotes to prevent query injection
-    const safeName = filename.replace(/'/g, "\\'");
+    const safeName = filename.replace(/'/g, "\\'")
     let query = `name = '${safeName}' and trashed = false`
     if (parentId) {
-      const safeParentId = parentId.replace(/'/g, "\\'");
+      const safeParentId = parentId.replace(/'/g, "\\'")
       query += ` and '${safeParentId}' in parents`
     }
     if (mimeType) {
-      const safeMimeType = mimeType.replace(/'/g, "\\'");
+      const safeMimeType = mimeType.replace(/'/g, "\\'")
       query += ` and mimeType = '${safeMimeType}'`
     }
 

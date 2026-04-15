@@ -165,10 +165,10 @@ async function main() {
   // Internal endpoint called by Orchestrator for graceful shutdown
   app.post('/api/internal/shutdown', (req, res) => {
     if (req.ip === '::1' || req.ip === '127.0.0.1' || req.ip === '::ffff:127.0.0.1') {
-      res.send('Shutting down');
-      shutdown();
+      res.send('Shutting down')
+      shutdown()
     } else {
-      res.status(403).send('Forbidden');
+      res.status(403).send('Forbidden')
     }
   })
 
