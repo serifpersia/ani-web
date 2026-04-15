@@ -65,12 +65,20 @@ export class DatabaseWrapper {
   public close(cb?: (err: Error | null) => void) {
     if (this.saveTimeout) {
       clearTimeout(this.saveTimeout)
-      this.saveNow()
     }
     try {
+      // Synchronously flush to disk before closing to prevent data loss
+      const data = this.db.export()
+      fs.writeFileSync(this.dbPath, Buffer.from(data))
       this.db.close()
       if (cb) cb(null)
     } catch (e) {
+      logger.error({ err: e }, 'Error during database close/flush')
+      try {
+        this.db.close()
+      } catch {
+        // Already closing, ignore
+      }
       if (cb) cb(e as Error)
     }
   }
@@ -82,7 +90,8 @@ export class DatabaseWrapper {
   public run(
     query: string,
     params?: unknown[] | ((err: Error | null) => void),
-    cb?: (err: Error | null) => void
+    cb?: (err: Error | null) => void,
+    options?: { skipSave?: boolean }
   ) {
     if (typeof params === 'function') {
       cb = params as (err: Error | null) => void
@@ -94,7 +103,9 @@ export class DatabaseWrapper {
       } else {
         this.db.run(query)
       }
-      this.scheduleSave()
+      if (!options?.skipSave) {
+        this.scheduleSave()
+      }
       if (cb) cb(null)
     } catch (e) {
       logger.error({ err: e, query, params }, 'SQL Execution Error (run)')
@@ -157,7 +168,7 @@ export class DatabaseWrapper {
 
     return {
       run: (...args: unknown[]) => {
-        stmt.run(args as unknown as BindParams)
+        stmt.run(this.sanitizeParams(args) as unknown as BindParams)
         this.scheduleSave()
       },
       finalize: () => {

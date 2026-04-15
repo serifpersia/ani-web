@@ -126,12 +126,16 @@ export class GoogleDriveService {
   ): Promise<{ id: string; name: string } | null> {
     if (!this.isAuthenticated()) return null
 
-    let query = `name = '${filename}' and trashed = false`
+    // Escape single quotes to prevent query injection
+    const safeName = filename.replace(/'/g, "\\'");
+    let query = `name = '${safeName}' and trashed = false`
     if (parentId) {
-      query += ` and '${parentId}' in parents`
+      const safeParentId = parentId.replace(/'/g, "\\'");
+      query += ` and '${safeParentId}' in parents`
     }
     if (mimeType) {
-      query += ` and mimeType = '${mimeType}'`
+      const safeMimeType = mimeType.replace(/'/g, "\\'");
+      query += ` and mimeType = '${safeMimeType}'`
     }
 
     try {
@@ -159,8 +163,14 @@ export class GoogleDriveService {
 
     return new Promise((resolve, reject) => {
       res.data
-        .on('end', () => resolve())
-        .on('error', (err) => reject(err))
+        .on('end', () => {
+          dest.end()
+          resolve()
+        })
+        .on('error', (err) => {
+          dest.destroy()
+          reject(err)
+        })
         .pipe(dest)
     })
   }

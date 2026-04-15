@@ -527,8 +527,10 @@ export class WatchlistController {
     req.db.get(
       'SELECT EXISTS(SELECT 1 FROM watchlist WHERE id = ?) as inWatchlist',
       [req.params.showId],
-      (err: Error | null, row: { inWatchlist: number }) =>
-        res.json({ inWatchlist: !!row.inWatchlist })
+      (err: Error | null, row: { inWatchlist: number }) => {
+        if (err) return res.status(500).json({ error: 'DB error' })
+        res.json({ inWatchlist: !!(row && row.inWatchlist) })
+      }
     )
   }
 
@@ -536,8 +538,10 @@ export class WatchlistController {
     req.db.get(
       'SELECT currentTime, duration FROM watched_episodes WHERE showId = ? AND episodeNumber = ?',
       [req.params.showId, req.params.episodeNumber],
-      (err: Error | null, row: { currentTime: number; duration: number }) =>
+      (err: Error | null, row: { currentTime: number; duration: number }) => {
+        if (err) return res.status(500).json({ error: 'DB error' })
         res.json(row || { currentTime: 0, duration: 0 })
+      }
     )
   }
 
@@ -545,8 +549,10 @@ export class WatchlistController {
     req.db.all(
       `SELECT episodeNumber FROM watched_episodes WHERE showId = ?`,
       [req.params.showId],
-      (err: Error | null, rows: { episodeNumber: string }[]) =>
+      (err: Error | null, rows: { episodeNumber: string }[]) => {
+        if (err) return res.status(500).json({ error: 'DB error' })
         res.json(rows ? rows.map((r) => r.episodeNumber) : [])
+      }
     )
   }
 

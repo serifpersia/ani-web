@@ -72,14 +72,27 @@ export class SettingsController {
     const tempPath = path.join(CONFIG.ROOT, `restore_temp.db`)
     const dbPath = path.join(CONFIG.ROOT, dbName)
 
-    db.close((err: Error | null) => {
-      if (err) return res.status(500).json({ error: 'Failed to close database.' })
-      fs.rename(tempPath, dbPath, (err) => {
-        initializeDatabase(dbPath).then((newDb) => {
-          req.db = newDb // Update the request db reference if needed
-        })
-        if (err) return res.status(500).json({ error: 'Failed to replace database file.' })
-        res.json({ success: true, message: 'Database restored.' })
+    db.close((closeErr: Error | null) => {
+      if (closeErr) return res.status(500).json({ error: 'Failed to close database.' })
+      fs.rename(tempPath, dbPath, async (renameErr) => {
+        if (renameErr) {
+          // Re-open existing DB so server can keep running
+          try {
+            const reopenedDb = await initializeDatabase(dbPath)
+            req.db = reopenedDb
+          } catch (e) {
+            logger.error({ err: e }, 'Failed to reopen DB after rename failure')
+          }
+          return res.status(500).json({ error: 'Failed to replace database file.' })
+        }
+        try {
+          const newDb = await initializeDatabase(dbPath)
+          req.db = newDb
+          res.json({ success: true, message: 'Database restored.' })
+        } catch (e) {
+          logger.error({ err: e }, 'Failed to initialize restored database')
+          res.status(500).json({ error: 'Failed to initialize restored database.' })
+        }
       })
     })
   }

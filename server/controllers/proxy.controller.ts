@@ -36,6 +36,7 @@ export class ProxyController {
           url: url as string,
           responseType: 'stream',
           headers,
+          timeout: 30000,
         })
         res.status(resp.status)
 
@@ -56,6 +57,10 @@ export class ProxyController {
         })
         res.set('Access-Control-Allow-Origin', '*')
 
+        resp.data.on('error', () => {
+          if (!res.headersSent) res.status(502).send('Upstream error')
+          else res.destroy()
+        })
         resp.data.pipe(res)
       }
     } catch (e) {
