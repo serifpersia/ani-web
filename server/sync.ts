@@ -234,9 +234,9 @@ export async function syncUp(
 
     await new Promise<void>((resolve, reject) => {
       db.serialize(() => {
-        db.run('UPDATE sync_metadata SET value = 0 WHERE key = "is_dirty"')
+        db.run("UPDATE sync_metadata SET value = 0 WHERE key = 'is_dirty'")
         db.run(
-          'UPDATE sync_metadata SET value = ? WHERE key = "last_synced_version"',
+          "UPDATE sync_metadata SET value = ? WHERE key = 'last_synced_version'",
           [localVersion],
           (err: Error | null) => {
             if (err) reject(err)
@@ -265,8 +265,8 @@ export async function performWriteTransaction(
       db.run('BEGIN TRANSACTION')
       try {
         runnable(db)
-        db.run('UPDATE sync_metadata SET value = value + 1 WHERE key = "db_version"')
-        db.run('UPDATE sync_metadata SET value = 1 WHERE key = "is_dirty"')
+        db.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
+        db.run("UPDATE sync_metadata SET value = 1 WHERE key = 'is_dirty'")
         db.run('COMMIT', (err: Error | null) => {
           if (err) {
             db.run('ROLLBACK')

@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "A web application for watching anime.",
   "main": "index.js",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "scripts": {
     "postinstall": "npm install --prefix client && npm install --prefix server",
     "build": "npm run build --prefix client && npm run build --prefix server",

@@ -1,90 +1,57 @@
-import initSqlJs, { Database as SqlJsDatabase, BindParams } from 'sql.js'
+import { DatabaseSync } from 'node:sqlite'
 import fs from 'fs'
 import path from 'path'
 import logger from './logger'
 
-export class DatabaseWrapper {
-  private db: SqlJsDatabase
-  private dbPath: string
-  private saveTimeout: NodeJS.Timeout | null = null
+type BindableValue = string | number | bigint | null | Uint8Array
 
-  constructor(dbPath: string, db: SqlJsDatabase) {
+export class DatabaseWrapper {
+  private db: DatabaseSync
+  private dbPath: string
+
+  constructor(dbPath: string, db: DatabaseSync) {
     this.dbPath = dbPath
     this.db = db
   }
 
   public static async create(dbPath: string): Promise<DatabaseWrapper> {
-    const SQL = await initSqlJs()
-    let data: Buffer | undefined
     try {
-      if (fs.existsSync(dbPath)) {
-        data = fs.readFileSync(dbPath)
+      const dir = path.dirname(dbPath)
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true })
       }
+      const db = new DatabaseSync(dbPath)
+      return new DatabaseWrapper(dbPath, db)
     } catch (e) {
-      logger.warn({ err: e }, `Failed to read database at ${dbPath}`)
+      logger.error({ err: e }, `Failed to initialize database at ${dbPath}`)
+      throw e
     }
-
-    let db: SqlJsDatabase
-    if (data && data.length > 0) {
-      db = new SQL.Database(data)
-    } else {
-      db = new SQL.Database()
-    }
-    return new DatabaseWrapper(dbPath, db)
   }
 
   public scheduleSave() {
-    if (this.saveTimeout) clearTimeout(this.saveTimeout)
-    this.saveTimeout = setTimeout(() => {
-      this.saveNow()
-    }, 500)
+    // No-op for built-in database
   }
 
   public async saveNow(retryCount = 0) {
-    try {
-      const data = this.db.export()
-      await fs.promises.writeFile(this.dbPath, Buffer.from(data))
-    } catch (err) {
-      if (retryCount < 3) {
-        setTimeout(() => this.saveNow(retryCount + 1), 100)
-      } else {
-        logger.error({ err }, 'Failed to save database to disk after 3 retries')
-      }
-    }
+    // No-op for built-in database
   }
 
   public configure(option: string, value: unknown) {
-    // No-op for sql.js compatibility layer
+    // No-op
   }
 
   public serialize(cb: () => void) {
-    // Everything is synchronous anyway
     cb()
   }
 
   public close(cb?: (err: Error | null) => void) {
-    if (this.saveTimeout) {
-      clearTimeout(this.saveTimeout)
-    }
     try {
-      // Synchronously flush to disk before closing to prevent data loss
-      const data = this.db.export()
-      fs.writeFileSync(this.dbPath, Buffer.from(data))
       this.db.close()
       if (cb) cb(null)
     } catch (e) {
-      logger.error({ err: e }, 'Error during database close/flush')
-      try {
-        this.db.close()
-      } catch {
-        // Already closing, ignore
-      }
+      logger.error({ err: e }, 'Error during database close')
       if (cb) cb(e as Error)
     }
-  }
-
-  private sanitizeParams(params: unknown[]): BindParams {
-    return params.map((p) => (p === undefined ? null : p)) as unknown as BindParams
   }
 
   public run(
@@ -98,13 +65,11 @@ export class DatabaseWrapper {
       params = []
     }
     try {
+      const stmt = this.db.prepare(query)
       if (params && Array.isArray(params) && params.length > 0) {
-        this.db.run(query, this.sanitizeParams(params))
+        stmt.run(...(params as BindableValue[]))
       } else {
-        this.db.run(query)
-      }
-      if (!options?.skipSave) {
-        this.scheduleSave()
+        stmt.run()
       }
       if (cb) cb(null)
     } catch (e) {
@@ -124,16 +89,15 @@ export class DatabaseWrapper {
     }
     try {
       const stmt = this.db.prepare(query)
+      let res: T | undefined
       if (params && Array.isArray(params) && params.length > 0) {
-        stmt.bind(this.sanitizeParams(params))
+        res = stmt.get(...(params as BindableValue[])) as T | undefined
+      } else {
+        res = stmt.get() as T | undefined
       }
-      let res: T | null = null
-      if (stmt.step()) {
-        res = stmt.getAsObject() as T
-      }
-      stmt.free()
-      if (cb) cb(null, res as T)
+      if (cb) cb(null, (res === undefined ? null : res) as unknown as T)
     } catch (e) {
+      logger.error({ err: e, query, params }, 'SQL Execution Error (get)')
       if (cb) cb(e as Error, null as unknown as T)
     }
   }
@@ -149,16 +113,15 @@ export class DatabaseWrapper {
     }
     try {
       const stmt = this.db.prepare(query)
+      let res: T[]
       if (params && Array.isArray(params) && params.length > 0) {
-        stmt.bind(this.sanitizeParams(params))
+        res = stmt.all(...(params as BindableValue[])) as T[]
+      } else {
+        res = stmt.all() as T[]
       }
-      const res: T[] = []
-      while (stmt.step()) {
-        res.push(stmt.getAsObject() as T)
-      }
-      stmt.free()
       if (cb) cb(null, res)
     } catch (e) {
+      logger.error({ err: e, query, params }, 'SQL Execution Error (all)')
       if (cb) cb(e as Error, [])
     }
   }
@@ -168,11 +131,10 @@ export class DatabaseWrapper {
 
     return {
       run: (...args: unknown[]) => {
-        stmt.run(this.sanitizeParams(args) as unknown as BindParams)
-        this.scheduleSave()
+        stmt.run(...(args as BindableValue[]))
       },
       finalize: () => {
-        stmt.free()
+        // No-op
       },
     }
   }
