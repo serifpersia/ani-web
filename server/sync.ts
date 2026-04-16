@@ -160,7 +160,7 @@ export async function syncDownOnBoot(
         try {
           await fs.copyFile(backupPath, dbPath)
         } catch {
-          // Ignore
+          // backup already restored, ignore error
         }
         return true
       }
@@ -232,18 +232,9 @@ export async function syncUp(
 
     await fs.unlink(CONFIG.TEMP_MANIFEST_PATH)
 
-    await new Promise<void>((resolve, reject) => {
-      db.serialize(() => {
-        db.run("UPDATE sync_metadata SET value = 0 WHERE key = 'is_dirty'")
-        db.run(
-          "UPDATE sync_metadata SET value = ? WHERE key = 'last_synced_version'",
-          [localVersion],
-          (err: Error | null) => {
-            if (err) reject(err)
-            else resolve()
-          }
-        )
-      })
+    db.serialize(() => {
+      db.run("UPDATE sync_metadata SET value = 0 WHERE key = 'is_dirty'")
+      db.run("UPDATE sync_metadata SET value = ? WHERE key = 'last_synced_version'", [localVersion])
     })
 
     console.log('[SYNC_END]')
@@ -260,26 +251,10 @@ export async function performWriteTransaction(
   db: DatabaseWrapper,
   runnable: (tx: DatabaseWrapper) => void
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      db.run('BEGIN TRANSACTION')
-      try {
-        runnable(db)
-        db.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
-        db.run("UPDATE sync_metadata SET value = 1 WHERE key = 'is_dirty'")
-        db.run('COMMIT', (err: Error | null) => {
-          if (err) {
-            db.run('ROLLBACK')
-            reject(err)
-          } else {
-            resolve()
-          }
-        })
-      } catch (e) {
-        db.run('ROLLBACK')
-        reject(e)
-      }
-    })
+  db.serialize(() => {
+    runnable(db)
+    db.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
+    db.run("UPDATE sync_metadata SET value = 1 WHERE key = 'is_dirty'")
   })
 }
 
@@ -287,6 +262,13 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
   try {
     const db = await DatabaseWrapper.create(dbPath)
     db.configure('busyTimeout', 5000)
+
+    db.run('PRAGMA journal_mode = WAL;')
+    db.run('PRAGMA synchronous = NORMAL;')
+    db.run('PRAGMA cache_size = -20000;')
+    db.run('PRAGMA temp_store = MEMORY;')
+    db.run('PRAGMA mmap_size = 268435456;')
+    db.run('PRAGMA foreign_keys = ON;')
 
     const initOpts = { skipSave: true } as const
 
@@ -352,6 +334,12 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     )
     db.run(
       `CREATE INDEX IF NOT EXISTS idx_watched_episodes_showId ON watched_episodes(showId)`,
+      undefined,
+      undefined,
+      initOpts
+    )
+    db.run(
+      `CREATE INDEX IF NOT EXISTS idx_watched_episodes_showId_episodeNumber ON watched_episodes(showId, episodeNumber)`,
       undefined,
       undefined,
       initOpts

@@ -1,8 +1,3 @@
-// ... (Previous imports and setup)
-// Find the formatTime function (around line 125) and ensure correct deps in surrounding hooks if any.
-// The warning was likely in 'onTimeUpdate' or similar.
-// I will provide the FULL corrected file to be safe.
-
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import type { SkipInterval, SubtitleTrack } from '../types/player'
 
@@ -30,11 +25,22 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
   const lastThrottledUpdateTime = useRef(0)
 
   const [isPlaying, setIsPlaying] = useState(false)
-  const [isMuted, setIsMuted] = useState(false)
-  const [volume, setVolume] = useState(1)
+  const [isMuted, setIsMuted] = useState(() => {
+    try {
+      return localStorage.getItem('playerMuted') === 'true'
+    } catch {
+      return false
+    }
+  })
+  const [volume, setVolume] = useState(() => {
+    try {
+      const savedVolume = parseFloat(localStorage.getItem('playerVolume') || '')
+      return isNaN(savedVolume) ? 1 : Math.max(0, Math.min(1, savedVolume))
+    } catch {
+      return 1
+    }
+  })
   const [isFullscreen, setIsFullscreen] = useState(false)
-  // Removed currentTime and buffered from state to prevent global re-renders
-  // These are now handled locally in PlayerControls.tsx
   const [duration, setDuration] = useState(0)
   const [showControls, setShowControls] = useState(true)
   const [isScrubbing, setIsScrubbing] = useState(false)
@@ -122,6 +128,15 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
     ]
   )
 
+  // Apply saved volume/mute settings when video element loads
+  useEffect(() => {
+    const video = videoRef.current
+    if (video) {
+      video.volume = volume
+      video.muted = isMuted
+    }
+  }, [videoRef, volume, isMuted])
+
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (!hasEnded.current) {
@@ -187,8 +202,10 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
     setIsMuted(newMuted)
     localStorage.setItem('playerMuted', String(newMuted))
     if (!newMuted && videoRef.current.volume === 0) {
-      videoRef.current.volume = 0.5
-      setVolume(0.5)
+      const newVolume = 0.5
+      videoRef.current.volume = newVolume
+      setVolume(newVolume)
+      localStorage.setItem('playerVolume', String(newVolume))
     }
     setShowControls(true)
   }, [setShowControls])
@@ -268,19 +285,21 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
   const onLoadedMetadata = useCallback(() => setDuration(videoRef.current?.duration || 0), [])
   const onVolumeChange = useCallback(() => {
     if (videoRef.current) {
-      setIsMuted(videoRef.current.muted)
-      setVolume(videoRef.current.volume)
+      const newMuted = videoRef.current.muted
+      const newVolume = videoRef.current.volume
+
+      setIsMuted(newMuted)
+      setVolume(newVolume)
+
+      localStorage.setItem('playerMuted', String(newMuted))
+      localStorage.setItem('playerVolume', String(newVolume))
     }
   }, [])
-  const onProgress = useCallback(() => {
-    // Buffering state is now handled locally in PlayerControls.tsx
-  }, [])
+  const onProgress = useCallback(() => {}, [])
   const onTimeUpdate = useCallback(() => {
     const video = videoRef.current
     if (!video) return
     const time = video.currentTime || 0
-
-    // Throttled progress update to the backend (every 30 seconds instead of 5)
     const now = Date.now()
     if (now - lastThrottledUpdateTime.current > 30000) {
       lastThrottledUpdateTime.current = now

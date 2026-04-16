@@ -63,10 +63,9 @@ interface WatchlistRow {
   [key: string]: unknown
 }
 
-// Memory cache to prevent overlapping background API requests
-const activeTypeFetches = new Set<string>()
-
 export class WatchlistController {
+  private activeTypeFetches = new Set<string>()
+
   constructor(private provider: AllAnimeProvider) {}
 
   private async getContinueWatchingData(
@@ -101,39 +100,61 @@ export class WatchlistController {
       })
     })
 
-    const enrichedRows = await Promise.all(
-      rows.map(async (show) => {
-        let epCount = show.episodeCount
-        const watchedCount = (show.watchedCount as unknown as number) || 0
-        if (!epCount || (watchedCount > 0 && epCount <= watchedCount)) {
-          try {
-            const epDetails = await this.provider.getEpisodes(show.id, 'sub')
-            if (epDetails && epDetails.episodes) {
-              epCount = epDetails.episodes.length
+    const showsNeedingEpisodes = rows.filter((show) => {
+      const watchedCount = (show.watchedCount as unknown as number) || 0
+      return !show.episodeCount || (watchedCount > 0 && show.episodeCount <= watchedCount)
+    })
+
+    const episodeFetchResults = new Map<string, number>()
+    if (showsNeedingEpisodes.length > 0) {
+      const BATCH_SIZE = 5
+      for (let i = 0; i < showsNeedingEpisodes.length; i += BATCH_SIZE) {
+        const batch = showsNeedingEpisodes.slice(i, i + BATCH_SIZE)
+        const batchResults = await Promise.allSettled(
+          batch.map((show) => this.provider.getEpisodes(show.id, 'sub'))
+        )
+
+        batch.forEach((show, index) => {
+          const result = batchResults[index]
+          if (result.status === 'fulfilled' && result.value?.episodes) {
+            const epCount = result.value.episodes.length
+            episodeFetchResults.set(show.id, epCount)
+            try {
               db.run('UPDATE shows_meta SET episodeCount = ? WHERE id = ?', [epCount, show.id])
+            } catch (e) {
+              logger.error({ err: e, showId: show.id }, 'Failed to update episode count in DB')
             }
-          } catch (e) {
-            logger.error({ err: e, showId: show.id }, 'Failed to fetch episode count')
+          } else {
+            logger.error(
+              {
+                err: result.status === 'rejected' ? result.reason : 'No episodes',
+                showId: show.id,
+              },
+              'Failed to fetch episode count'
+            )
           }
-        }
+        })
+      }
+    }
 
-        return {
-          ...show,
-          episodeCount: epCount,
-          type: show.type || show.smType,
-          thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
-        }
-      })
-    )
+    const enrichedRows = rows.map((show) => {
+      const epCount = episodeFetchResults.get(show.id) ?? show.episodeCount
+      return {
+        ...show,
+        episodeCount: epCount,
+        type: show.type || show.smType,
+        thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
+      }
+    })
 
-    // Background job: Fetch missing types (Optimized to prevent overlapping)
     setImmediate(async () => {
+      if (db.isClosedCheck()) return
       for (const show of enrichedRows) {
-        if (!show.type && !activeTypeFetches.has(show.id)) {
-          activeTypeFetches.add(show.id)
+        if (!show.type && !this.activeTypeFetches.has(show.id)) {
+          this.activeTypeFetches.add(show.id)
           try {
             const meta = await this.provider.getShowMeta(show.id)
-            if (meta && meta.type) {
+            if (meta && meta.type && !db.isClosedCheck()) {
               db.run('UPDATE shows_meta SET type = ? WHERE id = ?', [meta.type, show.id])
               db.run('UPDATE watchlist SET type = ? WHERE id = ?', [meta.type, show.id])
               db.scheduleSave()
@@ -141,7 +162,7 @@ export class WatchlistController {
           } catch (e) {
             logger.error({ err: e, showId: show.id }, 'Lazy migration error for type')
           } finally {
-            activeTypeFetches.delete(show.id)
+            this.activeTypeFetches.delete(show.id)
           }
         }
       }
@@ -309,32 +330,58 @@ export class WatchlistController {
           }
         )
       })
-      const refreshed = await Promise.all(
-        rows.map(async (show) => {
-          let epCount = show.episodeCount
-          const watchedCount = (show.watchedCount as unknown as number) || 0
-          if (!epCount || (watchedCount > 0 && epCount <= watchedCount)) {
-            try {
-              const epDetails = await this.provider.getEpisodes(show.id, 'sub')
-              if (epDetails && epDetails.episodes) {
-                epCount = epDetails.episodes.length
+      const showsNeedingEpisodes = rows.filter((show) => {
+        const watchedCount = (show.watchedCount as unknown as number) || 0
+        return !show.episodeCount || (watchedCount > 0 && show.episodeCount <= watchedCount)
+      })
+
+      const episodeFetchResults = new Map<string, number>()
+      if (showsNeedingEpisodes.length > 0) {
+        const BATCH_SIZE = 5
+        for (let i = 0; i < showsNeedingEpisodes.length; i += BATCH_SIZE) {
+          const batch = showsNeedingEpisodes.slice(i, i + BATCH_SIZE)
+          const batchResults = await Promise.allSettled(
+            batch.map((show) => this.provider.getEpisodes(show.id, 'sub'))
+          )
+
+          batch.forEach((show, index) => {
+            const result = batchResults[index]
+            if (result.status === 'fulfilled' && result.value?.episodes) {
+              const epCount = result.value.episodes.length
+              episodeFetchResults.set(show.id, epCount)
+              try {
                 req.db.run('UPDATE shows_meta SET episodeCount = ? WHERE id = ?', [
                   epCount,
                   show.id,
                 ])
+              } catch (e) {
+                logger.error(
+                  { err: e, showId: show.id },
+                  'Failed to update episode count in DB (fast)'
+                )
               }
-            } catch (e) {
-              logger.error({ err: e, showId: show.id }, 'Failed to refresh episode count (fast)')
+            } else {
+              logger.error(
+                {
+                  err: result.status === 'rejected' ? result.reason : 'No episodes',
+                  showId: show.id,
+                },
+                'Failed to fetch episode count (fast)'
+              )
             }
-          }
-          return {
-            ...show,
-            episodeCount: epCount,
-            type: show.type || show.smType,
-            thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
-          }
-        })
-      )
+          })
+        }
+      }
+
+      const refreshed = rows.map((show) => {
+        const epCount = episodeFetchResults.get(show.id) ?? show.episodeCount
+        return {
+          ...show,
+          episodeCount: epCount,
+          type: show.type || show.smType,
+          thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
+        }
+      })
 
       res.json(refreshed)
     } catch {
@@ -400,9 +447,8 @@ export class WatchlistController {
       const genresStr = Array.isArray(genres) ? JSON.stringify(genres) : genres
 
       await performWriteTransaction(req.db, (tx) => {
-        // Optimized: Reduced 7 DB statements down to a single UPSERT
         tx.run(
-          `INSERT INTO shows_meta (id, name, thumbnail, nativeName, englishName, genres, popularityScore, status, episodeCount, type) 
+          `INSERT INTO shows_meta (id, name, thumbnail, nativeName, englishName, genres, popularityScore, status, episodeCount, type)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              name = COALESCE(EXCLUDED.name, shows_meta.name),
@@ -418,13 +464,13 @@ export class WatchlistController {
             showId,
             showName,
             this.provider.deobfuscateUrl(showThumbnail),
-            nativeName,
-            englishName,
-            genresStr || null,
-            popularityScore !== undefined ? popularityScore : null,
-            status || null,
-            episodeCount || null,
-            type || null,
+            nativeName || '',
+            englishName || '',
+            genresStr || '',
+            popularityScore || 0,
+            status || '',
+            episodeCount || 0,
+            type || '',
           ]
         )
 
@@ -494,12 +540,13 @@ export class WatchlistController {
           })
 
           setImmediate(async () => {
+            if (req.db.isClosedCheck()) return
             for (const row of watchlistRows) {
-              if (!row.type && !activeTypeFetches.has(row.id)) {
-                activeTypeFetches.add(row.id)
+              if (!row.type && !this.activeTypeFetches.has(row.id)) {
+                this.activeTypeFetches.add(row.id)
                 try {
                   const meta = await this.provider.getShowMeta(row.id)
-                  if (meta && meta.type) {
+                  if (meta && meta.type && !req.db.isClosedCheck()) {
                     req.db.run('UPDATE watchlist SET type = ? WHERE id = ?', [meta.type, row.id])
                     req.db.run('UPDATE shows_meta SET type = ? WHERE id = ?', [meta.type, row.id])
                     req.db.scheduleSave()
@@ -507,7 +554,7 @@ export class WatchlistController {
                 } catch (e) {
                   logger.error({ err: e, showId: row.id }, 'Watchlist lazy migration error')
                 } finally {
-                  activeTypeFetches.delete(row.id)
+                  this.activeTypeFetches.delete(row.id)
                 }
               }
             }
@@ -576,8 +623,8 @@ export class WatchlistController {
             name,
             this.provider.deobfuscateUrl(thumbnail),
             status || 'Watching',
-            nativeName,
-            englishName,
+            nativeName || '',
+            englishName || '',
             type || 'TV',
           ]
         )

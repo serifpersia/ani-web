@@ -7,17 +7,9 @@ type BindableValue = string | number | bigint | null | Uint8Array
 
 export class DatabaseWrapper {
   private db: DatabaseSync
-  private dbPath: string
+  private isClosed = false
 
-  /**
-   * NOTE: Node 22's DatabaseSync is 100% synchronous.
-   * While this wrapper provides callback/Promise interfaces to maintain compatibility
-   * with asynchronous drivers, calls to this database will block the Node.js event
-   * loop while executing. This is typically fine for local/single-user apps,
-   * but heavy queries could impact concurrent tasks like video streaming.
-   */
-  constructor(dbPath: string, db: DatabaseSync) {
-    this.dbPath = dbPath
+  constructor(_dbPath: string, db: DatabaseSync) {
     this.db = db
   }
 
@@ -35,24 +27,34 @@ export class DatabaseWrapper {
     }
   }
 
-  public scheduleSave() {
-    // No-op for built-in database
-  }
+  public scheduleSave() {}
 
-  public async saveNow(retryCount = 0) {
-    // No-op for built-in database
-  }
+  public async saveNow() {}
 
   public configure(option: string, value: unknown) {
-    // No-op
+    if (option === 'busyTimeout') {
+      this.db.exec(`PRAGMA busy_timeout = ${value}`)
+    }
   }
 
   public serialize(cb: () => void) {
-    cb()
+    this.db.exec('BEGIN IMMEDIATE')
+    try {
+      cb()
+      this.db.exec('COMMIT')
+    } catch (e) {
+      this.db.exec('ROLLBACK')
+      throw e
+    }
   }
 
   public close(cb?: (err: Error | null) => void) {
+    if (this.isClosed) {
+      if (cb) cb(null)
+      return
+    }
     try {
+      this.isClosed = true
       this.db.close()
       if (cb) cb(null)
     } catch (e) {
@@ -61,23 +63,64 @@ export class DatabaseWrapper {
     }
   }
 
+  public isClosedCheck(): boolean {
+    return this.isClosed
+  }
+
+  private executeAndFinalize(
+    query: string,
+    params: BindableValue[] | undefined,
+    operation: 'run' | 'get' | 'all'
+  ): unknown {
+    const stmt = this.db.prepare(query)
+    try {
+      let result: unknown
+      if (operation === 'run') {
+        if (params && params.length > 0) {
+          stmt.run(...params)
+        } else {
+          stmt.run()
+        }
+        result = null
+      } else if (operation === 'get') {
+        if (params && params.length > 0) {
+          result = stmt.get(...params)
+        } else {
+          result = stmt.get()
+        }
+      } else {
+        if (params && params.length > 0) {
+          result = stmt.all(...params)
+        } else {
+          result = stmt.all()
+        }
+      }
+      return result
+    } finally {
+      // no cleanup needed
+    }
+  }
+
   public run(
     query: string,
     params?: unknown[] | ((err: Error | null) => void),
     cb?: (err: Error | null) => void,
-    options?: { skipSave?: boolean }
+    _options?: { skipSave?: boolean }
   ) {
+    if (this.isClosed) {
+      if (cb) cb(new Error('Database is closed'))
+      return
+    }
     if (typeof params === 'function') {
       cb = params as (err: Error | null) => void
       params = []
     }
     try {
-      const stmt = this.db.prepare(query)
-      if (params && Array.isArray(params) && params.length > 0) {
-        stmt.run(...(params as BindableValue[]))
-      } else {
-        stmt.run()
-      }
+      const bindableParams =
+        params && Array.isArray(params) && params.length > 0
+          ? (params as BindableValue[])
+          : undefined
+      this.executeAndFinalize(query, bindableParams, 'run')
       if (cb) cb(null)
     } catch (e) {
       logger.error({ err: e, query, params }, 'SQL Execution Error (run)')
@@ -90,19 +133,21 @@ export class DatabaseWrapper {
     params?: unknown[] | ((err: Error | null, row: T) => void),
     cb?: (err: Error | null, row: T) => void
   ) {
+    if (this.isClosed) {
+      if (cb) cb(new Error('Database is closed'), null as unknown as T)
+      return
+    }
     if (typeof params === 'function') {
       cb = params as (err: Error | null, row: T) => void
       params = []
     }
     try {
-      const stmt = this.db.prepare(query)
-      let res: T | undefined
-      if (params && Array.isArray(params) && params.length > 0) {
-        res = stmt.get(...(params as BindableValue[])) as T | undefined
-      } else {
-        res = stmt.get() as T | undefined
-      }
-      if (cb) cb(null, (res === undefined ? null : res) as unknown as T)
+      const bindableParams =
+        params && Array.isArray(params) && params.length > 0
+          ? (params as BindableValue[])
+          : undefined
+      const res = this.executeAndFinalize(query, bindableParams, 'get')
+      if (cb) cb(null, res as unknown as T)
     } catch (e) {
       logger.error({ err: e, query, params }, 'SQL Execution Error (get)')
       if (cb) cb(e as Error, null as unknown as T)
@@ -114,18 +159,20 @@ export class DatabaseWrapper {
     params?: unknown[] | ((err: Error | null, rows: T[]) => void),
     cb?: (err: Error | null, rows: T[]) => void
   ) {
+    if (this.isClosed) {
+      if (cb) cb(new Error('Database is closed'), [])
+      return
+    }
     if (typeof params === 'function') {
       cb = params as (err: Error | null, rows: T[]) => void
       params = []
     }
     try {
-      const stmt = this.db.prepare(query)
-      let res: T[]
-      if (params && Array.isArray(params) && params.length > 0) {
-        res = stmt.all(...(params as BindableValue[])) as T[]
-      } else {
-        res = stmt.all() as T[]
-      }
+      const bindableParams =
+        params && Array.isArray(params) && params.length > 0
+          ? (params as BindableValue[])
+          : undefined
+      const res = this.executeAndFinalize(query, bindableParams, 'all') as T[]
       if (cb) cb(null, res)
     } catch (e) {
       logger.error({ err: e, query, params }, 'SQL Execution Error (all)')
@@ -140,16 +187,24 @@ export class DatabaseWrapper {
       run: (...args: unknown[]) => {
         stmt.run(...(args as BindableValue[]))
       },
-      finalize: () => {
-        // No-op
+      all: <T = unknown>(): T[] => {
+        return stmt.all() as T[]
+      },
+      get: <T = unknown>(): T | undefined => {
+        return stmt.get() as T | undefined
+      },
+      finalize: () => {},
+      runAsync: (cb: (err: Error | null) => void) => {
+        try {
+          stmt.run()
+          cb(null)
+        } catch (e) {
+          cb(e as Error)
+        }
       },
     }
   }
 
-  /**
-   * Performs a safe backup of the live database using VACUUM INTO.
-   * This is safe even when WAL mode is enabled.
-   */
   public backup(backupPath: string) {
     try {
       this.db.exec(`VACUUM INTO '${backupPath}'`)
