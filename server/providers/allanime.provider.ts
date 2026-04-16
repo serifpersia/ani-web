@@ -1,5 +1,6 @@
 import axios from 'axios'
 import logger from '../logger'
+import * as crypto from 'node:crypto'
 import {
   Provider,
   Show,
@@ -134,7 +135,30 @@ export class AllAnimeProvider implements Provider {
     this.cache = cache
   }
 
-  /** Shared hex-pair decode — converts obfuscated hex pairs using DEOBFUSCATION_MAP */
+  private decryptTobeparsed(encryptedBase64: string): unknown {
+    try {
+      const secret = 'P7K2RGbFgauVtmiS'.split('').reverse().join('')
+      const keyMaterial = Buffer.from(secret, 'utf8')
+      const key = crypto.createHash('sha256').update(keyMaterial).digest()
+      const encryptedBuffer = Buffer.from(encryptedBase64, 'base64')
+      if (encryptedBuffer.length < 28) {
+        throw new Error('Encrypted data too short for IV + tag')
+      }
+      const iv = encryptedBuffer.subarray(0, 12)
+      const authTag = encryptedBuffer.subarray(encryptedBuffer.length - 16)
+      const ciphertext = encryptedBuffer.subarray(12, encryptedBuffer.length - 16)
+      const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv)
+      decipher.setAuthTag(authTag)
+      let decrypted = decipher.update(ciphertext)
+      decrypted = Buffer.concat([decrypted, decipher.final()])
+      return JSON.parse(decrypted.toString('utf8'))
+    } catch (error: unknown) {
+      const err = error as Error
+      logger.error({ err: err.message, stack: err.stack }, 'Failed to decrypt tobeparsed field')
+      throw new Error(`Decryption failed: ${err.message}`)
+    }
+  }
+
   private _hexDecode(obfuscatedBody: string): string {
     let result = ''
     for (let i = 0; i < obfuscatedBody.length; i += 2) {
@@ -147,24 +171,17 @@ export class AllAnimeProvider implements Provider {
   private deobfuscateStreamUrl(obfuscatedUrl: string): string {
     if (!obfuscatedUrl) return ''
     if (!obfuscatedUrl.startsWith('--')) return obfuscatedUrl
-
     let deobfuscated = this._hexDecode(obfuscatedUrl.slice(2))
-
-    // Normalize any accidental double slashes
     deobfuscated = deobfuscated.replace(/([^:]\/)\/+/g, '$1')
-
-    // AllAnime stream URLs are relative to the main domain
     if (deobfuscated.startsWith('/')) {
       return `${API_BASE_URL}${deobfuscated}`
     }
-
     return deobfuscated
   }
 
   public deobfuscateUrl(obfuscatedUrl: string): string {
     if (!obfuscatedUrl) return ''
     let finalUrl = obfuscatedUrl
-
     if (!obfuscatedUrl.startsWith('--') && obfuscatedUrl.includes('s4.anilist.co')) {
       finalUrl = obfuscatedUrl.replace(
         'https://s4.anilist.co',
@@ -177,10 +194,6 @@ export class AllAnimeProvider implements Provider {
       } else {
         finalUrl = deobfuscated
       }
-    }
-
-    if (finalUrl.startsWith('http://') || finalUrl.startsWith('https://')) {
-      return finalUrl
     }
     return finalUrl
   }
@@ -196,24 +209,24 @@ export class AllAnimeProvider implements Provider {
           edges { _id name nativeName englishName thumbnail description type availableEpisodesDetail isAdult rating }
         }
       }`
-
     if (extensions) {
       body.extensions = extensions
     } else {
       body.query = fullQuery
     }
-
     try {
       const response = await axios.post(API_ENDPOINT, body, {
         headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
         timeout: 15000,
       })
-
-      if (response.data.errors && response.data.errors[0]?.message === 'PersistedQueryNotFound') {
+      const responseData = response.data
+      if (responseData?.data?.tobeparsed) {
+        responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
+      }
+      if (responseData.errors && responseData.errors[0]?.message === 'PersistedQueryNotFound') {
         throw new Error('PersistedQueryNotFound')
       }
-
-      const shows = response.data?.data?.shows?.edges || []
+      const shows = responseData?.data?.shows?.edges || []
       return shows.map((show: Show) => ({
         ...show,
         thumbnail: this.deobfuscateUrl(show.thumbnail || ''),
@@ -224,16 +237,17 @@ export class AllAnimeProvider implements Provider {
         logger.info('Search hash expired, falling back to full query')
         const response = await axios.post(
           API_ENDPOINT,
-          {
-            variables,
-            query: fullQuery,
-          },
+          { variables, query: fullQuery },
           {
             headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
             timeout: 15000,
           }
         )
-        const shows = response.data?.data?.shows?.edges || []
+        const responseData = response.data
+        if (responseData?.data?.tobeparsed) {
+          responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
+        }
+        const shows = responseData?.data?.shows?.edges || []
         return shows.map((show: Show) => ({
           ...show,
           thumbnail: this.deobfuscateUrl(show.thumbnail || ''),
@@ -259,7 +273,7 @@ export class AllAnimeProvider implements Provider {
       excludeTags,
       studios,
     } = options
-    const searchObj: { [key: string]: unknown } = { allowAdult: false }
+    const searchObj: Record<string, unknown> = { allowAdult: false }
     if (query) searchObj.query = query
     if (season && season !== 'ALL') searchObj.season = season
     if (year && year !== 'ALL') searchObj.year = parseInt(year as string)
@@ -270,7 +284,6 @@ export class AllAnimeProvider implements Provider {
     if (tags) searchObj.tags = (tags as string).split(',')
     if (studios) searchObj.studios = (studios as string).split(',')
     if (excludeTags) searchObj.excludeTags = (excludeTags as string).split(',')
-
     const variables = {
       search: searchObj,
       limit: 28,
@@ -282,7 +295,7 @@ export class AllAnimeProvider implements Provider {
   }
 
   async getPopular(timeframe: 'daily' | 'weekly' | 'monthly' | 'all'): Promise<Show[]> {
-    let dateRange
+    let dateRange = 0
     switch (timeframe) {
       case 'daily':
         dateRange = 1
@@ -293,9 +306,6 @@ export class AllAnimeProvider implements Provider {
       case 'monthly':
         dateRange = 30
         break
-      case 'all':
-        dateRange = 0
-        break
     }
     const variables = {
       type: 'anime',
@@ -303,7 +313,7 @@ export class AllAnimeProvider implements Provider {
       page: 1,
       allowAdult: false,
       allowUnknown: false,
-      dateRange: dateRange,
+      dateRange,
     }
     const extensions = {
       persistedQuery: {
@@ -311,7 +321,6 @@ export class AllAnimeProvider implements Provider {
         sha256Hash: '60f50b84bb545fa25ee7f7c8c0adbf8f5cea40f7b1ef8501cbbff70e38589489',
       },
     }
-
     try {
       const response = await axios.post(
         API_ENDPOINT,
@@ -321,12 +330,14 @@ export class AllAnimeProvider implements Provider {
           timeout: 15000,
         }
       )
-
-      if (response.data.errors && response.data.errors[0]?.message === 'PersistedQueryNotFound') {
+      const responseData = response.data
+      if (responseData?.data?.tobeparsed) {
+        responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
+      }
+      if (responseData.errors && responseData.errors[0]?.message === 'PersistedQueryNotFound') {
         throw new Error('PersistedQueryNotFound')
       }
-
-      const recommendations = response.data?.data?.queryPopular?.recommendations || []
+      const recommendations = responseData?.data?.queryPopular?.recommendations || []
       return recommendations.map((rec: { anyCard: Show }) => {
         const card = rec.anyCard
         return { ...card, thumbnail: this.deobfuscateUrl(card.thumbnail || '') }
@@ -339,21 +350,10 @@ export class AllAnimeProvider implements Provider {
           query ($type: VaildPopularTypeEnumType!, $size: Int!, $dateRange: Int, $page: Int, $allowAdult: Boolean, $allowUnknown: Boolean) {
             queryPopular(type: $type, size: $size, dateRange: $dateRange, page: $page, allowAdult: $allowAdult, allowUnknown: $allowUnknown) {
               recommendations {
-                anyCard {
-                  _id
-                  name
-                  nativeName
-                  englishName
-                  thumbnail
-                  type
-                  availableEpisodesDetail
-                  isAdult
-                  rating
-                }
+                anyCard { _id name nativeName englishName thumbnail type availableEpisodesDetail isAdult rating }
               }
             }
-          }
-          `
+          }`
         const response = await axios.post(
           API_ENDPOINT,
           { query: fullQuery, variables },
@@ -362,7 +362,11 @@ export class AllAnimeProvider implements Provider {
             timeout: 15000,
           }
         )
-        const recommendations = response.data?.data?.queryPopular?.recommendations || []
+        const responseData = response.data
+        if (responseData?.data?.tobeparsed) {
+          responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
+        }
+        const recommendations = responseData?.data?.queryPopular?.recommendations || []
         return recommendations.map((rec: { anyCard: Show }) => {
           const card = rec.anyCard
           return { ...card, thumbnail: this.deobfuscateUrl(card.thumbnail || '') }
@@ -390,6 +394,7 @@ export class AllAnimeProvider implements Provider {
     }
     return this._fetchShows(variables)
   }
+
   async getSeasonal(page: number): Promise<Show[]> {
     const month = new Date().getMonth()
     const season =
@@ -404,12 +409,13 @@ export class AllAnimeProvider implements Provider {
     const variables = {
       search: { year, season, sortBy: 'Latest_Update', allowAdult: false },
       limit: 14,
-      page: page,
+      page,
       translationType: 'sub',
       countryOrigin: 'JP',
     }
     return this._fetchShows(variables)
   }
+
   async getLatestReleases(): Promise<Show[]> {
     const variables = {
       search: { sortBy: 'Latest_Update', allowAdult: false },
@@ -433,7 +439,11 @@ export class AllAnimeProvider implements Provider {
         timeout: 15000,
       }
     )
-    const show = response.data.data.show
+    const responseData = response.data
+    if (responseData?.data?.tobeparsed) {
+      responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
+    }
+    const show = responseData.data.show
     if (show) {
       return {
         _id: show._id,
@@ -453,10 +463,7 @@ export class AllAnimeProvider implements Provider {
   async getEpisodes(showId: string, mode: 'sub' | 'dub'): Promise<EpisodeDetails | null> {
     const cacheKey = `episodes-${showId}-${mode}`
     const cachedData = this.cache.get<EpisodeDetails>(cacheKey)
-    if (cachedData) {
-      return cachedData
-    }
-
+    if (cachedData) return cachedData
     const response = await axios.post(
       API_ENDPOINT,
       {
@@ -468,7 +475,11 @@ export class AllAnimeProvider implements Provider {
         timeout: 15000,
       }
     )
-    const showData = response.data.data.show
+    const responseData = response.data
+    if (responseData?.data?.tobeparsed) {
+      responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
+    }
+    const showData = responseData.data.show
     if (showData) {
       const episodeDetails = {
         episodes: (showData.availableEpisodesDetail[mode] as string[]) || [],
@@ -493,7 +504,11 @@ export class AllAnimeProvider implements Provider {
           timeout: 10000,
         }
       )
-      const malId = malIdResponse.data?.data?.show?.malId
+      const responseData = malIdResponse.data
+      if (responseData?.data?.tobeparsed) {
+        responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
+      }
+      const malId = responseData?.data?.show?.malId
       if (!malId) return { found: false, results: [] }
       const response = await axios.get(
         `https://api.aniskip.com/v1/skip-times/${malId}/${episodeNumber}?types=op&types=ed`,
@@ -502,7 +517,7 @@ export class AllAnimeProvider implements Provider {
           timeout: 5000,
         }
       )
-      return response.data
+      return response.data as SkipIntervals
     } catch {
       return { found: false, results: [] }
     }
@@ -513,10 +528,14 @@ export class AllAnimeProvider implements Provider {
     episodeNumber: string,
     mode: 'sub' | 'dub'
   ): Promise<VideoSource[] | null> {
-    const { data } = await axios.post(
+    const { data: axiosResponse } = await axios.post(
       API_ENDPOINT,
       {
-        query: `query($showId: String!, $translationType: VaildTranslationTypeEnumType!, $episodeString: String!) { episode(showId: $showId, translationType: $translationType, episodeString: $episodeString) { sourceUrls } }`,
+        query: `query($showId: String!, $translationType: VaildTranslationTypeEnumType!, $episodeString: String!) {
+          episode(showId: $showId, translationType: $translationType, episodeString: $episodeString) {
+            sourceUrls
+          }
+        }`,
         variables: { showId, translationType: mode, episodeString: episodeNumber },
       },
       {
@@ -524,10 +543,17 @@ export class AllAnimeProvider implements Provider {
         timeout: 15000,
       }
     )
-
-    const sourceUrls = data.data.episode?.sourceUrls
+    const responseData = axiosResponse
+    if (responseData?.data?.tobeparsed) {
+      responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
+    }
+    const sourceUrls = responseData.data?.episode?.sourceUrls as {
+      sourceName: string
+      sourceUrl: string
+      priority?: number
+      type?: string
+    }[]
     if (!Array.isArray(sourceUrls)) return null
-
     const supportedSources = [
       'Yt-mp4',
       'S-mp4',
@@ -540,127 +566,76 @@ export class AllAnimeProvider implements Provider {
       'Ok',
       'Uni',
     ]
-
     const filteredSources = sourceUrls
-      .filter((s: { sourceName: string }) => supportedSources.includes(s.sourceName))
-      .sort(
-        (a: { priority?: number }, b: { priority?: number }) =>
-          (b.priority || 0) - (a.priority || 0)
-      )
-
+      .filter((s) => supportedSources.includes(s.sourceName))
+      .sort((a, b) => (b.priority || 0) - (a.priority || 0))
     const processedSources: VideoSource[] = []
-
-    for (const source of filteredSources as {
-      sourceName: string
-      sourceUrl: string
-      type?: string
-      priority?: number
-    }[]) {
+    for (const source of filteredSources) {
       try {
         if (['Yt-mp4', 'S-mp4', 'wixmp', 'Default'].includes(source.sourceName)) {
-          if (!source.sourceUrl.startsWith('--')) continue
-
-          let videoLinks: VideoLink[] = []
-          let subtitles: SubtitleTrack[] = []
-
           let decryptedUrl = this.deobfuscateStreamUrl(source.sourceUrl)
-
           if (decryptedUrl.includes('/clock') && !decryptedUrl.includes('.json')) {
             decryptedUrl = decryptedUrl.replace('/clock', '/clock.json')
           }
-
+          let videoLinks: VideoLink[] = []
+          let subtitles: SubtitleTrack[] = []
           if (decryptedUrl.includes('/clock.json')) {
             const finalUrl = decryptedUrl.startsWith('http')
               ? decryptedUrl
               : new URL(decryptedUrl, API_BASE_URL).href
-
-            let clockData: RawClockData | null = null
-            for (let retry = 0; retry < 2; retry++) {
-              try {
-                const resp = await axios.get(finalUrl, {
-                  headers: { Referer: REFERER, 'User-Agent': USER_AGENT },
-                  timeout: 10000,
-                })
-                clockData = resp.data
-                if (clockData && clockData !== ('error' as unknown)) break
-              } catch (e) {
-                if (retry === 1)
-                  logger.error({ err: e, sourceName: source.sourceName }, 'Clock.json fetch failed')
-              }
-            }
-
+            const resp = await axios.get(finalUrl, {
+              headers: { Referer: REFERER, 'User-Agent': USER_AGENT },
+              timeout: 10000,
+            })
+            const clockData = resp.data as RawClockData
             if (clockData && Array.isArray(clockData.links) && clockData.links.length > 0) {
               const linkData = clockData.links[0]
               if (linkData.hls) {
-                try {
-                  const hlsResp = await axios.get(linkData.link, {
-                    headers: linkData.headers || { Referer: REFERER },
-                    responseType: 'text',
-                    timeout: 10000,
-                  })
-                  const lines = (hlsResp.data as string).split('\n')
-                  for (let i = 0; i < lines.length; i++) {
-                    if (lines[i].startsWith('#EXT-X-STREAM-INF')) {
-                      const resMatch = lines[i].match(/RESOLUTION=\d+x(\d+)/)
-                      videoLinks.push({
-                        resolutionStr: resMatch ? `${resMatch[1]}p` : 'Auto',
-                        link: new URL(lines[i + 1], linkData.link).href,
-                        hls: true,
-                        headers: linkData.headers || { Referer: REFERER },
-                      })
-                    }
+                const hlsResp = await axios.get(linkData.link, {
+                  headers: linkData.headers || { Referer: REFERER },
+                  responseType: 'text',
+                  timeout: 10000,
+                })
+                const lines = (hlsResp.data as string).split('\n')
+                for (let i = 0; i < lines.length; i++) {
+                  if (lines[i].startsWith('#EXT-X-STREAM-INF')) {
+                    const resMatch = lines[i].match(/RESOLUTION=\d+x(\d+)/)
+                    videoLinks.push({
+                      resolutionStr: resMatch ? `${resMatch[1]}p` : 'Auto',
+                      link: new URL(lines[i + 1], linkData.link).href,
+                      hls: true,
+                      headers: linkData.headers || { Referer: REFERER },
+                    })
                   }
-                } catch (e) {
-                  logger.error(
-                    { err: e, sourceName: source.sourceName },
-                    'Failed to parse HLS master playlist'
-                  )
                 }
-
-                if (videoLinks.length === 0) {
-                  videoLinks.push({
-                    resolutionStr: 'Auto',
-                    link: linkData.link,
-                    hls: true,
-                    headers: linkData.headers || { Referer: REFERER },
-                  })
-                }
-              } else if (Array.isArray(clockData.links)) {
-                videoLinks = clockData.links.map((l: RawClockLink) => ({
+              } else {
+                videoLinks = clockData.links.map((l) => ({
                   resolutionStr: l.resolutionStr || 'Default',
-                  link:
-                    l.link && typeof l.link === 'string' && l.link.startsWith('/')
-                      ? `https://wp.youtube-anime.com${l.link}`
-                      : l.link,
+                  link: l.link.startsWith('/') ? `https://wp.youtube-anime.com${l.link}` : l.link,
                   hls: !!l.hls,
                   headers: l.headers || { Referer: REFERER },
                 }))
               }
-
               if (Array.isArray(linkData.subtitles)) {
                 subtitles = linkData.subtitles.map((s) => ({
                   language: s.lang || s.language || 'en',
                   label: s.label || 'Subtitle',
                   url:
-                    s.src && typeof s.src === 'string' && s.src.startsWith('/')
+                    s.src && s.src.startsWith('/')
                       ? `https://wp.youtube-anime.com${s.src}`
                       : s.src || s.url || '',
                 }))
               }
             }
           }
-
-          // Fallback if clock.json failed or provided no links
           if (videoLinks.length === 0) {
-            const fallbackUrl = decryptedUrl
             videoLinks.push({
               resolutionStr: 'Default',
-              link: fallbackUrl,
-              hls: fallbackUrl.includes('.m3u8'),
+              link: decryptedUrl,
+              hls: decryptedUrl.includes('.m3u8'),
               headers: { Referer: REFERER },
             })
           }
-
           processedSources.push({
             sourceName: source.sourceName,
             links: videoLinks,
@@ -668,16 +643,9 @@ export class AllAnimeProvider implements Provider {
             type: 'player',
           })
         } else {
-          // Handle iframe-like sources and Fm-Hls
           processedSources.push({
             sourceName: source.sourceName,
-            links: [
-              {
-                resolutionStr: 'iframe',
-                link: source.sourceUrl,
-                hls: false,
-              },
-            ],
+            links: [{ resolutionStr: 'iframe', link: source.sourceUrl, hls: false }],
             type:
               source.type === 'iframe' ||
               source.sourceName === 'Fm-Hls' ||
@@ -687,29 +655,30 @@ export class AllAnimeProvider implements Provider {
           })
         }
       } catch (e) {
-        logger.error({ err: e, sourceName: source.sourceName }, `Failed to process source`)
+        logger.error({ err: e }, `Failed to process source ${source.sourceName}`)
       }
     }
-
-    return processedSources
+    return processedSources.length > 0 ? processedSources : null
   }
 
   async getShowDetails(showId: string): Promise<ShowDetails> {
-    const metaQuery = `query($showId: String!) { show(_id: $showId) { name } }`
-    const metaResponse = await axios.post(
+    const response = await axios.post(
       API_ENDPOINT,
-      { query: metaQuery, variables: { showId } },
+      {
+        query: `query($showId: String!) { show(_id: $showId) { name } }`,
+        variables: { showId },
+      },
       {
         headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
         timeout: 10000,
       }
     )
-    const showName = metaResponse.data?.data?.show?.name
-
-    if (!showName) {
-      throw new Error('Show not found')
+    const responseData = response.data
+    if (responseData?.data?.tobeparsed) {
+      responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
     }
-
+    const showName = responseData?.data?.show?.name as string
+    if (!showName) throw new Error('Show not found')
     const scheduleSearchUrl = `https://animeschedule.net/api/v3/anime?q=${encodeURIComponent(showName)}`
     const scheduleResponse = await axios.get(scheduleSearchUrl, { timeout: 10000 })
     const firstResult = scheduleResponse.data?.anime?.[0]
@@ -720,29 +689,29 @@ export class AllAnimeProvider implements Provider {
             `https://animeschedule.net/anime/${firstResult.route}`,
             { timeout: 10000 }
           )
-          const countdownMatch = pageResponse.data.match(/countdown-time" datetime="([^"]*)"/)
+          const countdownMatch = (pageResponse.data as string).match(
+            /countdown-time" datetime="([^"]*)"/
+          )
           if (countdownMatch) {
             firstResult.nextEpisodeAirDate = countdownMatch[1]
+          } else {
+            logger.debug('No countdown found')
           }
-        } catch (_e) {
-          logger.warn({ err: _e }, 'Failed to scrape for nextEpisodeAirDate')
+        } catch (e) {
+          logger.warn({ err: e }, 'Failed to fetch schedule page')
         }
       }
-      return firstResult
+      return firstResult as ShowDetails
     }
     throw new Error('Not Found on Schedule')
   }
 
   async getAllmangaDetails(showId: string): Promise<AllmangaDetails> {
     const url = `https://allmanga.to/bangumi/${showId}`
-    const headers = {
-      'User-Agent': USER_AGENT,
-      Referer: REFERER,
-    }
-
-    const response = await axios.get(url, { headers })
+    const response = await axios.get(url, {
+      headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+    })
     const $ = cheerio.load(response.data)
-
     const details: AllmangaDetails = {
       Rating: 'N/A',
       Season: 'N/A',
@@ -750,7 +719,6 @@ export class AllAnimeProvider implements Provider {
       Date: 'N/A',
       'Original Broadcast': 'N/A',
     }
-
     $('.info-season').each((_i, elem) => {
       const label = $(elem).find('h4').text().trim() as keyof AllmangaDetails
       const value = $(elem).find('li').text().trim()
