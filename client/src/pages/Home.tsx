@@ -228,7 +228,7 @@ const Home: React.FC = () => {
                       setPage((p) => p - 1)
                       if (seasonalRef.current) {
                         const y =
-                          seasonalRef.current.getBoundingClientRect().top + window.scrollY - 80
+                          seasonalRef.current.getBoundingClientRect().top + window.scrollY - 120
                         window.scrollTo({ top: y, behavior: 'smooth' })
                       }
                     }
@@ -263,7 +263,7 @@ const Home: React.FC = () => {
                       setPage((p) => p + 1)
                       if (seasonalRef.current) {
                         const y =
-                          seasonalRef.current.getBoundingClientRect().top + window.scrollY - 80
+                          seasonalRef.current.getBoundingClientRect().top + window.scrollY - 120
                         window.scrollTo({ top: y, behavior: 'smooth' })
                       }
                     }
