@@ -233,7 +233,7 @@ const Player: React.FC = () => {
         if (currentIndex > -1 && currentIndex < state.episodes.length - 1) {
           const nextEpisode = state.episodes[currentIndex + 1]
           wasFullscreenRef.current = player.state.isFullscreen
-          navigate(`/player/${showId}/${nextEpisode}`)
+          navigate(`/watch/${showId}/${nextEpisode}`)
         }
       }
     }
@@ -500,7 +500,7 @@ const Player: React.FC = () => {
             episodes={state.episodes}
             currentEpisode={state.currentEpisode}
             watchedEpisodes={state.watchedEpisodes}
-            onEpisodeClick={(ep) => navigate(`/player/${showId}/${ep}`)}
+            onEpisodeClick={(ep) => navigate(`/watch/${showId}/${ep}`)}
           />
         )}
       </aside>

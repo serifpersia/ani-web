@@ -1,5 +1,5 @@
 import { useEffect, Suspense, lazy } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
 import Footer from './components/layout/Footer'
@@ -17,6 +17,11 @@ import { useSidebar } from './hooks/useSidebar'
 import { Toaster } from 'react-hot-toast'
 import TopProgressBar from './components/common/TopProgressBar'
 import ErrorBoundary from './components/common/ErrorBoundary'
+
+const PlayerRedirect = () => {
+  const { id, episodeNumber } = useParams()
+  return <Navigate to={episodeNumber ? `/watch/${id}/${episodeNumber}` : `/watch/${id}`} replace />
+}
 
 function App() {
   const { isOpen, setIsOpen } = useSidebar()
@@ -82,8 +87,32 @@ function App() {
               <Route path="/settings" element={<Settings />} />
               <Route path="/mal" element={<MAL />} />
               <Route path="/insights" element={<Insights />} />
-              <Route path="/player/:id" element={<Player />} />
-              <Route path="/player/:id/:episodeNumber" element={<Player />} />
+              {/* New standard watch routes */}
+              <Route path="/watch/:id" element={<Player />} />
+              <Route path="/watch/:id/:episodeNumber" element={<Player />} />
+
+              {/* Legacy player routes - redirect permanently to new watch URLs */}
+              <Route path="/player/:id" element={<PlayerRedirect />} />
+              <Route path="/player/:id/:episodeNumber" element={<PlayerRedirect />} />
+              <Route
+                path="/player/:id/:episodeNumber"
+                element={<Navigate to="../../watch/:id/:episodeNumber" replace relative="path" />}
+              />
+              <Route
+                path="/player/:id/:episodeNumber"
+                element={
+                  <Navigate to={`/watch/${useParams().id}/${useParams().episodeNumber}`} replace />
+                }
+              />
+              <Route
+                path="/player/:id/:episodeNumber"
+                element={
+                  <Navigate
+                    to={({ params }) => `/watch/${params.id}/${params.episodeNumber}`}
+                    replace
+                  />
+                }
+              />
             </Routes>
           </Suspense>
         </ErrorBoundary>

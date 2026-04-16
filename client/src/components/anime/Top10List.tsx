@@ -91,7 +91,7 @@ const Top10List: React.FC<Top10ListProps> = ({ title }) => {
       ) : (
         <div className={styles.list}>
           {top10List.map((item, i) => (
-            <Link to={`/player/${item._id}`} key={item._id} className={styles.item}>
+            <Link to={`/watch/${item._id}`} key={item._id} className={styles.item}>
               <div className={styles.rank}>#{i + 1}</div>
               <img
                 src={fixThumbnailUrl(item.thumbnail, 130, 182)}

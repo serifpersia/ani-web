@@ -40,7 +40,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => 
 
   return (
     <Link
-      to={`/player/${notification.showId}/${notification.episodeNumber}`}
+      to={`/watch/${notification.showId}/${notification.episodeNumber}`}
       className={styles.item}
       onClick={handleClick}
     >
