@@ -610,7 +610,13 @@ const Player: React.FC = () => {
               onProviderChange={(newProvider) => {
                 dispatch({
                   type: 'SET_STATE',
-                  payload: { selectedProvider: newProvider },
+                  payload: {
+                    selectedProvider: newProvider,
+                    videoSources: [],
+                    selectedSource: null,
+                    selectedLink: null,
+                    loadingVideo: true,
+                  },
                 })
                 localStorage.setItem('preferredProvider', newProvider)
               }}
@@ -618,10 +624,14 @@ const Player: React.FC = () => {
                 if (refs.videoRef.current && !isNaN(refs.videoRef.current.currentTime)) {
                   seekToTimeRef.current = refs.videoRef.current.currentTime
                 }
-                const bestLink = source.links.sort(
-                  (a: VideoLink, b: VideoLink) =>
-                    (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
-                )[0]
+                // Add this safety check
+                const links = source.links || []
+                const bestLink =
+                  links.sort(
+                    (a: VideoLink, b: VideoLink) =>
+                      (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
+                  )[0] || null
+
                 setPreferredSource(source.sourceName)
                 dispatch({
                   type: 'SET_STATE',

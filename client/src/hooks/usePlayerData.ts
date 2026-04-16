@@ -181,8 +181,33 @@ export const usePlayerData = (
             fetch(`/api/skip-times/${showId}/${state.currentEpisode}`),
           ])
 
-        if (!sourcesResponse.ok) throw new Error('Failed to fetch video sources')
+        if (!sourcesResponse.ok) {
+          dispatch({
+            type: 'SET_STATE',
+            payload: {
+              videoSources: [],
+              selectedSource: null,
+              selectedLink: null,
+              loadingVideo: false,
+            },
+          })
+          throw new Error('Failed to fetch video sources')
+        }
         const sources: VideoSource[] = await sourcesResponse.json()
+
+        if (!Array.isArray(sources)) {
+          console.error('API returned invalid sources:', sources)
+          dispatch({
+            type: 'SET_STATE',
+            payload: {
+              videoSources: [],
+              selectedSource: null,
+              selectedLink: null,
+              loadingVideo: false,
+            },
+          })
+          return
+        }
 
         const preferredSourceName = preferredSourceResponse.ok
           ? (await preferredSourceResponse.json()).value

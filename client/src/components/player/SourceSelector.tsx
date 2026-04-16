@@ -17,6 +17,8 @@ const SourceSelector: React.FC<SourceSelectorProps> = ({
   selectedProvider,
   onProviderChange,
 }) => {
+  const sources = Array.isArray(videoSources) ? videoSources : []
+
   return (
     <div className={styles.sourceSelectionContainer}>
       <div className={styles.providerSelectContainer}>
@@ -31,14 +33,16 @@ const SourceSelector: React.FC<SourceSelectorProps> = ({
         </select>
       </div>
 
-      {videoSources.length > 0 && (
+      {sources.length > 0 && (
         <>
           <h4>Source</h4>
           <div className={styles.sourceButtons}>
-            {videoSources.map((source) => (
+            {sources.map((source) => (
               <button
                 key={source.sourceName}
-                className={`${styles.sourceButton} ${selectedSource?.sourceName === source.sourceName ? styles.active : ''}`}
+                className={`${styles.sourceButton} ${
+                  selectedSource?.sourceName === source.sourceName ? styles.active : ''
+                }`}
                 onClick={() => onSourceChange(source)}
               >
                 {source.sourceName}
@@ -55,8 +59,6 @@ export default React.memo(SourceSelector, (prevProps, nextProps) => {
   return (
     prevProps.selectedSource?.sourceName === nextProps.selectedSource?.sourceName &&
     prevProps.videoSources === nextProps.videoSources &&
-    prevProps.onSourceChange === nextProps.onSourceChange &&
-    prevProps.selectedProvider === nextProps.selectedProvider &&
-    prevProps.onProviderChange === nextProps.onProviderChange
+    prevProps.selectedProvider === nextProps.selectedProvider
   )
 })
