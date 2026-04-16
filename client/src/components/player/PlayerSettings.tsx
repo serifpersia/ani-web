@@ -22,19 +22,20 @@ interface PlayerSettingsProps {
 
 type SettingsView = 'main' | 'quality' | 'subtitles' | 'subtitle-style'
 
-const PlayerSettings: React.FC<PlayerSettingsProps> = ({
-  isOpen,
-  onClose,
-  videoSources,
-  currentSource,
-  currentLink,
-  onSourceChange,
-  subtitles,
-  activeSubtitleTrack,
-  onSubtitleChange,
-  subtitleSettings,
-  onSubtitleSettingsChange,
-}) => {
+const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTMLDivElement>) => {
+  const {
+    isOpen,
+    onClose,
+    videoSources,
+    currentSource,
+    currentLink,
+    onSourceChange,
+    subtitles,
+    activeSubtitleTrack,
+    onSubtitleChange,
+    subtitleSettings,
+    onSubtitleSettingsChange,
+  } = props
   const [view, setView] = useState<SettingsView>('main')
 
   React.useEffect(() => {
@@ -137,7 +138,7 @@ const PlayerSettings: React.FC<PlayerSettingsProps> = ({
   if (!isOpen) return null
 
   return (
-    <div className={styles.settingsPanel} onClick={(e) => e.stopPropagation()}>
+    <div ref={ref} className={styles.settingsPanel} onClick={(e) => e.stopPropagation()}>
       <div className={styles.header}>
         {view !== 'main' && (
           <button className={styles.backBtn} onClick={() => setView('main')}>
@@ -161,4 +162,4 @@ const PlayerSettings: React.FC<PlayerSettingsProps> = ({
   )
 }
 
-export default PlayerSettings
+export default React.forwardRef(PlayerSettings)

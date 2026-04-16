@@ -41,12 +41,34 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
 }) => {
   const { state, refs, actions } = player
   const [showSettings, setShowSettings] = useState(false)
+  const settingsRef = React.useRef<HTMLDivElement>(null)
+  const settingsBtnRef = React.useRef<HTMLButtonElement>(null)
 
-  // Local state for frequently changing values to prevent global re-renders
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        settingsRef.current &&
+        !settingsRef.current.contains(event.target as Node) &&
+        settingsBtnRef.current &&
+        !settingsBtnRef.current.contains(event.target as Node) &&
+        showSettings
+      ) {
+        setShowSettings(false)
+      }
+    }
+
+    if (showSettings) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showSettings])
+
   const [currentTime, setCurrentTime] = useState(0)
   const [buffered, setBuffered] = useState(0)
 
-  // Listen to video events directly
   useEffect(() => {
     const video = refs.videoRef.current
     if (!video) return
@@ -63,7 +85,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
       }
     }
 
-    // Initialize values
     setCurrentTime(video.currentTime)
     if (video.buffered.length > 0) {
       setBuffered(video.buffered.end(video.buffered.length - 1))
@@ -328,8 +349,10 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
             </div>
 
             <button
+              ref={settingsBtnRef}
               className={`${styles.controlBtn} ${showSettings ? styles.active : ''} `}
               onClick={() => setShowSettings(!showSettings)}
+              aria-label="Settings"
             >
               <FaCog />
             </button>
@@ -342,6 +365,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
       </div>
 
       <PlayerSettings
+        ref={settingsRef}
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
         videoSources={videoSources}
