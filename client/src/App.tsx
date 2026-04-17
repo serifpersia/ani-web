@@ -91,13 +91,13 @@ function App() {
               <Route path="/watch/:id" element={<Player />} />
               <Route path="/watch/:id/:episodeNumber" element={<Player />} />
 
+              {/* New standard watch routes */}
+              <Route path="/watch/:id" element={<Player />} />
+              <Route path="/watch/:id/:episodeNumber" element={<Player />} />
+
               {/* Legacy player routes - redirect permanently to new watch URLs */}
               <Route path="/player/:id" element={<PlayerRedirect />} />
               <Route path="/player/:id/:episodeNumber" element={<PlayerRedirect />} />
-              <Route
-                path="/player/:id/:episodeNumber"
-                element={<Navigate to="../../watch/:id/:episodeNumber" replace relative="path" />}
-              />
               <Route
                 path="/player/:id/:episodeNumber"
                 element={

@@ -20,7 +20,7 @@
   bottom: 0;
   background-color: rgba(255, 255, 255, 0.1);
   border: 1px solid var(--border-primary);
-  transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: var(--transition-base);
   border-radius: 24px;
 }
 
@@ -32,9 +32,9 @@
   left: 3px;
   bottom: 2px;
   background-color: var(--text-secondary);
-  transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: var(--transition-base);
   border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-sm);
 }
 
 input:checked + .slider {

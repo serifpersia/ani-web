@@ -1,26 +1,28 @@
 .title-preference-container {
-  margin-bottom: 20px;
-  padding: 15px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background-color: var(--background-light);
+  margin-bottom: var(--space-6);
+  padding: var(--space-4);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-tertiary);
 }
 
 .title-preference-container h4 {
   margin-top: 0;
-  margin-bottom: 15px;
-  color: var(--text-color-primary);
+  margin-bottom: var(--space-4);
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
 }
 
 .error {
-  color: var(--error-color);
+  color: var(--danger);
 }
 
 .toggle-button {
   position: relative;
   width: 200px;
   height: 40px;
-  background-color: var(--accent);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
   border: none;
   border-radius: 20px;
   cursor: pointer;
@@ -29,13 +31,16 @@
   align-items: center;
   justify-content: center;
   color: white;
-  font-size: 1rem;
-  font-weight: bold;
-  transition: background-color 0.3s ease;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  transition: var(--transition-base);
+  box-shadow: var(--shadow-md);
 }
 
-.toggle-button:hover {
-  background-color: var(--accent-dark);
+.toggle-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  filter: brightness(1.1);
 }
 
 .toggle-button:disabled {
@@ -46,7 +51,5 @@
 .toggle-label {
   position: absolute;
   white-space: nowrap;
-  transition:
-    transform 0.3s ease-out,
-    opacity 0.3s ease-out;
+  transition: var(--transition-base);
 }

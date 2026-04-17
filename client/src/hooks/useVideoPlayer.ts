@@ -65,29 +65,33 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
   const [isBuffering, setIsBuffering] = useState(false)
   const hasEnded = useRef(false)
 
+  const buildProgressPayload = useCallback(() => {
+    const video = videoRef.current
+    if (!video || !showId || !episodeNumber || !showMeta?.name) return null
+
+    return {
+      showId,
+      episodeNumber,
+      currentTime: video.currentTime,
+      duration: video.duration,
+      showName: showMeta.name,
+      showThumbnail: showMeta.thumbnail,
+      nativeName: showMeta.names?.native,
+      englishName: showMeta.names?.english,
+      genres: showMeta.genres?.map((g) => g.name),
+      popularityScore: showMeta.score,
+      type: showMeta.type,
+    }
+  }, [showId, episodeNumber, showMeta])
+
   const sendProgressUpdate = useCallback(
     (isFinalUpdate = false) => {
       if (hasEnded.current) return
 
-      const video = videoRef.current
-      const name = showMeta?.name
-      const thumbnail = showMeta?.thumbnail
-      const nativeName = showMeta?.names?.native
-      const englishName = showMeta?.names?.english
-      const genres = showMeta?.genres
-      const popularityScore = showMeta?.score
+      const payload = buildProgressPayload()
+      if (!payload) return
 
-      if (
-        !video ||
-        !showId ||
-        !episodeNumber ||
-        !name ||
-        isNaN(video.duration) ||
-        video.duration === 0
-      ) {
-        return
-      }
-
+      const video = videoRef.current!
       const isFinished = video.currentTime >= video.duration * 0.95
       let timeToReport = video.currentTime
 
@@ -97,35 +101,15 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
 
       if (timeToReport === 0 && !isFinished) return
 
+      payload.currentTime = timeToReport
+
       fetch('/api/update-progress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          showId,
-          episodeNumber,
-          currentTime: timeToReport,
-          duration: video.duration,
-          showName: name,
-          showThumbnail: thumbnail,
-          nativeName: nativeName,
-          englishName: englishName,
-          genres: genres?.map((g) => g.name),
-          popularityScore,
-          type: showMeta?.type,
-        }),
+        body: JSON.stringify(payload),
       }).catch((err) => console.error('Failed to update progress:', err))
     },
-    [
-      showId,
-      episodeNumber,
-      showMeta?.name,
-      showMeta?.thumbnail,
-      showMeta?.names?.native,
-      showMeta?.names?.english,
-      showMeta?.genres,
-      showMeta?.score,
-      showMeta?.type,
-    ]
+    [buildProgressPayload]
   )
 
   // Apply saved volume/mute settings when video element loads
@@ -317,53 +301,17 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
   }, [skipIntervals, isAutoSkipEnabled, sendProgressUpdate])
 
   const reportFinalProgress = useCallback(() => {
-    const video = videoRef.current
-    const name = showMeta?.name
-    const thumbnail = showMeta?.thumbnail
-    const nativeName = showMeta?.names?.native
-    const englishName = showMeta?.names?.english
-    const genres = showMeta?.genres
-    const popularityScore = showMeta?.score
+    const payload = buildProgressPayload()
+    if (!payload) return
 
-    if (
-      !video ||
-      !showId ||
-      !episodeNumber ||
-      !name ||
-      isNaN(video.duration) ||
-      video.duration === 0
-    ) {
-      return
-    }
+    payload.currentTime = payload.duration
 
     fetch('/api/update-progress', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        showId,
-        episodeNumber,
-        currentTime: video.duration,
-        duration: video.duration,
-        showName: name,
-        showThumbnail: thumbnail,
-        nativeName: nativeName,
-        englishName: englishName,
-        genres: genres?.map((g) => g.name),
-        popularityScore,
-        type: showMeta?.type,
-      }),
+      body: JSON.stringify(payload),
     }).catch((err) => console.error('Failed to send final progress:', err))
-  }, [
-    showId,
-    episodeNumber,
-    showMeta?.name,
-    showMeta?.thumbnail,
-    showMeta?.names?.native,
-    showMeta?.names?.english,
-    showMeta?.genres,
-    showMeta?.score,
-    showMeta?.type,
-  ])
+  }, [buildProgressPayload])
 
   const onEnded = useCallback(() => {
     hasEnded.current = true

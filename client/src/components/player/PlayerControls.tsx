@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, Suspense, lazy } from 'react'
 import styles from '../../pages/Player.module.css'
 import ToggleSwitch from '../common/ToggleSwitch'
 import {
@@ -15,7 +15,8 @@ import {
 import { MdReplay10, MdForward10 } from 'react-icons/md'
 import type { VideoSource, VideoLink, SkipInterval } from '../../types/player'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
-import PlayerSettings from './PlayerSettings'
+
+const PlayerSettings = lazy(() => import('./PlayerSettings'))
 
 interface PlayerControlsProps {
   player: ReturnType<typeof useVideoPlayer>
@@ -29,7 +30,7 @@ interface PlayerControlsProps {
   skipIntervals: SkipInterval[]
 }
 
-const PlayerControls: React.FC<PlayerControlsProps> = ({
+const PlayerControls = ({
   player,
   isAutoplayEnabled,
   onAutoplayChange,
@@ -327,7 +328,9 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
             </div>
 
             <div className={styles.toggleContainer}>
-              <span>Auto Skip</span>
+              <label htmlFor="auto-skip-toggle" className={styles.toggleLabel}>
+                Auto Skip
+              </label>
               <ToggleSwitch
                 id="auto-skip-toggle"
                 isChecked={state.isAutoSkipEnabled}
@@ -340,7 +343,9 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
             </div>
 
             <div className={styles.toggleContainer}>
-              <span>Autoplay</span>
+              <label htmlFor="autoplay-toggle" className={styles.toggleLabel}>
+                Autoplay
+              </label>
               <ToggleSwitch
                 id="autoplay-toggle"
                 isChecked={isAutoplayEnabled}
@@ -364,50 +369,35 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
         </div>
       </div>
 
-      <PlayerSettings
-        ref={settingsRef}
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-        videoSources={videoSources}
-        currentSource={selectedSource}
-        currentLink={selectedLink}
-        onSourceChange={onSourceChange}
-        subtitles={state.availableSubtitles}
-        activeSubtitleTrack={state.activeSubtitleTrack}
-        onSubtitleChange={handleSubtitleSelection}
-        subtitleSettings={{
-          fontSize: state.subtitleFontSize,
-          position: state.subtitlePosition,
-        }}
-        onSubtitleSettingsChange={(key, value) => {
-          if (key === 'fontSize') {
-            actions.setSubtitleFontSize(value)
-            localStorage.setItem('subtitleFontSize', value.toString())
-          } else {
-            actions.setSubtitlePosition(value)
-            localStorage.setItem('subtitlePosition', value.toString())
-          }
-        }}
-      />
+      <Suspense fallback={null}>
+        <PlayerSettings
+          ref={settingsRef}
+          isOpen={showSettings}
+          onClose={() => setShowSettings(false)}
+          videoSources={videoSources}
+          currentSource={selectedSource}
+          currentLink={selectedLink}
+          onSourceChange={onSourceChange}
+          subtitles={state.availableSubtitles}
+          activeSubtitleTrack={state.activeSubtitleTrack}
+          onSubtitleChange={handleSubtitleSelection}
+          subtitleSettings={{
+            fontSize: state.subtitleFontSize,
+            position: state.subtitlePosition,
+          }}
+          onSubtitleSettingsChange={(key, value) => {
+            if (key === 'fontSize') {
+              actions.setSubtitleFontSize(value)
+              localStorage.setItem('subtitleFontSize', value.toString())
+            } else {
+              actions.setSubtitlePosition(value)
+              localStorage.setItem('subtitlePosition', value.toString())
+            }
+          }}
+        />
+      </Suspense>
     </div>
   )
 }
 
-export default React.memo(PlayerControls, (prevProps, nextProps) => {
-  return (
-    prevProps.isAutoplayEnabled === nextProps.isAutoplayEnabled &&
-    prevProps.loadingVideo === nextProps.loadingVideo &&
-    prevProps.selectedSource?.sourceName === nextProps.selectedSource?.sourceName &&
-    prevProps.selectedLink?.link === nextProps.selectedLink?.link &&
-    prevProps.player.state.isPlaying === nextProps.player.state.isPlaying &&
-    prevProps.player.state.duration === nextProps.player.state.duration &&
-    prevProps.player.state.volume === nextProps.player.state.volume &&
-    prevProps.player.state.isMuted === nextProps.player.state.isMuted &&
-    prevProps.player.state.isFullscreen === nextProps.player.state.isFullscreen &&
-    prevProps.player.state.showControls === nextProps.player.state.showControls &&
-    prevProps.player.state.currentSkipInterval === nextProps.player.state.currentSkipInterval &&
-    prevProps.player.state.subtitleFontSize === nextProps.player.state.subtitleFontSize &&
-    prevProps.player.state.subtitlePosition === nextProps.player.state.subtitlePosition &&
-    prevProps.player.state.activeSubtitleTrack === nextProps.player.state.activeSubtitleTrack
-  )
-})
+export default PlayerControls

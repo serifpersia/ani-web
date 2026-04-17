@@ -5,12 +5,18 @@
 }
 
 .selectHeader {
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background-color: var(--bg);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-tertiary);
   cursor: pointer;
   user-select: none;
+  transition: var(--transition-base);
+}
+
+.selectHeader:hover {
+  border-color: var(--border-secondary);
+  background-color: var(--bg-elevated);
 }
 
 .dropdown {
@@ -18,22 +24,24 @@
   top: 100%;
   left: 0;
   right: 0;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-primary);
   border-top: none;
-  border-radius: 0 0 4px 4px;
-  background-color: var(--bg);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  background-color: var(--bg-secondary);
   z-index: 1000;
   max-height: 200px;
   overflow-y: auto;
+  box-shadow: var(--shadow-lg);
 }
 
 .searchInput {
   width: 100%;
-  padding: 0.5rem 1rem;
+  padding: var(--space-3) var(--space-4);
   border: none;
-  border-bottom: 1px solid var(--border-color);
-  background-color: var(--bg);
+  border-bottom: 1px solid var(--border-primary);
+  background-color: var(--bg-secondary);
   color: var(--text-primary);
+  font-size: var(--font-size-sm);
 }
 
 .optionsList {
@@ -43,10 +51,13 @@
 }
 
 .option {
-  padding: 0.5rem 1rem;
+  padding: var(--space-3) var(--space-4);
   cursor: pointer;
+  transition: var(--transition-fast);
+  font-size: var(--font-size-sm);
 }
 
 .option:hover {
-  background-color: var(--bg-secondary);
+  background-color: var(--bg-tertiary);
+  color: var(--accent-light);
 }

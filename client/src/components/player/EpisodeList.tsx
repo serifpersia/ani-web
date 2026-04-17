@@ -8,12 +8,7 @@ interface EpisodeListProps {
   onEpisodeClick: (ep: string) => void
 }
 
-const EpisodeList: React.FC<EpisodeListProps> = ({
-  episodes,
-  currentEpisode,
-  watchedEpisodes,
-  onEpisodeClick,
-}) => {
+const EpisodeList = ({ episodes, currentEpisode, watchedEpisodes, onEpisodeClick }) => {
   const [selectedRange, setSelectedRange] = useState(0)
 
   const episodeRanges = useMemo(() => {
@@ -69,11 +64,4 @@ const EpisodeList: React.FC<EpisodeListProps> = ({
   )
 }
 
-export default React.memo(EpisodeList, (prevProps, nextProps) => {
-  return (
-    prevProps.currentEpisode === nextProps.currentEpisode &&
-    prevProps.episodes === nextProps.episodes &&
-    prevProps.watchedEpisodes === nextProps.watchedEpisodes &&
-    prevProps.onEpisodeClick === nextProps.onEpisodeClick
-  )
-})
+export default EpisodeList

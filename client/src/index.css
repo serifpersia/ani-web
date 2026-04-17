@@ -2,6 +2,26 @@
   --font-family:
     'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-md: 1.125rem;
+  --font-size-lg: 1.5rem;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+  --border-color: var(--border-primary);
+  --text-color-primary: var(--text-primary);
+  --background-light: var(--bg-tertiary);
+
   --accent-h: 265;
   --accent-s: 95%;
   --accent-l: 72%;
@@ -39,6 +59,7 @@
   --text-muted: #a1a1aa;
 
   --danger: #ef4444;
+  --error-color: var(--danger);
   --success: #10b981;
   --warning: #f59e0b;
 
@@ -298,6 +319,13 @@ a {
   background-color: var(--bg-elevated);
   color: var(--text-primary);
   padding: var(--space-2);
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  background-color: var(--bg-tertiary);
+  box-shadow: 0 0 0 2px var(--accent-glow);
 }
 
 .app-container {
