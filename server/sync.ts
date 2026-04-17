@@ -8,6 +8,32 @@ import { DatabaseWrapper } from './db'
 
 const log = logger.child({ module: 'Sync' })
 
+class Mutex {
+  private _locked = false
+  private _waiting: (() => void)[] = []
+
+  async lock() {
+    return new Promise<void>((resolve) => {
+      if (!this._locked) {
+        this._locked = true
+        resolve()
+      } else {
+        this._waiting.push(resolve)
+      }
+    })
+  }
+
+  unlock() {
+    if (this._waiting.length > 0) {
+      const resolve = this._waiting.shift()!
+      resolve()
+    } else {
+      this._locked = false
+    }
+  }
+}
+
+const syncMutex = new Mutex()
 let isSyncing = false
 let activeProvider: 'google' | 'rclone' | 'none' = 'none'
 
@@ -38,24 +64,38 @@ async function getRemoteVersion(
       const file = await googleDriveService.findFile(CONFIG.MANIFEST_FILENAME, folderId)
       if (!file) return { version: 0 }
 
-      await googleDriveService.downloadFile(file.id, CONFIG.TEMP_MANIFEST_PATH)
-      const content = await fs.readFile(CONFIG.TEMP_MANIFEST_PATH, 'utf-8')
-      await fs.unlink(CONFIG.TEMP_MANIFEST_PATH)
-      return { version: JSON.parse(content).version || 0, fileId: file.id }
+      try {
+        await googleDriveService.downloadFile(file.id, CONFIG.TEMP_MANIFEST_PATH)
+        const content = await fs.readFile(CONFIG.TEMP_MANIFEST_PATH, 'utf-8')
+        return { version: JSON.parse(content).version || 0, fileId: file.id }
+      } finally {
+        try {
+          await fs.unlink(CONFIG.TEMP_MANIFEST_PATH)
+        } catch {
+          // ignore cleanup error
+        }
+      }
     }
 
     if (activeProvider === 'rclone') {
       const exists = await rcloneService.fileExists(remoteFolder, CONFIG.MANIFEST_FILENAME)
       if (!exists) return { version: 0 }
 
-      await rcloneService.downloadFile(
-        remoteFolder,
-        CONFIG.MANIFEST_FILENAME,
-        CONFIG.TEMP_MANIFEST_PATH
-      )
-      const content = await fs.readFile(CONFIG.TEMP_MANIFEST_PATH, 'utf-8')
-      await fs.unlink(CONFIG.TEMP_MANIFEST_PATH)
-      return { version: JSON.parse(content).version || 0 }
+      try {
+        await rcloneService.downloadFile(
+          remoteFolder,
+          CONFIG.MANIFEST_FILENAME,
+          CONFIG.TEMP_MANIFEST_PATH
+        )
+        const content = await fs.readFile(CONFIG.TEMP_MANIFEST_PATH, 'utf-8')
+        return { version: JSON.parse(content).version || 0 }
+      } finally {
+        try {
+          await fs.unlink(CONFIG.TEMP_MANIFEST_PATH)
+        } catch {
+          // ignore cleanup error
+        }
+      }
     }
   } catch (err) {
     log.warn({ err }, 'Could not read remote manifest.')
@@ -118,7 +158,11 @@ export async function syncDownOnBoot(
   closeMainDb: () => Promise<void>
 ): Promise<boolean> {
   if (activeProvider === 'none') return false
-  if (isSyncing) return false
+  await syncMutex.lock()
+  if (isSyncing) {
+    syncMutex.unlock()
+    return false
+  }
   isSyncing = true
 
   try {
@@ -174,6 +218,7 @@ export async function syncDownOnBoot(
     return false
   } finally {
     isSyncing = false
+    syncMutex.unlock()
   }
 }
 
@@ -183,7 +228,11 @@ export async function syncUp(
   remoteFolderName: string
 ): Promise<void> {
   if (activeProvider === 'none') return
-  if (isSyncing) return
+  await syncMutex.lock()
+  if (isSyncing) {
+    syncMutex.unlock()
+    return
+  }
 
   isSyncing = true
   try {
@@ -244,6 +293,12 @@ export async function syncUp(
     log.error({ err }, 'Sync up failed.')
   } finally {
     isSyncing = false
+    syncMutex.unlock()
+    try {
+      await fs.unlink(CONFIG.TEMP_MANIFEST_PATH)
+    } catch {
+      // ignore cleanup error
+    }
   }
 }
 
