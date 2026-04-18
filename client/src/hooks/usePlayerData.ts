@@ -270,7 +270,7 @@ export const usePlayerData = (
             selectedSource: sourceToSelect,
             selectedLink,
             resumeTime,
-            showResumeModal: showResumeModal && resumeTime > 5,
+            showResumeModal: showResumeModal && resumeTime > 5 && sourceToSelect?.type !== 'iframe',
             skipIntervals,
             loadingVideo: false,
           },

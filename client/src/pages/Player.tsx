@@ -571,7 +571,11 @@ const Player: React.FC = () => {
                     setPreferredSource(source.sourceName)
                     dispatch({
                       type: 'SET_STATE',
-                      payload: { selectedSource: source, selectedLink: link },
+                      payload: {
+                        selectedSource: source,
+                        selectedLink: link,
+                        showResumeModal: state.showResumeModal && source.type !== 'iframe',
+                      },
                     })
                   }}
                   loadingVideo={state.loadingVideo}
@@ -635,7 +639,11 @@ const Player: React.FC = () => {
                 setPreferredSource(source.sourceName)
                 dispatch({
                   type: 'SET_STATE',
-                  payload: { selectedSource: source, selectedLink: bestLink },
+                  payload: {
+                    selectedSource: source,
+                    selectedLink: bestLink,
+                    showResumeModal: state.showResumeModal && source.type !== 'iframe',
+                  },
                 })
               }}
             />
