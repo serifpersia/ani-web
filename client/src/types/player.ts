@@ -102,7 +102,7 @@ export interface PlayerState {
   showResumeModal: boolean
   resumeTime: number
   skipIntervals: SkipInterval[]
-  selectedProvider: 'allanime' | 'hianime'
+  selectedProvider: 'allanime' | 'hianime' | 'animepahe'
   loadingShowData: boolean
   loadingVideo: boolean
   loadingDetails: boolean

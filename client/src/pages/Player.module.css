@@ -748,6 +748,28 @@
   box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
 }
 
+.sourceSelect {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  outline: none;
+  cursor: pointer;
+  width: 100%;
+  max-width: 400px;
+}
+
+.sourceSelect:focus {
+  border-color: var(--accent);
+}
+
+.sourceSelect option {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
 .detailsBox {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);

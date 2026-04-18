@@ -156,14 +156,16 @@ export const usePlayerData = (
 
       try {
         let providerShowId = showId
-        if (state.selectedProvider === 'hianime' && state.showMeta.name) {
-          // Search for HiAnime ID if we don't have it (we use the name from AllAnime)
+        if (
+          (state.selectedProvider === 'hianime' || state.selectedProvider === 'animepahe') &&
+          state.showMeta.name
+        ) {
           const searchResponse = await fetch(
-            `/api/search?query=${encodeURIComponent(state.showMeta.name)}&provider=hianime`
+            `/api/search?query=${encodeURIComponent(state.showMeta.name)}&provider=${state.selectedProvider}`
           )
           const searchResults = await searchResponse.json()
           if (searchResults && searchResults.length > 0) {
-            providerShowId = searchResults[0].id
+            providerShowId = searchResults[0].session || searchResults[0].id
           }
         }
 

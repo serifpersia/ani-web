@@ -6,8 +6,8 @@ interface SourceSelectorProps {
   videoSources: VideoSource[]
   selectedSource: VideoSource | null
   onSourceChange: (source: VideoSource) => void
-  selectedProvider: 'allanime' | 'hianime'
-  onProviderChange: (provider: 'allanime' | 'hianime') => void
+  selectedProvider: 'allanime' | 'hianime' | 'animepahe'
+  onProviderChange: (provider: 'allanime' | 'hianime' | 'animepahe') => void
 }
 
 const SourceSelector: React.FC<SourceSelectorProps> = ({
@@ -26,29 +26,47 @@ const SourceSelector: React.FC<SourceSelectorProps> = ({
         <select
           className={styles.providerSelect}
           value={selectedProvider}
-          onChange={(e) => onProviderChange(e.target.value as 'allanime' | 'hianime')}
+          onChange={(e) => onProviderChange(e.target.value as 'allanime' | 'hianime' | 'animepahe')}
         >
           <option value="allanime">AllAnime</option>
           <option value="hianime">HiAnime</option>
+          <option value="animepahe">AnimePahe</option>
         </select>
       </div>
 
       {sources.length > 0 && (
         <>
           <h4>Source</h4>
-          <div className={styles.sourceButtons}>
-            {sources.map((source) => (
-              <button
-                key={source.sourceName}
-                className={`${styles.sourceButton} ${
-                  selectedSource?.sourceName === source.sourceName ? styles.active : ''
-                }`}
-                onClick={() => onSourceChange(source)}
-              >
-                {source.sourceName}
-              </button>
-            ))}
-          </div>
+          {selectedProvider === 'animepahe' ? (
+            <select
+              className={styles.sourceSelect}
+              value={selectedSource?.sourceName || ''}
+              onChange={(e) => {
+                const source = sources.find((s) => s.sourceName === e.target.value)
+                if (source) onSourceChange(source)
+              }}
+            >
+              {sources.map((source) => (
+                <option key={source.sourceName} value={source.sourceName}>
+                  {source.sourceName}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className={styles.sourceButtons}>
+              {sources.map((source) => (
+                <button
+                  key={source.sourceName}
+                  className={`${styles.sourceButton} ${
+                    selectedSource?.sourceName === source.sourceName ? styles.active : ''
+                  }`}
+                  onClick={() => onSourceChange(source)}
+                >
+                  {source.sourceName}
+                </button>
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>
