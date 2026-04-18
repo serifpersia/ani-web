@@ -6,8 +6,8 @@ interface SourceSelectorProps {
   videoSources: VideoSource[]
   selectedSource: VideoSource | null
   onSourceChange: (source: VideoSource) => void
-  selectedProvider: 'allanime' | 'hianime' | 'animepahe'
-  onProviderChange: (provider: 'allanime' | 'hianime' | 'animepahe') => void
+  selectedProvider: 'allanime' | 'hianime' | 'animepahe' | '123anime'
+  onProviderChange: (provider: 'allanime' | 'hianime' | 'animepahe' | '123anime') => void
 }
 
 const SourceSelector: React.FC<SourceSelectorProps> = ({
@@ -26,11 +26,14 @@ const SourceSelector: React.FC<SourceSelectorProps> = ({
         <select
           className={styles.providerSelect}
           value={selectedProvider}
-          onChange={(e) => onProviderChange(e.target.value as 'allanime' | 'hianime' | 'animepahe')}
+          onChange={(e) =>
+            onProviderChange(e.target.value as 'allanime' | 'hianime' | 'animepahe' | '123anime')
+          }
         >
           <option value="allanime">AllAnime</option>
           <option value="hianime">HiAnime</option>
           <option value="animepahe">AnimePahe</option>
+          <option value="123anime">123Anime</option>
         </select>
       </div>
 

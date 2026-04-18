@@ -157,7 +157,9 @@ export const usePlayerData = (
       try {
         let providerShowId = showId
         if (
-          (state.selectedProvider === 'hianime' || state.selectedProvider === 'animepahe') &&
+          (state.selectedProvider === 'hianime' ||
+            state.selectedProvider === 'animepahe' ||
+            state.selectedProvider === '123anime') &&
           state.showMeta.name
         ) {
           const searchResponse = await fetch(
