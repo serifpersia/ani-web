@@ -1,4 +1,5 @@
 import * as fs from 'fs/promises'
+import { existsSync } from 'fs'
 import path from 'path'
 import logger from './logger'
 import { googleDriveService } from './google'
@@ -55,7 +56,23 @@ export async function initSyncProvider(): Promise<void> {
   log.info('No sync provider available.')
 }
 
-async function getRemoteVersion(
+export async function getLocalManifestVersion(): Promise<number> {
+  if (existsSync(CONFIG.LOCAL_MANIFEST_PATH)) {
+    try {
+      const content = await fs.readFile(CONFIG.LOCAL_MANIFEST_PATH, 'utf-8')
+      return JSON.parse(content).version || 0
+    } catch {
+      return 0
+    }
+  }
+  return 0
+}
+
+export async function setLocalManifestVersion(version: number): Promise<void> {
+  await fs.writeFile(CONFIG.LOCAL_MANIFEST_PATH, JSON.stringify({ version }))
+}
+
+async function getRemoteManifestVersion(
   remoteFolder: string
 ): Promise<{ version: number; fileId?: string }> {
   try {
@@ -64,37 +81,25 @@ async function getRemoteVersion(
       const file = await googleDriveService.findFile(CONFIG.MANIFEST_FILENAME, folderId)
       if (!file) return { version: 0 }
 
+      const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_manifest.json`)
       try {
-        await googleDriveService.downloadFile(file.id, CONFIG.TEMP_MANIFEST_PATH)
-        const content = await fs.readFile(CONFIG.TEMP_MANIFEST_PATH, 'utf-8')
+        await googleDriveService.downloadFile(file.id, tempPath)
+        const content = await fs.readFile(tempPath, 'utf-8')
         return { version: JSON.parse(content).version || 0, fileId: file.id }
       } finally {
-        try {
-          await fs.unlink(CONFIG.TEMP_MANIFEST_PATH)
-        } catch {
-          // ignore cleanup error
-        }
+        if (existsSync(tempPath)) await fs.unlink(tempPath)
       }
-    }
-
-    if (activeProvider === 'rclone') {
+    } else if (activeProvider === 'rclone') {
       const exists = await rcloneService.fileExists(remoteFolder, CONFIG.MANIFEST_FILENAME)
       if (!exists) return { version: 0 }
 
+      const tempPath = path.join(CONFIG.ROOT, `temp_${Date.now()}_manifest.json`)
       try {
-        await rcloneService.downloadFile(
-          remoteFolder,
-          CONFIG.MANIFEST_FILENAME,
-          CONFIG.TEMP_MANIFEST_PATH
-        )
-        const content = await fs.readFile(CONFIG.TEMP_MANIFEST_PATH, 'utf-8')
+        await rcloneService.downloadFile(remoteFolder, CONFIG.MANIFEST_FILENAME, tempPath)
+        const content = await fs.readFile(tempPath, 'utf-8')
         return { version: JSON.parse(content).version || 0 }
       } finally {
-        try {
-          await fs.unlink(CONFIG.TEMP_MANIFEST_PATH)
-        } catch {
-          // ignore cleanup error
-        }
+        if (existsSync(tempPath)) await fs.unlink(tempPath)
       }
     }
   } catch (err) {
@@ -103,61 +108,31 @@ async function getRemoteVersion(
   return { version: 0 }
 }
 
-async function getLocalVersion(db: DatabaseWrapper): Promise<number> {
-  return new Promise((resolve) => {
-    db.get(
-      'SELECT value FROM sync_metadata WHERE key = ?',
-      ['db_version'],
-      (err: Error | null, row: { value: number }) => {
-        resolve(row ? row.value : 0)
-      }
-    )
-  })
-}
-
-async function isLocalDbEmpty(db: DatabaseWrapper): Promise<boolean> {
-  return new Promise((resolve) => {
-    db.get(
-      'SELECT COUNT(*) as count FROM watchlist',
-      (err: Error | null, row: { count: number }) => {
-        if (err) resolve(true)
-        else resolve(row.count === 0)
-      }
-    )
-  })
-}
-
-async function getSyncMetadata(
-  db: DatabaseWrapper
-): Promise<{ localVersion: number; isDirty: boolean }> {
-  return new Promise((resolve, reject) => {
-    db.all(
-      'SELECT key, value FROM sync_metadata',
-      (err: Error | null, rows: { key: string; value: number }[]) => {
-        if (err) return reject(err)
-        const metadata = rows.reduce(
-          (acc, row) => {
-            acc[row.key] = row.value
-            return acc
-          },
-          {} as Record<string, number>
-        )
-        resolve({
-          localVersion: metadata.db_version || 0,
-          isDirty: !!metadata.is_dirty,
-        })
-      }
-    )
-  })
-}
-
 export async function syncDownOnBoot(
   db: DatabaseWrapper,
   dbPath: string,
   remoteFolderName: string,
   closeMainDb: () => Promise<void>
 ): Promise<boolean> {
+  let localVersion = await getLocalManifestVersion()
+
+  if (localVersion === 0 && db) {
+    localVersion = await new Promise<number>((resolve) => {
+      db.get(
+        "SELECT value FROM sync_metadata WHERE key = 'db_version'",
+        undefined,
+        (_err: Error | null, row: { value: number } | undefined) => {
+          resolve(row ? row.value : 0)
+        }
+      )
+    })
+    if (localVersion > 0) {
+      await setLocalManifestVersion(localVersion)
+    }
+  }
+
   if (activeProvider === 'none') return false
+
   await syncMutex.lock()
   if (isSyncing) {
     syncMutex.unlock()
@@ -167,44 +142,70 @@ export async function syncDownOnBoot(
 
   try {
     console.log(`[SYNC_START] Initial sync check (${activeProvider})`)
-
-    const localVersion = await getLocalVersion(db)
-    const isEmpty = await isLocalDbEmpty(db)
-    const { version: remoteVersion } = await getRemoteVersion(remoteFolderName)
-
+    const { version: remoteVersion } = await getRemoteManifestVersion(remoteFolderName)
     console.log('[SYNC_END]')
-    log.info(`Sync Check: Local v${localVersion} (Empty: ${isEmpty}) vs Remote v${remoteVersion}`)
 
-    if (remoteVersion > localVersion || (isEmpty && remoteVersion > 0)) {
+    log.info(`Sync Check: Local v${localVersion} vs Remote v${remoteVersion}`)
+
+    if (remoteVersion > localVersion) {
       console.log(`[SYNC_START] Downloading remote database (Remote v${remoteVersion})`)
-
       await closeMainDb()
+
       const backupPath = `${dbPath}.bak`
       const dbName = path.basename(dbPath)
 
       try {
-        await fs.copyFile(dbPath, backupPath)
+        if (existsSync(dbPath)) {
+          await fs.copyFile(dbPath, backupPath)
+        }
+
+        try {
+          await fs.unlink(`${dbPath}-wal`)
+        } catch (e) {
+          void e
+        }
+        try {
+          await fs.unlink(`${dbPath}-shm`)
+        } catch (e) {
+          void e
+        }
 
         if (activeProvider === 'google') {
           const folderId = await googleDriveService.ensureFolder(remoteFolderName)
-          const remoteFile = await googleDriveService.findFile(dbName, folderId)
-          if (remoteFile) await googleDriveService.downloadFile(remoteFile.id, dbPath)
-          else throw new Error('Manifest exists but DB file missing.')
+          const remoteDb = await googleDriveService.findFile(dbName, folderId)
+          const remoteManifest = await googleDriveService.findFile(
+            CONFIG.MANIFEST_FILENAME,
+            folderId
+          )
+
+          if (remoteDb) await googleDriveService.downloadFile(remoteDb.id, dbPath)
+          if (remoteManifest)
+            await googleDriveService.downloadFile(remoteManifest.id, CONFIG.LOCAL_MANIFEST_PATH)
         } else if (activeProvider === 'rclone') {
           await rcloneService.downloadFile(remoteFolderName, dbName, dbPath)
+          await rcloneService.downloadFile(
+            remoteFolderName,
+            CONFIG.MANIFEST_FILENAME,
+            CONFIG.LOCAL_MANIFEST_PATH
+          )
         }
 
-        await fs.unlink(backupPath)
+        if (existsSync(backupPath)) {
+          await fs.unlink(backupPath)
+        }
+
         console.log('[SYNC_END]')
         log.info('Sync down complete.')
         return true
       } catch (err) {
         console.log('[SYNC_END]')
         log.error({ err }, 'Sync down failed. Restoring backup.')
-        try {
-          await fs.copyFile(backupPath, dbPath)
-        } catch {
-          // backup already restored, ignore error
+        if (existsSync(backupPath)) {
+          try {
+            await fs.copyFile(backupPath, dbPath)
+          } catch (restoreErr) {
+            log.error({ err: restoreErr }, 'Restore failed')
+          }
         }
         return true
       }
@@ -228,77 +229,69 @@ export async function syncUp(
   remoteFolderName: string
 ): Promise<void> {
   if (activeProvider === 'none') return
+
   await syncMutex.lock()
   if (isSyncing) {
     syncMutex.unlock()
     return
   }
-
   isSyncing = true
-  try {
-    const { localVersion, isDirty } = await getSyncMetadata(db)
-    if (!isDirty) return
 
+  try {
+    const localVersion = await getLocalManifestVersion()
     console.log(`[SYNC_START] Syncing up (Local v${localVersion})`)
 
-    const { version: remoteVersion, fileId: manifestId } = await getRemoteVersion(remoteFolderName)
-    if (remoteVersion > localVersion) {
+    const { version: remoteVersion, fileId: manifestId } =
+      await getRemoteManifestVersion(remoteFolderName)
+
+    if (localVersion > remoteVersion) {
+      const dbName = path.basename(dbPath)
+      const syncDbPath = `${dbPath}.sync.db`
+
+      db.backup(syncDbPath)
+
+      if (activeProvider === 'google') {
+        const folderId = await googleDriveService.ensureFolder(remoteFolderName)
+        const remoteDbFile = await googleDriveService.findFile(dbName, folderId)
+
+        await googleDriveService.uploadFile(
+          syncDbPath,
+          dbName,
+          'application/x-sqlite3',
+          folderId,
+          remoteDbFile?.id
+        )
+
+        await googleDriveService.uploadFile(
+          CONFIG.LOCAL_MANIFEST_PATH,
+          CONFIG.MANIFEST_FILENAME,
+          'application/json',
+          folderId,
+          manifestId
+        )
+      } else if (activeProvider === 'rclone') {
+        await rcloneService.uploadFile(syncDbPath, remoteFolderName, dbName)
+        await rcloneService.uploadFile(
+          CONFIG.LOCAL_MANIFEST_PATH,
+          remoteFolderName,
+          CONFIG.MANIFEST_FILENAME
+        )
+      }
+
+      if (existsSync(syncDbPath)) await fs.unlink(syncDbPath)
+
       console.log('[SYNC_END]')
-      log.error(`CONFLICT: Remote v${remoteVersion} > Local v${localVersion}. Aborting upload.`)
-      return
+      log.info('Sync up complete.')
+    } else {
+      console.log('[SYNC_END]')
+      log.info('No changes to sync up or remote is newer.')
     }
-
-    const dbName = path.basename(dbPath)
-    const newManifest = JSON.stringify({ version: localVersion })
-    await fs.writeFile(CONFIG.TEMP_MANIFEST_PATH, newManifest)
-
-    if (activeProvider === 'google') {
-      const folderId = await googleDriveService.ensureFolder(remoteFolderName)
-      const remoteDbFile = await googleDriveService.findFile(dbName, folderId)
-
-      await googleDriveService.uploadFile(
-        dbPath,
-        dbName,
-        'application/x-sqlite3',
-        folderId,
-        remoteDbFile?.id
-      )
-      await googleDriveService.uploadFile(
-        CONFIG.TEMP_MANIFEST_PATH,
-        CONFIG.MANIFEST_FILENAME,
-        'application/json',
-        folderId,
-        manifestId
-      )
-    } else if (activeProvider === 'rclone') {
-      await rcloneService.uploadFile(dbPath, remoteFolderName, dbName)
-      await rcloneService.uploadFile(
-        CONFIG.TEMP_MANIFEST_PATH,
-        remoteFolderName,
-        CONFIG.MANIFEST_FILENAME
-      )
-    }
-
-    await fs.unlink(CONFIG.TEMP_MANIFEST_PATH)
-
-    db.serialize(() => {
-      db.run("UPDATE sync_metadata SET value = 0 WHERE key = 'is_dirty'")
-      db.run("UPDATE sync_metadata SET value = ? WHERE key = 'last_synced_version'", [localVersion])
-    })
-
-    console.log('[SYNC_END]')
-    log.info('Sync up complete.')
   } catch (err) {
     console.log('[SYNC_END]')
     log.error({ err }, 'Sync up failed.')
   } finally {
     isSyncing = false
     syncMutex.unlock()
-    try {
-      await fs.unlink(CONFIG.TEMP_MANIFEST_PATH)
-    } catch {
-      // ignore cleanup error
-    }
   }
 }
 
@@ -306,10 +299,30 @@ export async function performWriteTransaction(
   db: DatabaseWrapper,
   runnable: (tx: DatabaseWrapper) => void
 ): Promise<void> {
-  db.serialize(() => {
-    runnable(db)
-    db.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
-    db.run("UPDATE sync_metadata SET value = 1 WHERE key = 'is_dirty'")
+  return new Promise((resolve, reject) => {
+    try {
+      db.serialize(() => {
+        runnable(db)
+        db.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
+      })
+
+      db.get(
+        "SELECT value FROM sync_metadata WHERE key = 'db_version'",
+        undefined,
+        async (err: Error | null, row: { value: number } | undefined) => {
+          if (err) return reject(err)
+          const newVersion = row ? row.value : 1
+          try {
+            await setLocalManifestVersion(newVersion)
+            resolve()
+          } catch (e) {
+            reject(e)
+          }
+        }
+      )
+    } catch (e) {
+      reject(e)
+    }
   })
 }
 
@@ -320,6 +333,7 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
 
     db.run('PRAGMA journal_mode = WAL;')
     db.run('PRAGMA synchronous = NORMAL;')
+
     db.run('PRAGMA cache_size = -20000;')
     db.run('PRAGMA temp_store = MEMORY;')
     db.run('PRAGMA mmap_size = 268435456;')
@@ -375,18 +389,7 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
       undefined,
       initOpts
     )
-    db.run(
-      `INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('last_synced_version', 0)`,
-      undefined,
-      undefined,
-      initOpts
-    )
-    db.run(
-      `INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('is_dirty', 0)`,
-      undefined,
-      undefined,
-      initOpts
-    )
+
     db.run(
       `CREATE INDEX IF NOT EXISTS idx_watched_episodes_showId ON watched_episodes(showId)`,
       undefined,
@@ -432,7 +435,6 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     addCol('shows_meta', 'type', 'TEXT')
 
     await db.saveNow()
-
     return db
   } catch (err) {
     log.error({ err }, 'Database opening error')

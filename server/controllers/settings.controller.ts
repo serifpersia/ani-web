@@ -51,9 +51,7 @@ export class SettingsController {
     try {
       req.db.backup(backupPath)
       res.download(backupPath, 'ani-web-backup.db', () => {
-        fs.unlink(backupPath, () => {
-          // Ignore error
-        })
+        fs.unlink(backupPath, () => {})
       })
     } catch (err) {
       logger.error({ err }, 'Manual backup failed')
@@ -75,9 +73,16 @@ export class SettingsController {
 
     db.close((closeErr: Error | null) => {
       if (closeErr) return res.status(500).json({ error: 'Failed to close database.' })
+
+      try {
+        if (fs.existsSync(`${dbPath}-wal`)) fs.unlinkSync(`${dbPath}-wal`)
+        if (fs.existsSync(`${dbPath}-shm`)) fs.unlinkSync(`${dbPath}-shm`)
+      } catch (cleanupErr) {
+        logger.warn({ err: cleanupErr }, 'Failed to clean up WAL files')
+      }
+
       fs.rename(tempPath, dbPath, async (renameErr) => {
         if (renameErr) {
-          // Re-open existing DB so server can keep running
           try {
             const reopenedDb = await initializeDatabase(dbPath)
             req.db = reopenedDb

@@ -11,3 +11,4 @@
 *.db
 server/.env
 server/google_tokens.json
+server/sync_manifest*.json

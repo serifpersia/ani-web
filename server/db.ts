@@ -73,32 +73,28 @@ export class DatabaseWrapper {
     operation: 'run' | 'get' | 'all'
   ): unknown {
     const stmt = this.db.prepare(query)
-    try {
-      let result: unknown
-      if (operation === 'run') {
-        if (params && params.length > 0) {
-          stmt.run(...params)
-        } else {
-          stmt.run()
-        }
-        result = null
-      } else if (operation === 'get') {
-        if (params && params.length > 0) {
-          result = stmt.get(...params)
-        } else {
-          result = stmt.get()
-        }
+    let result: unknown
+    if (operation === 'run') {
+      if (params && params.length > 0) {
+        stmt.run(...params)
       } else {
-        if (params && params.length > 0) {
-          result = stmt.all(...params)
-        } else {
-          result = stmt.all()
-        }
+        stmt.run()
       }
-      return result
-    } finally {
-      // no cleanup needed
+      result = null
+    } else if (operation === 'get') {
+      if (params && params.length > 0) {
+        result = stmt.get(...params)
+      } else {
+        result = stmt.get()
+      }
+    } else {
+      if (params && params.length > 0) {
+        result = stmt.all(...params)
+      } else {
+        result = stmt.all()
+      }
     }
+    return result
   }
 
   public run(

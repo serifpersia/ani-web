@@ -16,7 +16,6 @@ import { _123AnimeProvider as Anime123Provider } from './providers/123anime.prov
 import { googleDriveService } from './google'
 import { CONFIG } from './config'
 import { initializeDatabase, syncDownOnBoot, syncUp, initSyncProvider } from './sync'
-
 import { createAuthRouter } from './routes/auth.routes'
 import { createWatchlistRouter } from './routes/watchlist.routes'
 import { createDataRouter } from './routes/data.routes'
@@ -32,10 +31,12 @@ declare module 'express-serve-static-core' {
 
 const app = express()
 const apiCache = new NodeCache({ stdTTL: 3600 })
+
 const allAnimeProvider = new AllAnimeProvider(apiCache)
 const hiAnimeProvider = new HiAnimeProvider(apiCache)
 const animePaheProvider = new AnimePaheProvider(apiCache)
 const _123AnimeProvider = new Anime123Provider(apiCache)
+
 const providers = {
   allanime: allAnimeProvider,
   hianime: hiAnimeProvider,
@@ -55,7 +56,7 @@ async function runSyncSequence(database: DatabaseWrapper) {
 
   const didDownload = await syncDownOnBoot(database, dbPath, remoteFolder, () => {
     return new Promise<void>((resolve) => {
-      if (database) {
+      if (database && !database.isClosedCheck()) {
         database.close(() => resolve())
       } else {
         resolve()
@@ -102,6 +103,7 @@ app.use(
   '/api/auth',
   createAuthRouter((database) => runSyncSequence(database))
 )
+
 app.use('/api', createWatchlistRouter(allAnimeProvider))
 app.use('/api', createDataRouter(apiCache, providers))
 app.use('/api', createProxyRouter())
@@ -114,7 +116,6 @@ app.use(
 if (!CONFIG.IS_DEV) {
   const frontendPath = path.resolve(CONFIG.ROOT, '../client/dist')
   logger.info(`Serving frontend from: ${frontendPath}`)
-
   app.use(express.static(frontendPath))
 
   app.get(/^(?!\/api).+/, (req, res) => {
@@ -134,58 +135,68 @@ async function main() {
   const dbPath = path.join(CONFIG.ROOT, dbName)
   const remoteFolder = CONFIG.IS_DEV ? CONFIG.REMOTE_FOLDER_DEV : CONFIG.REMOTE_FOLDER_PROD
 
-  if (CONFIG.IS_DEV && fs.existsSync(dbPath)) {
-    try {
-      fs.unlinkSync(dbPath)
-    } catch {
-      // Ignore error
-    }
-  }
-
   db = await initializeDatabase(dbPath)
   logger.info(`Database initialized at ${dbPath}`)
 
   await runSyncSequence(db)
 
-  const watcher = chokidar.watch(dbPath, { persistent: true, ignoreInitial: true })
+  if (!fs.existsSync(CONFIG.LOCAL_MANIFEST_PATH)) {
+    fs.writeFileSync(CONFIG.LOCAL_MANIFEST_PATH, JSON.stringify({ version: 0 }))
+  }
+
+  const watcher = chokidar.watch(CONFIG.LOCAL_MANIFEST_PATH, {
+    persistent: true,
+    ignoreInitial: true,
+  })
   let debounceTimer: NodeJS.Timeout
+
+  const expressServer = app.listen(CONFIG.PORT, () => {
+    logger.info(`Server running on http://localhost:${CONFIG.PORT}`)
+  })
 
   watcher.on('change', () => {
     clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => syncUp(db, dbPath, remoteFolder), 15000)
+    debounceTimer = setTimeout(() => syncUp(db, dbPath, remoteFolder), 5000)
   })
 
-  const shutdown = async () => {
+  const shutdown = async (signal?: string) => {
     if (isShuttingDown) return
     isShuttingDown = true
     clearTimeout(debounceTimer)
+
+    if (expressServer) {
+      expressServer.close()
+    }
+
     try {
       await syncUp(db, dbPath, remoteFolder)
     } catch (e) {
       console.error('Sync failed:', e)
     }
+
     db.close(() => {
       console.log('[SERVER_EXIT]')
-      // Short delay ensuring orchestrator catches the stdout before exit
-      setTimeout(() => process.exit(0), 100)
+      setTimeout(() => {
+        if (signal === 'SIGUSR2') {
+          process.kill(process.pid, 'SIGUSR2')
+        } else {
+          process.exit(0)
+        }
+      }, 600)
     })
   }
 
-  process.on('SIGINT', shutdown)
-  process.on('SIGTERM', shutdown)
+  process.on('SIGINT', () => shutdown('SIGINT'))
+  process.on('SIGTERM', () => shutdown('SIGTERM'))
+  process.once('SIGUSR2', () => shutdown('SIGUSR2'))
 
-  // Internal endpoint called by Orchestrator for graceful shutdown
   app.post('/api/internal/shutdown', (req, res) => {
     if (req.ip === '::1' || req.ip === '127.0.0.1' || req.ip === '::ffff:127.0.0.1') {
-      res.send('Shutting down')
-      shutdown()
+      res.status(200).json({ message: 'Shutting down' })
+      setTimeout(() => shutdown(), 500)
     } else {
       res.status(403).send('Forbidden')
     }
-  })
-
-  app.listen(CONFIG.PORT, () => {
-    logger.info(`Server running on http://localhost:${CONFIG.PORT}`)
   })
 }
 
