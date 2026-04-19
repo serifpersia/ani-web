@@ -7,7 +7,7 @@ interface LogoProps {
 const Logo: React.FC<LogoProps> = ({ className }) => {
   return (
     <img
-      src="/ani-web-header-logo.png"
+      src="/logo.png"
       alt="Ani-Web"
       className={className}
       style={{
