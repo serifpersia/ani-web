@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="client/public/ani-web-header-logo.png" alt="ani-web logo" width="400"/>
+<img src="client/public/logo.png" alt="ani-web logo" width="400"/>
 
 _A fast, lightweight local anime streaming web-app._
 
@@ -18,7 +18,7 @@ _A fast, lightweight local anime streaming web-app._
   <img 
     width="800" 
     alt="ani-web user interface" 
-    src="https://github.com/user-attachments/assets/73c79a4f-a902-4d84-88e5-d24e7b633989"
+    src="https://github.com/user-attachments/assets/5a152f3b-ab8e-4303-b416-8fa2a67bb8d9"
     style="border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); margin: 20px 0;"
   />
 </div>
