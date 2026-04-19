@@ -155,7 +155,9 @@ export class AllAnimeProvider implements Provider {
     } catch (error: unknown) {
       const err = error as Error
       logger.error({ err: err.message, stack: err.stack }, 'Failed to decrypt tobeparsed field')
-      throw new Error(`Decryption failed: ${err.message}`)
+      const e = new Error(`Decryption failed: ${err.message}`)
+      e.cause = error
+      throw e
     }
   }
 

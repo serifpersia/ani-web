@@ -18,6 +18,7 @@ export async function updateEnvFile(updates: Record<string, string>) {
       if (newLines[i].startsWith(`${key}=`)) {
         if (value === '') {
           newLines.splice(i, 1)
+          // eslint-disable-next-line no-useless-assignment
           i--
         } else {
           newLines[i] = `${key}=${value}`

@@ -176,7 +176,7 @@ export class ProxyController {
       })
 
       res.set('Cache-Control', 'public, max-age=604800, immutable')
-      res.set('Content-Type', imageResponse.headers['content-type'])
+      res.set('Content-Type', String(imageResponse.headers['content-type'] ?? ''))
       // Pipe directly to response instead of loading into memory
       imageResponse.data.pipe(res)
     } catch (e) {

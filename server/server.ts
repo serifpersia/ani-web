@@ -1,3 +1,4 @@
+console.log('DEBUG: server.ts loading...')
 import express from 'express'
 import path from 'path'
 import cors from 'cors'
@@ -9,6 +10,7 @@ import fs from 'fs'
 import { DatabaseWrapper } from './db'
 import chokidar from 'chokidar'
 import logger from './logger'
+// ... rest of imports
 import { AllAnimeProvider } from './providers/allanime.provider'
 import { HiAnimeProvider } from './providers/hianime.provider'
 import { AnimePaheProvider } from './providers/animepahe.provider'
@@ -131,6 +133,7 @@ if (!CONFIG.IS_DEV) {
 }
 
 async function main() {
+  console.log('DEBUG: main() started')
   const dbName = CONFIG.IS_DEV ? CONFIG.DB_NAME_DEV : CONFIG.DB_NAME_PROD
   const dbPath = path.join(CONFIG.ROOT, dbName)
   const remoteFolder = CONFIG.IS_DEV ? CONFIG.REMOTE_FOLDER_DEV : CONFIG.REMOTE_FOLDER_PROD

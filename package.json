@@ -29,7 +29,7 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "eslint": "^9.17.0",
-    "prettier": "^3.4.2"
+    "eslint": "^10.2.1",
+    "prettier": "^3.8.3"
   }
 }

@@ -1,8 +1,17 @@
 import { defineConfig } from 'vite'
 import preact from '@preact/preset-vite'
 
+const compatHooksPlugin = () => ({
+  name: 'compat-hooks-plugin',
+  transform(code, id) {
+    if (id.includes('compat.module.js')) {
+      return code + ';export const use=(...args)=>null;export const useOptimistic=(v)=>[v,()=>{}];'
+    }
+  },
+})
+
 export default defineConfig({
-  plugins: [preact()],
+  plugins: [preact(), compatHooksPlugin()],
   server: {
     proxy: {
       '/api': {
@@ -23,8 +32,16 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['preact', 'react-router-dom', '@tanstack/react-query'],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (
+              id.includes('preact') ||
+              id.includes('react-router-dom') ||
+              id.includes('@tanstack/react-query')
+            ) {
+              return 'vendor'
+            }
+          }
         },
       },
     },
