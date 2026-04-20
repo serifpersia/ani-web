@@ -1,8 +1,11 @@
 {
   "name": "ani-web",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "description": "A web application for watching anime.",
-  "main": "index.js",
+  "main": "orchestrator.js",
+  "bin": {
+    "ani-web": "orchestrator.js"
+  },
   "engines": {
     "node": ">=22.5.0"
   },
@@ -17,17 +20,47 @@
     "lighthouse": "npm run lighthouse --prefix client",
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "npm run lint --prefix client && npm run lint --prefix server",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "prepublishOnly": "npm run build"
   },
+  "files": [
+    "orchestrator.js",
+    "client/dist",
+    "server/dist",
+    "server/vendor",
+    "LICENSE",
+    "README.md",
+    "package.json"
+  ],
   "keywords": [
     "anime",
     "react",
     "express",
-    "typescript"
+    "typescript",
+    "streaming",
+    "cli"
   ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "dependencies": {
+    "axios": "^1.15.1",
+    "axios-retry": "^4.5.0",
+    "cheerio": "^1.2.0",
+    "chokidar": "^5.0.0",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.1.0",
+    "google-auth-library": "^10.6.2",
+    "googleapis": "^171.4.0",
+    "multer": "^2.0.2",
+    "node-cache": "^5.1.2",
+    "pino": "^10.3.1",
+    "pino-pretty": "^13.1.1",
+    "xml2js": "^0.6.2"
+  },
   "devDependencies": {
     "eslint": "^10.2.1",
     "prettier": "^3.8.3"

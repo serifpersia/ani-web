@@ -1,7 +1,9 @@
+#!/usr/bin/env node
 const { spawn } = require('child_process')
 const readline = require('readline')
 const http = require('http')
 const os = require('os')
+const path = require('path')
 
 const mode = process.argv[2] || 'prod'
 const isWin = os.platform() === 'win32'
@@ -12,6 +14,9 @@ const colors = {
   client: '\x1b[32m', // Green
   system: '\x1b[33m', // Yellow
 }
+
+const SERVER_DIR = path.join(__dirname, 'server')
+const CLIENT_DIR = path.join(__dirname, 'client')
 
 let syncSpinner = null
 let syncMessage = ''
@@ -92,7 +97,7 @@ const log = (prefix, color, data) => {
 }
 
 const npmCmd = isWin ? 'npm.cmd' : 'npm'
-const spawnOpts = { stdio: 'pipe', shell: isWin } // Added shell: true for Windows
+const spawnOpts = (cwd) => ({ stdio: 'pipe', shell: isWin, cwd })
 let serverProcess, clientProcess
 let isShuttingDown = false
 
@@ -104,10 +109,12 @@ console.log(
 )
 
 if (mode === 'dev') {
-  serverProcess = spawn(npmCmd, ['run', 'dev', '--prefix', 'server'], spawnOpts)
-  clientProcess = spawn(npmCmd, ['run', 'dev', '--prefix', 'client'], spawnOpts)
+  serverProcess = spawn(npmCmd, ['run', 'dev'], spawnOpts(SERVER_DIR))
+  clientProcess = spawn(npmCmd, ['run', 'dev'], spawnOpts(CLIENT_DIR))
 } else {
-  serverProcess = spawn(npmCmd, ['run', 'start', '--prefix', 'server'], spawnOpts)
+  // Directly run the compiled server to avoid runtime NPM dependency and handle paths better
+  const serverPath = path.join(SERVER_DIR, 'dist', 'server.js')
+  serverProcess = spawn('node', ['--max-old-space-size=256', serverPath], spawnOpts(SERVER_DIR))
 }
 
 if (serverProcess) {
@@ -173,7 +180,7 @@ if (process.stdin.isTTY) {
 }
 
 process.stdin.on('keypress', (str, key) => {
-  if (key.name === 'q' || (key.ctrl && key.name === 'c')) {
+  if (key && (key.name === 'q' || (key.ctrl && key.name === 'c'))) {
     shutdown()
   }
 })

@@ -43,6 +43,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install Dependencies
         run: npm install
@@ -79,7 +80,19 @@ jobs:
           gh release create "latest" \
             "ani-web.zip" \
             --title "latest" \
-            --notes "Automatically built from the latest commit. Download the 'ani-web.zip' file below, run 'npm install --omit=dev --prefix server' and 'npm install --omit=dev --prefix client' and then run using run.bat or run.sh." \
+            --notes "Automatically built from the latest commit. 
+
+          ### Manual Setup:
+          1. Download and extract 'ani-web.zip'
+          2. Run 'npm install --omit=dev' inside the folder
+          3. Launch using 'run.bat' (Windows) or 'run.sh' (Linux/Mac)" \
             --target ${{ github.sha }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to NPM
+        continue-on-error: true
+        run: |
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
