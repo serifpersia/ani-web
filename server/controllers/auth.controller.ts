@@ -4,6 +4,7 @@ import { googleDriveService } from '../google'
 import { DatabaseWrapper } from '../db'
 import { initializeDatabase, syncDownOnBoot, initSyncProvider } from '../sync'
 import { CONFIG } from '../config'
+import { rcloneService } from '../rclone'
 import path from 'path'
 
 export class AuthController {
@@ -38,6 +39,34 @@ export class AuthController {
     } catch (error) {
       logger.error({ err: error }, 'Failed to update .env file')
       res.status(500).json({ error: 'Failed to save configuration' })
+    }
+  }
+
+  getRcloneSettings = async (_req: Request, res: Response) => {
+    try {
+      const remotes = await rcloneService.listRemotes()
+      res.json({
+        remote: CONFIG.RCLONE_REMOTE || '',
+        availableRemotes: remotes,
+        activeRemote: rcloneService.isActive() ? rcloneService.getRemoteName() : null,
+      })
+    } catch {
+      res.status(500).json({ error: 'Failed to fetch Rclone settings' })
+    }
+  }
+
+  updateRcloneSettings = async (req: Request, res: Response) => {
+    const { remote } = req.body
+    const { updateEnvFile } = await import('../utils/env.utils')
+
+    try {
+      await updateEnvFile({
+        RCLONE_REMOTE: remote,
+      })
+      res.json({ success: true })
+    } catch (error) {
+      logger.error({ err: error }, 'Failed to update .env for Rclone')
+      res.status(500).json({ error: 'Failed to save Rclone configuration' })
     }
   }
 

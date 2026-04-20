@@ -8,6 +8,13 @@ const path = require('path')
 const mode = process.argv[2] || 'prod'
 const isWin = os.platform() === 'win32'
 
+// Handle version flag
+if (mode === '--version' || mode === '-v') {
+  const pkg = require('./package.json')
+  console.log(`ani-web version ${pkg.version}`)
+  process.exit(0)
+}
+
 const colors = {
   reset: '\x1b[0m',
   server: '\x1b[36m', // Cyan

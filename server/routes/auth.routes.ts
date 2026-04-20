@@ -9,6 +9,8 @@ export function createAuthRouter(runSyncSequence: (db: DatabaseWrapper) => Promi
   router.get('/config-status', controller.getConfigStatus)
   router.get('/google-auth', controller.getGoogleAuthSettings)
   router.post('/google-auth', controller.updateGoogleAuthSettings)
+  router.get('/settings/rclone', controller.getRcloneSettings)
+  router.post('/settings/rclone', controller.updateRcloneSettings)
   router.get('/google', controller.getAuthUrl)
   router.get('/google/callback', controller.handleCallback)
   router.get('/user', controller.getUserProfile)

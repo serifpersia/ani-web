@@ -27,28 +27,46 @@ class RcloneService {
       process.on('error', (err) => reject(err))
     })
   }
+  public async listRemotes(): Promise<string[]> {
+    try {
+      const remotesStr = await this.executeCommand('rclone listremotes')
+      return remotesStr
+        .split('\n')
+        .map((r) => r.trim())
+        .filter((r) => r !== '')
+        .map((r) => r.replace(/:$/, ''))
+    } catch {
+      return []
+    }
+  }
 
   public async init(): Promise<boolean> {
     try {
       await this.executeCommand('rclone version')
 
-      const remotesStr = await this.executeCommand('rclone listremotes')
-      const remotes = remotesStr.split('\n').map((r) => r.trim())
+      const remotes = await this.listRemotes()
 
-      const gdriveRemote = remotes.find((r) => r.toLowerCase() === 'gdrive:')
-      const megaRemote = remotes.find((r) => r.toLowerCase() === 'mega:')
+      // 1. Check if a manual remote is configured
+      if (CONFIG.RCLONE_REMOTE) {
+        const found = remotes.find((r) => r.toLowerCase() === CONFIG.RCLONE_REMOTE?.toLowerCase())
+        if (found) {
+          this.activeRemote = found
+          logger.info(`Rclone initialized with manual remote: ${this.activeRemote}`)
+          return true
+        } else {
+          logger.warn(
+            `Configured RCLONE_REMOTE '${CONFIG.RCLONE_REMOTE}' not found in rclone listremotes.`
+          )
+        }
+      }
 
-      if (megaRemote) {
-        this.activeRemote = megaRemote.slice(0, -1)
-      } else if (gdriveRemote) {
-        this.activeRemote = gdriveRemote.slice(0, -1)
-      } else if (remotes.length > 0) {
-        logger.info({ remotes }, "Rclone initialized but no 'gdrive:' or 'mega:' found.")
-        return false
-      } else {
+      // 2. Fall back to automatic detection (REMOVED: Strictly use manual config now)
+      if (remotes.length > 0 && !CONFIG.RCLONE_REMOTE) {
+        logger.info({ remotes }, 'Rclone available but no manual remote is configured in settings.')
         return false
       }
-      return true
+
+      return false
     } catch (error) {
       logger.warn({ err: error }, 'Rclone initialization failed')
       return false

@@ -96,6 +96,44 @@ chmod +x run.sh
 run.bat
 ```
 
+### Commands
+
+Once installed globally, you can use the following commands:
+
+- `ani-web` - Start the application.
+- `ani-web --version` (or `-v`) - Check your installed version.
+
+---
+
+## Cloud Sync (Optional)
+
+**ani-web** can automatically sync your watchlist and settings to the cloud. There are two ways to set this up:
+
+### 1. Built-in Google Drive Sync
+
+To use the native Google Drive integration, you need to provide your own Google Cloud credentials:
+
+1.  Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2.  Create a new project and enable the **Google Drive API**.
+3.  Configure the **OAuth Consent Screen** (set it to "External" and add yourself as a test user).
+4.  Create **OAuth 2.0 Client IDs** (Application type: "Web application").
+5.  Add `http://localhost:3000/api/auth/google/callback` to the **Authorized redirect URIs**.
+6.  Open **ani-web**, go to **Settings** -> **Google Drive**, and enter your **Client ID** and **Client Secret**.
+
+**ani-web** will automatically handle the rest, including creating your configuration and syncing your data!
+
+### 2. Rclone Integration
+
+If you prefer using **Mega**, **Dropbox**, or other providers, you can use [Rclone](https://rclone.org/):
+
+1.  Install Rclone on your system and ensure it's in your PATH.
+2.  Configure a remote (any name) using `rclone config`.
+3.  In **ani-web** Settings, select your remote name from the dropdown.
+
+**Note:** If Google Drive Sync is active, it will always take priority over Rclone.
+
+---
+
 ## Disclaimer
 
 **ani-web does not host, upload, or manage any video content.**

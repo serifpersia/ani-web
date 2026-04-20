@@ -3,6 +3,7 @@ import TitlePreferenceToggle from '../components/common/TitlePreferenceToggle'
 import styles from './Settings.module.css'
 import GoogleAuthSettings from '../components/settings/GoogleAuthSettings'
 import WatchlistSettings from '../components/settings/WatchlistSettings'
+import RcloneSettings from '../components/settings/RcloneSettings'
 
 const Settings: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState('')
@@ -74,6 +75,7 @@ const Settings: React.FC = () => {
       <h2 className="section-title">Settings</h2>
 
       <GoogleAuthSettings />
+      <RcloneSettings />
 
       <div className={styles['settings-section']}>
         <TitlePreferenceToggle />
