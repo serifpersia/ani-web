@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import axios from 'axios'
+import axiosRetry from 'axios-retry'
 import path from 'path'
 import http from 'http'
 import https from 'https'
@@ -10,11 +11,16 @@ const proxyCache = new NodeCache({ stdTTL: 30, checkperiod: 60 })
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 100 })
 const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 100 })
 
-const axiosInstance = axios.create({
+httpAgent.setMaxListeners(100)
+httpsAgent.setMaxListeners(100)
+
+export const axiosInstance = axios.create({
   httpAgent,
   httpsAgent,
   timeout: 30000,
 })
+
+axiosRetry(axiosInstance, { retries: 3, retryDelay: axiosRetry.exponentialDelay })
 
 export class ProxyController {
   handleProxy = async (req: Request, res: Response) => {
@@ -162,7 +168,7 @@ export class ProxyController {
         refererValue = 'https://allanime.day/'
       }
 
-      const imageResponse = await axios({
+      const imageResponse = await axiosInstance({
         method: 'get',
         url: targetUrl,
         responseType: 'stream',
@@ -177,7 +183,16 @@ export class ProxyController {
 
       res.set('Cache-Control', 'public, max-age=604800, immutable')
       res.set('Content-Type', String(imageResponse.headers['content-type'] ?? ''))
-      // Pipe directly to response instead of loading into memory
+
+      imageResponse.data.on('error', () => {
+        if (!res.headersSent) {
+          res
+            .status(200)
+            .sendFile(path.join(__dirname, '..', '..', 'client/public/placeholder.svg'))
+        }
+      })
+
+      // Pipe directly to response
       imageResponse.data.pipe(res)
     } catch (e) {
       if (axios.isCancel(e)) {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
-// import SearchableSelect from '../components/common/SearchableSelect'
+import SearchableSelect from '../components/common/SearchableSelect'
 import ErrorMessage from '../components/common/ErrorMessage'
 import { useSearchAnime } from '../hooks/useAnimeData'
 import styles from './Search.module.css'
@@ -15,9 +15,11 @@ const Search: React.FC = () => {
   const [season, setSeason] = useState('ALL')
   const [year, setYear] = useState('ALL')
   const [country, setCountry] = useState('ALL')
+  const [studio, setStudio] = useState('ALL')
   const [showFilters, setShowFilters] = useState(false)
 
   const [availableGenres, setAvailableGenres] = useState<string[]>([])
+  const [availableStudios, setAvailableStudios] = useState<string[]>([])
   const [genreStates, setGenreStates] = useState<{ [key: string]: 'include' | 'exclude' }>({})
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, error } =
@@ -26,12 +28,16 @@ const Search: React.FC = () => {
 
   useEffect(() => {
     setQuery(searchParams.get('query') || '')
+    setStudio(searchParams.get('studios') || 'ALL')
   }, [searchParams])
 
   useEffect(() => {
     fetch('/api/genres-and-tags')
       .then((res) => res.json())
-      .then((data) => setAvailableGenres(data.genres || []))
+      .then((data) => {
+        setAvailableGenres(data.genres || [])
+        setAvailableStudios(data.studios || [])
+      })
       .catch(console.error)
   }, [])
 
@@ -43,6 +49,7 @@ const Search: React.FC = () => {
     if (season !== 'ALL') params.set('season', season)
     if (year !== 'ALL') params.set('year', year)
     if (country !== 'ALL') params.set('country', country)
+    if (studio !== 'ALL') params.set('studios', studio)
 
     const genres = Object.entries(genreStates)
       .filter(([, s]) => s === 'include')
@@ -148,6 +155,17 @@ const Search: React.FC = () => {
               <option value="JP">Japan</option>
               <option value="CN">China</option>
             </select>
+            {availableStudios.length > 0 && (
+              <SearchableSelect
+                options={[
+                  { value: 'ALL', label: 'Studio: All' },
+                  ...availableStudios.map((s) => ({ value: s, label: s })),
+                ]}
+                value={studio}
+                onChange={setStudio}
+                placeholder="Studio: All"
+              />
+            )}
           </div>
 
           {availableGenres.length > 0 && (
