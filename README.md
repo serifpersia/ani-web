@@ -2,7 +2,7 @@
 
 <img src="client/public/logo.png" alt="ani-web logo" width="400"/>
 
-_A fast, lightweight local anime streaming web-app._
+_Stream anime locally with no ads, no tracking, and smooth performance._
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-8b5cf6?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![GitHub stars](https://img.shields.io/github/stars/serifpersia/ani-web.svg?style=for-the-badge&color=8b5cf6)](https://github.com/serifpersia/ani-web/stargazers)
@@ -12,7 +12,7 @@ _A fast, lightweight local anime streaming web-app._
 
 ---
 
-**ani-web** is an easy-to-use, local Node-based anime streaming web application. Modern anime streaming sites are often bloated with heavy scripts, ads, and trackers, making them frustrating to use on low-end hardware. **ani-web** was built to solve this by providing a clean, fast, and completely local interface.
+**ani-web** is a lightweight Node.js application that lets you browse and watch anime through a clean and responsive frontend running entirely on your machine.
 
 <div align="center">
   <img 
@@ -43,22 +43,10 @@ Based on a lightweight architecture, ani-web includes:
 
 ### ⚡ Quick Install
 
-Use provided run scripts to get you up and running in seconds.
-
-#### Windows
-
-Open a **PowerShell** terminal and run:
-
-```powershell
-irm serifpersia.github.io/ani-web/win | iex
-```
-
-#### Linux & macOS
-
-Open a **Terminal** and run:
+Open a terminal and run:
 
 ```bash
-curl -sL serifpersia.github.io/ani-web/install | bash
+npm install -g ani-web
 ```
 
 > **Note:** After the one-time setup, you can start the application anytime, from any directory, by simply opening a terminal and typing `ani-web`.
@@ -70,7 +58,7 @@ curl -sL serifpersia.github.io/ani-web/install | bash
 If you need to remove the application from your system, simply open a terminal and run:
 
 ```bash
-ani-web uninstall
+npm uninstall -g ani-web
 ```
 
 _This safely deletes the application files and removes the `ani-web` command from your system's PATH._
@@ -105,8 +93,6 @@ chmod +x run.sh
 ```bat
 run.bat
 ```
-
----
 
 ## Disclaimer
 
