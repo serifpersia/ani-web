@@ -1,0 +1,14 @@
+# Exclude source code to keep the package small
+client/src/
+server/controllers/
+server/providers/
+server/routes/
+server/utils/
+server/*.ts
+docs/
+.github/
+
+# Ensure build artifacts are NOT ignored
+!client/dist/
+!server/dist/
+!server/vendor/

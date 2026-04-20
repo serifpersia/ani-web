@@ -77,9 +77,11 @@ cd ani-web
 ```
 
 **2. Install, Build, and Run:**
-Use provided run scripts that offer a menu to choose between a **Development** or **Production** setup. To run a development environment (which installs all dependencies and builds the source code), run the script below and choose "Development".
+Use provided run scripts that offer a menu to choose between a **Development** or **Production** setup. To run a development environment manually:
 
-_To build run `npm install` followed by `npm run build`._
+1. Run `npm install` to install core dependencies.
+2. Run `npm run setup` to install development tools (Vite, TypeScript, etc).
+3. Run `npm run build` to build the source code.
 
 **On Linux / macOS:**
 
