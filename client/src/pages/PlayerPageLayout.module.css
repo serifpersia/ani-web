@@ -154,22 +154,62 @@
 
 @media (max-width: 768px) {
   .playerPageLayout {
-    padding: 1rem;
-    gap: 1.5rem;
+    padding: 0;
+    gap: 0;
+  }
+
+  .playerMain {
+    gap: 0;
+  }
+
+  .videoPlayerWrapper {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+  }
+
+  .playerInfoContainer {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
   }
 
   .playerInfoHeader {
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 1.5rem;
+    gap: 1rem;
   }
 
   .videoTitleSection h1 {
-    font-size: 1.75rem;
+    font-size: 1.5rem;
   }
 
   .playerAnimeCard {
-    width: 140px;
+    width: 110px;
+  }
+
+  .episodeSidebar {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  .playerPageLayout {
+    padding: 0;
+    gap: 0;
+  }
+  .videoPlayerWrapper {
+    border-radius: 0;
+    height: 100vh;
+    padding-top: 0;
+  }
+  .playerInfoContainer {
+    padding: 1rem max(1rem, env(safe-area-inset-right)) 1rem max(1rem, env(safe-area-inset-left));
   }
 }

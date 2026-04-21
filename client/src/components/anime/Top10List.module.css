@@ -150,23 +150,12 @@
     overflow-x: auto;
     gap: 1.5rem;
     padding-bottom: 1rem;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
   }
 
   .list::-webkit-scrollbar {
-    height: 6px;
-  }
-
-  .list::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .list::-webkit-scrollbar-thumb {
-    background: var(--bg-elevated);
-    border-radius: 4px;
-  }
-
-  .list::-webkit-scrollbar-thumb:hover {
-    background: var(--text-tertiary);
+    display: none;
   }
 
   .item {
@@ -177,6 +166,7 @@
     border: none;
     width: 130px;
     flex-shrink: 0;
+    scroll-snap-align: start;
   }
 
   .item:last-child {

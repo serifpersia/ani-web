@@ -1,6 +1,6 @@
 {
   "name": "ani-web",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "A web application for watching anime.",
   "main": "orchestrator.js",
   "bin": {
@@ -21,7 +21,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "npm run lint --prefix client && npm run lint --prefix server",
     "format": "prettier --write .",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "update-version": "node update-version.js"
   },
   "files": [
     "orchestrator.js",

@@ -163,17 +163,18 @@
 
 @media (max-width: 768px) {
   .header {
-    --header-height: 70px;
-    padding: 0 var(--space-4);
-    gap: var(--space-4);
+    --header-height: 60px;
+    padding: 0 var(--space-3);
+    gap: var(--space-2);
+    flex-wrap: wrap;
   }
 
   .logo {
-    --logo-height: 55px;
+    --logo-height: 45px;
   }
 
   .leftSection {
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
 
   .hamburgerBtn {
@@ -182,14 +183,18 @@
     font-size: 1.2rem;
   }
 
+  .rightSection {
+    gap: var(--space-2);
+  }
+
   .searchInput {
-    width: 160px;
+    width: 120px;
     min-height: 40px;
     font-size: var(--font-size-sm);
   }
 
   .searchInput:focus {
-    width: 200px;
+    width: calc(100vw - 140px);
   }
 
   .profileBtn {
@@ -203,6 +208,12 @@
   }
 
   .signInText {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .searchContainer {
     display: none;
   }
 }

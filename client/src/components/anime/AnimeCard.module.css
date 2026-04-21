@@ -242,24 +242,25 @@
 
   .card {
     flex-direction: row;
-    height: 120px;
+    height: auto;
+    min-height: 100px;
   }
 
   .posterContainer {
-    width: 80px;
+    width: 85px;
     height: 100%;
     aspect-ratio: auto;
     flex-shrink: 0;
   }
 
   .info {
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-2) var(--space-3);
     justify-content: center;
   }
 
   .title {
-    font-size: var(--font-size-base);
-    margin-bottom: var(--space-1);
+    font-size: var(--font-size-sm);
+    margin-bottom: 2px;
     -webkit-line-clamp: 2;
     line-clamp: 2;
   }

@@ -89,6 +89,13 @@
   --max-width: 1600px;
 }
 
+@media (min-width: 1920px) {
+  :root {
+    --font-size-base: 1.125rem;
+    --max-width: 2000px;
+  }
+}
+
 *,
 *::before,
 *::after {
@@ -147,7 +154,7 @@ footer a:hover {
 }
 
 .section-title {
-  font-size: 1.5rem;
+  font-size: clamp(1.25rem, 4vw, 1.5rem);
   font-weight: 700;
   margin-bottom: var(--space-6);
   padding-left: var(--space-3);
@@ -344,6 +351,18 @@ main {
   z-index: 1;
 }
 
+@media (max-width: 768px) {
+  main {
+    padding: var(--space-4);
+  }
+}
+
+@media (max-width: 480px) {
+  main {
+    padding: var(--space-2) var(--space-3);
+  }
+}
+
 #nprogress .bar {
   background: var(--accent) !important;
   height: 3px !important;
@@ -407,6 +426,6 @@ main {
 @media (max-width: 768px) {
   .grid-container {
     grid-template-columns: 1fr;
-    gap: var(--space-4);
+    gap: var(--space-3);
   }
 }

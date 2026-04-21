@@ -221,11 +221,12 @@
 @media (max-width: 768px) {
   .dropdown {
     position: fixed;
-    top: calc(var(--header-height, 70px) + 5px);
-    left: 10px;
-    right: 10px;
-    width: auto;
-    max-height: calc(100vh - var(--header-height, 70px) - 20px);
+    top: var(--header-height, 60px);
+    left: 0;
+    right: 0;
+    width: 100vw;
+    max-height: calc(100vh - var(--header-height, 60px));
+    border-radius: 0 0 12px 12px;
   }
 
   .bellBtn {

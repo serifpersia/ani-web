@@ -646,11 +646,36 @@
 
 @media (max-width: 768px) {
   .bottomControls {
-    padding: 1rem;
+    padding: 0.75rem;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    border-radius: 12px;
+  }
+
+  .leftControls,
+  .rightControls {
+    gap: 0.5rem;
+  }
+
+  .controlBtn {
+    padding: 8px;
+    font-size: 1.1rem;
   }
 
   .timeDisplay {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
+    margin-left: 0.25rem;
+  }
+
+  .centerPlayPause {
+    width: 64px;
+    height: 64px;
+    font-size: 2rem;
+  }
+
+  .titleContainer h1 {
+    font-size: 1.25rem;
   }
 
   .volumeSlider {
@@ -661,10 +686,37 @@
     display: none;
   }
 
-  .centerPlayPause {
-    width: 60px;
-    height: 60px;
+  .skipBubble {
+    width: 80px;
+    height: 80px;
+  }
+  .skipIcon {
     font-size: 1.8rem;
+  }
+  .skipText {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  .bottomControls {
+    bottom: 8px;
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    padding: 0.5rem 1rem;
+  }
+
+  .centerPlayPause {
+    width: 54px;
+    height: 54px;
+    font-size: 1.5rem;
+  }
+
+  .skipIndicatorContainer.leftSkip {
+    left: max(0px, env(safe-area-inset-left));
+  }
+  .skipIndicatorContainer.rightSkip {
+    right: max(0px, env(safe-area-inset-right));
   }
 }
 

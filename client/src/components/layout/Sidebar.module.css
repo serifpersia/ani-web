@@ -3,6 +3,7 @@
   top: 0;
   left: 0;
   width: 300px;
+  max-width: 85vw;
   height: 100%;
   transition: transform var(--transition-fast);
   z-index: 1010;
@@ -93,4 +94,20 @@
   will-change: opacity;
   transition: opacity var(--transition-base);
   opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    padding: var(--space-3);
+  }
+  .sidebarHeader {
+    margin-bottom: var(--space-4);
+  }
+  .logo {
+    --logo-height: 45px;
+  }
+  .navLink {
+    padding: var(--space-3);
+    font-size: var(--font-size-base);
+  }
 }
