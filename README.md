@@ -103,6 +103,16 @@ Once installed globally, you can use the following commands:
 - `ani-web` - Start the application.
 - `ani-web --version` (or `-v`) - Check your installed version.
 
+### Data Location
+
+ani-web stores your persistent files in your OS app-data folder instead of inside the globally installed npm package:
+
+- **Windows:** `%APPDATA%\ani-web`
+- **macOS:** `~/Library/Application Support/ani-web`
+- **Linux:** `$XDG_DATA_HOME/ani-web` or `~/.local/share/ani-web`
+
+This folder contains your `.env`, database files, sync manifests, and Google token file. Existing installs will automatically migrate legacy files from the old `server/` folder on first launch when those files are still present.
+
 ---
 
 ## Cloud Sync (Optional)

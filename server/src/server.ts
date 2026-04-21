@@ -116,7 +116,7 @@ app.use(
 )
 
 if (!CONFIG.IS_DEV) {
-  const frontendPath = path.resolve(CONFIG.ROOT, '../client/dist')
+  const frontendPath = path.join(CONFIG.PACKAGE_ROOT, 'client', 'dist')
   logger.info(`Serving frontend from: ${frontendPath}`)
   app.use(express.static(frontendPath))
 

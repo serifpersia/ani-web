@@ -1,6 +1,6 @@
 {
   "name": "ani-web-server",
-  "version": "1.2.0",
+  "version": "1.2.2",
   "type": "commonjs",
   "engines": {
     "node": ">=22.5.0"
