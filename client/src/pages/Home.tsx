@@ -25,6 +25,8 @@ const Home: React.FC = () => {
   const [page, setPage] = React.useState(1)
   const seasonalRef = useRef<HTMLDivElement>(null)
 
+  const { data: nextPageData } = usePaginatedCurrentSeason(page + 1)
+
   const { titlePreference } = useTitlePreference()
   const [itemToRemove, setItemToRemove] = React.useState<{ id: string; name: string } | null>(null)
   const removeWatchlistMutation = useRemoveFromWatchlist()
@@ -34,7 +36,7 @@ const Home: React.FC = () => {
   }, [])
 
   const { data: latest, isLoading: loadingLatest } = useLatestReleases()
-  const { data: cwFast, isLoading: loadingFast } = useContinueWatchingFast(15)
+  const { data: cwFast, isLoading: loadingFast } = useContinueWatchingFast(14)
   const { data: cwUpNext, isLoading: loadingUpNext } = useContinueWatchingUpNext()
   const loadingCw = loadingFast || loadingUpNext
 
@@ -62,6 +64,9 @@ const Home: React.FC = () => {
   }, [cwFast, cwUpNext])
 
   const { data: currentSeason, isLoading: loadingSeason } = usePaginatedCurrentSeason(page)
+
+  const canGoNext =
+    currentSeason && currentSeason.length >= 14 && nextPageData && nextPageData.length > 0
 
   const removeCw = useMutation({
     mutationFn: async (showId: string) => {
@@ -256,19 +261,17 @@ const Home: React.FC = () => {
                     display: 'flex',
                     alignItems: 'center',
                     padding: '4px',
-                    opacity: !currentSeason || currentSeason.length < 14 ? 0.3 : 1,
+                    opacity: canGoNext ? 1 : 0.3,
                   }}
                   onClick={() => {
-                    if (currentSeason && currentSeason.length >= 14) {
-                      setPage((p) => p + 1)
-                      if (seasonalRef.current) {
-                        const y =
-                          seasonalRef.current.getBoundingClientRect().top + window.scrollY - 120
-                        window.scrollTo({ top: y, behavior: 'smooth' })
-                      }
+                    setPage((p) => p + 1)
+                    if (seasonalRef.current) {
+                      const y =
+                        seasonalRef.current.getBoundingClientRect().top + window.scrollY - 120
+                      window.scrollTo({ top: y, behavior: 'smooth' })
                     }
                   }}
-                  disabled={!currentSeason || currentSeason.length < 14}
+                  disabled={!canGoNext}
                 >
                   <FaChevronRight size={14} />
                 </button>
