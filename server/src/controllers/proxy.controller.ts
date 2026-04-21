@@ -69,12 +69,18 @@ export class ProxyController {
             if (line.startsWith('#')) {
               return line.replace(/URI="([^"]+)"/g, (match, uri) => {
                 const fullUri = new URL(uri, baseUrl).href
-                return `URI="/api/proxy?url=${encodeURIComponent(fullUri)}&referer=${encodeURIComponent(refererStr)}"`
+                if (fullUri.includes('.m3u8')) {
+                  return `URI="/api/proxy?url=${encodeURIComponent(fullUri)}&referer=${encodeURIComponent(refererStr)}"`
+                }
+                return `URI="${fullUri}"`
               })
             }
 
             const fullUrl = new URL(line, baseUrl).href
-            return `/api/proxy?url=${encodeURIComponent(fullUrl)}&referer=${encodeURIComponent(refererStr)}`
+            if (fullUrl.includes('.m3u8')) {
+              return `/api/proxy?url=${encodeURIComponent(fullUrl)}&referer=${encodeURIComponent(refererStr)}`
+            }
+            return fullUrl
           })
           .join('\n')
 
@@ -112,6 +118,7 @@ export class ProxyController {
         res.set('Access-Control-Allow-Origin', '*')
 
         resp.data.on('error', () => {
+          abortController.abort()
           if (!res.headersSent) res.status(502).send('Upstream error')
           else res.destroy()
         })
@@ -181,7 +188,9 @@ export class ProxyController {
         signal: abortController.signal,
       })
 
-      res.set('Cache-Control', 'public, max-age=604800, immutable')
+      if (imageResponse.status === 200) {
+        res.set('Cache-Control', 'public, max-age=604800, immutable')
+      }
       res.set('Content-Type', String(imageResponse.headers['content-type'] ?? ''))
 
       imageResponse.data.on('error', () => {
@@ -199,7 +208,9 @@ export class ProxyController {
         return
       }
       // Serve placeholder if proxy fails
-      res.status(200).sendFile(path.join(__dirname, '..', '..', 'client/public/placeholder.svg'))
+      if (!res.headersSent) {
+        res.status(200).sendFile(path.join(__dirname, '..', '..', 'client/public/placeholder.svg'))
+      }
     }
   }
 }

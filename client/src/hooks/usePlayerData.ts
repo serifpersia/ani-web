@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useReducer } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useEffect, useCallback, useReducer, useRef } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import type {
   DetailedShowMeta,
@@ -33,260 +33,245 @@ export const usePlayerData = (
   showId: string | undefined,
   episodeNumber: string | undefined
 ): UsePlayerDataReturn => {
-  const navigate = useNavigate()
   const [state, dispatch] = useReducer(playerReducer, initialState)
+  const latestShowMetaRef = useRef(state.showMeta)
 
   useEffect(() => {
-    const fetchInitialData = async () => {
-      if (!showId) return
-      dispatch({ type: 'SET_LOADING', key: 'loadingShowData', value: true })
+    latestShowMetaRef.current = state.showMeta
+  }, [state.showMeta])
 
-      try {
-        const [metaResponse, episodesResponse, watchlistResponse, watchedResponse] =
-          await Promise.all([
-            fetch(`/api/show-meta/${showId}`),
-            fetch(`/api/episodes?showId=${showId}&mode=${state.currentMode}`),
-            fetch(`/api/watchlist/check/${showId}`, {
-              headers: { 'Content-Type': 'application/json' },
-            }),
-            fetch(`/api/watched-episodes/${showId}`, {
-              headers: { 'Content-Type': 'application/json' },
-            }),
-          ])
+  const {
+    data: showData,
+    isLoading: loadingShowData,
+    error: showDataError,
+  } = useQuery({
+    queryKey: ['show-data', showId, state.currentMode],
+    queryFn: async () => {
+      if (!showId) throw new Error('No showId')
+      const [metaResponse, episodesResponse, watchlistResponse, watchedResponse] =
+        await Promise.all([
+          fetch(`/api/show-meta/${showId}`),
+          fetch(`/api/episodes?showId=${showId}&mode=${state.currentMode}`),
+          fetch(`/api/watchlist/check/${showId}`),
+          fetch(`/api/watched-episodes/${showId}`),
+        ])
 
-        if (!metaResponse.ok) throw new Error('Failed to fetch show metadata')
+      if (!metaResponse.ok) throw new Error('Failed to fetch show metadata')
 
-        const meta = await metaResponse.json()
-        const watchlistStatus = watchlistResponse.ok
-          ? await watchlistResponse.json()
-          : { inWatchlist: false }
-        const watchedData = watchedResponse.ok ? await watchedResponse.json() : []
+      const meta = await metaResponse.json()
+      const watchlistStatus = watchlistResponse.ok
+        ? await watchlistResponse.json()
+        : { inWatchlist: false }
+      const watchedData = watchedResponse.ok ? await watchedResponse.json() : []
 
-        if (!meta) {
-          dispatch({
-            type: 'SHOW_DATA_SUCCESS',
-            payload: {
-              showMeta: {},
-              episodes: [],
-              inWatchlist: watchlistStatus.inWatchlist,
-              watchedEpisodes: watchedData,
-              currentEpisode: undefined,
-            },
-          })
-          return
-        }
+      let episodes = []
+      let description = meta?.description
 
-        let episodes = []
-        let description = meta.description
-
-        if (episodesResponse.ok) {
-          const episodeData = await episodesResponse.json()
-          if (episodeData) {
-            episodes = episodeData.episodes.sort(
-              (a: string, b: string) => parseFloat(a) - parseFloat(b)
-            )
-            description = episodeData.description || description
-          }
-        }
-
-        dispatch({
-          type: 'SHOW_DATA_SUCCESS',
-          payload: {
-            showMeta: {
-              ...meta,
-              description,
-              names: meta.names || {
-                romaji: meta.name,
-                english: meta.englishName,
-                native: meta.nativeName,
-              },
-            },
-            episodes,
-            inWatchlist: watchlistStatus.inWatchlist,
-            watchedEpisodes: watchedData,
-            currentEpisode: episodeNumber || (episodes.length > 0 ? episodes[0] : undefined),
-          },
-        })
-      } catch (e) {
-        console.error('Error fetching show data:', e)
-        dispatch({
-          type: 'SET_ERROR',
-          payload: e instanceof Error ? e.message : 'An unknown error occurred',
-        })
-      }
-    }
-
-    fetchInitialData()
-  }, [showId, state.currentMode, episodeNumber])
-
-  useEffect(() => {
-    const fetchDetails = async () => {
-      if (!showId || state.loadingShowData) return
-      if (state.showMeta.genres) return
-
-      dispatch({ type: 'SET_LOADING', key: 'loadingDetails', value: true })
-
-      try {
-        const detailsResponse = await fetch(`/api/show-details/${showId}`)
-        if (detailsResponse.ok) {
-          const details = await detailsResponse.json()
-          dispatch({
-            type: 'SET_STATE',
-            payload: { showMeta: { ...state.showMeta, ...details }, loadingDetails: false },
-          })
-        }
-      } catch (error) {
-        console.warn('Failed to background fetch details:', error)
-        dispatch({ type: 'SET_LOADING', key: 'loadingDetails', value: false })
-      }
-    }
-
-    fetchDetails()
-  }, [showId, state.loadingShowData, state.showMeta])
-
-  useEffect(() => {
-    if (!showId || !state.currentEpisode) return
-
-    const fetchVideoSources = async () => {
-      dispatch({ type: 'SET_LOADING', key: 'loadingVideo', value: true })
-      dispatch({
-        type: 'SET_STATE',
-        payload: { videoSources: [], selectedSource: null, selectedLink: null, skipIntervals: [] },
-      })
-
-      try {
-        let providerShowId = showId
-        if (
-          (state.selectedProvider === 'hianime' ||
-            state.selectedProvider === 'animepahe' ||
-            state.selectedProvider === '123anime') &&
-          state.showMeta.name
-        ) {
-          const searchResponse = await fetch(
-            `/api/search?query=${encodeURIComponent(state.showMeta.name)}&provider=${state.selectedProvider}`
+      if (episodesResponse.ok) {
+        const episodeData = await episodesResponse.json()
+        if (episodeData) {
+          episodes = episodeData.episodes.sort(
+            (a: string, b: string) => parseFloat(a) - parseFloat(b)
           )
-          const searchResults = await searchResponse.json()
-          if (searchResults && searchResults.length > 0) {
-            providerShowId = searchResults[0].session || searchResults[0].id
-          }
+          description = episodeData.description || description
         }
+      }
 
-        const [sourcesResponse, progressResponse, preferredSourceResponse, skipTimesResponse] =
-          await Promise.all([
-            fetch(
-              `/api/video?showId=${providerShowId}&episodeNumber=${state.currentEpisode}&mode=${state.currentMode}&provider=${state.selectedProvider}`
-            ),
-            fetch(`/api/episode-progress/${showId}/${state.currentEpisode}`, {
-              headers: { 'Content-Type': 'application/json' },
-            }),
-            fetch(`/api/settings?key=preferredSource`, {
-              headers: { 'Content-Type': 'application/json' },
-            }),
-            fetch(`/api/skip-times/${showId}/${state.currentEpisode}`),
-          ])
+      return {
+        showMeta: {
+          ...meta,
+          description,
+          names: meta?.names || {
+            romaji: meta?.name,
+            english: meta?.englishName,
+            native: meta?.nativeName,
+          },
+        },
+        episodes,
+        inWatchlist: watchlistStatus.inWatchlist,
+        watchedEpisodes: watchedData,
+      }
+    },
+    enabled: !!showId,
+  })
 
-        if (!sourcesResponse.ok) {
-          dispatch({
-            type: 'SET_STATE',
-            payload: {
-              videoSources: [],
-              selectedSource: null,
-              selectedLink: null,
-              loadingVideo: false,
-            },
-          })
-          throw new Error('Failed to fetch video sources')
+  useEffect(() => {
+    if (showData) {
+      dispatch({
+        type: 'SHOW_DATA_SUCCESS',
+        payload: {
+          ...showData,
+          currentEpisode:
+            episodeNumber || (showData.episodes.length > 0 ? showData.episodes[0] : undefined),
+        },
+      })
+    }
+  }, [showData, episodeNumber])
+
+  useEffect(() => {
+    if (showDataError) {
+      dispatch({
+        type: 'SET_ERROR',
+        payload: showDataError instanceof Error ? showDataError.message : 'Show data load failed',
+      })
+    }
+  }, [showDataError])
+
+  const {
+    data: videoData,
+    isLoading: loadingVideo,
+    error: videoError,
+  } = useQuery({
+    queryKey: [
+      'video-sources',
+      showId,
+      state.currentEpisode,
+      state.selectedProvider,
+      state.currentMode,
+      state.showMeta?.name,
+    ],
+    queryFn: async () => {
+      if (!showId || !state.currentEpisode) throw new Error('Missing params')
+
+      let providerShowId = showId
+      if (
+        ['hianime', 'animepahe', '123anime'].includes(state.selectedProvider) &&
+        state.showMeta.name
+      ) {
+        const searchResponse = await fetch(
+          `/api/search?query=${encodeURIComponent(state.showMeta.name)}&provider=${state.selectedProvider}`
+        )
+        const searchResults = await searchResponse.json()
+        if (searchResults && searchResults.length > 0) {
+          providerShowId = searchResults[0].session || searchResults[0].id
         }
-        const sources: VideoSource[] = await sourcesResponse.json()
+      }
 
-        if (!Array.isArray(sources)) {
-          console.error('API returned invalid sources:', sources)
-          dispatch({
-            type: 'SET_STATE',
-            payload: {
-              videoSources: [],
-              selectedSource: null,
-              selectedLink: null,
-              loadingVideo: false,
-            },
-          })
-          return
-        }
+      const [sourcesResponse, progressResponse, preferredSourceResponse, skipTimesResponse] =
+        await Promise.all([
+          fetch(
+            `/api/video?showId=${providerShowId}&episodeNumber=${state.currentEpisode}&mode=${state.currentMode}&provider=${state.selectedProvider}`
+          ),
+          fetch(`/api/episode-progress/${showId}/${state.currentEpisode}`),
+          fetch(`/api/settings?key=preferredSource`),
+          fetch(`/api/skip-times/${showId}/${state.currentEpisode}`),
+        ])
 
-        const preferredSourceName = preferredSourceResponse.ok
-          ? (await preferredSourceResponse.json()).value
+      if (!sourcesResponse.ok) throw new Error('Failed to fetch video sources')
+      const sources: VideoSource[] = await sourcesResponse.json()
+
+      const preferredSourceName = preferredSourceResponse.ok
+        ? (await preferredSourceResponse.json()).value
+        : null
+
+      let sourceToSelect: VideoSource | null = sources.length > 0 ? sources[0] : null
+      if (preferredSourceName) {
+        const found = sources.find((s) => s.sourceName === preferredSourceName)
+        if (found) sourceToSelect = found
+      }
+
+      const selectedLink =
+        sourceToSelect && sourceToSelect.links.length > 0
+          ? sourceToSelect.links.sort(
+              (a: VideoLink, b: VideoLink) =>
+                (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
+            )[0]
           : null
 
-        let sourceToSelect: VideoSource | null = sources.length > 0 ? sources[0] : null
-        if (preferredSourceName) {
-          const found = sources.find((s) => s.sourceName === preferredSourceName)
-          if (found) sourceToSelect = found
+      let resumeTime = 0
+      let showResumeModal = false
+      if (progressResponse.ok) {
+        const progress = await progressResponse.json()
+        if (
+          progress?.currentTime > 0 &&
+          progress.currentTime < (progress.duration || 10000) * 0.95
+        ) {
+          resumeTime = progress.currentTime
+          showResumeModal = true
         }
-
-        const selectedLink =
-          sourceToSelect && sourceToSelect.links.length > 0
-            ? sourceToSelect.links.sort(
-                (a: VideoLink, b: VideoLink) =>
-                  (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
-              )[0]
-            : null
-
-        let resumeTime = 0
-        let showResumeModal = false
-
-        if (progressResponse.ok) {
-          try {
-            const progress = await progressResponse.json()
-            if (
-              progress?.currentTime > 0 &&
-              progress.currentTime < (progress.duration || 10000) * 0.95
-            ) {
-              resumeTime = progress.currentTime
-              showResumeModal = true
-            }
-          } catch (e) {
-            console.warn('Failed to parse progress:', e)
-          }
-        }
-
-        const skipResponseData = skipTimesResponse.ok ? await skipTimesResponse.json() : []
-        const rawSkips = Array.isArray(skipResponseData)
-          ? skipResponseData
-          : skipResponseData.results || []
-
-        const skipIntervals: SkipInterval[] = Array.isArray(rawSkips)
-          ? rawSkips
-              .map((item: RawSkipInterval) => ({
-                skip_id: item.skip_id || '',
-                skip_type: item.skip_type || '',
-                start_time: item.interval?.start_time ?? item.start_time ?? 0,
-                end_time: item.interval?.end_time ?? item.end_time ?? 0,
-              }))
-              .filter((i: SkipInterval) => i.end_time > 0)
-          : []
-
-        dispatch({
-          type: 'SET_STATE',
-          payload: {
-            videoSources: sources,
-            selectedSource: sourceToSelect,
-            selectedLink,
-            resumeTime,
-            showResumeModal: showResumeModal && resumeTime > 5 && sourceToSelect?.type !== 'iframe',
-            skipIntervals,
-            loadingVideo: false,
-          },
-        })
-      } catch (e) {
-        dispatch({
-          type: 'SET_ERROR',
-          payload: e instanceof Error ? e.message : 'Video load failed',
-        })
       }
-    }
 
-    fetchVideoSources()
-  }, [showId, state.currentEpisode, state.currentMode, state.selectedProvider, state.showMeta.name])
+      const skipResponseData = skipTimesResponse.ok ? await skipTimesResponse.json() : []
+      const rawSkips = Array.isArray(skipResponseData)
+        ? skipResponseData
+        : skipResponseData.results || []
+
+      const skipIntervals: SkipInterval[] = rawSkips
+        .map((item: RawSkipInterval) => ({
+          skip_id: item.skip_id || '',
+          skip_type: item.skip_type || '',
+          start_time: item.interval?.start_time ?? item.start_time ?? 0,
+          end_time: item.interval?.end_time ?? item.end_time ?? 0,
+        }))
+        .filter((i: SkipInterval) => i.end_time > 0)
+
+      return {
+        videoSources: sources,
+        selectedSource: sourceToSelect,
+        selectedLink,
+        resumeTime,
+        showResumeModal: showResumeModal && resumeTime > 5 && sourceToSelect?.type !== 'iframe',
+        skipIntervals,
+      }
+    },
+    enabled: !!showId && !!state.currentEpisode && !loadingShowData,
+  })
+
+  useEffect(() => {
+    if (videoData) {
+      dispatch({ type: 'VIDEO_DATA_SUCCESS', payload: videoData })
+    }
+  }, [videoData])
+
+  useEffect(() => {
+    if (videoError) {
+      dispatch({
+        type: 'SET_ERROR',
+        payload: videoError instanceof Error ? videoError.message : 'Video load failed',
+      })
+    }
+  }, [videoError])
+
+  useEffect(() => {
+    dispatch({ type: 'SET_LOADING', key: 'loadingShowData', value: loadingShowData })
+  }, [loadingShowData])
+
+  useEffect(() => {
+    dispatch({ type: 'SET_LOADING', key: 'loadingVideo', value: loadingVideo })
+  }, [loadingVideo])
+
+  const { data: detailsData, isLoading: loadingDetails } = useQuery({
+    queryKey: ['show-details', showId],
+    queryFn: async () => {
+      const detailsResponse = await fetch(`/api/show-details/${showId}`)
+      if (!detailsResponse.ok) {
+        throw new Error('Failed to fetch show details')
+      }
+      return detailsResponse.json()
+    },
+    enabled: !!showId && !loadingShowData && !!state.showMeta?.name && !state.showMeta?.genres,
+  })
+
+  useEffect(() => {
+    dispatch({ type: 'SET_LOADING', key: 'loadingDetails', value: loadingDetails })
+  }, [loadingDetails])
+
+  useEffect(() => {
+    if (detailsData) {
+      const currentShowMeta = latestShowMetaRef.current
+      dispatch({
+        type: 'SET_STATE',
+        payload: {
+          showMeta: {
+            ...currentShowMeta,
+            ...detailsData,
+            name: currentShowMeta.name,
+          },
+          loadingDetails: false,
+        },
+      })
+    }
+  }, [detailsData])
 
   const toggleWatchlist = useCallback(async () => {
     if (!state.showMeta || !showId) return

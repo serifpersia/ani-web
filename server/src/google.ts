@@ -126,7 +126,6 @@ export class GoogleDriveService {
   ): Promise<{ id: string; name: string } | null> {
     if (!this.isAuthenticated()) return null
 
-    // Escape single quotes to prevent query injection
     const safeName = filename.replace(/'/g, "\\'")
     let query = `name = '${safeName}' and trashed = false`
     if (parentId) {

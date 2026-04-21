@@ -72,12 +72,12 @@ export class WatchlistController {
     db: DatabaseWrapper
   ): Promise<CombinedContinueWatchingShow[]> {
     const query = `
-    SELECT 
-    w.id as _id, 
-    w.id as id, 
-    w.name as name, 
-    w.thumbnail as thumbnail, 
-    w.nativeName as nativeName, 
+    SELECT
+    w.id as _id,
+    w.id as id,
+    w.name as name,
+    w.thumbnail as thumbnail,
+    w.nativeName as nativeName,
     w.englishName as englishName,
     w.type as type,
     sm.episodeCount,
@@ -175,12 +175,12 @@ export class WatchlistController {
     db: DatabaseWrapper
   ): Promise<CombinedContinueWatchingShow[]> {
     const query = `
-    SELECT 
-    w.id as _id, 
-    w.id as id, 
-    w.name as name, 
-    w.thumbnail as thumbnail, 
-    w.nativeName as nativeName, 
+    SELECT
+    w.id as _id,
+    w.id as id,
+    w.name as name,
+    w.thumbnail as thumbnail,
+    w.nativeName as nativeName,
     w.englishName as englishName,
     w.type as type,
     sm.episodeCount,
@@ -217,8 +217,8 @@ export class WatchlistController {
            FROM watchlist w
            LEFT JOIN shows_meta sm ON w.id = sm.id
            LEFT JOIN (
-              SELECT showId, MAX(watchedAt) as lastActivity 
-              FROM watched_episodes 
+              SELECT showId, MAX(watchedAt) as lastActivity
+              FROM watched_episodes
               GROUP BY showId
            ) we ON w.id = we.showId
            WHERE w.status = 'Watching'

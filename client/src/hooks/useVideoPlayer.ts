@@ -112,7 +112,6 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
     [buildProgressPayload]
   )
 
-  // Apply saved volume/mute settings when video element loads
   useEffect(() => {
     const video = videoRef.current
     if (video) {
@@ -128,11 +127,15 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
       }
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
+    const debounceTimer = debouncedUpdateTimer
+    const activityTimer = inactivityTimer
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
       if (!hasEnded.current) {
         sendProgressUpdate(true)
       }
+      if (debounceTimer.current) clearTimeout(debounceTimer.current)
+      if (activityTimer.current) clearTimeout(activityTimer.current)
     }
   }, [sendProgressUpdate])
 

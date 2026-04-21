@@ -159,7 +159,6 @@ export class InsightsController {
       for (const show of watchedShows) {
         let genres: string[] = []
         if (show.genres) {
-          // Optimized: Bypass expensive try/catch error traps for simple arrays
           if (show.genres.startsWith('[')) {
             genres = JSON.parse(show.genres)
           } else {
@@ -167,7 +166,6 @@ export class InsightsController {
           }
         }
 
-        // Use a standard for-loop to iterate faster
         for (let i = 0; i < genres.length; i++) {
           const g = genres[i]
           genreCounts[g] = (genreCounts[g] || 0) + 1

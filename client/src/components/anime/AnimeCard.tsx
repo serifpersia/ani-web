@@ -96,7 +96,6 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
 
     const [isLoaded, setIsLoaded] = useState(false)
 
-    // Calculate episode progress string
     const displayEpisodeCount = (() => {
       const epCount = anime.episodeCount ?? 0
       const watched = anime.watchedCount ?? 0

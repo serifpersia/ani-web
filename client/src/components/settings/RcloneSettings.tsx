@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import styles from './GoogleAuthSettings.module.css' // Reusing styles for consistency
+import styles from './GoogleAuthSettings.module.css'
 import StatusModal from '../common/StatusModal'
 
 const RcloneSettings: React.FC = () => {

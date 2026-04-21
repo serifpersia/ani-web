@@ -13,7 +13,6 @@ const useIsMobile = (breakpoint = 768): boolean => {
       mediaQuery.addEventListener('change', handler)
       return () => mediaQuery.removeEventListener('change', handler)
     } else {
-      // Fallback for older browsers
       mediaQuery.addListener(handler)
       return () => mediaQuery.removeListener(handler)
     }

@@ -201,7 +201,7 @@ export const useNotifications = (enabled: boolean = true) => {
     queryKey: ['notifications'],
     queryFn: () => fetchApi('/api/notifications'),
     enabled,
-    refetchInterval: 120000, // Refetch every 2 minutes
+    refetchInterval: 120000,
   })
 }
 

@@ -247,7 +247,7 @@ export async function syncUp(
     if (localVersion > remoteVersion) {
       const dbName = path.basename(dbPath)
       const syncDbPath = `${dbPath}.sync.db`
-
+      db.checkpoint()
       db.backup(syncDbPath)
 
       if (activeProvider === 'google') {

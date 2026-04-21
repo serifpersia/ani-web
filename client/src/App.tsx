@@ -87,15 +87,15 @@ function App() {
               <Route path="/settings" element={<Settings />} />
               <Route path="/mal" element={<MAL />} />
               <Route path="/insights" element={<Insights />} />
-              {/* New standard watch routes */}
+              {}
               <Route path="/watch/:id" element={<Player />} />
               <Route path="/watch/:id/:episodeNumber" element={<Player />} />
 
-              {/* New standard watch routes */}
+              {}
               <Route path="/watch/:id" element={<Player />} />
               <Route path="/watch/:id/:episodeNumber" element={<Player />} />
 
-              {/* Legacy player routes - redirect permanently to new watch URLs */}
+              {}
               <Route path="/player/:id" element={<PlayerRedirect />} />
               <Route path="/player/:id/:episodeNumber" element={<PlayerRedirect />} />
               <Route

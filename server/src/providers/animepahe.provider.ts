@@ -48,12 +48,7 @@ export class AnimePaheProvider implements Provider {
     this.cache = cache
   }
 
-  /**
-   * Generates headers that perfectly mimic a browser to bypass passive checks.
-   * Injects the DDoS-Guard cookies.
-   */
   private getHeaders(isApi: boolean = false): Record<string, string> {
-    // Paste your cookies directly here
     const cookies = {
       __ddg1_: '5H0114JE1p0wQHdJiV2O',
       __ddg2_: 'FxnuwLkvPnXSQtPE',
@@ -212,7 +207,7 @@ export class AnimePaheProvider implements Provider {
           links: [
             {
               resolutionStr: src.quality || 'Auto',
-              link: src.url, // Usually Kwik Embed URL
+              link: src.url,
               hls: false,
             },
           ],
@@ -263,10 +258,6 @@ export class AnimePaheProvider implements Provider {
     }
   }
 
-  /**
-   * Browser-less Kwik.cx Extractor
-   * Relies entirely on Regex to break the eval() obfuscation.
-   */
   async resolveKwik(kwikUrl: string): Promise<{ m3u8: string; referer: string }> {
     try {
       const fetchUrl = kwikUrl.replace('/e/', '/f/')
@@ -283,11 +274,9 @@ export class AnimePaheProvider implements Provider {
         throw new Error('Kwik triggered a Cloudflare challenge.')
       }
 
-      // Pattern 1: Direct link
       const directMatch = html.match(/(?:source|file)\s*:\s*['"]([^'"]+\.m3u8)['"]/)
       if (directMatch) return { m3u8: directMatch[1], referer: kwikUrl }
 
-      // Pattern 2: Split-Array Obfuscation (Most common Kwik packer)
       const packedMatch = html.match(/'([^']{50,})'\.split\('\|'\)/)
       if (packedMatch) {
         const parts = packedMatch[1].split('|')

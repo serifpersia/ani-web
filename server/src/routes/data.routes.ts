@@ -3,8 +3,6 @@ import { DataController } from '../controllers/data.controller'
 import { Provider } from '../providers/provider.interface'
 import NodeCache from 'node-cache'
 
-/** Creates a middleware that checks the cache before passing to the handler,
- *  and intercepts res.json to cache successful responses. */
 function makeCacheMiddleware(
   cache: NodeCache,
   keyFn: (req: Request) => string,

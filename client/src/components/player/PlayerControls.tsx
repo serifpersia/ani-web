@@ -67,8 +67,12 @@ const PlayerControls = ({
     }
   }, [showSettings])
 
-  const [currentTime, setCurrentTime] = useState(0)
-  const [buffered, setBuffered] = useState(0)
+  const watchedBarRef = React.useRef<HTMLDivElement>(null)
+  const thumbRef = React.useRef<HTMLDivElement>(null)
+  const bufferedBarRef = React.useRef<HTMLDivElement>(null)
+  const timeDisplayRef = React.useRef<HTMLSpanElement>(null)
+
+  const currentTimeRef = React.useRef(0)
 
   useEffect(() => {
     const video = refs.videoRef.current
@@ -76,20 +80,27 @@ const PlayerControls = ({
 
     const handleTimeUpdate = () => {
       if (!state.isScrubbing) {
-        setCurrentTime(video.currentTime)
+        const time = video.currentTime
+        currentTimeRef.current = time
+        const percent = (time / state.duration) * 100 || 0
+        if (watchedBarRef.current) watchedBarRef.current.style.width = `${percent}%`
+        if (thumbRef.current) thumbRef.current.style.left = `${percent}%`
+        if (timeDisplayRef.current) {
+          timeDisplayRef.current.innerText = `${actions.formatTime(time)} / ${actions.formatTime(state.duration)}`
+        }
       }
     }
 
     const handleProgress = () => {
       if (video.buffered.length > 0) {
-        setBuffered(video.buffered.end(video.buffered.length - 1))
+        const bufferedEnd = video.buffered.end(video.buffered.length - 1)
+        const percent = (bufferedEnd / state.duration) * 100 || 0
+        if (bufferedBarRef.current) bufferedBarRef.current.style.width = `${percent}%`
       }
     }
 
-    setCurrentTime(video.currentTime)
-    if (video.buffered.length > 0) {
-      setBuffered(video.buffered.end(video.buffered.length - 1))
-    }
+    handleTimeUpdate()
+    handleProgress()
 
     video.addEventListener('timeupdate', handleTimeUpdate)
     video.addEventListener('progress', handleProgress)
@@ -98,7 +109,7 @@ const PlayerControls = ({
       video.removeEventListener('timeupdate', handleTimeUpdate)
       video.removeEventListener('progress', handleProgress)
     }
-  }, [refs.videoRef, state.isScrubbing])
+  }, [refs.videoRef, state.isScrubbing, state.duration, actions])
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!refs.videoRef.current) return
@@ -170,7 +181,12 @@ const PlayerControls = ({
       const percent = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
       const scrubTime = percent * state.duration
       refs.videoRef.current.currentTime = scrubTime
-      setCurrentTime(scrubTime)
+      const percent100 = (scrubTime / state.duration) * 100 || 0
+      if (watchedBarRef.current) watchedBarRef.current.style.width = `${percent100}%`
+      if (thumbRef.current) thumbRef.current.style.left = `${percent100}%`
+      if (timeDisplayRef.current) {
+        timeDisplayRef.current.innerText = `${actions.formatTime(scrubTime)} / ${actions.formatTime(state.duration)}`
+      }
       actions.setHoverTime({ time: scrubTime, position: e.clientX - rect.left })
     }
     const handleDocumentMouseUp = () => {
@@ -234,19 +250,9 @@ const PlayerControls = ({
                 }}
               ></div>
             )}
-            <div
-              className={styles.bufferedBar}
-              style={{ width: `${(buffered / state.duration) * 100 || 0}% ` }}
-            ></div>
-            <div
-              className={styles.watchedBar}
-              style={{ width: `${(currentTime / state.duration) * 100 || 0}% ` }}
-            ></div>
-            <div
-              className={styles.thumb}
-              style={{ left: `${(currentTime / state.duration) * 100 || 0}% ` }}
-              onMouseDown={handleThumbMouseDown}
-            ></div>
+            <div className={styles.bufferedBar} ref={bufferedBarRef}></div>
+            <div className={styles.watchedBar} ref={watchedBarRef}></div>
+            <div className={styles.thumb} ref={thumbRef} onMouseDown={handleThumbMouseDown}></div>
 
             {skipIntervals.map((interval) => {
               const startPercent = (interval.start_time / state.duration) * 100
@@ -290,8 +296,8 @@ const PlayerControls = ({
               />
             </div>
 
-            <span className={styles.timeDisplay}>
-              {actions.formatTime(currentTime)} / {actions.formatTime(state.duration)}
+            <span className={styles.timeDisplay} ref={timeDisplayRef}>
+              {actions.formatTime(currentTimeRef.current)} / {actions.formatTime(state.duration)}
             </span>
 
             {state.currentSkipInterval && !state.isAutoSkipEnabled && (

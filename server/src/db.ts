@@ -209,4 +209,13 @@ export class DatabaseWrapper {
       throw e
     }
   }
+
+  public checkpoint() {
+    try {
+      this.db.exec('PRAGMA wal_checkpoint(TRUNCATE)')
+    } catch (e) {
+      logger.error({ err: e }, 'Database WAL checkpoint failed')
+      throw e
+    }
+  }
 }

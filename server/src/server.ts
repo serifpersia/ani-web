@@ -10,7 +10,7 @@ import fs from 'fs'
 import { DatabaseWrapper } from './db'
 import chokidar from 'chokidar'
 import logger from './logger'
-// ... rest of imports
+
 import { AllAnimeProvider } from './providers/allanime.provider'
 import { HiAnimeProvider } from './providers/hianime.provider'
 import { AnimePaheProvider } from './providers/animepahe.provider'

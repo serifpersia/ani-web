@@ -24,7 +24,6 @@ export const fixThumbnailUrl = (
     return thumbnailCache.get(cacheKey)!
   }
 
-  // Determine the base transformed URL
   let transformedUrl: string
   if (optimizedUrl.startsWith('https://ytimgf.youtube-anime.com/images/')) {
     transformedUrl = optimizedUrl.replace(
@@ -52,7 +51,6 @@ export const fixThumbnailUrl = (
     transformedUrl = `https://wp.youtube-anime.com/aln.youtube-anime.com/images/${optimizedUrl}`
   }
 
-  // Always use local proxy for absolute URLs to ensure consistent Referer/CORS in all environments
   let finalUrl: string
   if (transformedUrl.startsWith('http')) {
     finalUrl = `/api/image-proxy?url=${encodeURIComponent(transformedUrl)}`
@@ -60,7 +58,6 @@ export const fixThumbnailUrl = (
     finalUrl = transformedUrl
   }
 
-  // Append size parameters
   if (width || height) {
     const separator = finalUrl.includes('?') ? '&' : '?'
     if (width) finalUrl += `${separator}w=${width}`

@@ -184,7 +184,7 @@ const Player: React.FC = () => {
             const hls = new Hls({
               maxBufferLength: 30,
               maxMaxBufferLength: 60,
-              maxBufferSize: 60 * 1000 * 1000, // 60MB
+              maxBufferSize: 60 * 1000 * 1000,
               startLevel: -1,
               enableWorker: true,
             })
@@ -628,7 +628,7 @@ const Player: React.FC = () => {
                 if (refs.videoRef.current && !isNaN(refs.videoRef.current.currentTime)) {
                   seekToTimeRef.current = refs.videoRef.current.currentTime
                 }
-                // Add this safety check
+
                 const links = source.links || []
                 const bestLink =
                   links.sort(

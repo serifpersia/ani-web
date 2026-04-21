@@ -46,7 +46,6 @@ class RcloneService {
 
       const remotes = await this.listRemotes()
 
-      // 1. Check if a manual remote is configured
       if (CONFIG.RCLONE_REMOTE) {
         const found = remotes.find((r) => r.toLowerCase() === CONFIG.RCLONE_REMOTE?.toLowerCase())
         if (found) {
@@ -60,7 +59,6 @@ class RcloneService {
         }
       }
 
-      // 2. Fall back to automatic detection (REMOVED: Strictly use manual config now)
       if (remotes.length > 0 && !CONFIG.RCLONE_REMOTE) {
         logger.info({ remotes }, 'Rclone available but no manual remote is configured in settings.')
         return false
