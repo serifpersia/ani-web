@@ -59,7 +59,6 @@ jobs:
           mkdir -p release-package/server
           cp -r client/dist release-package/client/
           cp -r server/dist release-package/server/
-          cp -r server/vendor release-package/server/vendor
           cp client/package.json client/package-lock.json release-package/client/
           cp server/package.json server/package-lock.json release-package/server/
           cp package.json package-lock.json release-package/

@@ -1,14 +1,14 @@
 {
   "name": "ani-web-server",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "type": "commonjs",
   "engines": {
     "node": ">=22.5.0"
   },
   "scripts": {
     "start": "node --max-old-space-size=256 dist/server.js",
-    "dev": "nodemon --watch \"**/*.ts\" --exec \"ts-node --transpile-only server.ts --dev\"",
-    "build": "tsc && node -e \"require('fs').cpSync('vendor', 'dist/vendor', {recursive: true})\"",
+    "dev": "nodemon --watch \"src/**/*.ts\" --exec \"ts-node --transpile-only src/server.ts --dev\"",
+    "build": "tsc && node -e \"require('fs').cpSync('src/vendor', 'dist/vendor', {recursive: true})\"",
     "format": "prettier --write .",
     "lint": "eslint ."
   },

@@ -1,8 +1,7 @@
 import path from 'path'
 import dotenv from 'dotenv'
 
-const isDist = __dirname.endsWith('dist')
-export const SERVER_ROOT = isDist ? path.resolve(__dirname, '..') : path.resolve(__dirname)
+export const SERVER_ROOT = path.resolve(__dirname, '..')
 
 dotenv.config({ path: path.join(SERVER_ROOT, '.env') })
 

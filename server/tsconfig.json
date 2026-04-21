@@ -4,7 +4,7 @@
     "module": "commonjs",
     "moduleResolution": "bundler",
     "ignoreDeprecations": "6.0",
-    "rootDir": "./",
+    "rootDir": "./src",
     "outDir": "./dist",
     "strict": true,
     "noImplicitAny": false,
@@ -14,6 +14,6 @@
     "resolveJsonModule": true,
     "typeRoots": ["./node_modules/@types"]
   },
-  "include": ["./**/*.ts"],
+  "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }
