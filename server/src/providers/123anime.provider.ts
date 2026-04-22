@@ -14,11 +14,12 @@ import logger from '../logger'
 interface ApiAnime {
   id?: string
   title: string
+  japanese_title?: string
   thumbnail?: string
   image?: string
   poster?: string
   type?: string
-  episode?: number
+  episode?: number | string
 }
 
 interface ApiStreamData {
@@ -51,13 +52,40 @@ export class _123AnimeProvider implements Provider {
       .replace(/^-+|-+$/g, '')
   }
 
+  private normalizeSlugForSearch(title: string): string {
+    return title
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/['"]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '')
+  }
+
+  private extractSlugFromUrl(url?: string): string | null {
+    if (!url) return null
+    try {
+      const parts = url.split('/')
+      const lastPart = parts[parts.length - 1]
+      if (lastPart) {
+        return lastPart.replace(/\.(jpg|jpeg|png|webp|gif)$/i, '')
+      }
+    } catch (e) {
+      // ignore
+    }
+    return null
+  }
+
   async search(options: SearchOptions): Promise<Show[]> {
     try {
-      const query = options.query || ''
+      const rawQuery = options.query || ''
+      const query = rawQuery.replace(/[""]/g, '').replace(/[']/g, '').replace(/\s+/g, ' ').trim()
       const url = `${BASE_URL}/search?keyword=${encodeURIComponent(query)}`
 
       const response = await fetch(url)
+
       if (!response.ok) {
+        logger.warn({ url, status: response.status }, '123Anime search failed with non-200 status')
         return []
       }
 
@@ -71,18 +99,25 @@ export class _123AnimeProvider implements Provider {
         return []
       }
 
-      return (data.data || []).map((anime: ApiAnime) => ({
-        _id: anime.id || this.createSlug(anime.title),
-        id: anime.id || this.createSlug(anime.title),
-        name: anime.title,
-        englishName: anime.title,
-        thumbnail: anime.thumbnail || anime.image || anime.poster,
-        type: anime.type,
-        availableEpisodesDetail: {
-          sub: Array.from({ length: anime.episode || 0 }, (_, i) => (i + 1).toString()),
-          dub: [],
-        },
-      }))
+      return (data.data || []).map((anime: ApiAnime) => {
+        const imageUrl = anime.thumbnail || anime.image || anime.poster
+        const slugFromUrl = this.extractSlugFromUrl(imageUrl)
+        const titleForSlug = anime.japanese_title || anime.title
+        const id = anime.id || slugFromUrl || this.normalizeSlugForSearch(titleForSlug)
+
+        return {
+          _id: id,
+          id: id,
+          name: anime.title,
+          englishName: anime.title,
+          thumbnail: imageUrl,
+          type: anime.type,
+          availableEpisodesDetail: {
+            sub: Array.from({ length: Number(anime.episode) || 0 }, (_, i) => (i + 1).toString()),
+            dub: [],
+          },
+        }
+      })
     } catch (error) {
       logger.error({ err: error }, '123Anime search failed')
       return []
@@ -93,9 +128,11 @@ export class _123AnimeProvider implements Provider {
     try {
       const cacheKey = `123anime_eps_${showId}`
       const cached = this.cache.get<EpisodeDetails>(cacheKey)
-      if (cached) return cached
+      if (cached) {
+        return cached
+      }
 
-      const results = await this.search({ query: showId.replace(/-/g, ' ') })
+      const results = await this.search({ query: showId.replace(/ /g, '-') })
       const show = results.find((s) => s.id === showId || s._id === showId)
 
       if (!show || !show.availableEpisodesDetail) {
@@ -119,7 +156,7 @@ export class _123AnimeProvider implements Provider {
 
   async getStreamUrls(showId: string, episodeNumber: string): Promise<VideoSource[] | null> {
     try {
-      const query = showId.replace(/-/g, ' ')
+      const query = showId.replace(/ /g, '-')
       const searchResults = await this.search({ query })
 
       if (!searchResults || searchResults.length === 0) {
@@ -132,7 +169,9 @@ export class _123AnimeProvider implements Provider {
       const url = `${BASE_URL}/episode-stream?id=${animeId}&ep=${episodeNumber}`
 
       const response = await fetch(url)
+
       if (!response.ok) {
+        logger.warn({ url, status: response.status }, '123Anime stream request failed')
         return null
       }
 
@@ -144,14 +183,12 @@ export class _123AnimeProvider implements Provider {
 
       const streamingLink = data.data['streaming_link'] || data.data['stream'] || data.data['url']
       if (!streamingLink) {
+        logger.warn({ data }, '123Anime No streaming link found in response data')
         return null
       }
 
-      let finalUrl = streamingLink
-      if (!streamingLink.includes('?') && !streamingLink.endsWith('/')) {
-        finalUrl = streamingLink + '/'
-      }
-      finalUrl += '?autoplay=1'
+      const separator = streamingLink.includes('?') ? '&' : '?'
+      const finalUrl = `${streamingLink}${separator}autoplay=1`
 
       return [
         {
@@ -173,7 +210,7 @@ export class _123AnimeProvider implements Provider {
   }
 
   async getShowMeta(showId: string): Promise<Partial<Show> | null> {
-    const results = await this.search({ query: showId.replace(/-/g, ' ') })
+    const results = await this.search({ query: showId.replace(/ /g, '-') })
     return results.find((s) => s.id === showId || s._id === showId) || null
   }
 
