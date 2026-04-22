@@ -12,6 +12,7 @@ import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import PlayerControls from '../components/player/PlayerControls'
 import EpisodeList from '../components/player/EpisodeList'
 import SourceSelector from '../components/player/SourceSelector'
+import { ProviderSelector } from '../components/player/SourceSelector'
 import useVideoPlayer from '../hooks/useVideoPlayer'
 import { usePlayerData } from '../hooks/usePlayerData'
 import type { VideoLink, SubtitleTrack } from '../types/player'
@@ -612,6 +613,23 @@ const Player: React.FC = () => {
           )}
         </div>
 
+        <ProviderSelector
+          selectedProvider={state.selectedProvider}
+          onProviderChange={(newProvider) => {
+            dispatch({
+              type: 'SET_STATE',
+              payload: {
+                selectedProvider: newProvider,
+                videoSources: [],
+                selectedSource: null,
+                selectedLink: null,
+                loadingVideo: true,
+              },
+            })
+            localStorage.setItem('preferredProvider', newProvider)
+          }}
+        />
+
         {isVideoLoading ? (
           <div className={styles.sourceLoader}>
             <div className={styles.spinner}></div>
@@ -621,20 +639,6 @@ const Player: React.FC = () => {
             <SourceSelector
               videoSources={state.videoSources}
               selectedSource={state.selectedSource}
-              selectedProvider={state.selectedProvider}
-              onProviderChange={(newProvider) => {
-                dispatch({
-                  type: 'SET_STATE',
-                  payload: {
-                    selectedProvider: newProvider,
-                    videoSources: [],
-                    selectedSource: null,
-                    selectedLink: null,
-                    loadingVideo: true,
-                  },
-                })
-                localStorage.setItem('preferredProvider', newProvider)
-              }}
               onSourceChange={(source) => {
                 if (refs.videoRef.current && !isNaN(refs.videoRef.current.currentTime)) {
                   seekToTimeRef.current = refs.videoRef.current.currentTime
