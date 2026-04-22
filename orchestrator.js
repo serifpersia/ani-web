@@ -4,6 +4,7 @@ const readline = require('readline')
 const http = require('http')
 const os = require('os')
 const path = require('path')
+const axios = require('axios')
 
 const mode = process.argv[2] || 'prod'
 const isWin = os.platform() === 'win32'
@@ -13,6 +14,39 @@ if (mode === '--version' || mode === '-v') {
   console.log(`ani-web version ${pkg.version}`)
   process.exit(0)
 }
+
+async function checkForUpdates() {
+  try {
+    const npmGlobalPrefix = require('child_process')
+      .execSync('npm config get prefix', { encoding: 'utf8' })
+      .trim()
+    const scriptPath = path.resolve(__dirname)
+    const isGlobalInstall = scriptPath.includes(npmGlobalPrefix)
+
+    if (!isGlobalInstall) return
+
+    const pkg = require('./package.json')
+    const current = pkg.version
+
+    const { data } = await axios.get('https://registry.npmjs.org/ani-web/latest', {
+      timeout: 3000,
+      headers: { 'User-Agent': 'ani-web-cli' },
+    })
+    const latest = data.version
+
+    if (current !== latest) {
+      console.log(
+        `\n${colors.system}[Update]${colors.reset} ` +
+          `New version ${latest} available. ` +
+          `Run: npm install -g ani-web to update.\n`
+      )
+    }
+  } catch (error) {
+    // Silently ignore network/registry errors
+  }
+}
+
+checkForUpdates()
 
 const colors = {
   reset: '\x1b[0m',
