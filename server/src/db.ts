@@ -1,4 +1,4 @@
-import { DatabaseSync } from 'node:sqlite'
+import { DatabaseSync, StatementSync } from 'node:sqlite'
 import fs from 'fs'
 import path from 'path'
 import logger from './logger'
@@ -8,6 +8,7 @@ type BindableValue = string | number | bigint | null | Uint8Array
 export class DatabaseWrapper {
   private db: DatabaseSync
   private isClosed = false
+  private statementCache = new Map<string, StatementSync>()
 
   constructor(_dbPath: string, db: DatabaseSync) {
     this.db = db
@@ -55,6 +56,7 @@ export class DatabaseWrapper {
     }
     try {
       this.isClosed = true
+      this.statementCache.clear()
       this.db.close()
       if (cb) cb(null)
     } catch (e) {
@@ -67,12 +69,21 @@ export class DatabaseWrapper {
     return this.isClosed
   }
 
+  private getPreparedStatement(query: string): StatementSync {
+    let stmt = this.statementCache.get(query)
+    if (!stmt) {
+      stmt = this.db.prepare(query)
+      this.statementCache.set(query, stmt)
+    }
+    return stmt
+  }
+
   private executeAndFinalize(
     query: string,
     params: BindableValue[] | undefined,
     operation: 'run' | 'get' | 'all'
   ): unknown {
-    const stmt = this.db.prepare(query)
+    const stmt = this.getPreparedStatement(query)
     let result: unknown
     if (operation === 'run') {
       if (params && params.length > 0) {
@@ -177,7 +188,7 @@ export class DatabaseWrapper {
   }
 
   public prepare(query: string) {
-    const stmt = this.db.prepare(query)
+    const stmt = this.getPreparedStatement(query)
 
     return {
       run: (...args: unknown[]) => {

@@ -137,20 +137,26 @@ export class AllAnimeProvider implements Provider {
 
   private decryptTobeparsed(encryptedBase64: string): unknown {
     try {
-      const secret = 'P7K2RGbFgauVtmiS'.split('').reverse().join('')
-      const keyMaterial = Buffer.from(secret, 'utf8')
-      const key = crypto.createHash('sha256').update(keyMaterial).digest()
+      const secret = 'Xot36i3lK3:v1'
+      const key = crypto.createHash('sha256').update(secret).digest()
       const encryptedBuffer = Buffer.from(encryptedBase64, 'base64')
-      if (encryptedBuffer.length < 28) {
-        throw new Error('Encrypted data too short for IV + tag')
+
+      if (encryptedBuffer.length < 30) {
+        throw new Error('Encrypted data too short')
       }
-      const iv = encryptedBuffer.subarray(0, 12)
-      const authTag = encryptedBuffer.subarray(encryptedBuffer.length - 16)
-      const ciphertext = encryptedBuffer.subarray(12, encryptedBuffer.length - 16)
-      const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv)
-      decipher.setAuthTag(authTag)
+
+      // Extract IV (12 bytes starting at index 1)
+      const ivPart = encryptedBuffer.subarray(1, 13)
+      // Construct 16-byte IV (ivPart + 00000002)
+      const iv = Buffer.concat([ivPart, Buffer.from('00000002', 'hex')])
+
+      // Ciphertext starts at index 13 and ends 16 bytes before the end
+      const ciphertext = encryptedBuffer.subarray(13, encryptedBuffer.length - 16)
+
+      const decipher = crypto.createDecipheriv('aes-256-ctr', key, iv)
       let decrypted = decipher.update(ciphertext)
       decrypted = Buffer.concat([decrypted, decipher.final()])
+
       return JSON.parse(decrypted.toString('utf8'))
     } catch (error: unknown) {
       const err = error as Error

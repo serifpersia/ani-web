@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { Provider } from '../providers/provider.interface'
 import { genres, tags, studios } from '../constants'
+import logger from '../logger'
 
 export class DataController {
   constructor(private providers: { [key: string]: Provider }) {}
@@ -49,15 +50,17 @@ export class DataController {
 
   getVideo = async (req: Request, res: Response) => {
     try {
-      res.json(
-        await this.getProvider(req).getStreamUrls(
-          req.query.showId as string,
-          req.query.episodeNumber as string,
-          req.query.mode as 'sub' | 'dub'
-        )
+      const urls = await this.getProvider(req).getStreamUrls(
+        req.query.showId as string,
+        req.query.episodeNumber as string,
+        req.query.mode as 'sub' | 'dub'
       )
-    } catch {
-      res.status(500).send('Error')
+      res.json(urls || [])
+    } catch (e) {
+      // Return empty array instead of 500 so frontend can stay functional
+      // and allow provider switching.
+      logger.error({ err: e, provider: req.query.provider }, 'Provider video fetch failed')
+      res.json([])
     }
   }
 

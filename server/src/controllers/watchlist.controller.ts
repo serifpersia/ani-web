@@ -69,8 +69,11 @@ export class WatchlistController {
   constructor(private provider: AllAnimeProvider) {}
 
   private async getContinueWatchingData(
-    db: DatabaseWrapper
+    db: DatabaseWrapper,
+    limit?: number
   ): Promise<CombinedContinueWatchingShow[]> {
+    const limitClause = typeof limit === 'number' ? 'LIMIT ?' : ''
+    const queryParams: unknown[] = typeof limit === 'number' ? [limit] : []
     const query = `
     SELECT
     w.id as _id,
@@ -91,10 +94,11 @@ export class WatchlistController {
     JOIN watchlist w ON we.showId = w.id
     LEFT JOIN shows_meta sm ON we.showId = sm.id
     WHERE we.rn = 1 AND w.status = 'Watching'
-    ORDER BY we.watchedAt DESC;
+    ORDER BY we.watchedAt DESC
+    ${limitClause}
     `
     const rows: CombinedContinueWatchingShow[] = await new Promise((resolve, reject) => {
-      db.all(query, [], (err: Error | null, rows: unknown) => {
+      db.all(query, queryParams, (err: Error | null, rows: unknown) => {
         if (err) reject(err)
         else resolve(rows as CombinedContinueWatchingShow[])
       })
@@ -171,44 +175,6 @@ export class WatchlistController {
     return enrichedRows
   }
 
-  private async getInProgressShowsData(
-    db: DatabaseWrapper
-  ): Promise<CombinedContinueWatchingShow[]> {
-    const query = `
-    SELECT
-    w.id as _id,
-    w.id as id,
-    w.name as name,
-    w.thumbnail as thumbnail,
-    w.nativeName as nativeName,
-    w.englishName as englishName,
-    w.type as type,
-    sm.episodeCount,
-    sm.type as smType,
-    (SELECT COUNT(DISTINCT episodeNumber) FROM watched_episodes WHERE showId = w.id) as watchedCount,
-    we.episodeNumber, we.currentTime, we.duration, we.watchedAt
-    FROM (
-      SELECT *, ROW_NUMBER() OVER(PARTITION BY showId ORDER BY watchedAt DESC) as rn
-      FROM watched_episodes
-    ) we
-    JOIN watchlist w ON we.showId = w.id
-    LEFT JOIN shows_meta sm ON we.showId = sm.id
-    WHERE we.rn = 1 AND w.status = 'Watching'
-    ORDER BY we.watchedAt DESC;
-    `
-    const rows: CombinedContinueWatchingShow[] = await new Promise((resolve, reject) => {
-      db.all(query, [], (err: Error | null, rows: unknown) => {
-        if (err) reject(err)
-        else resolve(rows as CombinedContinueWatchingShow[])
-      })
-    })
-
-    return rows.map((show) => ({
-      ...show,
-      thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
-    }))
-  }
-
   private async getUpNextShowsData(db: DatabaseWrapper): Promise<CombinedContinueWatchingShow[]> {
     const watchingShows: (WatchingShow & { episodeCount?: number })[] = await new Promise(
       (resolve, reject) => {
@@ -232,55 +198,62 @@ export class WatchlistController {
       }
     )
 
-    const results: PromiseSettledResult<{
-      type: string
-      show: CombinedContinueWatchingShow
-    } | null>[] = []
+    if (watchingShows.length === 0) return []
+
+    // Pre-fetch all watched episodes for the relevant shows in one bulk query
+    // instead of one individual DB call per show inside the batch loop (issue #12).
+    const showIds = watchingShows.map((s) => s.id)
+    const placeholders = showIds.map(() => '?').join(',')
+    const allWatchedEps: (WatchedEpisode & { showId: string })[] = await new Promise(
+      (resolve, reject) => {
+        db.all(
+          `SELECT showId, episodeNumber, currentTime, duration, watchedAt FROM watched_episodes WHERE showId IN (${placeholders})`,
+          showIds,
+          (err: Error | null, rows: unknown) => {
+            if (err) reject(err)
+            else resolve(rows as (WatchedEpisode & { showId: string })[])
+          }
+        )
+      }
+    )
+
+    const watchedByShow = new Map<string, WatchedEpisode[]>()
+    for (const ep of allWatchedEps) {
+      const arr = watchedByShow.get(ep.showId)
+      if (arr) arr.push(ep)
+      else watchedByShow.set(ep.showId, [ep])
+    }
+
     const BATCH_SIZE = 5
+    const upNextShows: CombinedContinueWatchingShow[] = []
 
     for (let i = 0; i < watchingShows.length; i += BATCH_SIZE) {
       const batch = watchingShows.slice(i, i + BATCH_SIZE)
       const batchResults = await Promise.allSettled(
         batch.map(async (show) => {
           try {
-            const [epDetails, watchedEpisodesResult] = await Promise.all([
-              this.provider.getEpisodes(show.id, 'sub'),
-              new Promise<WatchedEpisode[]>((resolve, reject) => {
-                db.all(
-                  'SELECT * FROM watched_episodes WHERE showId = ?',
-                  [show.id],
-                  (err: Error | null, rows: unknown) => {
-                    if (err) reject(err)
-                    else resolve(rows as WatchedEpisode[])
-                  }
-                )
-              }),
-            ])
-
+            const epDetails = await this.provider.getEpisodes(show.id, 'sub')
+            const watchedEpisodesResult = watchedByShow.get(show.id) ?? []
             const allEps = epDetails?.episodes?.sort((a, b) => parseFloat(a) - parseFloat(b)) || []
             const watchedEpsMap = new Map(
               watchedEpisodesResult.map((r) => [r.episodeNumber.toString(), r])
             )
-
             const unwatchedEps = allEps.filter((ep) => !watchedEpsMap.has(ep))
 
             if (unwatchedEps.length > 0) {
               return {
-                type: 'upNext',
-                show: {
-                  _id: show.id,
-                  id: show.id,
-                  name: show.name,
-                  thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
-                  nativeName: show.nativeName,
-                  englishName: show.englishName,
-                  type: show.type || show.smType,
-                  nextEpisodeToWatch: unwatchedEps[0],
-                  newEpisodesCount: unwatchedEps.length,
-                  episodeCount: allEps.length,
-                  watchedCount: watchedEpsMap.size,
-                },
-              }
+                _id: show.id,
+                id: show.id,
+                name: show.name,
+                thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
+                nativeName: show.nativeName,
+                englishName: show.englishName,
+                type: show.type || show.smType,
+                nextEpisodeToWatch: unwatchedEps[0],
+                newEpisodesCount: unwatchedEps.length,
+                episodeCount: allEps.length,
+                watchedCount: watchedEpsMap.size,
+              } as CombinedContinueWatchingShow
             }
             return null
           } catch (e) {
@@ -289,17 +262,12 @@ export class WatchlistController {
           }
         })
       )
-      results.push(...batchResults)
-    }
-
-    const upNextShows: CombinedContinueWatchingShow[] = []
-    results.forEach((result) => {
-      if (result.status === 'fulfilled' && result.value) {
-        if (result.value.type === 'upNext') {
-          upNextShows.push(result.value.show as CombinedContinueWatchingShow)
+      for (const result of batchResults) {
+        if (result.status === 'fulfilled' && result.value) {
+          upNextShows.push(result.value)
         }
       }
-    })
+    }
 
     return upNextShows
   }
@@ -307,83 +275,10 @@ export class WatchlistController {
   getContinueWatchingFast = async (req: Request, res: Response) => {
     try {
       const limit = parseInt(req.query.limit as string) || 10
-      const rows: CombinedContinueWatchingShow[] = await new Promise((resolve, reject) => {
-        req.db.all(
-          `SELECT
-            w.id as _id, w.id as id, w.name, w.thumbnail, w.nativeName, w.englishName, w.type,
-            sm.episodeCount, sm.type as smType,
-            (SELECT COUNT(DISTINCT episodeNumber) FROM watched_episodes WHERE showId = w.id) as watchedCount,
-            we.episodeNumber, we.currentTime, we.duration, we.watchedAt
-          FROM (
-            SELECT *, ROW_NUMBER() OVER(PARTITION BY showId ORDER BY watchedAt DESC) as rn
-            FROM watched_episodes
-          ) we
-          JOIN watchlist w ON we.showId = w.id
-          LEFT JOIN shows_meta sm ON we.showId = sm.id
-          WHERE we.rn = 1 AND w.status = 'Watching'
-          ORDER BY we.watchedAt DESC
-          LIMIT ?`,
-          [limit],
-          (err: Error | null, rows: unknown) => {
-            if (err) reject(err)
-            else resolve(rows as CombinedContinueWatchingShow[])
-          }
-        )
-      })
-      const showsNeedingEpisodes = rows.filter((show) => {
-        const watchedCount = (show.watchedCount as unknown as number) || 0
-        return !show.episodeCount || (watchedCount > 0 && show.episodeCount <= watchedCount)
-      })
-
-      const episodeFetchResults = new Map<string, number>()
-      if (showsNeedingEpisodes.length > 0) {
-        const BATCH_SIZE = 5
-        for (let i = 0; i < showsNeedingEpisodes.length; i += BATCH_SIZE) {
-          const batch = showsNeedingEpisodes.slice(i, i + BATCH_SIZE)
-          const batchResults = await Promise.allSettled(
-            batch.map((show) => this.provider.getEpisodes(show.id, 'sub'))
-          )
-
-          batch.forEach((show, index) => {
-            const result = batchResults[index]
-            if (result.status === 'fulfilled' && result.value?.episodes) {
-              const epCount = result.value.episodes.length
-              episodeFetchResults.set(show.id, epCount)
-              try {
-                req.db.run('UPDATE shows_meta SET episodeCount = ? WHERE id = ?', [
-                  epCount,
-                  show.id,
-                ])
-              } catch (e) {
-                logger.error(
-                  { err: e, showId: show.id },
-                  'Failed to update episode count in DB (fast)'
-                )
-              }
-            } else {
-              logger.error(
-                {
-                  err: result.status === 'rejected' ? result.reason : 'No episodes',
-                  showId: show.id,
-                },
-                'Failed to fetch episode count (fast)'
-              )
-            }
-          })
-        }
-      }
-
-      const refreshed = rows.map((show) => {
-        const epCount = episodeFetchResults.get(show.id) ?? show.episodeCount
-        return {
-          ...show,
-          episodeCount: epCount,
-          type: show.type || show.smType,
-          thumbnail: this.provider.deobfuscateUrl(show.thumbnail ?? ''),
-        }
-      })
-
-      res.json(refreshed)
+      // Delegate to the shared implementation with a SQL-level LIMIT applied,
+      // avoiding the duplicate enrichment logic that previously lived here.
+      const data = await this.getContinueWatchingData(req.db, limit)
+      res.json(data)
     } catch {
       res.status(500).json({ error: 'DB error' })
     }
@@ -706,7 +601,7 @@ export class WatchlistController {
       const BATCH_SIZE = 5
       for (let i = 0; i < watchingShows.length; i += BATCH_SIZE) {
         const batch = watchingShows.slice(i, i + BATCH_SIZE)
-        await Promise.all(
+        await Promise.allSettled(
           batch.map(async (show) => {
             try {
               const [epDetails, watchedEps, dismissedEps, showMeta, discoveredEps] =

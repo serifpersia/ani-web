@@ -1,10 +1,7 @@
-console.log('DEBUG: server.ts loading...')
 import express from 'express'
 import path from 'path'
 import cors from 'cors'
 import compression from 'compression'
-import axios from 'axios'
-import axiosRetry from 'axios-retry'
 import NodeCache from 'node-cache'
 import fs from 'fs'
 import { DatabaseWrapper } from './db'
@@ -83,7 +80,8 @@ app.use((req, res, next) => {
   next()
 })
 
-axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay })
+// axiosRetry is applied only on the dedicated proxy axiosInstance (proxy.controller.ts)
+// to avoid amplifying retries on providers that already have their own fallback logic.
 
 app.use(
   compression({
@@ -112,7 +110,14 @@ app.use('/api', createProxyRouter())
 app.use('/api', createInsightsRouter(allAnimeProvider))
 app.use(
   '/api',
-  createSettingsRouter(allAnimeProvider, () => db, initializeDatabase)
+  createSettingsRouter(
+    allAnimeProvider,
+    () => db,
+    initializeDatabase,
+    (newDb) => {
+      db = newDb
+    }
+  )
 )
 
 if (!CONFIG.IS_DEV) {
@@ -133,7 +138,7 @@ if (!CONFIG.IS_DEV) {
 }
 
 async function main() {
-  console.log('DEBUG: main() started')
+  logger.info('DEBUG: main() started')
   const dbName = CONFIG.IS_DEV ? CONFIG.DB_NAME_DEV : CONFIG.DB_NAME_PROD
   const dbPath = path.join(CONFIG.ROOT, dbName)
   const remoteFolder = CONFIG.IS_DEV ? CONFIG.REMOTE_FOLDER_DEV : CONFIG.REMOTE_FOLDER_PROD
@@ -166,6 +171,9 @@ async function main() {
     if (isShuttingDown) return
     isShuttingDown = true
     clearTimeout(debounceTimer)
+    // Close the watcher first to prevent a stale 'change' event from arming
+    // a new debounce timer that would call syncUp on an already-closed database.
+    await watcher.close()
 
     if (expressServer) {
       expressServer.close()

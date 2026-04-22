@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { performWriteTransaction } from '../sync'
 import { AllAnimeProvider } from '../providers/allanime.provider'
-import { parseString } from 'xml2js'
+import { parseStringPromise } from 'xml2js'
 import logger from '../logger'
 import path from 'path'
 import fs from 'fs'
@@ -63,7 +63,8 @@ export class SettingsController {
     req: Request,
     res: Response,
     db: DatabaseWrapper,
-    initializeDatabase: (path: string) => Promise<DatabaseWrapper>
+    initializeDatabase: (path: string) => Promise<DatabaseWrapper>,
+    setDb: (newDb: DatabaseWrapper) => void
   ) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
 
@@ -85,6 +86,7 @@ export class SettingsController {
         if (renameErr) {
           try {
             const reopenedDb = await initializeDatabase(dbPath)
+            setDb(reopenedDb)
             req.db = reopenedDb
           } catch (e) {
             logger.error({ err: e }, 'Failed to reopen DB after rename failure')
@@ -93,6 +95,9 @@ export class SettingsController {
         }
         try {
           const newDb = await initializeDatabase(dbPath)
+          // Update the server-level reference so all future requests get the
+          // new DB instance instead of the now-closed old one.
+          setDb(newDb)
           req.db = newDb
           res.json({ success: true, message: 'Database restored.' })
         } catch (e) {
@@ -107,45 +112,54 @@ export class SettingsController {
     if (!req.file) return res.status(400).json({ error: 'No file' })
     const { erase } = req.body
 
-    parseString(req.file.buffer.toString(), async (err, result) => {
-      if (err) return res.status(400).json({ error: 'Invalid XML' })
-      const animeList: MalAnimeItem[] = result?.myanimelist?.anime || []
+    let result: Record<string, unknown>
+    try {
+      result = await parseStringPromise(req.file.buffer.toString())
+    } catch {
+      return res.status(400).json({ error: 'Invalid XML' })
+    }
 
-      let skippedCount = 0
-      const showsToInsert: ShowToInsert[] = []
+    const animeList: MalAnimeItem[] =
+      ((result?.myanimelist as Record<string, unknown>)?.anime as MalAnimeItem[]) || []
 
-      for (const item of animeList) {
-        try {
-          const searchResults = await this.provider.search({ query: item.series_title[0] })
-          if (searchResults.length > 0) {
-            showsToInsert.push({
-              id: searchResults[0]._id,
-              name: searchResults[0].name,
-              thumbnail: searchResults[0].thumbnail,
-              status: item.my_status[0],
-            })
-          } else {
-            skippedCount++
-          }
-        } catch {
+    let skippedCount = 0
+    const showsToInsert: ShowToInsert[] = []
+
+    // Batch concurrent searches (5 at a time) instead of sequential awaits.
+    // A 500-entry MAL export drops from ~500 sequential requests to ~100 batches.
+    const BATCH_SIZE = 5
+    for (let i = 0; i < animeList.length; i += BATCH_SIZE) {
+      const batch = animeList.slice(i, i + BATCH_SIZE)
+      const batchResults = await Promise.allSettled(
+        batch.map((item) => this.provider.search({ query: item.series_title[0] }))
+      )
+      batchResults.forEach((r, idx) => {
+        if (r.status === 'fulfilled' && r.value.length > 0) {
+          showsToInsert.push({
+            id: r.value[0]._id,
+            name: r.value[0].name,
+            thumbnail: r.value[0].thumbnail,
+            status: batch[idx].my_status[0],
+          })
+        } else {
           skippedCount++
         }
-      }
+      })
+    }
 
-      try {
-        await performWriteTransaction(req.db, (tx) => {
-          if (erase) tx.run('DELETE FROM watchlist')
-          const stmt = tx.prepare(
-            'INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status) VALUES (?, ?, ?, ?)'
-          )
-          showsToInsert.forEach((show) => stmt.run(show.id, show.name, show.thumbnail, show.status))
-          stmt.finalize()
-        })
-        res.json({ imported: showsToInsert.length, skipped: skippedCount })
-      } catch (dbError) {
-        logger.error({ err: dbError }, 'Import DB error')
-        res.status(500).json({ error: 'DB error' })
-      }
-    })
+    try {
+      await performWriteTransaction(req.db, (tx) => {
+        if (erase) tx.run('DELETE FROM watchlist')
+        const stmt = tx.prepare(
+          'INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status) VALUES (?, ?, ?, ?)'
+        )
+        showsToInsert.forEach((show) => stmt.run(show.id, show.name, show.thumbnail, show.status))
+        stmt.finalize()
+      })
+      res.json({ imported: showsToInsert.length, skipped: skippedCount })
+    } catch (dbError) {
+      logger.error({ err: dbError }, 'Import DB error')
+      res.status(500).json({ error: 'DB error' })
+    }
   }
 }

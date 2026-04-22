@@ -1,6 +1,6 @@
 {
   "name": "ani-web",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "A web application for watching anime.",
   "main": "orchestrator.js",
   "bin": {

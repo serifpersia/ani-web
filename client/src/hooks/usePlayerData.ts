@@ -205,6 +205,10 @@ export const usePlayerData = (
         }))
         .filter((i: SkipInterval) => i.end_time > 0)
 
+      if (sources.length === 0) {
+        toast.error(`No video sources found for ${state.selectedProvider}`)
+      }
+
       return {
         videoSources: sources,
         selectedSource: sourceToSelect,
@@ -225,9 +229,11 @@ export const usePlayerData = (
 
   useEffect(() => {
     if (videoError) {
+      const message = videoError instanceof Error ? videoError.message : 'Video load failed'
+      toast.error(message)
       dispatch({
-        type: 'SET_ERROR',
-        payload: videoError instanceof Error ? videoError.message : 'Video load failed',
+        type: 'SET_STATE',
+        payload: { loadingVideo: false },
       })
     }
   }, [videoError])

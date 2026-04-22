@@ -5,6 +5,8 @@ import path from 'path'
 import http from 'http'
 import https from 'https'
 import NodeCache from 'node-cache'
+import { CONFIG } from '../config'
+import fs from 'fs'
 
 const proxyCache = new NodeCache({ stdTTL: 30, checkperiod: 60 })
 
@@ -136,6 +138,11 @@ export class ProxyController {
     const { url, referer } = req.query
     if (!url) return res.status(400).send('URL required')
 
+    const abortController = new AbortController()
+    req.on('close', () => {
+      abortController.abort()
+    })
+
     try {
       const headers: Record<string, string> = {
         'User-Agent':
@@ -146,9 +153,11 @@ export class ProxyController {
       const response = await axiosInstance.get(url as string, {
         headers,
         responseType: 'text',
+        signal: abortController.signal,
       })
       res.set('Content-Type', 'text/vtt; charset=utf-8').send(response.data)
     } catch (e) {
+      if (axios.isCancel(e)) return
       res.status(500).send('Proxy error')
     }
   }
@@ -195,9 +204,7 @@ export class ProxyController {
 
       imageResponse.data.on('error', () => {
         if (!res.headersSent) {
-          res
-            .status(200)
-            .sendFile(path.join(__dirname, '..', '..', 'client/public/placeholder.svg'))
+          this.sendPlaceholder(res)
         }
       })
 
@@ -209,8 +216,24 @@ export class ProxyController {
       }
       // Serve placeholder if proxy fails
       if (!res.headersSent) {
-        res.status(200).sendFile(path.join(__dirname, '..', '..', 'client/public/placeholder.svg'))
+        this.sendPlaceholder(res)
       }
     }
+  }
+
+  private sendPlaceholder(res: Response) {
+    const possiblePaths = [
+      path.join(CONFIG.PACKAGE_ROOT, 'client/public/placeholder.svg'),
+      path.join(CONFIG.PACKAGE_ROOT, 'client/dist/placeholder.svg'),
+      path.join(CONFIG.SERVER_ROOT, '..', 'client/public/placeholder.svg'),
+    ]
+
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        return res.status(200).sendFile(p)
+      }
+    }
+
+    res.status(404).send('Not Found')
   }
 }

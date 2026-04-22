@@ -8,7 +8,8 @@ import { DatabaseWrapper } from '../db'
 export function createSettingsRouter(
   provider: AllAnimeProvider,
   getDb: () => DatabaseWrapper,
-  initializeDatabase: (path: string) => Promise<DatabaseWrapper>
+  initializeDatabase: (path: string) => Promise<DatabaseWrapper>,
+  setDb: (newDb: DatabaseWrapper) => void
 ): Router {
   const router = Router()
   const controller = new SettingsController(provider)
@@ -25,7 +26,7 @@ export function createSettingsRouter(
   })
 
   router.post('/restore-db', restoreStorage.single('dbfile'), (req, res) =>
-    controller.restoreDatabase(req, res, getDb(), initializeDatabase)
+    controller.restoreDatabase(req, res, getDb(), initializeDatabase, setDb)
   )
 
   router.post('/import/mal-xml', multer().single('xmlfile'), controller.importMalXml)

@@ -556,7 +556,18 @@ const Player: React.FC = () => {
             )
           ) : (
             <>
-              {!isVideoLoading && !showNativePlayer && (
+              {!isVideoLoading && state.videoSources.length === 0 && (
+                <div className={styles.errorOverlay}>
+                  <p>No sources found for this episode with {state.selectedProvider}.</p>
+                  <p className={styles.errorSubtext}>
+                    Please try selecting a different provider below.
+                  </p>
+                  <button className={styles.retryButton} onClick={() => window.location.reload()}>
+                    Retry
+                  </button>
+                </div>
+              )}
+              {!isVideoLoading && state.videoSources.length > 0 && !showNativePlayer && (
                 <PlayerControls
                   player={player}
                   isAutoplayEnabled={state.isAutoplayEnabled}
@@ -583,7 +594,7 @@ const Player: React.FC = () => {
                 />
               )}
 
-              {!isVideoLoading && (
+              {!isVideoLoading && state.videoSources.length > 0 && (
                 <video
                   ref={refs.videoRef}
                   controls={showNativePlayer}

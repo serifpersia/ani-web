@@ -203,10 +203,16 @@ export async function syncDownOnBoot(
         if (existsSync(backupPath)) {
           try {
             await fs.copyFile(backupPath, dbPath)
+            log.info('Backup restored successfully after failed sync down.')
           } catch (restoreErr) {
-            log.error({ err: restoreErr }, 'Restore failed')
+            log.error({ err: restoreErr }, 'Critical: restore from backup also failed.')
+            // The DB may be corrupt – propagate so the caller can exit cleanly.
+            throw new Error('Sync down and restore both failed. Database may be corrupt.', {
+              cause: restoreErr,
+            })
           }
         }
+        // DB was already closed before the attempt; re-open is required regardless.
         return true
       }
     } else {
@@ -247,7 +253,10 @@ export async function syncUp(
     if (localVersion > remoteVersion) {
       const dbName = path.basename(dbPath)
       const syncDbPath = `${dbPath}.sync.db`
-      db.checkpoint()
+      // VACUUM INTO creates a fully consistent snapshot that already incorporates
+      // any pending WAL frames — an explicit checkpoint before backup is not needed
+      // and introduced a race window where a concurrent write could produce an
+      // inconsistent snapshot.
       db.backup(syncDbPath)
 
       if (activeProvider === 'google') {
@@ -299,31 +308,29 @@ export async function performWriteTransaction(
   db: DatabaseWrapper,
   runnable: (tx: DatabaseWrapper) => void
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    try {
-      db.serialize(() => {
-        runnable(db)
-        db.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
-      })
-
-      db.get(
-        "SELECT value FROM sync_metadata WHERE key = 'db_version'",
-        undefined,
-        async (err: Error | null, row: { value: number } | undefined) => {
-          if (err) return reject(err)
-          const newVersion = row ? row.value : 1
-          try {
-            await setLocalManifestVersion(newVersion)
-            resolve()
-          } catch (e) {
-            reject(e)
-          }
-        }
-      )
-    } catch (e) {
-      reject(e)
-    }
+  // node:sqlite is fully synchronous — serialize/run/get all complete before returning,
+  // so we can avoid the nested Promise/callback pattern that could hang forever if
+  // setLocalManifestVersion threw after resolve/reject was no longer reachable.
+  db.serialize(() => {
+    runnable(db)
+    db.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
   })
+
+  // Capture version synchronously; the callback fires immediately with node:sqlite.
+  let newVersion = 1
+  let capturedErr: Error | null = null
+  db.get(
+    "SELECT value FROM sync_metadata WHERE key = 'db_version'",
+    undefined,
+    (err: Error | null, row: { value: number } | undefined) => {
+      capturedErr = err
+      if (!err) newVersion = row?.value ?? 1
+    }
+  )
+  if (capturedErr) throw capturedErr
+
+  // Only the manifest write is truly async (disk I\O); errors here propagate normally.
+  await setLocalManifestVersion(newVersion)
 }
 
 export async function initializeDatabase(dbPath: string): Promise<DatabaseWrapper> {
