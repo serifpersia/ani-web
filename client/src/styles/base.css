@@ -1,0 +1,174 @@
+@import url('./tokens.css');
+
+/* ===== RESET ===== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-family);
+  background: var(--bg-main);
+  color: var(--text-primary);
+  line-height: var(--line-height-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 10% 10%, rgba(6, 182, 212, 0.02) 0%, transparent 40%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.02em;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-elevated);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* ===== TYPOGRAPHY UTILITIES ===== */
+.text-gradient {
+  background: linear-gradient(135deg, #fff 0%, #a5a5a5 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gradient-accent {
+  background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ===== LAYOUT ===== */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main {
+  flex: 1;
+  width: 100%;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: var(--space-6);
+  position: relative;
+  z-index: 1;
+}
+
+/* ===== SECTION ===== */
+.section-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--space-6);
+  padding-left: var(--space-3);
+  border-left: 4px solid var(--accent);
+  line-height: var(--line-height-tight);
+}
+
+/* ===== GRID ===== */
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-6);
+  width: 100%;
+}
+
+/* ===== FOOTER ===== */
+footer {
+  text-align: center;
+  padding: var(--space-12);
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-primary);
+  margin-top: var(--space-16);
+  background: var(--bg-secondary);
+}
+
+footer a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: var(--font-weight-medium);
+  transition: color var(--transition-fast);
+}
+
+footer a:hover {
+  color: var(--accent-light);
+  text-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* ===== NPROGRESS ===== */
+#nprogress .bar {
+  background: var(--accent) !important;
+  height: 3px !important;
+  box-shadow: 0 0 15px var(--accent) !important;
+}
+
+/* ===== SELECT GLOBAL ===== */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  background-color: var(--bg-tertiary) !important;
+  border-color: var(--border-primary) !important;
+}
+
+select:hover {
+  background-color: var(--bg-tertiary) !important;
+  border-color: var(--border-secondary) !important;
+}
+
+select:focus {
+  background-color: var(--bg-tertiary) !important;
+  border-color: var(--accent) !important;
+  outline: none;
+}
+
+select:active {
+  background-color: var(--bg-tertiary) !important;
+}

@@ -1,6 +1,5 @@
 import React from 'react'
-import ReactDOM from 'react-dom'
-import styles from './StatusModal.module.css'
+import { Button } from './Button'
 
 interface StatusModalProps {
   show: boolean
@@ -13,7 +12,7 @@ interface StatusModalProps {
   cancelButtonText?: string
 }
 
-const StatusModal: React.FC<StatusModalProps> = ({
+export default function StatusModal({
   show,
   message,
   type,
@@ -22,35 +21,52 @@ const StatusModal: React.FC<StatusModalProps> = ({
   onConfirm,
   confirmButtonText = 'Confirm',
   cancelButtonText = 'Cancel',
-}) => {
-  if (!show) {
-    return null
-  }
+}: StatusModalProps) {
+  if (!show) return null
 
-  return ReactDOM.createPortal(
-    <div className={styles.modalOverlay}>
-      <div className={`${styles.modalContent} ${styles[type]}`}>
-        <p className={styles.message}>{message}</p>
-        <div className={styles.modalActions}>
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        padding: '1rem',
+        backdropFilter: 'blur(3px)',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          backgroundColor: 'var(--bg-secondary)',
+          padding: '1.5rem',
+          borderRadius: 'var(--radius-lg)',
+          maxWidth: '400px',
+          width: '100%',
+          boxShadow: 'var(--shadow-xl)',
+          border: '1px solid var(--border-primary)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>{message}</p>
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
           {showConfirmButton ? (
             <>
-              <button className="btn-danger" onClick={onConfirm}>
-                {confirmButtonText}
-              </button>
-              <button className="btn-primary" onClick={onClose}>
+              <Button variant="secondary" onClick={onClose}>
                 {cancelButtonText}
-              </button>
+              </Button>
+              <Button variant="danger" onClick={onConfirm}>
+                {confirmButtonText}
+              </Button>
             </>
           ) : (
-            <button className="btn-primary" onClick={onClose}>
-              OK
-            </button>
+            <Button onClick={onClose}>OK</Button>
           )}
         </div>
       </div>
-    </div>,
-    document.body
+    </div>
   )
 }
-
-export default StatusModal

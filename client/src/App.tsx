@@ -12,6 +12,7 @@ const Player = lazy(() => import('./pages/Player'))
 const Search = lazy(() => import('./pages/Search'))
 const MAL = lazy(() => import('./pages/MAL'))
 const Insights = lazy(() => import('./pages/Insights'))
+const AnimeInfoPage = lazy(() => import('./pages/AnimeInfoPage'))
 
 import { useSidebar } from './hooks/useSidebar'
 import { Toaster } from 'react-hot-toast'
@@ -87,32 +88,11 @@ function App() {
               <Route path="/settings" element={<Settings />} />
               <Route path="/mal" element={<MAL />} />
               <Route path="/insights" element={<Insights />} />
-              {}
+              <Route path="/anime/:id" element={<AnimeInfoPage />} />
               <Route path="/watch/:id" element={<Player />} />
               <Route path="/watch/:id/:episodeNumber" element={<Player />} />
-
-              {}
-              <Route path="/watch/:id" element={<Player />} />
-              <Route path="/watch/:id/:episodeNumber" element={<Player />} />
-
-              {}
               <Route path="/player/:id" element={<PlayerRedirect />} />
               <Route path="/player/:id/:episodeNumber" element={<PlayerRedirect />} />
-              <Route
-                path="/player/:id/:episodeNumber"
-                element={
-                  <Navigate to={`/watch/${useParams().id}/${useParams().episodeNumber}`} replace />
-                }
-              />
-              <Route
-                path="/player/:id/:episodeNumber"
-                element={
-                  <Navigate
-                    to={({ params }) => `/watch/${params.id}/${params.episodeNumber}`}
-                    replace
-                  />
-                }
-              />
             </Routes>
           </Suspense>
         </ErrorBoundary>

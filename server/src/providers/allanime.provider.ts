@@ -702,6 +702,12 @@ export class AllAnimeProvider implements Provider {
           )
           if (countdownMatch) {
             firstResult.nextEpisodeAirDate = countdownMatch[1]
+            const airingTime = new Date(countdownMatch[1]).getTime()
+            const now = Date.now()
+            firstResult.nextAiring = {
+              episode: firstResult.currentEpisode ? firstResult.currentEpisode + 1 : 1,
+              timeUntilAiring: Math.floor((airingTime - now) / 1000),
+            }
           } else {
             logger.debug('No countdown found')
           }

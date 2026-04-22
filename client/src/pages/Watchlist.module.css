@@ -39,6 +39,65 @@
 
 .sortSelect {
   width: 180px;
+  height: 42px;
+  padding: 0 var(--space-3);
+  padding-right: 2rem;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23a1a1aa' stroke-width='2' viewBox='0 0 12 12'%3E%3Cpolyline points='3 5 6 8 9 5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  transition: border-color 0.15s ease;
+}
+
+.sortSelect:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-secondary);
+}
+
+.sortSelect:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.statusSelect {
+  flex-grow: 1;
+  height: 38px;
+  padding: 0 var(--space-3);
+  padding-right: 2rem;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23a1a1aa' stroke-width='2' viewBox='0 0 12 12'%3E%3Cpolyline points='3 5 6 8 9 5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  transition: border-color 0.15s ease;
+}
+
+.statusSelect:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-secondary);
+}
+
+.sortSelect:hover {
+  background-color: var(--bg-elevated);
+  border-color: var(--border-secondary);
+}
+
+.sortSelect:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 .itemWrapper {
@@ -55,26 +114,28 @@
 
 .statusSelect {
   flex-grow: 1;
+  height: 38px;
+  padding: 0 var(--space-3);
   background-color: var(--bg-tertiary);
-  border: 1px solid var(--border-secondary);
-  color: var(--text-secondary);
-  padding: 0.4rem 0.6rem;
-  border-radius: 6px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
 }
 
 .statusSelect:hover {
   background-color: var(--bg-elevated);
-  border-color: var(--text-tertiary);
-  color: var(--text-primary);
+  border-color: var(--border-secondary);
 }
 
 .removeBtn {
-  background-color: var(--bg-tertiary);
-  color: var(--danger);
-  border: 1px solid var(--border);
+  background-color: #ef4444;
+  color: white;
+  border: 1px solid #dc2626;
   width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -83,8 +144,8 @@
 }
 
 .removeBtn:hover {
-  background-color: rgba(239, 68, 68, 0.1);
-  border-color: var(--danger);
+  background-color: #dc2626;
+  transform: scale(1.08);
 }
 
 .emptyState {

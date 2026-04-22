@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import styles from './GoogleAuthSettings.module.css'
+import { Button } from '../common/Button'
 import { FaEye, FaEyeSlash } from 'react-icons/fa'
 import StatusModal from '../common/StatusModal'
+import styles from './GoogleAuthSettings.module.css'
 
 interface User {
   name: string
@@ -33,8 +34,7 @@ const GoogleAuthSettings: React.FC = () => {
       const res = await fetch('/api/auth/user')
       const userData = await res.json()
       setUser(userData)
-    } catch (error) {
-      console.error('Failed to fetch user', error)
+    } catch {
       setUser(null)
     }
   }
@@ -153,8 +153,8 @@ const GoogleAuthSettings: React.FC = () => {
 
   const handleSignIn = () => {
     if (authUrl) {
-      const width = 600,
-        height = 700
+      const width = 600
+      const height = 700
       const left = window.innerWidth / 2 - width / 2
       const top = window.innerHeight / 2 - height / 2
       window.open(authUrl, 'GoogleAuth', `width=${width},height=${height},top=${top},left=${left}`)
@@ -179,7 +179,8 @@ const GoogleAuthSettings: React.FC = () => {
     }
   }
 
-  if (loading) return <div>Loading Auth Settings...</div>
+  if (loading)
+    return <div style={{ color: 'var(--text-secondary)', padding: '1.5rem' }}>Loading...</div>
 
   return (
     <div className={styles.container}>
@@ -190,25 +191,16 @@ const GoogleAuthSettings: React.FC = () => {
           <p>
             Signed in as: <strong>{user.name}</strong> ({user.email})
           </p>
-          <button className="btn-danger" onClick={handleSignOut}>
+          <Button variant="danger" onClick={handleSignOut}>
             Sign Out
-          </button>
+          </Button>
         </div>
       ) : (
         <div className={styles.signIn}>
           <p>Sign in with your Google account to enable synchronization features.</p>
-          <button
-            className="btn-primary"
-            onClick={handleSignIn}
-            disabled={!hasAuthConfig}
-            title={
-              !hasAuthConfig
-                ? 'Google Auth is not configured on the server.'
-                : 'Sign in with Google'
-            }
-          >
+          <Button onClick={handleSignIn} disabled={!hasAuthConfig}>
             Sign in with Google
-          </button>
+          </Button>
           {!hasAuthConfig && (
             <p className={styles.warning}>
               Google authentication is not configured. Please set up Client ID and Secret below.
@@ -226,7 +218,7 @@ const GoogleAuthSettings: React.FC = () => {
             type={showClientId ? 'text' : 'password'}
             className={styles.input}
             value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
+            onChange={(e) => setClientId(e.currentTarget.value)}
             placeholder="Enter Google Client ID"
           />
           <button className={styles.iconButton} onClick={() => setShowClientId(!showClientId)}>
@@ -242,7 +234,7 @@ const GoogleAuthSettings: React.FC = () => {
             type={showClientSecret ? 'text' : 'password'}
             className={styles.input}
             value={clientSecret}
-            onChange={(e) => setClientSecret(e.target.value)}
+            onChange={(e) => setClientSecret(e.currentTarget.value)}
             placeholder="Enter Google Client Secret"
           />
           <button
@@ -255,12 +247,10 @@ const GoogleAuthSettings: React.FC = () => {
       </div>
 
       <div className={styles.actions}>
-        <button className="btn-primary" onClick={handleSave}>
-          Save Config
-        </button>
-        <button className="btn-secondary" onClick={handleClear}>
+        <Button onClick={handleSave}>Save Config</Button>
+        <Button variant="secondary" onClick={handleClear}>
           Clear Config
-        </button>
+        </Button>
       </div>
 
       <StatusModal

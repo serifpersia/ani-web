@@ -1,8 +1,7 @@
-import React, { memo, useState, useRef, useCallback } from 'react'
+import React, { memo, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { FaMicrophone, FaClosedCaptioning, FaTimes } from 'react-icons/fa'
 
-import AnimeInfoPopup from './AnimeInfoPopup'
 import { fixThumbnailUrl, formatTime } from '../../lib/utils'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 import styles from './AnimeCard.module.css'
@@ -31,22 +30,70 @@ interface Anime {
   rating?: string
 }
 
+interface AnimeCardConfig {
+  elements?: {
+    poster?: {
+      typeBadge?: boolean
+      episodeBadge?: boolean
+      removeButton?: boolean
+      adultBadge?: boolean
+    }
+    info?: {
+      title?: boolean
+      mobileBadges?: boolean
+      progress?: boolean
+      meta?: boolean
+    }
+  }
+}
+
+const defaultConfig: AnimeCardConfig = {
+  elements: {
+    poster: {
+      typeBadge: true,
+      episodeBadge: true,
+      removeButton: true,
+      adultBadge: true,
+    },
+    info: {
+      title: true,
+      mobileBadges: true,
+      progress: true,
+      meta: true,
+    },
+  },
+}
+
 interface AnimeCardProps {
   anime: Anime
   continueWatching?: boolean
   onRemove?: (id: string) => void
   isLCP?: boolean
+  config?: AnimeCardConfig
 }
 
 const AnimeCard: React.FC<AnimeCardProps> = memo(
-  ({ anime, continueWatching = false, onRemove, isLCP = false }) => {
+  ({ anime, continueWatching = false, onRemove, isLCP = false, config }) => {
     const isMobile = useIsMobile()
     const { titlePreference } = useTitlePreference()
-    const [showPopup, setShowPopup] = useState(false)
-    const [popupPosition, setPopupPosition] = useState<'left' | 'right'>('right')
+    const [isLoaded, setIsLoaded] = useState(false)
 
-    const cardRef = useRef<HTMLDivElement>(null)
-    const hoverTimeout = useRef<NodeJS.Timeout | null>(null)
+    const mergedConfig = {
+      ...defaultConfig,
+      ...config,
+      elements: {
+        ...defaultConfig.elements,
+        ...(config?.elements || {}),
+        poster: {
+          ...defaultConfig.elements?.poster,
+          ...(config?.elements?.poster || {}),
+        },
+        info: {
+          ...defaultConfig.elements?.info,
+          ...(config?.elements?.info || {}),
+        },
+      },
+    }
 
     const hasNewEpisodes = (anime.newEpisodesCount || 0) > 0
     const hasProgress = (anime.currentTime || 0) > 0 && (anime.duration || 0) > 0
@@ -61,11 +108,11 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
       ? episodeToPlay
         ? `/watch/${anime._id}/${episodeToPlay}`
         : `/watch/${anime._id}`
-      : progressRatio > 0.9 && hasNewEpisodes
-        ? `/watch/${anime._id}/${anime.nextEpisodeToWatch}`
+      : episodeToPlay && anime.episodeNumber
+        ? `/watch/${anime._id}/${anime.episodeNumber}`
         : hasProgress
           ? `/watch/${anime._id}/${anime.episodeNumber}`
-          : `/watch/${anime._id}`
+          : `/anime/${anime._id}`
 
     const progressPercent = hasProgress
       ? ((anime.currentTime || 0) / (anime.duration || 1)) * 100
@@ -75,26 +122,11 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
       (e: React.MouseEvent) => {
         e.preventDefault()
         e.stopPropagation()
-        if (onRemove) onRemove(anime.id)
+        const id = anime.id || anime.showId || anime._id
+        if (onRemove) onRemove(id)
       },
-      [onRemove, anime.id]
+      [onRemove, anime.id, anime.showId, anime._id]
     )
-
-    const handleMouseEnter = () => {
-      if (isMobile) return
-      if (cardRef.current) {
-        const rect = cardRef.current.getBoundingClientRect()
-        setPopupPosition(rect.right > window.innerWidth - 320 ? 'left' : 'right')
-      }
-      hoverTimeout.current = setTimeout(() => setShowPopup(true), 400)
-    }
-
-    const handleMouseLeave = () => {
-      if (hoverTimeout.current) clearTimeout(hoverTimeout.current)
-      setShowPopup(false)
-    }
-
-    const [isLoaded, setIsLoaded] = useState(false)
 
     const displayEpisodeCount = (() => {
       const epCount = anime.episodeCount ?? 0
@@ -111,13 +143,25 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
           ? `EP ${episodeToPlay}`
           : null
 
+    const posterEls = mergedConfig.elements?.poster
+    const infoEls = mergedConfig.elements?.info
+    const showTypeBadge = posterEls?.typeBadge ?? (continueWatching ? false : true)
+    const showEpBadge = posterEls?.episodeBadge ?? true
+    const showRemoveBtn =
+      posterEls?.removeButton === undefined ? continueWatching : posterEls.removeButton
+    const showAdultBadge = posterEls?.adultBadge ?? true
+    const showMobileBadges = infoEls?.mobileBadges ?? true
+    const showProgress = infoEls?.progress ?? true
+    const showMeta = infoEls?.meta ?? true
+
+    const adultContent =
+      anime.isAdult ||
+      anime.rating === 'R+' ||
+      anime.rating === 'Rx' ||
+      anime.rating?.includes('17+')
+
     return (
-      <div
-        ref={cardRef}
-        className={styles.cardWrapper}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      >
+      <div className={styles.cardWrapper}>
         <Link to={linkTarget} className={styles.card}>
           <div className={styles.posterContainer}>
             <img
@@ -134,37 +178,38 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
 
             {!isMobile && (
               <>
-                <div className={styles.typeBadge}>{anime.type || 'TV'}</div>
+                {showTypeBadge && <div className={styles.typeBadge}>{anime.type || 'TV'}</div>}
 
-                {progressString && <div className={styles.epBadge}>{progressString}</div>}
+                {showEpBadge && progressString && (
+                  <div className={styles.epBadge}>{progressString}</div>
+                )}
               </>
             )}
 
-            {continueWatching && (
+            {showRemoveBtn && (
               <button className={styles.removeBtn} onClick={handleRemoveClick} aria-label="Remove">
                 <FaTimes size={10} />
               </button>
             )}
 
-            {(anime.isAdult ||
-              anime.rating === 'R+' ||
-              anime.rating === 'Rx' ||
-              anime.rating?.includes('17+')) && <div className={styles.adultBadge}>18+</div>}
+            {showAdultBadge && adultContent && <div className={styles.adultBadge}>18+</div>}
           </div>
 
           <div className={styles.info}>
-            <div className={styles.title} title={displayTitle}>
-              {displayTitle}
-            </div>
+            {infoEls?.title !== false && (
+              <div className={styles.title} title={displayTitle}>
+                {displayTitle}
+              </div>
+            )}
 
-            {isMobile && (
+            {isMobile && showMobileBadges && (
               <div className={styles.mobileBadges}>
                 <span className={styles.mobileType}>{anime.type || 'TV'}</span>
                 {progressString && <span className={styles.mobileEp}>{progressString}</span>}
               </div>
             )}
 
-            {continueWatching && hasProgress && (
+            {showProgress && continueWatching && hasProgress && (
               <div>
                 <div className={styles.progressContainer}>
                   <div className={styles.progressBar} style={{ width: `${progressPercent}%` }} />
@@ -175,28 +220,24 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
               </div>
             )}
 
-            <div className={styles.metaRow}>
-              {anime.availableEpisodesDetail?.sub && (
-                <div className={styles.metaItem}>
-                  <FaClosedCaptioning size={10} />
-                  {anime.availableEpisodesDetail.sub.length}
-                </div>
-              )}
-              {anime.availableEpisodesDetail?.dub && (
-                <div className={styles.metaItem}>
-                  <FaMicrophone size={10} />
-                  {anime.availableEpisodesDetail.dub.length}
-                </div>
-              )}
-            </div>
+            {showMeta && (
+              <div className={styles.metaRow}>
+                {anime.availableEpisodesDetail?.sub && (
+                  <div className={styles.metaItem}>
+                    <FaClosedCaptioning size={10} />
+                    {anime.availableEpisodesDetail.sub.length}
+                  </div>
+                )}
+                {anime.availableEpisodesDetail?.dub && (
+                  <div className={styles.metaItem}>
+                    <FaMicrophone size={10} />
+                    {anime.availableEpisodesDetail.dub.length}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </Link>
-
-        <AnimeInfoPopup
-          animeId={anime._id}
-          isVisible={showPopup && !isMobile}
-          position={popupPosition}
-        />
       </div>
     )
   }

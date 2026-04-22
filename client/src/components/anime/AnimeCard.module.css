@@ -6,8 +6,6 @@
     transform var(--transition-base),
     z-index var(--transition-fast);
   will-change: transform;
-  content-visibility: auto;
-  contain-intrinsic-size: 150px 280px;
 }
 
 .cardWrapper:hover {
@@ -118,8 +116,8 @@
   composes: badge;
   bottom: var(--space-2);
   right: var(--space-2);
-  background-color: var(--danger);
-  color: white;
+  background-color: var(--color-danger) !important;
+  color: white !important;
   border: none;
   font-size: 14px;
   padding: 5px 10px;
@@ -188,14 +186,16 @@
   justify-content: center;
   cursor: pointer;
   opacity: 0;
-  transition: all var(--transition-base);
+  transition:
+    opacity 0.15s ease,
+    background-color 0.15s ease;
   z-index: 20;
   font-size: 1rem;
 }
 
 .removeBtn:hover {
-  background-color: var(--danger);
-  border-color: var(--danger);
+  background-color: rgba(239, 68, 68, 0.9) !important;
+  border-color: rgba(239, 68, 68, 0.9) !important;
   transform: scale(1.08);
   box-shadow: none;
   opacity: 1;
@@ -235,6 +235,10 @@
 }
 
 @media (max-width: 768px) {
+  .typeBadge {
+    display: none;
+  }
+
   .removeBtn {
     opacity: 1;
     background-color: rgba(0, 0, 0, 0.5);

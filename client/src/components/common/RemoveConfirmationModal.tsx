@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import GenericModal from './GenericModal'
+import { Button } from './Button'
+import { Modal as ModalUI } from './Modal'
 
 interface RemoveConfirmationModalProps {
   isOpen: boolean
@@ -9,13 +10,13 @@ interface RemoveConfirmationModalProps {
   scenario: 'continueWatching' | 'watchlist'
 }
 
-const RemoveConfirmationModal: React.FC<RemoveConfirmationModalProps> = ({
+export default function RemoveConfirmationModal({
   isOpen,
   onClose,
   onConfirm,
   animeName,
   scenario,
-}) => {
+}: RemoveConfirmationModalProps) {
   const [rememberPreference, setRememberPreference] = useState(false)
   const [removeFromWatchlist, setRemoveFromWatchlist] = useState(false)
 
@@ -40,51 +41,54 @@ const RemoveConfirmationModal: React.FC<RemoveConfirmationModalProps> = ({
       : `Are you sure you want to remove "${animeName}" from your watchlist?`
 
   return (
-    <GenericModal isOpen={isOpen} onClose={onClose} title={title}>
-      <div>
+    <ModalUI isOpen={isOpen} onClose={onClose} title={title}>
+      <div style={{ color: 'var(--text-secondary)' }}>
         <p>{message}</p>
         {scenario === 'continueWatching' && (
-          <div style={{ margin: '1rem 0' }}>
-            <label>
-              <input
-                type="checkbox"
-                checked={removeFromWatchlist}
-                onChange={(e) => setRemoveFromWatchlist(e.target.checked)}
-              />
-              &nbsp;Also remove from my watchlist
-            </label>
-          </div>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              margin: '1rem 0',
+              cursor: 'pointer',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={removeFromWatchlist}
+              onChange={(e) => setRemoveFromWatchlist(e.target.checked)}
+            />
+            Also remove from my watchlist
+          </label>
         )}
         {scenario === 'watchlist' && (
-          <div style={{ margin: '1rem 0' }}>
-            <label>
-              <input
-                type="checkbox"
-                checked={rememberPreference}
-                onChange={(e) => setRememberPreference(e.target.checked)}
-              />
-              &nbsp;Remember my choice
-            </label>
-          </div>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              margin: '1rem 0',
+              cursor: 'pointer',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={rememberPreference}
+              onChange={(e) => setRememberPreference(e.target.checked)}
+            />
+            Remember my choice
+          </label>
         )}
-        <div
-          style={{
-            marginTop: '1.5rem',
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '1rem',
-          }}
-        >
-          <button className="btn-secondary" onClick={onClose}>
+        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+          <Button variant="secondary" onClick={onClose} style={{ flex: 1 }}>
             No
-          </button>
-          <button className="btn-danger" onClick={handleConfirm}>
+          </Button>
+          <Button variant="danger" onClick={handleConfirm} style={{ flex: 1 }}>
             Yes
-          </button>
+          </Button>
         </div>
       </div>
-    </GenericModal>
+    </ModalUI>
   )
 }
-
-export default RemoveConfirmationModal

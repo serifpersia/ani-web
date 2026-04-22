@@ -1,13 +1,42 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'preact/hooks'
 import { useSearchParams } from 'react-router-dom'
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
-import SearchableSelect from '../components/common/SearchableSelect'
+import { Dropdown } from '../components/common/Dropdown'
+import { Button } from '../components/common/Button'
 import ErrorMessage from '../components/common/ErrorMessage'
+import SearchableSelect from '../components/common/SearchableSelect'
 import { useSearchAnime } from '../hooks/useAnimeData'
 import styles from './Search.module.css'
 
-const Search: React.FC = () => {
+interface Option {
+  value: string
+  label: string
+}
+
+const typeOptions: Option[] = [
+  { value: 'ALL', label: 'Type: All' },
+  { value: 'TV', label: 'TV' },
+  { value: 'Movie', label: 'Movie' },
+  { value: 'OVA', label: 'OVA' },
+  { value: 'ONA', label: 'ONA' },
+]
+
+const seasonOptions: Option[] = [
+  { value: 'ALL', label: 'Season: All' },
+  { value: 'Winter', label: 'Winter' },
+  { value: 'Spring', label: 'Spring' },
+  { value: 'Summer', label: 'Summer' },
+  { value: 'Fall', label: 'Fall' },
+]
+
+const countryOptions: Option[] = [
+  { value: 'ALL', label: 'Country: All' },
+  { value: 'JP', label: 'Japan' },
+  { value: 'CN', label: 'China' },
+]
+
+export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [query, setQuery] = useState(searchParams.get('query') || '')
 
@@ -92,9 +121,17 @@ const Search: React.FC = () => {
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   const currentYear = new Date().getFullYear()
-  const years = [
-    'ALL',
-    ...Array.from({ length: currentYear - 1980 + 1 }, (_, i) => (currentYear - i).toString()),
+  const yearOptions: Option[] = [
+    { value: 'ALL', label: 'Year: All' },
+    ...Array.from({ length: currentYear - 1980 + 1 }, (_, i) => ({
+      value: String(currentYear - i),
+      label: String(currentYear - i),
+    })),
+  ]
+
+  const studioOptions: Option[] = [
+    { value: 'ALL', label: 'Studio: All' },
+    ...availableStudios.map((s) => ({ value: s, label: s })),
   ]
 
   return (
@@ -104,63 +141,51 @@ const Search: React.FC = () => {
       <div className={styles.filterContainer}>
         <div className={styles.searchBar}>
           <input
-            className="form-input"
-            style={{ flex: 1 }}
+            className={styles.searchInput}
             placeholder="Search anime..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onInput={(e) => setQuery(e.currentTarget.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           />
-          <button className="btn-primary" onClick={handleSearch}>
-            Search
-          </button>
-          <button className="btn-secondary" onClick={() => setShowFilters(!showFilters)}>
+          <Button onClick={handleSearch}>Search</Button>
+          <Button variant="secondary" onClick={() => setShowFilters(!showFilters)}>
             {showFilters ? 'Hide Filters' : 'Filters'}
-          </button>
+          </Button>
         </div>
 
         <div className={`${styles.advancedFilters} ${showFilters ? styles.show : ''}`}>
           <div className={styles.selectGrid}>
-            <select className="form-select" value={type} onChange={(e) => setType(e.target.value)}>
-              <option value="ALL">Type: All</option>
-              <option value="TV">TV</option>
-              <option value="Movie">Movie</option>
-              <option value="OVA">OVA</option>
-              <option value="ONA">ONA</option>
-            </select>
-            <select
-              className="form-select"
-              value={season}
-              onChange={(e) => setSeason(e.target.value)}
-            >
-              <option value="ALL">Season: All</option>
-              <option value="Winter">Winter</option>
-              <option value="Spring">Spring</option>
-              <option value="Summer">Summer</option>
-              <option value="Fall">Fall</option>
-            </select>
-            <select className="form-select" value={year} onChange={(e) => setYear(e.target.value)}>
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y === 'ALL' ? 'Year: All' : y}
+            <select value={type} onChange={(e) => setType(e.currentTarget.value)}>
+              {typeOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
                 </option>
               ))}
             </select>
-            <select
-              className="form-select"
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-            >
-              <option value="ALL">Country: All</option>
-              <option value="JP">Japan</option>
-              <option value="CN">China</option>
+            <select value={season} onChange={(e) => setSeason(e.currentTarget.value)}>
+              {seasonOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
-            {availableStudios.length > 0 && (
+            <select value={year} onChange={(e) => setYear(e.currentTarget.value)}>
+              {yearOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <select value={country} onChange={(e) => setCountry(e.currentTarget.value)}>
+              {countryOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            {studioOptions.length > 1 && (
               <SearchableSelect
-                options={[
-                  { value: 'ALL', label: 'Studio: All' },
-                  ...availableStudios.map((s) => ({ value: s, label: s })),
-                ]}
+                options={studioOptions}
                 value={studio}
                 onChange={setStudio}
                 placeholder="Studio: All"
@@ -182,13 +207,9 @@ const Search: React.FC = () => {
             </div>
           )}
 
-          <button
-            className="btn-primary"
-            style={{ alignSelf: 'flex-start' }}
-            onClick={handleSearch}
-          >
+          <Button onClick={handleSearch} className={styles.applyBtn}>
             Apply Filters
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -207,5 +228,3 @@ const Search: React.FC = () => {
     </div>
   )
 }
-
-export default Search

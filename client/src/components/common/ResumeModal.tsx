@@ -1,5 +1,5 @@
 import React from 'react'
-import styles from './ResumeModal.module.css'
+import { Button } from './Button'
 
 interface ResumeModalProps {
   show: boolean
@@ -8,29 +8,50 @@ interface ResumeModalProps {
   onStartOver: () => void
 }
 
-const ResumeModal: React.FC<ResumeModalProps> = ({ show, resumeTime, onResume, onStartOver }) => {
-  if (!show) {
-    return null
-  }
+export default function ResumeModal({ show, resumeTime, onResume, onStartOver }: ResumeModalProps) {
+  if (!show) return null
 
   return (
-    <div className={styles.modalOverlay}>
-      <div className={styles.modalContent}>
-        <h3>Resume Playback?</h3>
-        <p>
-          You were watching at <strong>{resumeTime}</strong>. Would you like to continue?
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        padding: '1rem',
+        backdropFilter: 'blur(3px)',
+      }}
+      onClick={onStartOver}
+    >
+      <div
+        style={{
+          backgroundColor: 'var(--bg-secondary)',
+          padding: '1.5rem',
+          borderRadius: 'var(--radius-lg)',
+          maxWidth: '420px',
+          width: '100%',
+          boxShadow: 'var(--shadow-xl)',
+          border: '1px solid var(--border-primary)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 style={{ margin: '0 0 0.75rem', color: 'var(--text-primary)' }}>Resume Playback?</h3>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+          You were watching at <strong style={{ color: 'var(--accent)' }}>{resumeTime}</strong>.
+          Would you like to continue?
         </p>
-        <div className={styles.modalActions}>
-          <button className="btn-secondary" onClick={onStartOver}>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <Button variant="secondary" onClick={onStartOver} style={{ flex: 1 }}>
             Start Over
-          </button>
-          <button className="btn-primary" onClick={onResume}>
+          </Button>
+          <Button onClick={onResume} style={{ flex: 1 }}>
             Resume
-          </button>
+          </Button>
         </div>
       </div>
     </div>
   )
 }
-
-export default ResumeModal

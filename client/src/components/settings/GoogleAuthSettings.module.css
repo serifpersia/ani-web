@@ -1,62 +1,175 @@
 .container {
-  background-color: var(--card-background);
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: var(--card-shadow);
-  margin-bottom: 20px;
+  background-color: var(--bg-secondary);
+  padding: var(--space-6);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-primary);
+  margin-bottom: var(--space-6);
 }
 
 .title {
-  color: var(--text-color-primary);
-  margin-top: 0;
-  margin-bottom: 15px;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-size-lg);
+}
+
+.signIn {
+  color: var(--text-secondary);
+  margin-bottom: var(--space-4);
+}
+
+.userInfo {
+  padding: var(--space-4);
+  background: rgba(139, 92, 246, 0.1);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.userInfo p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.userInfo strong {
+  color: var(--accent);
+}
+
+.warning {
+  color: var(--color-warning);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-4);
 }
 
 .formGroup {
-  margin-bottom: 15px;
+  margin-bottom: var(--space-4);
 }
 
 .label {
   display: block;
-  margin-bottom: 8px;
-  color: var(--text-color-secondary);
+  margin-bottom: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .inputWrapper {
   display: flex;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .input {
   flex-grow: 1;
-  background-color: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  font-family: var(--font-family);
-  font-size: 1rem;
+  height: 44px;
+  padding: 0 var(--space-4);
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  transition: all 0.15s ease;
+}
+
+.input:hover {
+  background-color: var(--bg-elevated);
+  border-color: var(--border-secondary);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.select {
+  flex-grow: 1;
+  height: 44px;
+  padding: 0 var(--space-4);
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.select:hover {
+  background-color: var(--bg-elevated);
+  border-color: var(--border-secondary);
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 .iconButton {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border);
-  color: var(--text);
-  padding: 0 1rem;
-  border-radius: 8px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
+  font-size: 1.25rem;
+  transition: all 0.15s ease;
 }
 
 .iconButton:hover {
-  background-color: var(--border);
+  background-color: var(--bg-elevated);
+  border-color: var(--border-secondary);
 }
 
 .actions {
   display: flex;
-  gap: 10px;
-  margin-top: 20px;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.saveButton {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+  color: white;
+  border: none;
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.saveButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.status {
+  margin-top: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.dangerButton {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dangerButton:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.hr {
+  border: none;
+  border-top: 1px solid var(--border-primary);
+  margin: var(--space-6) 0;
 }

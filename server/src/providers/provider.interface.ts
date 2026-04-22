@@ -14,6 +14,11 @@ export interface Show {
   score?: number
   isAdult?: boolean
   rating?: string
+  genres?: { name: string }[]
+  nextAiring?: {
+    episode: number
+    timeUntilAiring: number
+  }
 }
 
 export interface VideoLink {
@@ -75,6 +80,10 @@ export interface SearchOptions {
 export interface ShowDetails {
   status: string
   nextEpisodeAirDate?: string
+  nextAiring?: {
+    episode: number
+    timeUntilAiring: number
+  }
 }
 
 export interface AllmangaDetails {

@@ -255,7 +255,7 @@ export const usePlayerData = (
       }
       return detailsResponse.json()
     },
-    enabled: !!showId && !loadingShowData && !!state.showMeta?.name && !state.showMeta?.genres,
+    enabled: !!showId && !loadingShowData && !!state.showMeta?.name && !!state.showMeta?.type,
   })
 
   useEffect(() => {

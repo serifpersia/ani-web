@@ -27,6 +27,23 @@ interface Anime {
   }
 }
 
+interface AnimeSectionConfig {
+  elements?: {
+    poster?: {
+      typeBadge?: boolean
+      episodeBadge?: boolean
+      removeButton?: boolean
+      adultBadge?: boolean
+    }
+    info?: {
+      title?: boolean
+      mobileBadges?: boolean
+      progress?: boolean
+      meta?: boolean
+    }
+  }
+}
+
 interface AnimeSectionProps {
   title: string
   animeList: Anime[]
@@ -36,6 +53,7 @@ interface AnimeSectionProps {
   showSeeMore?: boolean
   emptyState?: React.ReactNode
   carousel?: boolean
+  cardConfig?: AnimeSectionConfig
 }
 
 const AnimeSection: React.FC<AnimeSectionProps> = ({
@@ -47,6 +65,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
   showSeeMore,
   emptyState,
   carousel,
+  cardConfig,
 }) => {
   const carouselRef = useRef<HTMLDivElement>(null)
 
@@ -107,6 +126,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
                       continueWatching={continueWatching}
                       onRemove={onRemove}
                       isLCP={index < 4 && title === 'Latest Releases'}
+                      config={cardConfig}
                     />
                   </div>
                 ))}
@@ -124,6 +144,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
                 continueWatching={continueWatching}
                 onRemove={onRemove}
                 isLCP={index < 4 && title === 'Latest Releases'}
+                config={cardConfig}
               />
             ))
           ) : !loading ? (

@@ -27,6 +27,8 @@ const FILTERS = [
   'Planned',
 ]
 
+const STATUS_OPTIONS = FILTERS.slice(2)
+
 const Watchlist: React.FC = () => {
   const { filter: filterBy = 'All' } = useParams<{ filter: string }>()
   const navigate = useNavigate()
@@ -146,6 +148,10 @@ const Watchlist: React.FC = () => {
     setItemToRemove(null)
   }
 
+  const handleStatusChange = (id: string, status: string) => {
+    updateStatus.mutate({ id, status })
+  }
+
   return (
     <div className="page-container">
       <div className="section-title">My Watchlist</div>
@@ -162,15 +168,17 @@ const Watchlist: React.FC = () => {
             </button>
           ))}
         </div>
-        <select
-          className={`form-select ${styles.sortSelect}`}
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-        >
-          <option value="last_added">Recently Added</option>
-          <option value="name_asc">Name (A-Z)</option>
-          <option value="name_desc">Name (Z-A)</option>
-        </select>
+        <div style={{ width: '160px' }}>
+          <select
+            className={styles.sortSelect}
+            value={sortBy}
+            onChange={(e) => setSortBy(e.currentTarget.value)}
+          >
+            <option value="last_added">Recently Added</option>
+            <option value="name_asc">Name (A-Z)</option>
+            <option value="name_desc">Name (Z-A)</option>
+          </select>
+        </div>
       </div>
 
       {isLoading ? (
@@ -192,9 +200,11 @@ const Watchlist: React.FC = () => {
                     <select
                       className={styles.statusSelect}
                       value={item.status}
-                      onChange={(e) => updateStatus.mutate({ id: item.id, status: e.target.value })}
+                      onChange={(e) =>
+                        updateStatus.mutate({ id: item.id, status: e.currentTarget.value })
+                      }
                     >
-                      {FILTERS.slice(2).map((s) => (
+                      {STATUS_OPTIONS.map((s) => (
                         <option key={s} value={s}>
                           {s}
                         </option>

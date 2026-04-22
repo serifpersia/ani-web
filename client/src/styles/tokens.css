@@ -1,0 +1,120 @@
+:root {
+  /* ===== COLOR: ACCENT ===== */
+  --accent-h: 265;
+  --accent-s: 95%;
+  --accent-l: 72%;
+  --accent: hsl(var(--accent-h), var(--accent-s), var(--accent-l));
+  --accent-light: hsl(var(--accent-h), 90%, 80%);
+  --accent-lighter: hsl(var(--accent-h), 90%, 90%);
+  --accent-dark: hsl(var(--accent-h), 90%, 55%);
+  --accent-glow: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.5);
+
+  /* ===== COLOR: SEMANTIC ===== */
+  --color-danger: #ef4444;
+  --color-error: var(--color-danger);
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+
+  /* ===== COLOR: BLUE ===== */
+  --secondary-h: 180;
+  --secondary-s: 85%;
+  --secondary-l: 50%;
+  --accent-blue: hsl(var(--secondary-h), var(--secondary-s), var(--secondary-l));
+  --accent-blue-light: hsl(var(--secondary-h), var(--secondary-s), 70%);
+
+  /* ===== COLOR: NEUTRAL ===== */
+  --bg-main: #050505;
+  --bg-secondary: #0f0f11;
+  --bg-tertiary: #18181b;
+  --bg-elevated: #27272a;
+
+  --text-primary: #ffffff;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #71717a;
+  --text-muted: #a1a1aa;
+
+  /* ===== COLOR: BORDER ===== */
+  --border-primary: rgba(255, 255, 255, 0.08);
+  --border-secondary: rgba(255, 255, 255, 0.12);
+  --border-accent: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.3);
+  --border: var(--border-primary);
+
+  /* ===== COMPONENT TOKENS ===== */
+  --card-radius: var(--radius-lg);
+  --border-light: var(--border-secondary);
+  --danger-color: var(--color-danger);
+
+  /* ===== SHADOW TOKENS ===== */
+  --shadow-input-focus: 0 0 0 2px var(--accent-glow);
+  --shadow-focus: 0 0 0 2px var(--accent-glow);
+
+  /* ===== COLOR: GLASS ===== */
+  --glass-bg: rgba(20, 20, 22, 0.95);
+  --glass-border: var(--border-primary);
+  --glass-highlight: rgba(255, 255, 255, 0.05);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.36);
+
+  /* ===== TYPOGRAPHY ===== */
+  --font-family:
+    'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-md: 1.125rem;
+  --font-size-lg: 1.5rem;
+  --font-size-xl: 1.875rem;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* ===== SPACING ===== */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* ===== RADIUS ===== */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-full: 9999px;
+
+  /* ===== SHADOW ===== */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+  /* ===== LAYOUT ===== */
+  --header-height: 90px;
+  --max-width: 1600px;
+  --sidebar-width: 280px;
+
+  /* ===== ANIMATION ===== */
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 0.2s var(--ease-smooth);
+  --transition-base: 0.3s var(--ease-smooth);
+  --transition-slow: 0.5s var(--ease-smooth);
+}
+
+@media (min-width: 1920px) {
+  :root {
+    --font-size-base: 1.125rem;
+    --max-width: 2000px;
+  }
+}

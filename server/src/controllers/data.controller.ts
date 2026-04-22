@@ -104,7 +104,14 @@ export class DataController {
 
   getShowMeta = async (req: Request, res: Response) => {
     try {
-      res.json(await this.getProvider(req).getShowMeta(req.params.id as string))
+      const [meta, details] = await Promise.all([
+        this.getProvider(req).getShowMeta(req.params.id as string),
+        this.getProvider(req)
+          .getShowDetails(req.params.id as string)
+          .catch(() => ({})),
+      ])
+      const merged = { ...meta, ...details }
+      res.json(merged)
     } catch {
       res.status(500).send('Error')
     }

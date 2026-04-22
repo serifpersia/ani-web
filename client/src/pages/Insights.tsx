@@ -65,7 +65,6 @@ const Insights: React.FC = () => {
   })
 
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   const availableYears = useMemo(() => {
     if (!data?.activityGrid) return [new Date().getFullYear()]
@@ -205,43 +204,17 @@ const Insights: React.FC = () => {
       <div className={styles.wideSection}>
         <div className={styles.sectionHeader}>
           <h3>Activity</h3>
-          <div className={styles.customDropdownContainer}>
-            <button
-              className={styles.dropdownToggle}
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
-            >
-              {selectedYear}
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 12 12"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="3 5 6 8 9 5"></polyline>
-              </svg>
-            </button>
-            {isDropdownOpen && (
-              <div className={styles.dropdownMenu}>
-                {availableYears.map((year) => (
-                  <button
-                    key={year}
-                    className={`${styles.dropdownItem} ${year === selectedYear ? styles.activeItem : ''}`}
-                    onClick={() => {
-                      setSelectedYear(year)
-                      setIsDropdownOpen(false)
-                    }}
-                  >
-                    {year}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <select
+            className={styles.yearSelect}
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.currentTarget.value))}
+          >
+            {availableYears.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
         </div>
         <div className={styles.heatmapLayout}>
           <div className={styles.dayLabels}>

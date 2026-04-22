@@ -52,7 +52,7 @@ const WatchlistSettings: React.FC = () => {
   }
 
   return (
-    <div className={styles['settings-section']}>
+    <div className={styles.section}>
       <h3>Watchlist</h3>
       <div className={styles.setting}>
         <label htmlFor="skip-confirmation-toggle">

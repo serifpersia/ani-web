@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import styles from './GoogleAuthSettings.module.css'
+import { Button } from '../common/Button'
 import StatusModal from '../common/StatusModal'
+import styles from './GoogleAuthSettings.module.css'
 
 const RcloneSettings: React.FC = () => {
   const [remote, setRemote] = useState('')
@@ -65,7 +66,8 @@ const RcloneSettings: React.FC = () => {
     }
   }
 
-  if (loading) return <div>Loading Rclone Settings...</div>
+  if (loading)
+    return <div style={{ color: 'var(--text-secondary)', padding: '1.5rem' }}>Loading...</div>
 
   return (
     <div className={styles.container}>
@@ -91,7 +93,7 @@ const RcloneSettings: React.FC = () => {
         <label className={styles.label}>Remote Name</label>
         <div className={styles.inputWrapper}>
           <select
-            className={styles.input}
+            className={styles.select}
             value={remote}
             onChange={(e) => setRemote(e.target.value)}
           >
@@ -106,19 +108,14 @@ const RcloneSettings: React.FC = () => {
             )}
           </select>
         </div>
-        <p
-          className={styles.warning}
-          style={{ marginTop: '8px', fontSize: '0.85em', opacity: 0.8 }}
-        >
+        <p className={styles.warning} style={{ marginTop: '8px', fontSize: '0.85em' }}>
           <strong>Priority Note:</strong> If you have <strong>Google Authentication</strong> signed
           in, it will always take priority and Rclone sync will be ignored.
         </p>
       </div>
 
       <div className={styles.actions}>
-        <button className="btn-primary" onClick={handleSave}>
-          Save Rclone Settings
-        </button>
+        <Button onClick={handleSave}>Save Rclone Settings</Button>
       </div>
 
       <StatusModal

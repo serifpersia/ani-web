@@ -35,20 +35,27 @@
 }
 
 .dayBtn.active {
-  background-color: var(--accent-dark);
-  border-color: var(--accent-dark);
+  background-color: var(--accent);
+  border-color: var(--accent);
   color: white;
   font-weight: var(--font-weight-bold);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 0 12px var(--accent-glow);
 }
 
 .dayName {
-  font-weight: var(--font-weight-bold);
   font-size: var(--font-size-sm);
   color: var(--text-primary);
+}
+
+.dayBtn.active .dayName {
+  color: white;
 }
 
 .dayDate {
   font-size: var(--font-size-xs);
   color: var(--text-secondary);
+}
+
+.dayBtn.active .dayDate {
+  color: rgba(255, 255, 255, 0.85);
 }

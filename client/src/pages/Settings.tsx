@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react'
+import { Button } from '../components/common/Button'
 import TitlePreferenceToggle from '../components/common/TitlePreferenceToggle'
 import styles from './Settings.module.css'
 import GoogleAuthSettings from '../components/settings/GoogleAuthSettings'
@@ -77,19 +78,15 @@ const Settings: React.FC = () => {
       <GoogleAuthSettings />
       <RcloneSettings />
 
-      <div className={styles['settings-section']}>
+      <div className={styles.section}>
         <TitlePreferenceToggle />
       </div>
       <WatchlistSettings />
-      <div className={styles['settings-section']}>
+      <div className={styles.section}>
         <h3>Database Backup and Restore</h3>
         <div className={styles.controls}>
-          <button onClick={handleBackup} className="btn-primary">
-            Backup Database
-          </button>
-          <button onClick={triggerFileSelect} className="btn-primary">
-            Restore Database
-          </button>
+          <Button onClick={handleBackup}>Backup Database</Button>
+          <Button onClick={triggerFileSelect}>Restore Database</Button>
         </div>
         <input
           type="file"
