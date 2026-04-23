@@ -446,7 +446,16 @@ const Player: React.FC = () => {
     const activeTrack = Array.from(video.textTracks).find((t) => t.mode === 'showing')
     if (activeTrack) {
       activeTrack.addEventListener('cuechange', handleCueChange)
-      return () => activeTrack.removeEventListener('cuechange', handleCueChange)
+    }
+
+    return () => {
+      if (activeTrack) {
+        activeTrack.removeEventListener('cuechange', handleCueChange)
+      }
+      const tag = document.getElementById(styleId)
+      if (tag) {
+        tag.remove()
+      }
     }
   }, [
     player.state.subtitleFontSize,

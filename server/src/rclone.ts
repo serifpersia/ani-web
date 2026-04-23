@@ -99,12 +99,29 @@ class RcloneService {
     await this.executeRcloneArgs(['copyto', localPath, remotePath])
   }
 
+  private executeRcloneArgsWithOutput(args: string[]): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const process = spawn('rclone', args, { stdio: 'pipe' })
+      let stdout = ''
+      let stderr = ''
+      process.stdout?.on('data', (data) => (stdout += data))
+      process.stderr?.on('data', (data) => (stderr += data))
+      process.on('close', (code) => {
+        if (code === 0) resolve(stdout.trim())
+        else {
+          if (stderr) logger.warn({ stderr }, 'Rclone command warning')
+          reject(new Error(stderr || `Rclone exited with code ${code}`))
+        }
+      })
+      process.on('error', (err) => reject(err))
+    })
+  }
+
   public async fileExists(remoteFolder: string, fileName: string): Promise<boolean> {
     if (!this.activeRemote) return false
     try {
-      const output = await this.executeCommand(
-        `rclone lsjson "${this.activeRemote}:${remoteFolder}/${fileName}"`
-      )
+      const remotePath = `${this.activeRemote}:${remoteFolder}/${fileName}`
+      const output = await this.executeRcloneArgsWithOutput(['lsjson', remotePath])
       const json = JSON.parse(output)
       return json && json.length > 0
     } catch {

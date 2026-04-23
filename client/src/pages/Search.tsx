@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'preact/hooks'
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { FaSearch, FaFilter, FaChevronDown, FaChevronUp } from 'react-icons/fa'
 import AnimeCard from '../components/anime/AnimeCard'

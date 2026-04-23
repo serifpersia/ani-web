@@ -76,6 +76,12 @@ export class SettingsController {
       if (closeErr) return res.status(500).json({ error: 'Failed to close database.' })
 
       try {
+        req.db.run('PRAGMA wal_checkpoint(TRUNCATE)')
+      } catch (checkpointErr) {
+        logger.warn({ err: checkpointErr }, 'WAL checkpoint failed')
+      }
+
+      try {
         if (fs.existsSync(`${dbPath}-wal`)) fs.unlinkSync(`${dbPath}-wal`)
         if (fs.existsSync(`${dbPath}-shm`)) fs.unlinkSync(`${dbPath}-shm`)
       } catch (cleanupErr) {
