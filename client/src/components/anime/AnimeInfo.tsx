@@ -1,7 +1,18 @@
 import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { FaPlay, FaPlus, FaCheck, FaChevronDown, FaChevronUp } from 'react-icons/fa'
-import { useState } from 'react'
+import {
+  FaPlay,
+  FaPlus,
+  FaCheck,
+  FaChevronDown,
+  FaChevronUp,
+  FaStar,
+  FaCalendarAlt,
+  FaTv,
+  FaClock,
+  FaLayerGroup,
+} from 'react-icons/fa'
+import { useState, useMemo } from 'react'
 import { useAnimeInfoData } from '../../hooks/useAnimeInfoData'
 import { fixThumbnailUrl } from '../../lib/utils'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
@@ -73,268 +84,239 @@ export default function AnimeInfo() {
     setLoadingDetails(false)
   }
 
+  const bannerUrl = useMemo(() => {
+    if (!showMeta?.thumbnail) return ''
+    return fixThumbnailUrl(showMeta.thumbnail, 1200, 450)
+  }, [showMeta?.thumbnail])
+
   if (loadingMeta || !showMeta?.name) {
     return (
       <div className={styles.container}>
         <div className={styles.heroSkeleton}>
-          <div className={styles.skeletonPoster} />
-          <div className={styles.skeletonInfo}>
-            <div className={styles.skeletonTitle} />
-            <div className={styles.skeletonMeta} />
-            <div className={styles.skeletonDesc} />
-            <div className={styles.skeletonActions} />
+          <div className={styles.skeletonBanner} />
+          <div className={styles.skeletonContent}>
+            <div className={styles.skeletonPoster} />
+            <div className={styles.skeletonInfo}>
+              <div className={styles.skeletonTitle} />
+              <div className={styles.skeletonMeta} />
+              <div className={styles.skeletonDesc} />
+              <div className={styles.skeletonActions} />
+            </div>
           </div>
         </div>
-      </div>
-    )
-  }
-
-  if (!showMeta?.name) {
-    return (
-      <div className={styles.container}>
-        <ErrorMessage message="Failed to load anime info" />
       </div>
     )
   }
 
   return (
     <div className={styles.container}>
-      <div className={styles.hero}>
-        <div className={styles.posterContainer}>
-          <img
-            src={fixThumbnailUrl(showMeta.thumbnail, 300, 420)}
-            alt={showMeta.name}
-            className={styles.poster}
-          />
+      <div className={styles.heroSection}>
+        <div className={styles.bannerContainer}>
+          <div className={styles.banner} style={{ backgroundImage: `url(${bannerUrl})` }} />
+          <div className={styles.bannerOverlay} />
         </div>
 
-        <div className={styles.info}>
-          <h1 className={styles.title}>{getDisplayTitle()}</h1>
-
-          <div className={styles.meta}>
-            {showMeta.score && (
-              <span className={styles.score}>
-                <span className={styles.scoreValue}>{showMeta.score}</span>
-              </span>
-            )}
-            {showMeta.status && <span className={styles.status}>{showMeta.status}</span>}
-            {formatNextAiring(showMeta) && (
-              <span className={styles.nextEpisode}>{formatNextAiring(showMeta)}</span>
-            )}
+        <div className={styles.heroContent}>
+          <div className={styles.posterContainer}>
+            <img
+              src={fixThumbnailUrl(showMeta.thumbnail, 320, 480)}
+              alt={showMeta.name}
+              className={styles.poster}
+            />
           </div>
 
-          {showMeta.genres && showMeta.genres.length > 0 && (
-            <div className={styles.genres}>
-              {showMeta.genres.slice(0, 5).map((g) => (
-                <span key={g.name} className={styles.genre}>
-                  {g.name}
-                </span>
-              ))}
-            </div>
-          )}
+          <div className={styles.infoGlass}>
+            <div className={styles.topInfo}>
+              <h1 className={styles.title}>{getDisplayTitle()}</h1>
 
-          <div className={styles.actions}>
-            <button className={styles.watchBtn} onClick={handleStartWatching}>
-              <FaPlay size={16} />
-              Start Watching
-            </button>
-            <button
-              className={`${styles.watchlistBtn} ${inWatchlist ? styles.active : ''}`}
-              onClick={toggleWatchlist}
-            >
-              {inWatchlist ? <FaCheck size={14} /> : <FaPlus size={14} />}
-              {inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className={styles.details}>
-        <h2 className={styles.sectionTitle}>Synopsis</h2>
-        <p className={styles.description}>
-          {showMeta.description
-            ? showMeta.description.replace(/<[^>]*>?/gm, '')
-            : 'No description available.'}
-        </p>
-      </div>
-
-      <button
-        className={styles.detailsToggleBtn}
-        onClick={() => {
-          setShowDetails(!showDetails)
-          if (!showDetails && !allmangaDetails && !loadingDetails) loadDetails()
-        }}
-      >
-        {showDetails ? <FaChevronUp /> : <FaChevronDown />}
-        {showDetails ? 'Hide Details' : 'Show Details'}
-      </button>
-
-      {showDetails && (
-        <>
-          {loadingDetails && <p className={styles.loadingDetails}>Loading details...</p>}
-          {allmangaDetails && (
-            <div className={styles.detailsGridContainer}>
-              {showMeta.mediaTypes?.[0] && (
-                <div className={styles.detailItem}>
-                  <strong>Type</strong>
-                  <span>{showMeta.mediaTypes[0].name}</span>
-                </div>
-              )}
-              {showMeta.status && (
-                <div className={styles.detailItem}>
-                  <strong>Status</strong>
-                  <span>{showMeta.status}</span>
-                </div>
-              )}
-              {showMeta.stats?.averageScore && (
-                <div className={styles.detailItem}>
-                  <strong>Score</strong>
-                  <span>{showMeta.stats.averageScore}</span>
-                </div>
-              )}
-              {showMeta.studios && showMeta.studios.length > 0 && (
-                <div className={styles.detailItem}>
-                  <strong>Studios</strong>
-                  <span>{showMeta.studios.map((s) => s.name).join(', ')}</span>
-                </div>
-              )}
-              {showMeta.sources?.[0] && (
-                <div className={styles.detailItem}>
-                  <strong>Source</strong>
-                  <span>{showMeta.sources[0].name}</span>
-                </div>
-              )}
-              {showMeta.lengthMin && (
-                <div className={styles.detailItem}>
-                  <strong>Episode Length</strong>
-                  <span>{showMeta.lengthMin} min</span>
-                </div>
-              )}
-              {showMeta.names?.english && (
-                <div className={styles.detailItem}>
-                  <strong>English Title</strong>
-                  <span>{showMeta.names.english}</span>
-                </div>
-              )}
-              {showMeta.names?.native && (
-                <div className={styles.detailItem}>
-                  <strong>Native Title</strong>
-                  <span>{showMeta.names.native}</span>
-                </div>
-              )}
-              {showMeta.genres && (
-                <div className={styles.detailItem}>
-                  <strong>Genres</strong>
-                  <div className={styles.genresList}>
-                    {showMeta.genres.map((g) => (
-                      <span key={g.name} className={styles.genreTag}>
-                        {g.name}
-                      </span>
-                    ))}
+              <div className={styles.quickMeta}>
+                {showMeta.score && (
+                  <div className={styles.metaItem}>
+                    <FaStar className={styles.iconStar} />
+                    <span>{showMeta.score}</span>
                   </div>
-                </div>
-              )}
-              {allmangaDetails.Rating && (
-                <div className={styles.detailItem}>
-                  <strong>Rating</strong>
-                  <span>{allmangaDetails.Rating}</span>
-                </div>
-              )}
-              {(showMeta.season?.title || allmangaDetails.Season) && (
-                <div className={styles.detailItem}>
-                  <strong>Season</strong>
-                  <span>{showMeta.season?.title || allmangaDetails.Season}</span>
-                </div>
-              )}
-              {allmangaDetails.Episodes && (
-                <div className={styles.detailItem}>
-                  <strong>Episodes</strong>
-                  <span>{allmangaDetails.Episodes}</span>
-                </div>
-              )}
-              {allmangaDetails.Date && (
-                <div className={styles.detailItem}>
-                  <strong>Date</strong>
-                  <span>{allmangaDetails.Date}</span>
-                </div>
-              )}
-              {allmangaDetails['Original Broadcast'] && (
-                <div className={styles.detailItem}>
-                  <strong>Original Broadcast</strong>
-                  <span>{allmangaDetails['Original Broadcast']}</span>
-                </div>
-              )}
-            </div>
-          )}
-          {showMeta.websites && (
-            <div className={styles.externalLinksSection}>
-              <strong>External Links</strong>
-              <div className={styles.externalLinksGrid}>
-                {showMeta.websites.official && (
-                  <a
-                    href={ensureHttpProtocol(showMeta.websites.official)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.websiteLink}
-                  >
-                    Official
-                  </a>
                 )}
-                {showMeta.websites.mal && (
-                  <a
-                    href={ensureHttpProtocol(showMeta.websites.mal)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.websiteLink}
-                  >
-                    MAL
-                  </a>
+                {showMeta.status && (
+                  <div className={styles.metaItem}>
+                    <FaTv className={styles.iconTv} />
+                    <span>{showMeta.status}</span>
+                  </div>
                 )}
-                {showMeta.websites.aniList && (
-                  <a
-                    href={ensureHttpProtocol(showMeta.websites.aniList)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.websiteLink}
-                  >
-                    AniList
-                  </a>
+                {showMeta.mediaTypes?.[0] && (
+                  <div className={styles.metaItem}>
+                    <FaLayerGroup className={styles.iconType} />
+                    <span>{showMeta.mediaTypes[0].name}</span>
+                  </div>
                 )}
-                {showMeta.websites.kitsu && (
-                  <a
-                    href={ensureHttpProtocol(showMeta.websites.kitsu)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.websiteLink}
-                  >
-                    Kitsu
-                  </a>
-                )}
-                {showMeta.websites.animePlanet && (
-                  <a
-                    href={ensureHttpProtocol(showMeta.websites.animePlanet)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.websiteLink}
-                  >
-                    Anime-Planet
-                  </a>
-                )}
-                {showMeta.websites.anidb && (
-                  <a
-                    href={ensureHttpProtocol(showMeta.websites.anidb)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.websiteLink}
-                  >
-                    AniDB
-                  </a>
+                {showMeta.lengthMin && (
+                  <div className={styles.metaItem}>
+                    <FaClock className={styles.iconClock} />
+                    <span>{showMeta.lengthMin}m</span>
+                  </div>
                 )}
               </div>
+
+              {showMeta.genres && showMeta.genres.length > 0 && (
+                <div className={styles.genres}>
+                  {showMeta.genres.slice(0, 5).map((g) => (
+                    <span key={g.name} className={styles.genre}>
+                      {g.name}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </>
-      )}
+
+            <div className={styles.synopsisSection}>
+              <h2 className={styles.sectionTitleSmall}>Synopsis</h2>
+              <p className={styles.description}>
+                {showMeta.description
+                  ? showMeta.description.replace(/<[^>]*>?/gm, '')
+                  : 'No description available.'}
+              </p>
+            </div>
+
+            <div className={styles.actions}>
+              <button className={styles.watchBtn} onClick={handleStartWatching}>
+                <FaPlay size={14} />
+                Start Watching
+              </button>
+              <button
+                className={`${styles.watchlistBtn} ${inWatchlist ? styles.active : ''}`}
+                onClick={toggleWatchlist}
+              >
+                {inWatchlist ? <FaCheck size={14} /> : <FaPlus size={14} />}
+                {inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.detailsSection}>
+        <button
+          className={styles.detailsToggleBtn}
+          onClick={() => {
+            setShowDetails(!showDetails)
+            if (!showDetails && !allmangaDetails && !loadingDetails) loadDetails()
+          }}
+        >
+          {showDetails ? <FaChevronUp /> : <FaChevronDown />}
+          {showDetails ? 'Hide Technical Details' : 'Show Technical Details'}
+        </button>
+
+        {showDetails && (
+          <div className={styles.expandedContent}>
+            {loadingDetails && (
+              <div className={styles.loadingDetails}>
+                <div className={styles.spinner} />
+                <span>Loading metadata...</span>
+              </div>
+            )}
+
+            {allmangaDetails && (
+              <div className={styles.detailsGridContainer}>
+                {showMeta.studios && showMeta.studios.length > 0 && (
+                  <div className={styles.detailItem}>
+                    <strong>Studios</strong>
+                    <span>{showMeta.studios.map((s) => s.name).join(', ')}</span>
+                  </div>
+                )}
+                {showMeta.sources?.[0] && (
+                  <div className={styles.detailItem}>
+                    <strong>Source</strong>
+                    <span>{showMeta.sources[0].name}</span>
+                  </div>
+                )}
+                {allmangaDetails.Rating && (
+                  <div className={styles.detailItem}>
+                    <strong>Rating</strong>
+                    <span>{allmangaDetails.Rating}</span>
+                  </div>
+                )}
+                {(showMeta.season?.title || allmangaDetails.Season) && (
+                  <div className={styles.detailItem}>
+                    <strong>Season</strong>
+                    <span>{showMeta.season?.title || allmangaDetails.Season}</span>
+                  </div>
+                )}
+                {allmangaDetails.Episodes && (
+                  <div className={styles.detailItem}>
+                    <strong>Episodes</strong>
+                    <span>{allmangaDetails.Episodes}</span>
+                  </div>
+                )}
+                {allmangaDetails.Date && (
+                  <div className={styles.detailItem}>
+                    <strong>Aired</strong>
+                    <span>{allmangaDetails.Date}</span>
+                  </div>
+                )}
+                {formatNextAiring(showMeta) && (
+                  <div className={styles.detailItem}>
+                    <strong>Next Airing</strong>
+                    <span className={styles.airingValue}>{formatNextAiring(showMeta)}</span>
+                  </div>
+                )}
+                {showMeta.names?.native && (
+                  <div className={styles.detailItem}>
+                    <strong>Native Title</strong>
+                    <span>{showMeta.names.native}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {showMeta.websites && (
+              <div className={styles.externalLinksSection}>
+                <h3 className={styles.externalLinksTitle}>External Links</h3>
+                <div className={styles.externalLinksGrid}>
+                  {showMeta.websites.official && (
+                    <a
+                      href={ensureHttpProtocol(showMeta.websites.official)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.websiteLink}
+                    >
+                      Official Website
+                    </a>
+                  )}
+                  {showMeta.websites.mal && (
+                    <a
+                      href={ensureHttpProtocol(showMeta.websites.mal)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.websiteLink}
+                    >
+                      MyAnimeList
+                    </a>
+                  )}
+                  {showMeta.websites.aniList && (
+                    <a
+                      href={ensureHttpProtocol(showMeta.websites.aniList)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.websiteLink}
+                    >
+                      AniList
+                    </a>
+                  )}
+                  {showMeta.websites.kitsu && (
+                    <a
+                      href={ensureHttpProtocol(showMeta.websites.kitsu)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.websiteLink}
+                    >
+                      Kitsu
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

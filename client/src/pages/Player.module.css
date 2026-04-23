@@ -60,14 +60,14 @@
 }
 
 .watchlistBtn.inList {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+  background: rgba(16, 185, 129, 0.1);
+  border-color: #10b981;
+  color: #10b981;
 }
 
 .watchlistBtn.inList:hover {
-  background: var(--accent-dark);
+  background: rgba(16, 185, 129, 0.15);
+  border-color: #10b981;
 }
 
 .videoContainer {
