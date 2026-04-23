@@ -54,6 +54,7 @@ interface AnimeSectionProps {
   emptyState?: React.ReactNode
   carousel?: boolean
   cardConfig?: AnimeSectionConfig
+  layout?: 'vertical' | 'horizontal'
 }
 
 const AnimeSection: React.FC<AnimeSectionProps> = ({
@@ -66,8 +67,12 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
   emptyState,
   carousel,
   cardConfig,
+  layout,
 }) => {
   const carouselRef = useRef<HTMLDivElement>(null)
+
+  const defaultLayout = carousel ? 'vertical' : 'horizontal'
+  const currentLayout = layout || defaultLayout
 
   const scroll = (direction: 'left' | 'right') => {
     if (!carouselRef.current) return
@@ -116,7 +121,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
             {loading && animeList.length === 0
               ? Array.from({ length: 7 }).map((_, i) => (
                   <div key={i} className={styles['carousel-card']}>
-                    <AnimeCardSkeleton />
+                    <AnimeCardSkeleton layout={currentLayout} />
                   </div>
                 ))
               : animeList.map((anime, index) => (
@@ -127,6 +132,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
                       onRemove={onRemove}
                       isLCP={index < 4 && title === 'Latest Releases'}
                       config={cardConfig}
+                      layout={currentLayout}
                     />
                   </div>
                 ))}
@@ -135,7 +141,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
       ) : (
         <div className="grid-container">
           {loading && animeList.length === 0 ? (
-            <SkeletonGrid count={6} />
+            <SkeletonGrid count={6} layout={currentLayout} />
           ) : animeList.length > 0 ? (
             animeList.map((anime, index) => (
               <AnimeCard
@@ -145,6 +151,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
                 onRemove={onRemove}
                 isLCP={index < 4 && title === 'Latest Releases'}
                 config={cardConfig}
+                layout={currentLayout}
               />
             ))
           ) : !loading ? (

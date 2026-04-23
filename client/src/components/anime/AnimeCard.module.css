@@ -206,6 +206,13 @@
   opacity: 1;
 }
 
+@media (hover: none), (pointer: coarse) {
+  .removeBtn {
+    opacity: 1 !important;
+    background-color: rgba(0, 0, 0, 0.4) !important;
+  }
+}
+
 .mobileBadges {
   display: flex;
   flex-wrap: wrap;
@@ -240,25 +247,47 @@
   }
 
   .removeBtn {
-    opacity: 1;
-    background-color: rgba(0, 0, 0, 0.5);
+    opacity: 1 !important;
+    background-color: rgba(0, 0, 0, 0.5) !important;
   }
 
-  .card {
+  .card.horizontal {
     flex-direction: row;
     height: auto;
     min-height: 100px;
   }
 
-  .posterContainer {
+  .card.horizontal .posterContainer {
     width: 85px;
     height: 100%;
     aspect-ratio: auto;
     flex-shrink: 0;
   }
 
-  .info {
+  .card.horizontal .info {
     padding: var(--space-2) var(--space-3);
+    justify-content: center;
+  }
+
+  .card.vertical .posterContainer {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+  }
+
+  .card.vertical .info {
+    padding: var(--space-2);
+    align-items: center;
+    text-align: center;
+  }
+
+  .card.vertical .title {
+    font-size: var(--font-size-xs);
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    text-align: center;
+  }
+
+  .card.vertical .mobileBadges {
     justify-content: center;
   }
 

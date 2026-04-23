@@ -52,7 +52,6 @@ const defaultConfig: AnimeCardConfig = {
     poster: {
       typeBadge: true,
       episodeBadge: true,
-      removeButton: true,
       adultBadge: true,
     },
     info: {
@@ -70,10 +69,11 @@ interface AnimeCardProps {
   onRemove?: (id: string) => void
   isLCP?: boolean
   config?: AnimeCardConfig
+  layout?: 'vertical' | 'horizontal'
 }
 
 const AnimeCard: React.FC<AnimeCardProps> = memo(
-  ({ anime, continueWatching = false, onRemove, isLCP = false, config }) => {
+  ({ anime, continueWatching = false, onRemove, isLCP = false, config, layout = 'vertical' }) => {
     const isMobile = useIsMobile()
     const { titlePreference } = useTitlePreference()
     const [isLoaded, setIsLoaded] = useState(false)
@@ -148,7 +148,9 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     const showTypeBadge = posterEls?.typeBadge ?? (continueWatching ? false : true)
     const showEpBadge = posterEls?.episodeBadge ?? true
     const showRemoveBtn =
-      posterEls?.removeButton === undefined ? continueWatching : posterEls.removeButton
+      posterEls?.removeButton === undefined
+        ? continueWatching && !!onRemove
+        : posterEls.removeButton
     const showAdultBadge = posterEls?.adultBadge ?? true
     const showMobileBadges = infoEls?.mobileBadges ?? true
     const showProgress = infoEls?.progress ?? true
@@ -162,7 +164,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
 
     return (
       <div className={styles.cardWrapper}>
-        <Link to={linkTarget} className={styles.card}>
+        <Link to={linkTarget} className={`${styles.card} ${styles[layout]}`}>
           <div className={styles.posterContainer}>
             <img
               src={fixThumbnailUrl(anime.thumbnail, 150, 200)}
@@ -184,12 +186,6 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
                   <div className={styles.epBadge}>{progressString}</div>
                 )}
               </>
-            )}
-
-            {showRemoveBtn && (
-              <button className={styles.removeBtn} onClick={handleRemoveClick} aria-label="Remove">
-                <FaTimes size={10} />
-              </button>
             )}
 
             {showAdultBadge && adultContent && <div className={styles.adultBadge}>18+</div>}
@@ -238,6 +234,11 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             )}
           </div>
         </Link>
+        {showRemoveBtn && (
+          <button className={styles.removeBtn} onClick={handleRemoveClick} aria-label="Remove">
+            <FaTimes size={10} />
+          </button>
+        )}
       </div>
     )
   }

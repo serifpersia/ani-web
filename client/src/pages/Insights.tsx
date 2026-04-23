@@ -230,21 +230,26 @@ const Insights: React.FC = () => {
                 heatmapData.forEach((d, i) => {
                   if (d.month !== lastMonth && !d.isOutOfRange) {
                     const weekIdx = Math.floor(i / 7) + 1
-                    labels.push(
-                      <span
-                        key={i}
-                        style={{
-                          gridColumn: weekIdx,
-                          width: '18px',
-                          display: 'inline-block',
-                          overflow: 'visible',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {new Date(0, d.month).toLocaleString('default', { month: 'short' })}
-                      </span>
-                    )
-                    lastMonth = d.month
+                    // Only add label if it's at least 2 weeks after the previous label to avoid overlap
+                    if (
+                      weekIdx >
+                      (labels.length > 0
+                        ? (labels[labels.length - 1].props.style.gridColumn as number) + 2
+                        : -1)
+                    ) {
+                      labels.push(
+                        <span
+                          key={i}
+                          style={{
+                            gridColumn: weekIdx,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {new Date(0, d.month).toLocaleString('default', { month: 'short' })}
+                        </span>
+                      )
+                      lastMonth = d.month
+                    }
                   }
                 })
                 return labels
@@ -290,10 +295,19 @@ const Insights: React.FC = () => {
               <div key={i} className={styles.hourlyBarContainer}>
                 <div
                   className={styles.hourlyBar}
-                  style={{ height: `${(h.count / maxHourly) * 100 || 2}%` }}
+                  style={{
+                    height: `${(h.count / maxHourly) * 100 || 2}%`,
+                    width: '100%',
+                    maxWidth: '12px',
+                  }}
                   title={`${h.count} watches at ${h.hour}:00`}
                 />
-                {i % 4 === 0 && <span className={styles.hourlyLabel}>{h.hour}</span>}
+                <span
+                  className={styles.hourlyLabel}
+                  style={{ visibility: i % 4 === 0 ? 'visible' : 'hidden' }}
+                >
+                  {h.hour}
+                </span>
               </div>
             ))}
           </div>
@@ -339,7 +353,11 @@ const Insights: React.FC = () => {
               <div key={i} className={styles.seasonalBarContainer}>
                 <div
                   className={styles.seasonalBar}
-                  style={{ height: `${(s.seconds / maxSeasonal) * 100 || 5}%` }}
+                  style={{
+                    height: `${(s.seconds / maxSeasonal) * 100 || 5}%`,
+                    width: '100%',
+                    maxWidth: '24px',
+                  }}
                   title={`${Math.round(s.seconds / 3600)}h in ${new Date(0, i).toLocaleString('default', { month: 'long' })}`}
                 />
                 <span className={styles.seasonalLabel}>

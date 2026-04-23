@@ -1,35 +1,50 @@
 .settingsPanel {
   position: absolute;
-  bottom: 90px;
+  bottom: 100px;
   right: 24px;
-  width: 300px;
-  background: rgba(15, 15, 17, 0.95);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
+  width: 320px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--glass-shadow);
   z-index: 60;
+  animation: slideUp 0.3s var(--ease-smooth);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .header {
   display: flex;
   align-items: center;
-  padding: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--glass-border);
   position: relative;
-  height: 56px;
+  height: 60px;
 }
 
 .header h3 {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 0.85rem;
+  font-weight: 800;
   flex-grow: 1;
   text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-tertiary);
 }
 
 .backBtn {
@@ -38,21 +53,22 @@
   color: white;
   cursor: pointer;
   position: absolute;
-  left: 12px;
-  padding: 4px;
+  left: 1rem;
+  padding: 8px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s;
+  transition: all var(--transition-fast);
 }
 
 .backBtn:hover {
   background: rgba(255, 255, 255, 0.1);
+  transform: translateX(-2px);
 }
 
 .contentWrapper {
-  max-height: 350px;
+  max-height: 400px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -60,79 +76,81 @@
 .menuContent {
   display: flex;
   flex-direction: column;
-  padding: 8px;
+  padding: 0.75rem;
 }
 
 .menuItem {
   background: transparent;
   border: none;
-  color: white;
-  padding: 12px 16px;
+  color: var(--text-secondary);
+  padding: 0.85rem 1rem;
   text-align: left;
   display: flex;
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
   font-size: 0.95rem;
-  border-radius: 8px;
-  transition: background 0.2s;
+  font-weight: 600;
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-fast);
 }
 
 .menuItem:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  transform: translateX(4px);
 }
 
 .menuItem.selected {
-  color: var(--accent);
+  color: var(--accent-light);
+  background: rgba(139, 92, 246, 0.1);
 }
 
 .currentValue {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  font-size: 0.8rem;
+  font-weight: 500;
 }
 
 .sliderGroup {
-  padding: 16px;
+  padding: 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 1rem;
 }
 
 .sliderGroup label {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .sliderGroup input[type='range'] {
   width: 100%;
   cursor: pointer;
   accent-color: var(--accent);
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  appearance: none;
 }
 
 .contentWrapper::-webkit-scrollbar {
   width: 4px;
 }
 
+.contentWrapper::-webkit-scrollbar-thumb {
+  background: var(--glass-border);
+  border-radius: 2px;
+}
+
 @media (max-width: 768px) {
   .settingsPanel {
     right: 12px;
-    bottom: 70px;
+    bottom: 80px;
     width: calc(100vw - 24px);
-    max-width: 300px;
-    max-height: 50vh;
-  }
-  .contentWrapper {
-    max-height: calc(50vh - 56px);
-  }
-}
-
-@media (max-width: 900px) and (orientation: landscape) {
-  .settingsPanel {
-    right: max(16px, env(safe-area-inset-right));
-    bottom: 60px;
-    max-height: 70vh;
-  }
-  .contentWrapper {
-    max-height: calc(70vh - 56px);
+    max-width: 320px;
   }
 }

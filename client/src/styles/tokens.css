@@ -109,6 +109,7 @@
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
   --transition-fast: 0.2s var(--ease-smooth);
   --transition-base: 0.3s var(--ease-smooth);
+  --transition-normal: 0.4s var(--ease-smooth);
   --transition-slow: 0.5s var(--ease-smooth);
 }
 

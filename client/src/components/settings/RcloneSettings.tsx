@@ -70,7 +70,7 @@ const RcloneSettings: React.FC = () => {
     return <div style={{ color: 'var(--text-secondary)', padding: '1.5rem' }}>Loading...</div>
 
   return (
-    <div className={styles.container}>
+    <div className={styles.sectionCard}>
       <h3 className={styles.title}>Rclone Cloud Sync</h3>
       <p className={styles.signIn}>
         Configure which Rclone remote to use for database synchronization.
@@ -83,7 +83,7 @@ const RcloneSettings: React.FC = () => {
           </p>
         </div>
       ) : (
-        <p className={styles.warning}>
+        <p className={styles.warning} style={{ marginBottom: '1.5rem' }}>
           Rclone sync is not currently active. Ensure rclone is installed and a remote is
           configured.
         </p>
@@ -108,7 +108,7 @@ const RcloneSettings: React.FC = () => {
             )}
           </select>
         </div>
-        <p className={styles.warning} style={{ marginTop: '8px', fontSize: '0.85em' }}>
+        <p className={styles.warning} style={{ marginTop: '12px' }}>
           <strong>Priority Note:</strong> If you have <strong>Google Authentication</strong> signed
           in, it will always take priority and Rclone sync will be ignored.
         </p>

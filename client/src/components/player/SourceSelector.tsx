@@ -1,5 +1,5 @@
 import React from 'react'
-import styles from '../../pages/Player.module.css'
+import styles from './Player.module.css'
 import type { VideoSource } from '../../pages/Player'
 
 interface ProviderSelectorProps {
@@ -43,27 +43,22 @@ const SourceSelector: React.FC<SourceSelectorProps> = ({
 }) => {
   const sources = Array.isArray(videoSources) ? videoSources : []
 
+  if (sources.length === 0) return null
+
   return (
     <div className={styles.sourceSelectionContainer}>
-      {sources.length > 0 && (
-        <>
-          <h4>Source</h4>
-          <select
-            className={styles.sourceSelect}
-            value={selectedSource?.sourceName || ''}
-            onChange={(e) => {
-              const source = sources.find((s) => s.sourceName === e.target.value)
-              if (source) onSourceChange(source)
-            }}
+      <h4>Source</h4>
+      <div className={styles.sourceButtons}>
+        {sources.map((source) => (
+          <button
+            key={source.sourceName}
+            className={`${styles.sourceButton} ${selectedSource?.sourceName === source.sourceName ? styles.active : ''} `}
+            onClick={() => onSourceChange(source)}
           >
-            {sources.map((source) => (
-              <option key={source.sourceName} value={source.sourceName}>
-                {source.sourceName}
-              </option>
-            ))}
-          </select>
-        </>
-      )}
+            {source.sourceName}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

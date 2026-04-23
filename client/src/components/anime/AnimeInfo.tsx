@@ -202,7 +202,7 @@ export default function AnimeInfo() {
           }}
         >
           {showDetails ? <FaChevronUp /> : <FaChevronDown />}
-          {showDetails ? 'Hide Technical Details' : 'Show Technical Details'}
+          {showDetails ? 'Hide Details' : 'Show Details'}
         </button>
 
         {showDetails && (

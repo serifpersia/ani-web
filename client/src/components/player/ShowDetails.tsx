@@ -1,5 +1,5 @@
 import React from 'react'
-import styles from '../../pages/Player.module.css'
+import styles from './Player.module.css'
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa'
 import type { DetailedShowMeta, AllMangaDetail } from '../../types/player'
 

@@ -1,45 +1,86 @@
 .skeletonCard {
-  border-radius: var(--card-border-radius);
-  overflow: hidden;
-  background-color: var(--dark-bg-secondary);
   display: flex;
   flex-direction: column;
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  height: 100%;
+  border: 1px solid var(--border-secondary);
 }
 
 .poster {
   width: 100%;
   aspect-ratio: 3 / 4;
-  background-color: var(--dark-border);
+  background-color: var(--bg-tertiary);
   animation: pulse 1.5s infinite ease-in-out;
 }
 
 .info {
-  padding: 1rem;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex-grow: 1;
 }
 
 .line {
-  height: 20px;
-  border-radius: 4px;
-  background-color: var(--dark-border);
+  height: 18px;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-tertiary);
   animation: pulse 1.5s infinite ease-in-out;
 }
 
 .line.short {
   width: 60%;
-  margin-top: 0.5rem;
-  height: 16px;
+  height: 14px;
 }
 
 @keyframes pulse {
   0% {
     opacity: 1;
   }
-
   50% {
-    opacity: 0.6;
+    opacity: 0.5;
   }
-
   100% {
     opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .skeletonCard.horizontal {
+    flex-direction: row;
+    height: auto;
+    min-height: 100px;
+  }
+
+  .skeletonCard.horizontal .poster {
+    width: 85px;
+    height: 100%;
+    aspect-ratio: auto;
+    flex-shrink: 0;
+  }
+
+  .skeletonCard.horizontal .info {
+    padding: var(--space-2) var(--space-3);
+    justify-content: center;
+  }
+
+  .skeletonCard.vertical .poster {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+  }
+
+  .skeletonCard.vertical .info {
+    padding: var(--space-2);
+    align-items: center;
+  }
+
+  .line {
+    height: 16px;
+  }
+
+  .line.short {
+    height: 12px;
   }
 }

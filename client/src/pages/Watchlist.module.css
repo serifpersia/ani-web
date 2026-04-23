@@ -1,93 +1,87 @@
+.header {
+  margin-bottom: var(--space-8);
+  animation: fadeIn 0.8s var(--ease-smooth);
+}
+
+.title {
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-2);
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  margin: 0;
+  font-weight: 500;
+}
+
 .controls {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-  background-color: var(--bg-secondary);
-  padding: 1rem;
-  border-radius: var(--card-radius);
-  border: 1px solid var(--border);
+  gap: var(--space-6);
+  margin-bottom: var(--space-10);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: var(--space-4) var(--space-6);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  animation: slideUpIn 0.8s var(--ease-smooth);
 }
 
 .filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .filterBtn {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text-secondary);
-  border: 1px solid transparent;
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  font-size: 0.9rem;
-  transition: all 0.2s;
+  border: 1px solid var(--border-primary);
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  transition: all var(--transition-base);
+  cursor: pointer;
 }
 
 .filterBtn:hover {
-  background-color: var(--bg-tertiary);
+  background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
+  border-color: var(--text-tertiary);
 }
 
 .filterBtn.active {
-  background-color: var(--accent);
+  background: var(--accent);
   color: white;
+  border-color: var(--accent);
+  box-shadow: 0 4px 15px var(--accent-glow);
 }
 
 .sortSelect {
   width: 180px;
-  height: 42px;
-  padding: 0 var(--space-3);
-  padding-right: 2rem;
+  height: 44px;
+  padding: 0 var(--space-4);
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-primary);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-lg);
   color: var(--text-primary);
   font-size: var(--font-size-sm);
+  font-weight: 600;
   cursor: pointer;
   appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23a1a1aa' stroke-width='2' viewBox='0 0 12 12'%3E%3Cpolyline points='3 5 6 8 9 5'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%2371717a' stroke-width='2' viewBox='0 0 12 12'%3E%3Cpolyline points='3 5 6 8 9 5'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 0.5rem center;
-  transition: border-color 0.15s ease;
-}
-
-.sortSelect:hover {
-  background-color: var(--bg-tertiary);
-  border-color: var(--border-secondary);
-}
-
-.sortSelect:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.statusSelect {
-  flex-grow: 1;
-  height: 38px;
-  padding: 0 var(--space-3);
-  padding-right: 2rem;
-  background-color: var(--bg-tertiary);
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23a1a1aa' stroke-width='2' viewBox='0 0 12 12'%3E%3Cpolyline points='3 5 6 8 9 5'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.5rem center;
-  transition: border-color 0.15s ease;
-}
-
-.statusSelect:hover {
-  background-color: var(--bg-tertiary);
-  border-color: var(--border-secondary);
+  background-position: right 1rem center;
+  transition: all var(--transition-fast);
 }
 
 .sortSelect:hover {
@@ -98,58 +92,128 @@
 .sortSelect:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-6);
+  animation: fadeIn 0.5s var(--ease-smooth);
 }
 
 .itemWrapper {
   display: flex;
   flex-direction: column;
   height: 100%;
+  transition: transform var(--transition-base);
+}
+
+.itemWrapper:hover {
+  transform: translateY(-4px);
 }
 
 .cardActions {
-  margin-top: 0.75rem;
+  margin-top: var(--space-3);
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .statusSelect {
   flex-grow: 1;
-  height: 38px;
+  height: 40px;
   padding: 0 var(--space-3);
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-primary);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none' stroke='%2371717a' stroke-width='2' viewBox='0 0 12 12'%3E%3Cpolyline points='3 5 6 8 9 5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  transition: all var(--transition-fast);
 }
 
 .statusSelect:hover {
   background-color: var(--bg-elevated);
-  border-color: var(--border-secondary);
+  border-color: var(--accent);
 }
 
 .removeBtn {
-  background-color: #ef4444;
-  color: white;
-  border: 1px solid #dc2626;
-  width: 32px;
-  height: 32px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
-  transition: all 0.2s;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
+  cursor: pointer;
 }
 
 .removeBtn:hover {
-  background-color: #dc2626;
-  transform: scale(1.08);
+  background: #ef4444;
+  color: white;
+  border-color: #ef4444;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
 }
 
 .emptyState {
   text-align: center;
-  padding: 4rem 1rem;
-  color: var(--text-muted);
+  padding: var(--space-16) var(--space-4);
+  color: var(--text-tertiary);
+  background: var(--glass-bg);
+  border: 1px dashed var(--border-primary);
+  border-radius: var(--radius-xl);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  animation: fadeIn 0.5s var(--ease-smooth);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUpIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
+    padding: var(--space-4);
+  }
+
+  .sortSelect {
+    width: 100%;
+  }
+
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: var(--space-4);
+  }
 }

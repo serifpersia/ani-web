@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import ToggleSwitch from '../common/ToggleSwitch'
-import styles from '../../pages/Settings.module.css'
+import styles from './WatchlistSettings.module.css'
 
 const WatchlistSettings: React.FC = () => {
   const [skipConfirmation, setSkipConfirmation] = useState(false)
@@ -52,18 +52,21 @@ const WatchlistSettings: React.FC = () => {
   }
 
   return (
-    <div className={styles.section}>
-      <h3>Watchlist</h3>
-      <div className={styles.setting}>
-        <label htmlFor="skip-confirmation-toggle">
-          Skip confirmation when removing from watchlist
-        </label>
-        <ToggleSwitch
-          isChecked={skipConfirmation}
-          onChange={handleToggle}
-          id="skip-confirmation-toggle"
-          disabled={isUpdating}
-        />
+    <div className={styles.sectionCard}>
+      <h3>Watchlist Preferences</h3>
+      <p>Customize your experience when managing your watchlist and series entries.</p>
+      <div className={styles.settingItem}>
+        <div className={styles.settingRow}>
+          <label htmlFor="skip-confirmation-toggle">
+            Skip confirmation when removing from watchlist
+          </label>
+          <ToggleSwitch
+            isChecked={skipConfirmation}
+            onChange={handleToggle}
+            id="skip-confirmation-toggle"
+            disabled={isUpdating}
+          />
+        </div>
       </div>
     </div>
   )

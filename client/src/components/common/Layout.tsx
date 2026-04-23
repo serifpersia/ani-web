@@ -1,5 +1,5 @@
 import { ComponentChildren, JSX } from 'preact'
-import './Container.css'
+import './Layout.css'
 
 interface Props {
   children: ComponentChildren

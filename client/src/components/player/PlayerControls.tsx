@@ -1,5 +1,5 @@
 import React, { useEffect, useState, Suspense, lazy } from 'react'
-import styles from '../../pages/Player.module.css'
+import styles from './PlayerControls.module.css'
 import ToggleSwitch from '../common/ToggleSwitch'
 import {
   FaPlay,

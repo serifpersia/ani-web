@@ -1,98 +1,256 @@
-.malPage {
-  padding: 20px;
-  max-width: 800px;
+.header {
+  margin-bottom: var(--space-8);
+  animation: fadeIn 0.8s var(--ease-smooth);
+}
+
+.pageTitle {
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-2);
+  letter-spacing: -0.02em;
+}
+
+.pageSubtitle {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.importCard {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  padding: var(--space-8);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--glass-shadow);
+  max-width: 600px;
   margin: 0 auto;
+  animation: slideUpIn 0.8s var(--ease-smooth);
 }
 
-.malPage h2 {
-  color: var(--text-color-primary);
-  margin-bottom: 20px;
-  font-size: 2em;
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: 10px;
+.cardHeader {
+  margin-bottom: var(--space-6);
 }
 
-.importSection,
-.exportSection {
-  background-color: var(--background-color-secondary);
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 20px;
-  box-shadow: var(--shadow-elevation-low);
+.cardHeader h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
-.importSection h3,
-.exportSection h3 {
-  color: var(--text-color-secondary);
-  margin-top: 0;
-  margin-bottom: 15px;
-  font-size: 1.5em;
+.cardHeader p {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  margin: 0;
+  line-height: 1.6;
 }
 
-.importControls,
-.exportControls {
+.uploadArea {
+  margin-bottom: var(--space-6);
+}
+
+.fileInputWrapper {
+  position: relative;
   display: flex;
-  gap: 10px;
   align-items: center;
-  margin-bottom: 15px;
+  gap: var(--space-4);
+  background: var(--bg-tertiary);
+  border: 1px dashed var(--border-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  transition: all var(--transition-fast);
 }
 
-.importControls input[type='file'],
-.exportControls input[type='file'] {
-  flex-grow: 1;
-  padding: 8px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background-color: var(--input-background-color);
-  color: var(--text-color-primary);
+.fileInputWrapper:hover {
+  border-color: var(--accent);
+  background: var(--bg-elevated);
 }
 
-.importControls button,
-.exportControls button {
-  padding: 10px 15px;
-  background-color: var(--accent-color);
-  color: var(--button-text-color);
-  border: none;
-  border-radius: 4px;
+.fileInput {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
   cursor: pointer;
-  font-size: 1em;
-  transition: background-color 0.2s ease;
+  z-index: 2;
 }
 
-.importControls button:hover,
-.exportControls button:hover {
-  background-color: var(--accent-color-hover);
-}
-
-.importOptions {
+.fileDisplay {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 15px;
+  gap: var(--space-3);
+  overflow: hidden;
 }
 
-.importOptions input[type='checkbox'] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--accent-color);
+.fileIcon {
+  color: var(--text-tertiary);
+  font-size: 1.5rem;
 }
 
-.importOptions label {
-  color: var(--text-color-secondary);
-  font-size: 0.95em;
+.fileName {
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.browseButton {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  pointer-events: none; /* Let the invisible file input handle clicks */
+}
+
+.optionsArea {
+  margin-bottom: var(--space-6);
+  padding: var(--space-4);
+  background: rgba(245, 158, 11, 0.05);
+  border: 1px solid rgba(245, 158, 11, 0.1);
+  border-radius: var(--radius-lg);
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  cursor: pointer;
+  position: relative;
+}
+
+.checkbox {
+  opacity: 0;
+  position: absolute;
+}
+
+.checkboxCustom {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-secondary);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: all var(--transition-fast);
+}
+
+.checkbox:checked + .checkboxCustom {
+  background: #f59e0b;
+  border-color: #f59e0b;
+}
+
+.checkbox:checked + .checkboxCustom::after {
+  content: '';
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  margin-bottom: 2px;
+}
+
+.optionText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.optionTitle {
+  color: #f59e0b;
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+}
+
+.optionDesc {
+  color: var(--text-tertiary);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border-primary);
+  padding-top: var(--space-6);
+}
+
+.importBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .statusMessage {
-  margin-top: 15px;
-  padding: 10px;
-  border-radius: 4px;
-  background-color: var(--info-background-color);
-  color: var(--info-text-color);
-  border: 1px solid var(--info-border-color);
+  margin-top: var(--space-6);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  text-align: center;
+  animation: fadeIn 0.3s ease;
+}
+
+.statusMessage.success {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 .statusMessage.error {
-  background-color: var(--error-background-color);
-  color: var(--error-text-color);
-  border-color: var(--error-border-color);
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUpIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 600px) {
+  .importCard {
+    padding: var(--space-6);
+  }
+
+  .fileInputWrapper {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .fileDisplay {
+    flex-direction: column;
+  }
+
+  .browseButton {
+    text-align: center;
+  }
 }

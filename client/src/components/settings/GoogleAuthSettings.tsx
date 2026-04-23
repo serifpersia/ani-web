@@ -183,7 +183,7 @@ const GoogleAuthSettings: React.FC = () => {
     return <div style={{ color: 'var(--text-secondary)', padding: '1.5rem' }}>Loading...</div>
 
   return (
-    <div className={styles.container}>
+    <div className={styles.sectionCard}>
       <h3 className={styles.title}>Google Authentication</h3>
 
       {user ? (

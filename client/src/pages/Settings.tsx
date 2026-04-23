@@ -5,8 +5,12 @@ import styles from './Settings.module.css'
 import GoogleAuthSettings from '../components/settings/GoogleAuthSettings'
 import WatchlistSettings from '../components/settings/WatchlistSettings'
 import RcloneSettings from '../components/settings/RcloneSettings'
+import { FaCog, FaCloud, FaDatabase, FaList } from 'react-icons/fa'
+
+type SettingsTab = 'general' | 'sync' | 'watchlist' | 'database'
 
 const Settings: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general')
   const [statusMessage, setStatusMessage] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -40,9 +44,7 @@ const Settings: React.FC = () => {
 
   const handleRestore = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file) {
-      return
-    }
+    if (!file) return
 
     setStatusMessage('Restoring database...')
     const formData = new FormData()
@@ -71,31 +73,97 @@ const Settings: React.FC = () => {
     fileInputRef.current?.click()
   }
 
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'general':
+        return (
+          <div className={styles.tabContent}>
+            <div className={styles.sectionCard}>
+              <h3>Appearance & Preferences</h3>
+              <p>Configure how titles are displayed and other general preferences.</p>
+              <div className={styles.settingItem}>
+                <TitlePreferenceToggle />
+              </div>
+            </div>
+          </div>
+        )
+      case 'sync':
+        return (
+          <div className={styles.tabContent}>
+            <GoogleAuthSettings />
+            <RcloneSettings />
+          </div>
+        )
+      case 'watchlist':
+        return (
+          <div className={styles.tabContent}>
+            <WatchlistSettings />
+          </div>
+        )
+      case 'database':
+        return (
+          <div className={styles.tabContent}>
+            <div className={styles.sectionCard}>
+              <h3>Database Management</h3>
+              <p>Download a backup of your current database or restore from an existing file.</p>
+              <div className={styles.controls}>
+                <Button onClick={handleBackup}>Backup Database</Button>
+                <Button variant="secondary" onClick={triggerFileSelect}>
+                  Restore Database
+                </Button>
+              </div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleRestore}
+                style={{ display: 'none' }}
+                accept=".db"
+              />
+              {statusMessage && <p className={styles.status}>{statusMessage}</p>}
+            </div>
+          </div>
+        )
+      default:
+        return null
+    }
+  }
+
   return (
     <div className="page-container">
-      <h2 className="section-title">Settings</h2>
-
-      <GoogleAuthSettings />
-      <RcloneSettings />
-
-      <div className={styles.section}>
-        <TitlePreferenceToggle />
+      <div className={styles.settingsHeader}>
+        <h1 className={styles.pageTitle}>Settings</h1>
+        <p className={styles.pageSubtitle}>Manage your preferences and data synchronization</p>
       </div>
-      <WatchlistSettings />
-      <div className={styles.section}>
-        <h3>Database Backup and Restore</h3>
-        <div className={styles.controls}>
-          <Button onClick={handleBackup}>Backup Database</Button>
-          <Button onClick={triggerFileSelect}>Restore Database</Button>
-        </div>
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleRestore}
-          style={{ display: 'none' }}
-          accept=".db"
-        />
-        {statusMessage && <p className={styles.status}>{statusMessage}</p>}
+
+      <div className={styles.settingsLayout}>
+        <aside className={styles.sidebar}>
+          <button
+            className={`${styles.sidebarItem} ${activeTab === 'general' ? styles.active : ''}`}
+            onClick={() => setActiveTab('general')}
+          >
+            <FaCog /> <span>General</span>
+          </button>
+          <button
+            className={`${styles.sidebarItem} ${activeTab === 'sync' ? styles.active : ''}`}
+            onClick={() => setActiveTab('sync')}
+          >
+            <FaCloud /> <span>Synchronization</span>
+          </button>
+          <button
+            className={`${styles.sidebarItem} ${activeTab === 'watchlist' ? styles.active : ''}`}
+            onClick={() => setActiveTab('watchlist')}
+          >
+            <FaList /> <span>Watchlist</span>
+          </button>
+          <button
+            className={`${styles.sidebarItem} ${activeTab === 'database' ? styles.active : ''}`}
+            onClick={() => setActiveTab('database')}
+          >
+            <FaDatabase /> <span>Database</span>
+          </button>
+        </aside>
+
+        <main className={styles.mainContent}>{renderTabContent()}</main>
       </div>
     </div>
   )

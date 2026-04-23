@@ -1,28 +1,33 @@
 .episodeListContainer {
-  display: grid;
-  grid-template-rows: auto 1fr;
+  display: flex;
+  flex-direction: column;
   height: 100%;
+  background: transparent;
 }
 
 .episodeListHeader {
-  background: var(--bg-secondary);
+  background: transparent;
+  padding: 1.5rem;
   border-bottom: 1px solid var(--glass-border);
   z-index: 10;
 }
 
 .episodeListTitle {
-  padding: 1.5rem;
-  margin: 0;
-  font-size: 1.1rem;
-  font-weight: 600;
+  margin: 0 0 1.25rem 0;
+  font-size: 1.25rem;
+  font-weight: 800;
   color: var(--text-primary);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  letter-spacing: 0.1em;
 }
 
 .rangeSelector {
-  padding: 0 1rem 1rem 1rem;
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
@@ -30,17 +35,18 @@
 
 .rangeButton {
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-primary);
+  border: 1px solid var(--glass-border);
   color: var(--text-secondary);
-  padding: 0.4rem 0.8rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.85rem;
-  transition: all 0.2s;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all var(--transition-fast);
   cursor: pointer;
 }
 
 .rangeButton:hover {
-  border-color: var(--text-primary);
+  border-color: var(--text-secondary);
   color: var(--text-primary);
   background: rgba(255, 255, 255, 0.1);
 }
@@ -49,48 +55,76 @@
   background: var(--accent);
   color: white;
   border-color: var(--accent);
+  box-shadow: 0 4px 12px var(--accent-glow);
 }
 
 .episodeList {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 0.5rem;
+  padding: 1rem;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  min-height: 0;
+}
+
+.episodeList::-webkit-scrollbar {
+  width: 5px;
+}
+
+.episodeList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.episodeList::-webkit-scrollbar-thumb {
+  background: var(--glass-border);
+  border-radius: var(--radius-full);
+}
+
+.episodeList::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
 }
 
 .episodeItem {
-  padding: 0.8rem 1rem;
-  margin: 2px 0;
-  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.5rem;
+  border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-normal);
   color: var(--text-secondary);
-  font-weight: 500;
+  font-weight: 600;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+  border: 1px solid transparent;
 }
 
 .episodeItem:hover {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
-  transform: translateX(4px);
+  transform: translateX(6px);
+  border-color: var(--glass-border);
 }
 
 .episodeItem.watched {
   color: var(--text-muted);
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 .episodeItem.active {
-  background: linear-gradient(90deg, rgba(139, 92, 246, 0.15), transparent);
+  background: rgba(139, 92, 246, 0.1);
   color: var(--accent-light);
-  border-left: 3px solid var(--accent);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.1);
 }
 
 .episodeItem.active:hover {
   transform: none;
+  background: rgba(139, 92, 246, 0.15);
+}
+
+.episodeItem span {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }

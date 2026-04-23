@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
+import { FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import AnimeCard from './AnimeCard'
 import styles from './Schedule.module.css'
 import AnimeCardSkeleton from './AnimeCardSkeleton'
@@ -21,19 +22,12 @@ interface Anime {
   }
 }
 
-const SkeletonGrid = () => (
-  <div className="grid-container">
-    {Array.from({ length: 10 }).map((_, i) => (
-      <AnimeCardSkeleton key={i} />
-    ))}
-  </div>
-)
-
 const Schedule: React.FC = () => {
   const [scheduleData, setScheduleData] = useState<Anime[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const carouselRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const fetchEpisodeSchedule = async (date: string) => {
@@ -54,6 +48,16 @@ const Schedule: React.FC = () => {
 
     fetchEpisodeSchedule(selectedDate)
   }, [selectedDate])
+
+  const scroll = (direction: 'left' | 'right') => {
+    if (!carouselRef.current) return
+    const { scrollLeft, clientWidth } = carouselRef.current
+    const offset = clientWidth * 0.8
+    carouselRef.current.scrollTo({
+      left: direction === 'left' ? scrollLeft - offset : scrollLeft + offset,
+      behavior: 'smooth',
+    })
+  }
 
   const getDayButtons = () => {
     const days = []
@@ -85,6 +89,7 @@ const Schedule: React.FC = () => {
   return (
     <div className={styles.scheduleSection}>
       <h2 className="section-title">Episode Schedule</h2>
+
       <div className={styles.daySelector}>
         {getDayButtons().map((dayButton) => (
           <button
@@ -97,25 +102,58 @@ const Schedule: React.FC = () => {
           </button>
         ))}
       </div>
-      {loading ? (
-        <SkeletonGrid />
-      ) : error ? (
-        <ErrorMessage message={error} />
-      ) : scheduleData.length === 0 ? (
-        <p style={{ textAlign: 'center', marginTop: '1rem' }}>
-          No episodes scheduled for this day.
-        </p>
-      ) : (
-        <div
-          key={selectedDate}
-          className="grid-container"
-          style={{ animation: 'fadeIn var(--transition-slow)' }}
-        >
-          {scheduleData.map((anime) => (
-            <AnimeCard key={anime._id} anime={anime} continueWatching={false} />
-          ))}
+
+      <div className={styles.carouselHeader}>
+        {scheduleData.length > 0 && (
+          <div className={styles.navArrows}>
+            <button
+              className={styles.navButton}
+              onClick={() => scroll('left')}
+              aria-label="Scroll left"
+            >
+              <FaChevronLeft />
+            </button>
+            <button
+              className={styles.navButton}
+              onClick={() => scroll('right')}
+              aria-label="Scroll right"
+            >
+              <FaChevronRight />
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className={styles.carouselContainer}>
+        <div className={styles.carousel} ref={carouselRef} key={selectedDate}>
+          {loading ? (
+            Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} className={styles.carouselCard}>
+                <AnimeCardSkeleton layout="vertical" />
+              </div>
+            ))
+          ) : error ? (
+            <div style={{ width: '100%' }}>
+              <ErrorMessage message={error} />
+            </div>
+          ) : scheduleData.length === 0 ? (
+            <p style={{ textAlign: 'center', marginTop: '1rem', width: '100%' }}>
+              No episodes scheduled for this day.
+            </p>
+          ) : (
+            scheduleData.map((anime) => (
+              <div key={anime._id} className={styles.carouselCard}>
+                <AnimeCard
+                  key={anime._id}
+                  anime={anime}
+                  continueWatching={false}
+                  layout="vertical"
+                />
+              </div>
+            ))
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

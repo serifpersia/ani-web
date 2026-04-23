@@ -288,9 +288,11 @@ const Home: React.FC = () => {
             }}
           >
             {loadingSeason ? (
-              <SkeletonGrid count={14} />
+              <SkeletonGrid count={14} layout="horizontal" />
             ) : (
-              currentSeason?.map((anime) => <AnimeCard key={anime._id} anime={anime} />)
+              currentSeason?.map((anime) => (
+                <AnimeCard key={anime._id} anime={anime} layout="horizontal" />
+              ))
             )}
           </div>
         </section>

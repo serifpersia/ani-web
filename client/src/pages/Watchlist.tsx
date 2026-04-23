@@ -154,7 +154,10 @@ const Watchlist: React.FC = () => {
 
   return (
     <div className="page-container">
-      <div className="section-title">My Watchlist</div>
+      <header className={styles.header}>
+        <h2 className={styles.title}>My Watchlist</h2>
+        <p className={styles.subtitle}>Track and manage your anime collection</p>
+      </header>
 
       <div className={styles.controls}>
         <div className={styles.filters}>
@@ -168,7 +171,7 @@ const Watchlist: React.FC = () => {
             </button>
           ))}
         </div>
-        <div style={{ width: '160px' }}>
+        <div>
           <select
             className={styles.sortSelect}
             value={sortBy}
@@ -187,13 +190,14 @@ const Watchlist: React.FC = () => {
         <ErrorMessage message={error.message} />
       ) : (
         <>
-          <div className="grid-container">
+          <div className={styles.grid}>
             {sortedList.map((item) => (
               <div key={item._id} className={styles.itemWrapper}>
                 <AnimeCard
                   anime={item}
                   continueWatching={isCW}
                   onRemove={() => handleRemove(item.id, item.name)}
+                  layout="horizontal"
                 />
                 {!isCW && (
                   <div className={styles.cardActions}>
@@ -213,6 +217,7 @@ const Watchlist: React.FC = () => {
                     <button
                       className={styles.removeBtn}
                       onClick={() => handleRemove(item.id, item.name)}
+                      title="Remove from Watchlist"
                     >
                       <FaTrash size={12} />
                     </button>
@@ -226,7 +231,9 @@ const Watchlist: React.FC = () => {
       )}
 
       {!isLoading && sortedList.length === 0 && (
-        <div className={styles.emptyState}>No anime found in this list.</div>
+        <div className={styles.emptyState}>
+          <p>No anime found in this list.</p>
+        </div>
       )}
 
       <RemoveConfirmationModal
