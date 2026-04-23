@@ -291,7 +291,26 @@
 .volumeSlider::-webkit-slider-runnable-track {
   width: 100%;
   height: 4px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0%,
+    var(--accent) var(--volume-percent, 0%),
+    rgba(255, 255, 255, 0.2) var(--volume-percent, 0%),
+    rgba(255, 255, 255, 0.2) 100%
+  );
+  border-radius: 4px;
+}
+
+.volumeSlider::-moz-range-track {
+  width: 100%;
+  height: 4px;
   background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.volumeSlider::-moz-range-progress {
+  height: 4px;
+  background: var(--accent);
   border-radius: 4px;
 }
 
