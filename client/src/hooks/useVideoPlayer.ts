@@ -92,7 +92,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
       if (!payload) return
 
       const video = videoRef.current!
-      const isFinished = video.currentTime >= video.duration * 0.95
+      const isFinished = video.currentTime >= video.duration * 0.8
       let timeToReport = video.currentTime
 
       if (isFinalUpdate && isFinished) {

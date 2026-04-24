@@ -211,10 +211,13 @@ const Player: React.FC = () => {
       videoElement.muted = savedMuted === 'true'
     }
 
-    videoElement.play().catch((error) => {
-      console.warn('Autoplay was prevented:', error)
-      actions.setShowControls(true)
-    })
+    const shouldAutoPlay = !(state.showResumeModal && state.resumeTime > 5)
+    if (shouldAutoPlay) {
+      videoElement.play().catch((error) => {
+        console.warn('Autoplay was prevented:', error)
+        actions.setShowControls(true)
+      })
+    }
 
     return () => {
       videoElement.removeEventListener('loadedmetadata', handleLoaded)
@@ -222,7 +225,15 @@ const Player: React.FC = () => {
         hlsInstance.current.destroy()
       }
     }
-  }, [state.selectedSource, state.selectedLink, refs.videoRef, actions, state.loadingVideo])
+  }, [
+    state.selectedSource,
+    state.selectedLink,
+    refs.videoRef,
+    actions,
+    state.loadingVideo,
+    state.showResumeModal,
+    state.resumeTime,
+  ])
 
   useEffect(() => {
     const videoElement = refs.videoRef.current
@@ -480,6 +491,25 @@ const Player: React.FC = () => {
     dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } })
   }
 
+  const handleNextEpisode = () => {
+    const currentIndex = state.episodes.findIndex((ep) => ep === state.currentEpisode)
+    if (currentIndex > -1 && currentIndex < state.episodes.length - 1) {
+      const nextEpisode = state.episodes[currentIndex + 1]
+      navigate(`/watch/${showId}/${nextEpisode}`)
+    }
+    dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } })
+  }
+
+  const hasNextEpisode = (() => {
+    const currentIndex = state.episodes.findIndex((ep) => ep === state.currentEpisode)
+    return currentIndex > -1 && currentIndex < state.episodes.length - 1
+  })()
+
+  const isCompleted =
+    state.resumeTime > 0 &&
+    state.resumeDuration > 0 &&
+    state.resumeTime >= state.resumeDuration * 0.8
+
   const handleAutoplayChange = (checked: boolean) => {
     dispatch({ type: 'SET_STATE', payload: { isAutoplayEnabled: checked } })
     localStorage.setItem('autoplayEnabled', checked.toString())
@@ -498,6 +528,9 @@ const Player: React.FC = () => {
         resumeTime={player.actions.formatTime(state.resumeTime)}
         onResume={handleResume}
         onStartOver={handleStartOver}
+        onNextEpisode={handleNextEpisode}
+        hasNextEpisode={hasNextEpisode}
+        isCompleted={isCompleted}
       />
 
       <aside className={layoutStyles.episodeSidebar}>
@@ -520,6 +553,9 @@ const Player: React.FC = () => {
           ref={refs.playerContainerRef}
           className={`${styles.videoContainer} ${layoutStyles.videoPlayerWrapper} ${player.state.isFullscreen ? styles.fullscreenActive : ''}`}
           onClick={handlePlayerClick}
+          style={{
+            ...(state.showResumeModal ? { visibility: 'hidden' } : {}),
+          }}
         >
           {skipIndicator && (
             <div

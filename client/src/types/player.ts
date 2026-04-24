@@ -101,6 +101,7 @@ export interface PlayerState {
   isAutoplayEnabled: boolean
   showResumeModal: boolean
   resumeTime: number
+  resumeDuration: number
   skipIntervals: SkipInterval[]
   selectedProvider: 'allanime' | 'hianime' | 'animepahe' | '123anime'
   loadingShowData: boolean

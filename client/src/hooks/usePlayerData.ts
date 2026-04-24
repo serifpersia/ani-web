@@ -179,14 +179,13 @@ export const usePlayerData = (
           : null
 
       let resumeTime = 0
+      let resumeDuration = 0
       let showResumeModal = false
       if (progressResponse.ok) {
         const progress = await progressResponse.json()
-        if (
-          progress?.currentTime > 0 &&
-          progress.currentTime < (progress.duration || 10000) * 0.95
-        ) {
+        if (progress?.currentTime > 0) {
           resumeTime = progress.currentTime
+          resumeDuration = progress.duration || 0
           showResumeModal = true
         }
       }
@@ -214,6 +213,7 @@ export const usePlayerData = (
         selectedSource: sourceToSelect,
         selectedLink,
         resumeTime,
+        resumeDuration,
         showResumeModal: showResumeModal && resumeTime > 5 && sourceToSelect?.type !== 'iframe',
         skipIntervals,
       }

@@ -27,6 +27,7 @@ export const initialState: PlayerState = {
   isAutoplayEnabled: localStorage.getItem('autoplayEnabled') === 'true',
   showResumeModal: false,
   resumeTime: 0,
+  resumeDuration: 0,
   skipIntervals: [],
   selectedProvider:
     (localStorage.getItem('preferredProvider') as
