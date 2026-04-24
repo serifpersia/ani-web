@@ -10,10 +10,11 @@ async function acquireLock(): Promise<fs.promises.FileHandle> {
     try {
       handle = await fs.promises.open(lockPath, 'wx')
     } catch {
-      if (++attempts >= 50) {
-        throw new Error('Failed to acquire lock on .env file')
+      if (++attempts >= 100) {
+        fs.promises.unlink(lockPath).catch(() => {})
+        throw new Error('Failed to acquire lock on .env file - another process may be holding it')
       }
-      await new Promise((r) => setTimeout(r, 50))
+      await new Promise((r) => setTimeout(r, 100))
     }
   }
   return handle
@@ -21,7 +22,7 @@ async function acquireLock(): Promise<fs.promises.FileHandle> {
 
 function releaseLock(handle: fs.promises.FileHandle) {
   handle.close().catch(() => {})
-  fs.unlink(lockPath, () => {})
+  fs.promises.unlink(lockPath).catch(() => {})
 }
 
 export async function updateEnvFile(updates: Record<string, string>) {
@@ -39,8 +40,7 @@ export async function updateEnvFile(updates: Record<string, string>) {
 
     Object.entries(updates).forEach(([key, value]) => {
       let found = false
-      const i = 0
-      while (i < newLines.length) {
+      for (let i = 0; i < newLines.length; i++) {
         const line = newLines[i]
         if (line && line.startsWith(`${key}=`)) {
           if (value === '') {

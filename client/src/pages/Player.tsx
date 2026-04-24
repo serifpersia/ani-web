@@ -62,6 +62,13 @@ const Player: React.FC = () => {
   const wasFullscreenRef = useRef(false)
   const rafIdRef = useRef<number | null>(null)
   const seekToTimeRef = useRef<number>(0)
+  const resumeTimeRef = useRef(state.resumeTime)
+  const showResumeModalRef = useRef(state.showResumeModal)
+
+  useEffect(() => {
+    resumeTimeRef.current = state.resumeTime
+    showResumeModalRef.current = state.showResumeModal
+  }, [state.resumeTime, state.showResumeModal])
 
   const [skipIndicator, setSkipIndicator] = useState<{
     side: 'left' | 'right'
@@ -130,6 +137,12 @@ const Player: React.FC = () => {
     if (state.selectedSource.type === 'iframe') {
       seekToTimeRef.current = 0
       return
+    }
+
+    if (resumeTimeRef.current > 5 && !showResumeModalRef.current) {
+      seekToTimeRef.current = resumeTimeRef.current
+    } else if (showResumeModalRef.current) {
+      seekToTimeRef.current = 0
     }
 
     let proxiedUrl = `/api/proxy?url=${encodeURIComponent(state.selectedLink.link)}`
@@ -211,7 +224,7 @@ const Player: React.FC = () => {
       videoElement.muted = savedMuted === 'true'
     }
 
-    const shouldAutoPlay = !(state.showResumeModal && state.resumeTime > 5)
+    const shouldAutoPlay = !(showResumeModalRef.current && resumeTimeRef.current > 5)
     if (shouldAutoPlay) {
       videoElement.play().catch((error) => {
         console.warn('Autoplay was prevented:', error)
@@ -225,15 +238,7 @@ const Player: React.FC = () => {
         hlsInstance.current.destroy()
       }
     }
-  }, [
-    state.selectedSource,
-    state.selectedLink,
-    refs.videoRef,
-    actions,
-    state.loadingVideo,
-    state.showResumeModal,
-    state.resumeTime,
-  ])
+  }, [state.selectedSource, state.selectedLink, refs.videoRef, actions, state.loadingVideo])
 
   useEffect(() => {
     const videoElement = refs.videoRef.current

@@ -23,6 +23,10 @@ const GoogleAuthSettings: React.FC = () => {
     show: boolean
     message: string
     type: 'success' | 'error' | 'info'
+    showConfirmButton?: boolean
+    onConfirm?: () => void
+    confirmButtonText?: string
+    cancelButtonText?: string
   }>({
     show: false,
     message: '',
@@ -93,6 +97,14 @@ const GoogleAuthSettings: React.FC = () => {
   }, [])
 
   const handleSave = async () => {
+    if (!clientId && !clientSecret) {
+      setStatusModal({
+        show: true,
+        message: 'Please enter a Client ID and Client Secret to save.',
+        type: 'info',
+      })
+      return
+    }
     try {
       const res = await fetch('/api/auth/google-auth', {
         method: 'POST',
@@ -110,7 +122,12 @@ const GoogleAuthSettings: React.FC = () => {
         fetchConfigStatus()
         if (clientId) fetchAuthUrl()
       } else {
-        throw new Error('Failed to save')
+        const data = await res.json().catch(() => ({}))
+        setStatusModal({
+          show: true,
+          message: data.error || 'Failed to save configuration.',
+          type: 'error',
+        })
       }
     } catch (error) {
       setStatusModal({
@@ -121,7 +138,23 @@ const GoogleAuthSettings: React.FC = () => {
     }
   }
 
-  const handleClear = async () => {
+  const handleClear = () => {
+    setStatusModal({
+      show: true,
+      message:
+        'Are you sure you want to clear your Google authentication configuration? This will sign you out and remove all stored credentials.',
+      type: 'info',
+      showConfirmButton: true,
+      onConfirm: () => {
+        setStatusModal({ show: false, message: '', type: 'info' })
+        clearConfig()
+      },
+      confirmButtonText: 'Clear',
+      cancelButtonText: 'Cancel',
+    })
+  }
+
+  const clearConfig = async () => {
     setClientId('')
     setClientSecret('')
     try {
@@ -258,6 +291,10 @@ const GoogleAuthSettings: React.FC = () => {
         message={statusModal.message}
         type={statusModal.type}
         onClose={() => setStatusModal((prev) => ({ ...prev, show: false }))}
+        showConfirmButton={statusModal.showConfirmButton}
+        onConfirm={statusModal.onConfirm}
+        confirmButtonText={statusModal.confirmButtonText}
+        cancelButtonText={statusModal.cancelButtonText}
       />
     </div>
   )
