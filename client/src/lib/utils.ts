@@ -1,4 +1,5 @@
 const thumbnailCache = new Map<string, string>()
+const MAX_CACHE_SIZE = 500
 
 export const fixThumbnailUrl = (
   url: string | undefined,
@@ -66,6 +67,9 @@ export const fixThumbnailUrl = (
     finalUrl += '&w=300'
   }
 
+  if (thumbnailCache.size > MAX_CACHE_SIZE) {
+    thumbnailCache.clear()
+  }
   thumbnailCache.set(cacheKey, finalUrl)
   return finalUrl
 }

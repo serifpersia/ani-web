@@ -124,6 +124,13 @@ export class ProxyController {
           if (!res.headersSent) res.status(502).send('Upstream error')
           else res.destroy()
         })
+
+        res.on('close', () => {
+          if (!resp.data.destroyed) {
+            resp.data.destroy()
+          }
+        })
+
         resp.data.pipe(res)
       }
     } catch (e) {
@@ -205,6 +212,12 @@ export class ProxyController {
       imageResponse.data.on('error', () => {
         if (!res.headersSent) {
           this.sendPlaceholder(res)
+        }
+      })
+
+      res.on('close', () => {
+        if (!imageResponse.data.destroyed) {
+          imageResponse.data.destroy()
         }
       })
 

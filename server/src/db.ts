@@ -72,6 +72,9 @@ export class DatabaseWrapper {
   private getPreparedStatement(query: string): StatementSync {
     let stmt = this.statementCache.get(query)
     if (!stmt) {
+      if (this.statementCache.size > 100) {
+        this.statementCache.clear()
+      }
       stmt = this.db.prepare(query)
       this.statementCache.set(query, stmt)
     }

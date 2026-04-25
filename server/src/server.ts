@@ -56,6 +56,7 @@ async function runSyncSequence(database: DatabaseWrapper) {
   const didDownload = await syncDownOnBoot(database, dbPath, remoteFolder, () => {
     return new Promise<void>((resolve) => {
       if (database && !database.isClosedCheck()) {
+        database.checkpoint()
         database.close(() => resolve())
       } else {
         resolve()

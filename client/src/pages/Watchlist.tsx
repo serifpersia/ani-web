@@ -69,13 +69,20 @@ const Watchlist: React.FC = () => {
   const isFetchingNextPage = isCW ? isFetchingNextCW : isFetchingNextWL
 
   useEffect(() => {
+    let ticking = false
     const handleScroll = () => {
-      if (
-        window.innerHeight + window.scrollY >= document.body.offsetHeight - 800 &&
-        hasNextPage &&
-        !isFetchingNextPage
-      ) {
-        fetchNextPage()
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          if (
+            window.innerHeight + window.scrollY >= document.body.offsetHeight - 800 &&
+            hasNextPage &&
+            !isFetchingNextPage
+          ) {
+            fetchNextPage()
+          }
+          ticking = false
+        })
+        ticking = true
       }
     }
     window.addEventListener('scroll', handleScroll)

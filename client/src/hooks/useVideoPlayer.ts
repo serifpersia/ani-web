@@ -293,10 +293,14 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
       sendProgressUpdate()
     }
 
-    const activeSkip = skipIntervals.find(
-      (interval) => time >= interval.start_time && time < interval.end_time
-    )
-    setCurrentSkipInterval(activeSkip || null)
+    const activeSkip =
+      skipIntervals.find((interval) => time >= interval.start_time && time < interval.end_time) ||
+      null
+
+    setCurrentSkipInterval((prev) => {
+      if (prev?.skip_id !== activeSkip?.skip_id) return activeSkip
+      return prev
+    })
     if (isAutoSkipEnabled && activeSkip && !video.paused) {
       video.currentTime = activeSkip.end_time
       setCurrentSkipInterval(null)

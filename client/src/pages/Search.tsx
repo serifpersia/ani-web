@@ -107,13 +107,20 @@ export default function Search() {
   }
 
   useEffect(() => {
+    let ticking = false
     const onScroll = () => {
-      if (
-        window.innerHeight + window.scrollY >= document.body.offsetHeight - 500 &&
-        hasNextPage &&
-        !isFetchingNextPage
-      ) {
-        fetchNextPage()
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          if (
+            window.innerHeight + window.scrollY >= document.body.offsetHeight - 500 &&
+            hasNextPage &&
+            !isFetchingNextPage
+          ) {
+            fetchNextPage()
+          }
+          ticking = false
+        })
+        ticking = true
       }
     }
     window.addEventListener('scroll', onScroll)

@@ -153,6 +153,7 @@ export class WatchlistController {
 
     setImmediate(async () => {
       if (db.isClosedCheck()) return
+      const delay = () => new Promise((res) => setImmediate(res))
       for (const show of enrichedRows) {
         if (!show.type && !this.activeTypeFetches.has(show.id)) {
           this.activeTypeFetches.add(show.id)
@@ -168,6 +169,7 @@ export class WatchlistController {
           } finally {
             this.activeTypeFetches.delete(show.id)
           }
+          await delay()
         }
       }
     })
@@ -266,6 +268,10 @@ export class WatchlistController {
         if (result.status === 'fulfilled' && result.value) {
           upNextShows.push(result.value)
         }
+      }
+
+      if (i + BATCH_SIZE < watchingShows.length) {
+        await new Promise((res) => setImmediate(res))
       }
     }
 
@@ -436,6 +442,7 @@ export class WatchlistController {
 
           setImmediate(async () => {
             if (req.db.isClosedCheck()) return
+            const delay = () => new Promise((res) => setImmediate(res))
             for (const row of watchlistRows) {
               if (!row.type && !this.activeTypeFetches.has(row.id)) {
                 this.activeTypeFetches.add(row.id)
@@ -451,6 +458,7 @@ export class WatchlistController {
                 } finally {
                   this.activeTypeFetches.delete(row.id)
                 }
+                await delay()
               }
             }
           })
@@ -703,6 +711,10 @@ export class WatchlistController {
             }
           })
         )
+
+        if (i + BATCH_SIZE < watchingShows.length) {
+          await new Promise((res) => setImmediate(res))
+        }
       }
 
       res.json(
