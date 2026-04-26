@@ -6,7 +6,7 @@ _Stream anime locally with no ads, no tracking, and smooth performance._
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-8b5cf6?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![GitHub stars](https://img.shields.io/github/stars/serifpersia/ani-web.svg?style=for-the-badge&color=8b5cf6)](https://github.com/serifpersia/ani-web/stargazers)
-[![Node version](https://img.shields.io/badge/Node.js-%3E%3D_22.5.0-8b5cf6?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![App version](https://img.shields.io/badge/ani--web-1.4.0-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/ani-web)
 
 </div>
 

@@ -134,10 +134,7 @@ export const usePlayerData = (
       if (!showId || !state.currentEpisode) throw new Error('Missing params')
 
       let providerShowId = showId
-      if (
-        ['hianime', 'animepahe', '123anime'].includes(state.selectedProvider) &&
-        state.showMeta.name
-      ) {
+      if (['animepahe', '123anime'].includes(state.selectedProvider) && state.showMeta.name) {
         const searchResponse = await fetch(
           `/api/search?query=${encodeURIComponent(state.showMeta.name)}&provider=${state.selectedProvider}`
         )

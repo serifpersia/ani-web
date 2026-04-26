@@ -32,7 +32,6 @@ export const initialState: PlayerState = {
   selectedProvider:
     (localStorage.getItem('preferredProvider') as
       | 'allanime'
-      | 'hianime'
       | 'animepahe'
       | '123anime') || 'allanime',
   loadingShowData: true,

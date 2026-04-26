@@ -9,7 +9,6 @@ import chokidar from 'chokidar'
 import logger from './logger'
 
 import { AllAnimeProvider } from './providers/allanime.provider'
-import { HiAnimeProvider } from './providers/hianime.provider'
 import { AnimePaheProvider } from './providers/animepahe.provider'
 import { _123AnimeProvider as Anime123Provider } from './providers/123anime.provider'
 import { googleDriveService } from './google'
@@ -32,13 +31,11 @@ const app = express()
 const apiCache = new NodeCache({ stdTTL: 3600 })
 
 const allAnimeProvider = new AllAnimeProvider(apiCache)
-const hiAnimeProvider = new HiAnimeProvider(apiCache)
 const animePaheProvider = new AnimePaheProvider(apiCache)
 const _123AnimeProvider = new Anime123Provider(apiCache)
 
 const providers = {
   allanime: allAnimeProvider,
-  hianime: hiAnimeProvider,
   animepahe: animePaheProvider,
   '123anime': _123AnimeProvider,
 }

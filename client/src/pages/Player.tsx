@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import styles from './Player.module.css'
 import layoutStyles from './PlayerPageLayout.module.css'
 import ToggleSwitch from '../components/common/ToggleSwitch'
@@ -74,6 +75,7 @@ const Player: React.FC = () => {
     side: 'left' | 'right'
     visible: boolean
   } | null>(null)
+  const [isMarkingWatched, setIsMarkingWatched] = useState(false)
   const clickCountRef = useRef(0)
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -520,6 +522,80 @@ const Player: React.FC = () => {
     localStorage.setItem('autoplayEnabled', checked.toString())
   }
 
+  const isCurrentEpisodeWatched = !!(
+    state.currentEpisode && state.watchedEpisodes.includes(state.currentEpisode)
+  )
+  const showManualWatchedButton = state.selectedProvider !== 'allanime'
+
+  const handleMarkEpisodeWatched = useCallback(async () => {
+    if (!showId || !state.currentEpisode || !state.showMeta.name || isMarkingWatched) return
+
+    setIsMarkingWatched(true)
+
+    const videoDuration = refs.videoRef.current?.duration
+    const fallbackDuration = Math.max(
+      videoDuration || 0,
+      state.resumeDuration || 0,
+      (state.showMeta.lengthMin || 0) * 60,
+      1
+    )
+
+    try {
+      const response = await fetch('/api/update-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          showId,
+          episodeNumber: state.currentEpisode,
+          currentTime: fallbackDuration,
+          duration: fallbackDuration,
+          showName: state.showMeta.name,
+          showThumbnail: state.showMeta.thumbnail,
+          nativeName: state.showMeta.names?.native,
+          englishName: state.showMeta.names?.english,
+          genres: state.showMeta.genres?.map((genre) => genre.name),
+          popularityScore: state.showMeta.score ?? state.showMeta.stats?.averageScore,
+          type: state.showMeta.type,
+          status: state.showMeta.status,
+          episodeCount: state.episodes.length,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save watched progress')
+      }
+
+      dispatch({
+        type: 'SET_STATE',
+        payload: {
+          watchedEpisodes: state.watchedEpisodes.includes(state.currentEpisode)
+            ? state.watchedEpisodes
+            : [...state.watchedEpisodes, state.currentEpisode],
+          resumeTime: fallbackDuration,
+          resumeDuration: fallbackDuration,
+          showResumeModal: false,
+        },
+      })
+
+      toast.success(`Episode ${state.currentEpisode} marked as watched`)
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to mark this episode as watched')
+    } finally {
+      setIsMarkingWatched(false)
+    }
+  }, [
+    showId,
+    state.currentEpisode,
+    state.showMeta,
+    state.resumeDuration,
+    state.episodes.length,
+    state.watchedEpisodes,
+    refs.videoRef,
+    dispatch,
+    isMarkingWatched,
+  ])
+
   if (state.error) return <p className="error-message">Error: {state.error}</p>
   if (!state.loadingShowData && !state.showMeta.name) return <p>Show not found.</p>
 
@@ -771,6 +847,20 @@ const Player: React.FC = () => {
                   {state.inWatchlist ? <FaCheck size={14} /> : <FaPlus size={14} />}
                   {state.inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
                 </button>
+                {showManualWatchedButton && (
+                  <button
+                    className={`${styles.watchlistBtn} ${styles.markWatchedBtn} ${isCurrentEpisodeWatched ? styles.markWatchedDone : ''}`}
+                    onClick={handleMarkEpisodeWatched}
+                    disabled={isMarkingWatched || !state.currentEpisode}
+                  >
+                    <FaCheck size={14} />
+                    {isMarkingWatched
+                      ? 'Saving...'
+                      : isCurrentEpisodeWatched
+                        ? 'Watched'
+                        : 'Mark Watched'}
+                  </button>
+                )}
                 <div className={styles.toggleContainer}>
                   <span>SUB</span>
                   <ToggleSwitch

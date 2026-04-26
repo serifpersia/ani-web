@@ -73,6 +73,39 @@
   border-color: var(--color-success);
 }
 
+.watchlistBtn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  transform: none;
+}
+
+.watchlistBtn:disabled:hover {
+  transform: none;
+}
+
+.markWatchedBtn {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #93c5fd;
+}
+
+.markWatchedBtn:hover {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(96, 165, 250, 0.55);
+  color: #dbeafe;
+}
+
+.markWatchedDone {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: var(--color-success);
+}
+
+.markWatchedDone:hover {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: var(--color-success);
+}
+
 .videoContainer {
   position: absolute;
   top: 0;
