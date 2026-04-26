@@ -556,7 +556,7 @@ const Player: React.FC = () => {
       <div className={layoutStyles.playerMain}>
         <div
           ref={refs.playerContainerRef}
-          className={`${styles.videoContainer} ${layoutStyles.videoPlayerWrapper} ${player.state.isFullscreen ? styles.fullscreenActive : ''}`}
+          className={`${styles.videoContainer} ${!player.state.isFullscreen ? layoutStyles.videoPlayerWrapper : ''} ${player.state.isFullscreen ? styles.fullscreenActive : ''}`}
           onClick={handlePlayerClick}
           style={{
             ...(state.showResumeModal ? { visibility: 'hidden' } : {}),
