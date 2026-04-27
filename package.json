@@ -1,6 +1,6 @@
 {
   "name": "ani-web",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "A web application for watching anime.",
   "main": "orchestrator.js",
   "bin": {
@@ -53,13 +53,14 @@
     "crypto-js": "^4.2.0",
     "dotenv": "^17.4.2",
     "express": "^5.1.0",
-    "google-auth-library": "^10.6.2",
-    "googleapis": "^171.4.0",
     "multer": "^2.0.2",
     "node-cache": "^5.1.2",
     "pino": "^10.3.1",
     "pino-pretty": "^13.1.1",
     "xml2js": "^0.6.2"
+  },
+  "overrides": {
+    "encoding-sniffer": "^1.0.2"
   },
   "devDependencies": {
     "eslint": "^10.2.1",

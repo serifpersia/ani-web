@@ -1,6 +1,6 @@
 {
   "name": "ani-web-server",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "type": "commonjs",
   "engines": {
     "node": ">=22.5.0"
@@ -22,8 +22,6 @@
     "crypto-js": "^4.2.0",
     "dotenv": "^17.4.2",
     "express": "^5.1.0",
-    "google-auth-library": "^10.6.2",
-    "googleapis": "^171.4.0",
     "multer": "^2.0.2",
     "node-cache": "^5.1.2",
     "pino": "^10.3.1",
@@ -31,6 +29,7 @@
     "xml2js": "^0.6.2"
   },
   "overrides": {
+    "encoding-sniffer": "^1.0.2",
     "glob": "^13.0.0"
   },
   "devDependencies": {
