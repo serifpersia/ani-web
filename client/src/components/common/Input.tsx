@@ -1,9 +1,8 @@
-import { JSX, ComponentChildren } from 'preact'
-import { forwardRef } from 'preact/compat'
+import { forwardRef, type InputHTMLAttributes, type ReactNode } from 'react'
 import './Input.css'
 
-interface Props extends JSX.HTMLAttributes<HTMLInputElement> {
-  label?: ComponentChildren
+interface Props extends InputHTMLAttributes<HTMLInputElement> {
+  label?: ReactNode
   error?: string
 }
 

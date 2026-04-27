@@ -20,11 +20,8 @@ type GoogleDriveFile = {
   name: string
 }
 
-const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 25 })
-const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 25 })
-
-httpAgent.setMaxListeners(100)
-httpsAgent.setMaxListeners(100)
+const httpAgent = new http.Agent({ keepAlive: false })
+const httpsAgent = new https.Agent({ keepAlive: false })
 
 const googleAxios = axios.create({
   httpAgent,

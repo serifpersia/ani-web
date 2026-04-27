@@ -1,17 +1,8 @@
 import { defineConfig } from 'vite'
 import preact from '@preact/preset-vite'
 
-const compatHooksPlugin = () => ({
-  name: 'compat-hooks-plugin',
-  transform(code, id) {
-    if (id.includes('compat.module.js')) {
-      return code + ';export const use=(...args)=>null;export const useOptimistic=(v)=>[v,()=>{}];'
-    }
-  },
-})
-
 export default defineConfig({
-  plugins: [preact(), compatHooksPlugin()],
+  plugins: [preact()],
   server: {
     proxy: {
       '/api': {

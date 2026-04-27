@@ -22,7 +22,7 @@ export class AuthController {
   getGoogleAuthSettings = (_req: Request, res: Response) => {
     res.json({
       clientId: process.env.GOOGLE_CLIENT_ID || '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      hasClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
     })
   }
 
@@ -31,10 +31,17 @@ export class AuthController {
     const { updateEnvFile } = await import('../utils/env.utils')
 
     try {
-      await updateEnvFile({
-        GOOGLE_CLIENT_ID: clientId,
-        GOOGLE_CLIENT_SECRET: clientSecret,
-      })
+      const updates: Record<string, string> = {}
+
+      if (typeof clientId === 'string') {
+        updates.GOOGLE_CLIENT_ID = clientId
+      }
+
+      if (typeof clientSecret === 'string') {
+        updates.GOOGLE_CLIENT_SECRET = clientSecret
+      }
+
+      await updateEnvFile(updates)
       res.json({ success: true })
     } catch (error) {
       logger.error({ err: error }, 'Failed to update .env file')

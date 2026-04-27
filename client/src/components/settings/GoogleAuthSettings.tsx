@@ -18,6 +18,7 @@ const GoogleAuthSettings: React.FC = () => {
   const [user, setUser] = useState<User | null>(null)
   const [authUrl, setAuthUrl] = useState('')
   const [hasAuthConfig, setHasAuthConfig] = useState(false)
+  const [hasStoredClientSecret, setHasStoredClientSecret] = useState(false)
 
   const [statusModal, setStatusModal] = useState<{
     show: boolean
@@ -73,7 +74,8 @@ const GoogleAuthSettings: React.FC = () => {
           .then((res) => res.json())
           .then((data) => {
             setClientId(data.clientId || '')
-            setClientSecret(data.clientSecret || '')
+            setClientSecret('')
+            setHasStoredClientSecret(!!data.hasClientSecret)
             if (data.clientId) {
               fetchAuthUrl()
             }
@@ -97,7 +99,7 @@ const GoogleAuthSettings: React.FC = () => {
   }, [])
 
   const handleSave = async () => {
-    if (!clientId && !clientSecret) {
+    if (!clientId && !clientSecret && !hasStoredClientSecret) {
       setStatusModal({
         show: true,
         message: 'Please enter a Client ID and Client Secret to save.',
@@ -106,13 +108,22 @@ const GoogleAuthSettings: React.FC = () => {
       return
     }
     try {
+      const body: { clientId: string; clientSecret?: string } = { clientId }
+      if (clientSecret) {
+        body.clientSecret = clientSecret
+      }
+
       const res = await fetch('/api/auth/google-auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId, clientSecret }),
+        body: JSON.stringify(body),
       })
 
       if (res.ok) {
+        if (clientSecret) {
+          setHasStoredClientSecret(true)
+          setClientSecret('')
+        }
         setStatusModal({
           show: true,
           message:
@@ -157,6 +168,7 @@ const GoogleAuthSettings: React.FC = () => {
   const clearConfig = async () => {
     setClientId('')
     setClientSecret('')
+    setHasStoredClientSecret(false)
     try {
       const res = await fetch('/api/auth/google-auth', {
         method: 'POST',
@@ -268,7 +280,11 @@ const GoogleAuthSettings: React.FC = () => {
             className={styles.input}
             value={clientSecret}
             onChange={(e) => setClientSecret(e.currentTarget.value)}
-            placeholder="Enter Google Client Secret"
+            placeholder={
+              hasStoredClientSecret
+                ? 'Stored securely. Enter a new secret only to replace it.'
+                : 'Enter Google Client Secret'
+            }
           />
           <button
             className={styles.iconButton}
@@ -278,6 +294,11 @@ const GoogleAuthSettings: React.FC = () => {
           </button>
         </div>
       </div>
+      {hasStoredClientSecret && !clientSecret && (
+        <p className={styles.warning}>
+          A client secret is already stored and will be kept unless you replace or clear it.
+        </p>
+      )}
 
       <div className={styles.actions}>
         <Button onClick={handleSave}>Save Config</Button>

@@ -1,5 +1,4 @@
-import React from 'react'
-import { forwardRef } from 'preact/compat'
+import React, { forwardRef } from 'react'
 import './Button.css'
 
 interface Props extends React.HTMLAttributes<HTMLButtonElement> {
