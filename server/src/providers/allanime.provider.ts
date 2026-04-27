@@ -20,7 +20,7 @@ const API_BASE_URL = 'https://allanime.day'
 const API_ENDPOINT = `https://api.allanime.day/api`
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0'
-const REFERER = 'https://allmanga.to'
+const REFERER = 'https://youtu-chan.com'
 
 const DEOBFUSCATION_MAP: { [key: string]: string } = {
   '79': 'A',
