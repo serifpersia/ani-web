@@ -30,8 +30,15 @@ const Player: React.FC = () => {
   const { id: showId, episodeNumber } = useParams<{ id: string; episodeNumber?: string }>()
   const navigate = useNavigate()
 
-  const { state, dispatch, toggleWatchlist, setPreferredSource, handleToggleDetails } =
-    usePlayerData(showId, episodeNumber)
+  const {
+    state,
+    dispatch,
+    toggleWatchlist,
+    setPreferredSource,
+    handleToggleDetails,
+    markEpisodeWatched,
+    isMarkingWatched,
+  } = usePlayerData(showId, episodeNumber)
 
   const memoizedShowMeta = useMemo(() => {
     if (!state.showMeta.name) return undefined
@@ -75,7 +82,6 @@ const Player: React.FC = () => {
     side: 'left' | 'right'
     visible: boolean
   } | null>(null)
-  const [isMarkingWatched, setIsMarkingWatched] = useState(false)
   const clickCountRef = useRef(0)
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -530,8 +536,6 @@ const Player: React.FC = () => {
   const handleMarkEpisodeWatched = useCallback(async () => {
     if (!showId || !state.currentEpisode || !state.showMeta.name || isMarkingWatched) return
 
-    setIsMarkingWatched(true)
-
     const videoDuration = refs.videoRef.current?.duration
     const fallbackDuration = Math.max(
       videoDuration || 0,
@@ -540,60 +544,15 @@ const Player: React.FC = () => {
       1
     )
 
-    try {
-      const response = await fetch('/api/update-progress', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          showId,
-          episodeNumber: state.currentEpisode,
-          currentTime: fallbackDuration,
-          duration: fallbackDuration,
-          showName: state.showMeta.name,
-          showThumbnail: state.showMeta.thumbnail,
-          nativeName: state.showMeta.names?.native,
-          englishName: state.showMeta.names?.english,
-          genres: state.showMeta.genres?.map((genre) => genre.name),
-          popularityScore: state.showMeta.score ?? state.showMeta.stats?.averageScore,
-          type: state.showMeta.type,
-          status: state.showMeta.status,
-          episodeCount: state.episodes.length,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to save watched progress')
-      }
-
-      dispatch({
-        type: 'SET_STATE',
-        payload: {
-          watchedEpisodes: state.watchedEpisodes.includes(state.currentEpisode)
-            ? state.watchedEpisodes
-            : [...state.watchedEpisodes, state.currentEpisode],
-          resumeTime: fallbackDuration,
-          resumeDuration: fallbackDuration,
-          showResumeModal: false,
-        },
-      })
-
-      toast.success(`Episode ${state.currentEpisode} marked as watched`)
-    } catch (error) {
-      console.error(error)
-      toast.error('Failed to mark this episode as watched')
-    } finally {
-      setIsMarkingWatched(false)
-    }
+    await markEpisodeWatched(state.currentEpisode, fallbackDuration)
   }, [
     showId,
     state.currentEpisode,
     state.showMeta,
     state.resumeDuration,
-    state.episodes.length,
-    state.watchedEpisodes,
-    refs.videoRef,
-    dispatch,
+    markEpisodeWatched,
     isMarkingWatched,
+    refs.videoRef,
   ])
 
   if (state.error) return <p className="error-message">Error: {state.error}</p>

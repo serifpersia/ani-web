@@ -6,7 +6,7 @@ import SkeletonGrid from '../components/common/SkeletonGrid'
 import { Button } from '../components/common/Button'
 import ErrorMessage from '../components/common/ErrorMessage'
 import SearchableSelect from '../components/common/SearchableSelect'
-import { useSearchAnime } from '../hooks/useAnimeData'
+import { useSearchAnime, useGenresAndStudios } from '../hooks/useAnimeData'
 import styles from './Search.module.css'
 
 interface Option {
@@ -47,8 +47,10 @@ export default function Search() {
   const [studio, setStudio] = useState('ALL')
   const [showFilters, setShowFilters] = useState(false)
 
-  const [availableGenres, setAvailableGenres] = useState<string[]>([])
-  const [availableStudios, setAvailableStudios] = useState<string[]>([])
+  const { data: metaData } = useGenresAndStudios()
+  const availableGenres = metaData?.genres || []
+  const availableStudios = metaData?.studios || []
+
   const [genreStates, setGenreStates] = useState<{ [key: string]: 'include' | 'exclude' }>({})
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, error } =
@@ -59,16 +61,6 @@ export default function Search() {
     setQuery(searchParams.get('query') || '')
     setStudio(searchParams.get('studios') || 'ALL')
   }, [searchParams])
-
-  useEffect(() => {
-    fetch('/api/genres-and-tags')
-      .then((res) => res.json())
-      .then((data) => {
-        setAvailableGenres(data.genres || [])
-        setAvailableStudios(data.studios || [])
-      })
-      .catch(console.error)
-  }, [])
 
   const handleSearch = () => {
     const params = new URLSearchParams()

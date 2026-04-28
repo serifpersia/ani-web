@@ -1,5 +1,5 @@
-import { useEffect, useCallback, useReducer, useRef } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useCallback, useReducer, useMemo } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import type {
   DetailedShowMeta,
@@ -16,6 +16,8 @@ interface UsePlayerDataReturn {
   toggleWatchlist: () => Promise<void>
   setPreferredSource: (sourceName: string) => Promise<void>
   handleToggleDetails: () => Promise<void>
+  markEpisodeWatched: (episodeNumber: string, duration: number) => Promise<void>
+  isMarkingWatched: boolean
 }
 
 interface RawSkipInterval {
@@ -29,58 +31,52 @@ interface RawSkipInterval {
   end_time?: number
 }
 
+const fetchApi = async (url: string) => {
+  const response = await fetch(url)
+  if (!response.ok) throw new Error(`Failed to fetch ${url}`)
+  return response.json()
+}
+
 export const usePlayerData = (
   showId: string | undefined,
   episodeNumber: string | undefined
 ): UsePlayerDataReturn => {
-  const [state, dispatch] = useReducer(playerReducer, initialState)
-  const latestShowMetaRef = useRef(state.showMeta)
+  const [uiState, dispatch] = useReducer(playerReducer, initialState)
+  const queryClient = useQueryClient()
 
   useEffect(() => {
-    latestShowMetaRef.current = state.showMeta
-  }, [state.showMeta])
+    if (episodeNumber && episodeNumber !== uiState.currentEpisode) {
+      dispatch({ type: 'SET_CURRENT_EPISODE', payload: episodeNumber })
+      dispatch({
+        type: 'SET_STATE',
+        payload: { selectedSource: null, selectedLink: null, showResumeModal: true },
+      })
+    }
+  }, [episodeNumber, uiState.currentEpisode])
 
   const {
     data: showData,
     isLoading: loadingShowData,
     error: showDataError,
   } = useQuery({
-    queryKey: ['show-data', showId, state.currentMode],
+    queryKey: ['show-data', showId, uiState.currentMode],
     queryFn: async () => {
       if (!showId) throw new Error('No showId')
-      const [metaResponse, episodesResponse, watchlistResponse, watchedResponse] =
-        await Promise.all([
-          fetch(`/api/show-meta/${showId}`),
-          fetch(`/api/episodes?showId=${showId}&mode=${state.currentMode}`),
-          fetch(`/api/watchlist/check/${showId}`),
-          fetch(`/api/watched-episodes/${showId}`),
-        ])
+      const [meta, episodeData, watchlistStatus, watchedEpisodes] = await Promise.all([
+        fetchApi(`/api/show-meta/${showId}`),
+        fetchApi(`/api/episodes?showId=${showId}&mode=${uiState.currentMode}`).catch(() => null),
+        fetchApi(`/api/watchlist/check/${showId}`).catch(() => ({ inWatchlist: false })),
+        fetchApi(`/api/watched-episodes/${showId}`).catch(() => []),
+      ])
 
-      if (!metaResponse.ok) throw new Error('Failed to fetch show metadata')
-
-      const meta = await metaResponse.json()
-      const watchlistStatus = watchlistResponse.ok
-        ? await watchlistResponse.json()
-        : { inWatchlist: false }
-      const watchedData = watchedResponse.ok ? await watchedResponse.json() : []
-
-      let episodes = []
-      let description = meta?.description
-
-      if (episodesResponse.ok) {
-        const episodeData = await episodesResponse.json()
-        if (episodeData) {
-          episodes = episodeData.episodes.sort(
-            (a: string, b: string) => parseFloat(a) - parseFloat(b)
-          )
-          description = episodeData.description || description
-        }
-      }
+      const episodes = episodeData?.episodes
+        ? episodeData.episodes.sort((a: string, b: string) => parseFloat(a) - parseFloat(b))
+        : []
 
       return {
         showMeta: {
           ...meta,
-          description,
+          description: episodeData?.description || meta?.description,
           names: meta?.names || {
             romaji: meta?.name,
             english: meta?.englishName,
@@ -89,33 +85,22 @@ export const usePlayerData = (
         },
         episodes,
         inWatchlist: watchlistStatus.inWatchlist,
-        watchedEpisodes: watchedData,
+        watchedEpisodes,
       }
     },
     enabled: !!showId,
   })
 
   useEffect(() => {
-    if (showData) {
-      dispatch({
-        type: 'SHOW_DATA_SUCCESS',
-        payload: {
-          ...showData,
-          currentEpisode:
-            episodeNumber || (showData.episodes.length > 0 ? showData.episodes[0] : undefined),
-        },
-      })
+    if (
+      !episodeNumber &&
+      showData?.episodes &&
+      showData.episodes.length > 0 &&
+      !uiState.currentEpisode
+    ) {
+      dispatch({ type: 'SET_CURRENT_EPISODE', payload: showData.episodes[0] })
     }
-  }, [showData, episodeNumber])
-
-  useEffect(() => {
-    if (showDataError) {
-      dispatch({
-        type: 'SET_ERROR',
-        payload: showDataError instanceof Error ? showDataError.message : 'Show data load failed',
-      })
-    }
-  }, [showDataError])
+  }, [showData, episodeNumber, uiState.currentEpisode])
 
   const {
     data: videoData,
@@ -125,45 +110,77 @@ export const usePlayerData = (
     queryKey: [
       'video-sources',
       showId,
-      state.currentEpisode,
-      state.selectedProvider,
-      state.currentMode,
-      state.showMeta?.name,
+      uiState.currentEpisode,
+      uiState.selectedProvider,
+      uiState.currentMode,
+      showData?.showMeta?.name,
     ],
     queryFn: async () => {
-      if (!showId || !state.currentEpisode) throw new Error('Missing params')
+      if (!showId || !uiState.currentEpisode) throw new Error('Missing params')
 
       let providerShowId = showId
-      if (['animepahe', '123anime'].includes(state.selectedProvider) && state.showMeta.name) {
-        const searchResponse = await fetch(
-          `/api/search?query=${encodeURIComponent(state.showMeta.name)}&provider=${state.selectedProvider}`
-        )
-        const searchResults = await searchResponse.json()
-        if (searchResults && searchResults.length > 0) {
-          providerShowId = searchResults[0].session || searchResults[0].id
+      if (['animepahe', '123anime'].includes(uiState.selectedProvider)) {
+        const names = showData?.showMeta?.names
+        const searchQuery =
+          uiState.currentMode === 'dub'
+            ? names?.english || showData?.showMeta?.name
+            : names?.romaji || showData?.showMeta?.name
+
+        if (searchQuery) {
+          const searchResults = await fetchApi(
+            `/api/search?query=${encodeURIComponent(searchQuery)}&provider=${uiState.selectedProvider}`
+          )
+          if (searchResults && searchResults.length > 0) {
+            interface SearchResult {
+              id: string
+              session?: string
+              name?: string
+              title?: string
+            }
+            // Prefer results that match the current mode in their title
+            const filtered = (searchResults as SearchResult[]).find((s) => {
+              const title = (s.name || s.title || '').toLowerCase()
+              if (uiState.currentMode === 'dub') {
+                return title.includes('dub')
+              } else {
+                return !title.includes('dub') || title.includes('sub')
+              }
+            })
+            const match = filtered || searchResults[0]
+            providerShowId = match.session || match.id
+          }
         }
       }
 
-      const [sourcesResponse, progressResponse, preferredSourceResponse, skipTimesResponse] =
-        await Promise.all([
-          fetch(
-            `/api/video?showId=${providerShowId}&episodeNumber=${state.currentEpisode}&mode=${state.currentMode}&provider=${state.selectedProvider}`
-          ),
-          fetch(`/api/episode-progress/${showId}/${state.currentEpisode}`),
-          fetch(`/api/settings?key=preferredSource`),
-          fetch(`/api/skip-times/${showId}/${state.currentEpisode}`),
-        ])
+      const [sources, progress, preferredSourceData, skipTimesData] = await Promise.all([
+        fetchApi(
+          `/api/video?showId=${providerShowId}&episodeNumber=${uiState.currentEpisode}&mode=${uiState.currentMode}&provider=${uiState.selectedProvider}`
+        ),
+        fetchApi(`/api/episode-progress/${showId}/${uiState.currentEpisode}`).catch(() => null),
+        fetchApi(`/api/settings?key=preferredSource`).catch(() => null),
+        fetchApi(`/api/skip-times/${showId}/${uiState.currentEpisode}`).catch(() => []),
+      ])
 
-      if (!sourcesResponse.ok) throw new Error('Failed to fetch video sources')
-      const sources: VideoSource[] = await sourcesResponse.json()
+      const preferredSourceName = preferredSourceData?.value
 
-      const preferredSourceName = preferredSourceResponse.ok
-        ? (await preferredSourceResponse.json()).value
-        : null
+      const modeMatchedSources = (sources as VideoSource[]).filter((s) => {
+        const name = s.sourceName.toLowerCase()
+        if (uiState.currentMode === 'dub') {
+          return name.includes('eng') || name.includes('dub')
+        } else {
+          return (
+            name.includes('jpn') ||
+            name.includes('sub') ||
+            (!name.includes('eng') && !name.includes('dub'))
+          )
+        }
+      })
 
-      let sourceToSelect: VideoSource | null = sources.length > 0 ? sources[0] : null
+      const pool = modeMatchedSources.length > 0 ? modeMatchedSources : (sources as VideoSource[])
+      let sourceToSelect: VideoSource | null = pool.length > 0 ? pool[0] : null
+
       if (preferredSourceName) {
-        const found = sources.find((s) => s.sourceName === preferredSourceName)
+        const found = pool.find((s: VideoSource) => s.sourceName === preferredSourceName)
         if (found) sourceToSelect = found
       }
 
@@ -175,22 +192,9 @@ export const usePlayerData = (
             )[0]
           : null
 
-      let resumeTime = 0
-      let resumeDuration = 0
-      let showResumeModal = false
-      if (progressResponse.ok) {
-        const progress = await progressResponse.json()
-        if (progress?.currentTime > 0) {
-          resumeTime = progress.currentTime
-          resumeDuration = progress.duration || 0
-          showResumeModal = true
-        }
-      }
-
-      const skipResponseData = skipTimesResponse.ok ? await skipTimesResponse.json() : []
-      const rawSkips = Array.isArray(skipResponseData)
-        ? skipResponseData
-        : skipResponseData.results || []
+      const resumeTime = progress?.currentTime || 0
+      const resumeDuration = progress?.duration || 0
+      const rawSkips = Array.isArray(skipTimesData) ? skipTimesData : skipTimesData.results || []
 
       const skipIntervals: SkipInterval[] = rawSkips
         .map((item: RawSkipInterval) => ({
@@ -202,108 +206,59 @@ export const usePlayerData = (
         .filter((i: SkipInterval) => i.end_time > 0)
 
       if (sources.length === 0) {
-        toast.error(`No video sources found for ${state.selectedProvider}`)
+        toast.error(`No video sources found for ${uiState.selectedProvider}`)
       }
 
       return {
-        videoSources: sources,
+        videoSources: sources as VideoSource[],
         selectedSource: sourceToSelect,
         selectedLink,
         resumeTime,
         resumeDuration,
-        showResumeModal: showResumeModal && resumeTime > 5 && sourceToSelect?.type !== 'iframe',
+        showResumeModal: resumeTime > 5 && sourceToSelect?.type !== 'iframe',
         skipIntervals,
       }
     },
-    enabled: !!showId && !!state.currentEpisode && !loadingShowData,
+    enabled: !!showId && !!uiState.currentEpisode && !!showData?.showMeta?.name,
   })
 
-  useEffect(() => {
-    if (videoData) {
-      dispatch({ type: 'VIDEO_DATA_SUCCESS', payload: videoData })
-    }
-  }, [videoData])
-
-  useEffect(() => {
-    if (videoError) {
-      const message = videoError instanceof Error ? videoError.message : 'Video load failed'
-      toast.error(message)
-      dispatch({
-        type: 'SET_STATE',
-        payload: { loadingVideo: false },
-      })
-    }
-  }, [videoError])
-
-  useEffect(() => {
-    dispatch({ type: 'SET_LOADING', key: 'loadingShowData', value: loadingShowData })
-  }, [loadingShowData])
-
-  useEffect(() => {
-    dispatch({ type: 'SET_LOADING', key: 'loadingVideo', value: loadingVideo })
-  }, [loadingVideo])
-
+  // 3. Additional Details Query
   const { data: detailsData, isLoading: loadingDetails } = useQuery({
     queryKey: ['show-details', showId],
-    queryFn: async () => {
-      const detailsResponse = await fetch(`/api/show-details/${showId}`)
-      if (!detailsResponse.ok) {
-        throw new Error('Failed to fetch show details')
-      }
-      return detailsResponse.json()
-    },
-    enabled: !!showId && !loadingShowData && !!state.showMeta?.name && !!state.showMeta?.type,
+    queryFn: () => fetchApi(`/api/show-details/${showId}`),
+    enabled: !!showId && !!showData?.showMeta?.name,
   })
 
-  useEffect(() => {
-    dispatch({ type: 'SET_LOADING', key: 'loadingDetails', value: loadingDetails })
-  }, [loadingDetails])
-
-  useEffect(() => {
-    if (detailsData) {
-      const currentShowMeta = latestShowMetaRef.current
-      dispatch({
-        type: 'SET_STATE',
-        payload: {
-          showMeta: {
-            ...currentShowMeta,
-            ...detailsData,
-            name: currentShowMeta.name,
-          },
-          loadingDetails: false,
-        },
-      })
-    }
-  }, [detailsData])
-
-  const toggleWatchlist = useCallback(async () => {
-    if (!state.showMeta || !showId) return
-    const wasIn = state.inWatchlist
-    dispatch({ type: 'SET_STATE', payload: { inWatchlist: !wasIn } })
-
-    try {
+  const { mutateAsync: toggleWatchlistMutation } = useMutation({
+    mutationFn: async ({ wasIn, showMeta }: { wasIn: boolean; showMeta: DetailedShowMeta }) => {
       const endpoint = wasIn ? '/api/watchlist/remove' : '/api/watchlist/add'
       const payload = {
         id: showId,
-        name: state.showMeta.name || state.showMeta.names?.romaji,
-        thumbnail: state.showMeta.thumbnail,
-        nativeName: state.showMeta.names?.native,
-        englishName: state.showMeta.names?.english,
-        type: state.showMeta.type,
+        name: showMeta.name || showMeta.names?.romaji,
+        thumbnail: showMeta.thumbnail,
+        nativeName: showMeta.names?.native,
+        englishName: showMeta.names?.english,
+        type: showMeta.type,
       }
-
-      const response = await fetch(endpoint, {
+      await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      if (!response.ok) throw new Error('Watchlist update failed')
-      toast.success(wasIn ? 'Removed from watchlist' : 'Added to watchlist')
-    } catch (e) {
-      dispatch({ type: 'SET_STATE', payload: { inWatchlist: wasIn } })
-      toast.error('Failed to update watchlist')
-    }
-  }, [showId, state.showMeta, state.inWatchlist])
+      return !wasIn
+    },
+    onSuccess: (newInWatchlist) => {
+      toast.success(newInWatchlist ? 'Added to watchlist' : 'Removed from watchlist')
+      queryClient.invalidateQueries({ queryKey: ['show-data', showId] })
+      queryClient.invalidateQueries({ queryKey: ['watchlist'] })
+    },
+    onError: () => toast.error('Failed to update watchlist'),
+  })
+
+  const toggleWatchlist = useCallback(async () => {
+    if (!showId || !showData?.showMeta) return
+    await toggleWatchlistMutation({ wasIn: !!showData.inWatchlist, showMeta: showData.showMeta })
+  }, [showId, showData, toggleWatchlistMutation])
 
   const setPreferredSource = useCallback(async (sourceName: string) => {
     try {
@@ -317,26 +272,119 @@ export const usePlayerData = (
     }
   }, [])
 
+  const { mutateAsync: markEpisodeWatchedMutation } = useMutation({
+    mutationFn: async ({
+      episodeNumber,
+      duration,
+      showMeta,
+      episodes,
+    }: {
+      episodeNumber: string
+      duration: number
+      showMeta: DetailedShowMeta
+      episodes: string[]
+    }) => {
+      await fetch('/api/update-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          showId,
+          episodeNumber,
+          currentTime: duration,
+          duration: duration,
+          showName: showMeta.name,
+          showThumbnail: showMeta.thumbnail,
+          nativeName: showMeta.names?.native,
+          englishName: showMeta.names?.english,
+          genres: showMeta.genres?.map((genre) => genre.name),
+          popularityScore: showMeta.score ?? showMeta.stats?.averageScore,
+          type: showMeta.type,
+          status: showMeta.status,
+          episodeCount: episodes.length,
+        }),
+      })
+    },
+    onSuccess: (data, variables) => {
+      toast.success(`Episode ${variables.episodeNumber} marked as watched`)
+      queryClient.invalidateQueries({ queryKey: ['show-data', showId] })
+      queryClient.invalidateQueries({
+        queryKey: ['video-sources', showId, variables.episodeNumber],
+      })
+      queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
+      queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
+    },
+    onError: () => toast.error('Failed to mark episode as watched'),
+  })
+
+  const markEpisodeWatched = useCallback(
+    async (episodeNumber: string, duration: number) => {
+      if (!showId || !showData?.showMeta) return
+      await markEpisodeWatchedMutation({
+        episodeNumber,
+        duration,
+        showMeta: showData.showMeta,
+        episodes: showData.episodes,
+      })
+    },
+    [showId, showData, markEpisodeWatchedMutation]
+  )
+
   const handleToggleDetails = useCallback(async () => {
-    dispatch({ type: 'SET_STATE', payload: { showCombinedDetails: !state.showCombinedDetails } })
-    if (state.showCombinedDetails || state.allMangaDetails) return
+    dispatch({ type: 'SET_STATE', payload: { showCombinedDetails: !uiState.showCombinedDetails } })
+    if (uiState.showCombinedDetails || uiState.allMangaDetails) return
 
     try {
-      dispatch({ type: 'SET_LOADING', key: 'loadingDetails', value: true })
-      const resp = await fetch(`/api/allmanga-details/${showId}`)
-      const data = resp.ok ? await resp.json() : null
-      dispatch({ type: 'SET_STATE', payload: { allMangaDetails: data, loadingDetails: false } })
+      const data = await fetchApi(`/api/allmanga-details/${showId}`)
+      dispatch({ type: 'SET_STATE', payload: { allMangaDetails: data } })
     } catch (e) {
       console.warn(e)
-      dispatch({ type: 'SET_LOADING', key: 'loadingDetails', value: false })
     }
-  }, [showId, state.showCombinedDetails, state.allMangaDetails])
+  }, [showId, uiState.showCombinedDetails, uiState.allMangaDetails])
+
+  // DERIVED STATE
+  const state = useMemo(() => {
+    const error = showDataError || videoError
+    return {
+      ...uiState,
+      showMeta: {
+        ...(showData?.showMeta || {}),
+        ...(detailsData || {}),
+        name: showData?.showMeta?.name, // Preserve original name
+      },
+      episodes: showData?.episodes || [],
+      watchedEpisodes: showData?.watchedEpisodes || [],
+      inWatchlist: !!showData?.inWatchlist,
+      videoSources: videoData?.videoSources || [],
+      selectedSource: uiState.selectedSource || videoData?.selectedSource || null,
+      selectedLink: uiState.selectedLink || videoData?.selectedLink || null,
+      resumeTime: videoData?.resumeTime || 0,
+      resumeDuration: videoData?.resumeDuration || 0,
+      showResumeModal: uiState.showResumeModal && (videoData?.showResumeModal ?? false),
+      skipIntervals: videoData?.skipIntervals || [],
+      loadingShowData,
+      loadingVideo,
+      loadingDetails,
+      error: error ? (error as Error).message : null,
+    }
+  }, [
+    uiState,
+    showData,
+    videoData,
+    detailsData,
+    loadingShowData,
+    loadingVideo,
+    loadingDetails,
+    showDataError,
+    videoError,
+  ])
 
   return {
-    state,
+    state: state as PlayerState,
     dispatch,
     toggleWatchlist,
     setPreferredSource,
     handleToggleDetails,
+    markEpisodeWatched,
+    isMarkingWatched: markEpisodeWatchedMutation.isPending,
   }
 }

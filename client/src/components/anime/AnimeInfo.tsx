@@ -50,12 +50,16 @@ export default function AnimeInfo() {
   const navigate = useNavigate()
   const { titlePreference } = useTitlePreference()
   const [showDetails, setShowDetails] = useState(false)
-  const [allmangaDetails, setAllmangaDetails] = useState<Record<string, string | number> | null>(
-    null
-  )
-  const [loadingDetails, setLoadingDetails] = useState(false)
 
-  const { showMeta, loadingMeta, toggleWatchlist, inWatchlist } = useAnimeInfoData(showId)
+  const {
+    showMeta,
+    loadingMeta,
+    toggleWatchlist,
+    inWatchlist,
+    allMangaDetails,
+    loadingDetails,
+    handleToggleDetails,
+  } = useAnimeInfoData(showId)
 
   const getDisplayTitle = () => {
     if (!showMeta?.name) return ''
@@ -67,21 +71,6 @@ export default function AnimeInfo() {
 
   const handleStartWatching = () => {
     if (showId) navigate(`/watch/${showId}`)
-  }
-
-  const loadDetails = async () => {
-    if (!showId || allmangaDetails || loadingDetails) return
-    setLoadingDetails(true)
-    try {
-      const res = await fetch(`/api/allmanga-details/${showId}`)
-      if (res.ok) {
-        const data = await res.json()
-        setAllmangaDetails(data)
-      }
-    } catch (e) {
-      console.warn(e)
-    }
-    setLoadingDetails(false)
   }
 
   const bannerUrl = useMemo(() => {
@@ -198,7 +187,7 @@ export default function AnimeInfo() {
           className={styles.detailsToggleBtn}
           onClick={() => {
             setShowDetails(!showDetails)
-            if (!showDetails && !allmangaDetails && !loadingDetails) loadDetails()
+            if (!showDetails && !allMangaDetails && !loadingDetails) handleToggleDetails()
           }}
         >
           {showDetails ? <FaChevronUp /> : <FaChevronDown />}
@@ -214,7 +203,7 @@ export default function AnimeInfo() {
               </div>
             )}
 
-            {allmangaDetails && (
+            {allMangaDetails && (
               <div className={styles.detailsGridContainer}>
                 {showMeta.studios && showMeta.studios.length > 0 && (
                   <div className={styles.detailItem}>
@@ -228,28 +217,28 @@ export default function AnimeInfo() {
                     <span>{showMeta.sources[0].name}</span>
                   </div>
                 )}
-                {allmangaDetails.Rating && (
+                {allMangaDetails.Rating && (
                   <div className={styles.detailItem}>
                     <strong>Rating</strong>
-                    <span>{allmangaDetails.Rating}</span>
+                    <span>{allMangaDetails.Rating}</span>
                   </div>
                 )}
-                {(showMeta.season?.title || allmangaDetails.Season) && (
+                {(showMeta.season?.title || allMangaDetails.Season) && (
                   <div className={styles.detailItem}>
                     <strong>Season</strong>
-                    <span>{showMeta.season?.title || allmangaDetails.Season}</span>
+                    <span>{showMeta.season?.title || allMangaDetails.Season}</span>
                   </div>
                 )}
-                {allmangaDetails.Episodes && (
+                {allMangaDetails.Episodes && (
                   <div className={styles.detailItem}>
                     <strong>Episodes</strong>
-                    <span>{allmangaDetails.Episodes}</span>
+                    <span>{allMangaDetails.Episodes}</span>
                   </div>
                 )}
-                {allmangaDetails.Date && (
+                {allMangaDetails.Date && (
                   <div className={styles.detailItem}>
                     <strong>Aired</strong>
-                    <span>{allmangaDetails.Date}</span>
+                    <span>{allMangaDetails.Date}</span>
                   </div>
                 )}
                 {formatNextAiring(showMeta) && (

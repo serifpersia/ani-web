@@ -81,7 +81,6 @@ export class _123AnimeProvider implements Provider {
       const rawQuery = options.query || ''
       const query = rawQuery.replace(/[""]/g, '').replace(/[']/g, '').replace(/\s+/g, ' ').trim()
       const url = `${BASE_URL}/search?keyword=${encodeURIComponent(query)}`
-
       const response = await fetch(url)
 
       if (!response.ok) {
@@ -163,8 +162,9 @@ export class _123AnimeProvider implements Provider {
         return null
       }
 
-      const bestMatch = searchResults[0]
-      const animeId = bestMatch.id || bestMatch._id
+      const match =
+        searchResults.find((s) => s.id === showId || s._id === showId) || searchResults[0]
+      const animeId = match.id || match._id
 
       const url = `${BASE_URL}/episode-stream?id=${animeId}&ep=${episodeNumber}`
 

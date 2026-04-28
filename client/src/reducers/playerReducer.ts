@@ -1,15 +1,11 @@
-import type { PlayerState } from '../types/player'
+import type { PlayerState, VideoSource, VideoLink } from '../types/player'
 
 export type Action =
   | { type: 'SET_STATE'; payload: Partial<PlayerState> }
-  | {
-      type: 'SET_LOADING'
-      key: 'loadingShowData' | 'loadingVideo' | 'loadingDetails'
-      value: boolean
-    }
-  | { type: 'SET_ERROR'; payload: string }
-  | { type: 'SHOW_DATA_SUCCESS'; payload: Partial<PlayerState> }
-  | { type: 'VIDEO_DATA_SUCCESS'; payload: Partial<PlayerState> }
+  | { type: 'SET_CURRENT_EPISODE'; payload: string | undefined }
+  | { type: 'SET_MODE'; payload: 'sub' | 'dub' }
+  | { type: 'SET_PROVIDER'; payload: 'allanime' | 'animepahe' | '123anime' }
+  | { type: 'SET_OVERRIDE_SOURCE'; payload: { source: VideoSource; link: VideoLink } | null }
 
 export const initialState: PlayerState = {
   showMeta: {},
@@ -25,7 +21,7 @@ export const initialState: PlayerState = {
   selectedLink: null,
   forceNativePlayer: localStorage.getItem('forceNativePlayer') === 'true',
   isAutoplayEnabled: localStorage.getItem('autoplayEnabled') === 'true',
-  showResumeModal: false,
+  showResumeModal: true,
   resumeTime: 0,
   resumeDuration: 0,
   skipIntervals: [],
@@ -43,14 +39,18 @@ export function playerReducer(state: PlayerState, action: Action): PlayerState {
   switch (action.type) {
     case 'SET_STATE':
       return { ...state, ...action.payload }
-    case 'SET_LOADING':
-      return { ...state, [action.key]: action.value }
-    case 'SET_ERROR':
-      return { ...state, error: action.payload, loadingShowData: false, loadingVideo: false }
-    case 'SHOW_DATA_SUCCESS':
-      return { ...state, ...action.payload, loadingShowData: false, error: null }
-    case 'VIDEO_DATA_SUCCESS':
-      return { ...state, ...action.payload, loadingVideo: false, error: null }
+    case 'SET_CURRENT_EPISODE':
+      return { ...state, currentEpisode: action.payload }
+    case 'SET_MODE':
+      return { ...state, currentMode: action.payload }
+    case 'SET_PROVIDER':
+      return { ...state, selectedProvider: action.payload }
+    case 'SET_OVERRIDE_SOURCE':
+      return {
+        ...state,
+        selectedSource: action.payload?.source ?? null,
+        selectedLink: action.payload?.link ?? null,
+      }
     default:
       return state
   }

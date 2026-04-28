@@ -1,11 +1,10 @@
-import { useEffect, useCallback, useReducer, useRef } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useCallback } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import type { DetailedShowMeta } from '../types/player'
-import { playerReducer, initialState, type Action } from '../reducers/playerReducer'
 
 interface UseAnimeInfoDataReturn {
-  showMeta: DetailedShowMeta
+  showMeta: DetailedShowMeta | undefined
   allMangaDetails: Record<string, string | number | null> | null
   inWatchlist: boolean
   loadingMeta: boolean
@@ -13,16 +12,16 @@ interface UseAnimeInfoDataReturn {
   error: string | null
   toggleWatchlist: () => Promise<void>
   handleToggleDetails: () => Promise<void>
-  dispatch: React.Dispatch<Action>
+}
+
+const fetchApi = async (url: string) => {
+  const response = await fetch(url)
+  if (!response.ok) throw new Error(`Failed to fetch ${url}`)
+  return response.json()
 }
 
 export function useAnimeInfoData(showId: string | undefined): UseAnimeInfoDataReturn {
-  const [state, dispatch] = useReducer(playerReducer, initialState)
-  const latestShowMetaRef = useRef(state.showMeta)
-
-  useEffect(() => {
-    latestShowMetaRef.current = state.showMeta
-  }, [state.showMeta])
+  const queryClient = useQueryClient()
 
   const {
     data: showData,
@@ -32,18 +31,11 @@ export function useAnimeInfoData(showId: string | undefined): UseAnimeInfoDataRe
     queryKey: ['show-data-info', showId],
     queryFn: async () => {
       if (!showId) throw new Error('No showId')
-      const [metaResponse, episodesResponse, watchlistResponse] = await Promise.all([
-        fetch(`/api/show-meta/${showId}`),
+      const [meta, watchlistStatus, episodesResponse] = await Promise.all([
+        fetchApi(`/api/show-meta/${showId}`),
+        fetchApi(`/api/watchlist/check/${showId}`).catch(() => ({ inWatchlist: false })),
         fetch(`/api/episodes?showId=${showId}&mode=sub`),
-        fetch(`/api/watchlist/check/${showId}`),
       ])
-
-      if (!metaResponse.ok) throw new Error('Failed to fetch show metadata')
-
-      const meta = await metaResponse.json()
-      const watchlistStatus = watchlistResponse.ok
-        ? await watchlistResponse.json()
-        : { inWatchlist: false }
 
       let description = meta?.description
       if (episodesResponse.ok) {
@@ -61,35 +53,22 @@ export function useAnimeInfoData(showId: string | undefined): UseAnimeInfoDataRe
     enabled: !!showId,
   })
 
-  useEffect(() => {
-    if (showData) {
-      dispatch({
-        type: 'SET_STATE',
-        payload: { showMeta: showData.showMeta, inWatchlist: showData.inWatchlist },
-      })
-    }
-  }, [showData])
+  const { data: allMangaDetails, isLoading: loadingDetails } = useQuery({
+    queryKey: ['allmanga-details', showId],
+    queryFn: () => fetchApi(`/api/allmanga-details/${showId}`),
+    enabled: false, // Manual trigger
+  })
 
-  useEffect(() => {
-    if (showDataError) {
-      dispatch({ type: 'SET_ERROR', payload: (showDataError as Error).message })
-    }
-  }, [showDataError])
-
-  const toggleWatchlist = useCallback(async () => {
-    if (!showId || !state.showMeta?.name) return
-    const wasIn = state.inWatchlist
-    dispatch({ type: 'SET_STATE', payload: { inWatchlist: !wasIn } })
-
-    try {
+  const { mutateAsync: toggleWatchlistMutation } = useMutation({
+    mutationFn: async ({ wasIn, showMeta }: { wasIn: boolean; showMeta: DetailedShowMeta }) => {
       const endpoint = wasIn ? '/api/watchlist/remove' : '/api/watchlist/add'
       const payload = {
         id: showId,
-        name: state.showMeta.name || state.showMeta.names?.romaji,
-        thumbnail: state.showMeta.thumbnail,
-        nativeName: state.showMeta.names?.native,
-        englishName: state.showMeta.names?.english,
-        type: state.showMeta.type,
+        name: showMeta.name || showMeta.names?.romaji,
+        thumbnail: showMeta.thumbnail,
+        nativeName: showMeta.names?.native,
+        englishName: showMeta.names?.english,
+        type: showMeta.type,
       }
 
       const response = await fetch(endpoint, {
@@ -98,37 +77,55 @@ export function useAnimeInfoData(showId: string | undefined): UseAnimeInfoDataRe
         body: JSON.stringify(payload),
       })
       if (!response.ok) throw new Error('Watchlist update failed')
-      toast.success(wasIn ? 'Removed from watchlist' : 'Added to watchlist')
-    } catch (e) {
-      dispatch({ type: 'SET_STATE', payload: { inWatchlist: wasIn } })
+      return !wasIn
+    },
+    onMutate: async ({ wasIn }) => {
+      await queryClient.cancelQueries({ queryKey: ['show-data-info', showId] })
+      const previousData = queryClient.getQueryData(['show-data-info', showId])
+      queryClient.setQueryData(
+        ['show-data-info', showId],
+        (old: { showMeta: DetailedShowMeta; inWatchlist: boolean } | undefined) => {
+          if (!old) return old
+          return {
+            ...old,
+            inWatchlist: !wasIn,
+          }
+        }
+      )
+      return { previousData }
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(['show-data-info', showId], context.previousData)
+      }
       toast.error('Failed to update watchlist')
-    }
-  }, [showId, state.showMeta, state.inWatchlist])
+    },
+    onSuccess: (newInWatchlist) => {
+      toast.success(newInWatchlist ? 'Added to watchlist' : 'Removed from watchlist')
+      queryClient.invalidateQueries({ queryKey: ['watchlist'] })
+    },
+  })
+
+  const toggleWatchlist = useCallback(async () => {
+    if (!showId || !showData?.showMeta) return
+    await toggleWatchlistMutation({ wasIn: !!showData.inWatchlist, showMeta: showData.showMeta })
+  }, [showId, showData, toggleWatchlistMutation])
 
   const handleToggleDetails = useCallback(async () => {
-    dispatch({ type: 'SET_STATE', payload: { showCombinedDetails: !state.showCombinedDetails } })
-    if (state.showCombinedDetails || state.allMangaDetails) return
-
-    try {
-      dispatch({ type: 'SET_LOADING', key: 'loadingDetails', value: true })
-      const resp = await fetch(`/api/allmanga-details/${showId}`)
-      const data = resp.ok ? await resp.json() : null
-      dispatch({ type: 'SET_STATE', payload: { allMangaDetails: data, loadingDetails: false } })
-    } catch (e) {
-      console.warn(e)
-      dispatch({ type: 'SET_LOADING', key: 'loadingDetails', value: false })
-    }
-  }, [showId, state.showCombinedDetails, state.allMangaDetails])
+    queryClient.prefetchQuery({
+      queryKey: ['allmanga-details', showId],
+      queryFn: () => fetchApi(`/api/allmanga-details/${showId}`),
+    })
+  }, [showId, queryClient])
 
   return {
-    showMeta: state.showMeta,
-    allMangaDetails: state.allMangaDetails,
-    inWatchlist: state.inWatchlist,
+    showMeta: showData?.showMeta,
+    allMangaDetails: allMangaDetails ?? null,
+    inWatchlist: !!showData?.inWatchlist,
     loadingMeta,
-    loadingDetails: state.loadingDetails,
-    error: state.error,
+    loadingDetails,
+    error: showDataError ? (showDataError as Error).message : null,
     toggleWatchlist,
     handleToggleDetails,
-    dispatch,
   }
 }

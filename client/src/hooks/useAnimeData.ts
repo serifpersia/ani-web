@@ -242,3 +242,10 @@ export const useClearAllNotifications = () => {
     },
   })
 }
+export const useGenresAndStudios = () => {
+  return useQuery<{ genres: string[]; studios: string[] }>({
+    queryKey: ['genresAndStudios'],
+    queryFn: () => fetchApi('/api/genres-and-tags'),
+    staleTime: 1000 * 60 * 60, // 1 hour
+  })
+}
