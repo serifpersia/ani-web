@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
 import { Provider } from '../providers/provider.interface'
-import { genres, tags, studios } from '../constants'
+import { genres, tags, studios } from '../constants.json'
 import logger from '../logger'
 
 export class DataController {

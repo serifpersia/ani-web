@@ -7,6 +7,7 @@ import path from 'path'
 import fs from 'fs'
 import { CONFIG } from '../config'
 import { DatabaseWrapper } from '../db'
+import { SettingsRepository } from '../repositories/settings.repository'
 
 interface MalAnimeItem {
   series_title: string[]
@@ -23,21 +24,19 @@ interface ShowToInsert {
 export class SettingsController {
   constructor(private provider: AllAnimeProvider) {}
 
-  getSettings = (req: Request, res: Response) => {
-    req.db.get(
-      'SELECT value FROM settings WHERE key = ?',
-      [req.query.key],
-      (err: Error | null, row: { value: string }) => res.json({ value: row ? row.value : null })
-    )
+  getSettings = async (req: Request, res: Response) => {
+    try {
+      const row = await SettingsRepository.getByKey(req.db, req.query.key as string)
+      res.json({ value: row ? row.value : null })
+    } catch {
+      res.status(500).json({ error: 'DB error' })
+    }
   }
 
   updateSettings = async (req: Request, res: Response) => {
     try {
       await performWriteTransaction(req.db, (tx) => {
-        tx.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [
-          req.body.key,
-          String(req.body.value),
-        ])
+        SettingsRepository.upsert(tx, req.body.key, String(req.body.value))
       })
       res.json({ success: true })
     } catch {
@@ -76,7 +75,7 @@ export class SettingsController {
       if (closeErr) return res.status(500).json({ error: 'Failed to close database.' })
 
       try {
-        req.db.run('PRAGMA wal_checkpoint(TRUNCATE)')
+        req.db.checkpoint()
       } catch (checkpointErr) {
         logger.warn({ err: checkpointErr }, 'WAL checkpoint failed')
       }
@@ -101,8 +100,6 @@ export class SettingsController {
         }
         try {
           const newDb = await initializeDatabase(dbPath)
-          // Update the server-level reference so all future requests get the
-          // new DB instance instead of the now-closed old one.
           setDb(newDb)
           req.db = newDb
           res.json({ success: true, message: 'Database restored.' })
@@ -131,8 +128,6 @@ export class SettingsController {
     let skippedCount = 0
     const showsToInsert: ShowToInsert[] = []
 
-    // Batch concurrent searches (5 at a time) instead of sequential awaits.
-    // A 500-entry MAL export drops from ~500 sequential requests to ~100 batches.
     const BATCH_SIZE = 5
     for (let i = 0; i < animeList.length; i += BATCH_SIZE) {
       const batch = animeList.slice(i, i + BATCH_SIZE)
@@ -155,12 +150,8 @@ export class SettingsController {
 
     try {
       await performWriteTransaction(req.db, (tx) => {
-        if (erase) tx.run('DELETE FROM watchlist')
-        const stmt = tx.prepare(
-          'INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status) VALUES (?, ?, ?, ?)'
-        )
-        showsToInsert.forEach((show) => stmt.run(show.id, show.name, show.thumbnail, show.status))
-        stmt.finalize()
+        if (erase) SettingsRepository.clearWatchlist(tx)
+        SettingsRepository.upsertWatchlistBatch(tx, showsToInsert)
       })
       res.json({ imported: showsToInsert.length, skipped: skippedCount })
     } catch (dbError) {

@@ -6,6 +6,7 @@ import { googleDriveService } from './google'
 import { rcloneService } from './rclone'
 import { CONFIG } from './config'
 import { DatabaseWrapper } from './db'
+import { dbGet } from './utils/db-utils'
 
 const log = logger.child({ module: 'Sync' })
 
@@ -117,15 +118,11 @@ export async function syncDownOnBoot(
   let localVersion = await getLocalManifestVersion()
 
   if (localVersion === 0 && db) {
-    localVersion = await new Promise<number>((resolve) => {
-      db.get(
-        "SELECT value FROM sync_metadata WHERE key = 'db_version'",
-        undefined,
-        (_err: Error | null, row: { value: number } | undefined) => {
-          resolve(row ? row.value : 0)
-        }
-      )
-    })
+    const row = await dbGet<{ value: number }>(
+      db,
+      "SELECT value FROM sync_metadata WHERE key = 'db_version'"
+    )
+    localVersion = row?.value ?? 0
     if (localVersion > 0) {
       await setLocalManifestVersion(localVersion)
     }
@@ -317,17 +314,11 @@ export async function performWriteTransaction(
   })
 
   // Capture version synchronously; the callback fires immediately with node:sqlite.
-  let newVersion = 1
-  let capturedErr: Error | null = null
-  db.get(
-    "SELECT value FROM sync_metadata WHERE key = 'db_version'",
-    undefined,
-    (err: Error | null, row: { value: number } | undefined) => {
-      capturedErr = err
-      if (!err) newVersion = row?.value ?? 1
-    }
+  const row = await dbGet<{ value: number }>(
+    db,
+    "SELECT value FROM sync_metadata WHERE key = 'db_version'"
   )
-  if (capturedErr) throw capturedErr
+  const newVersion = row?.value ?? 1
 
   // Only the manifest write is truly async (disk I\O); errors here propagate normally.
   await setLocalManifestVersion(newVersion)

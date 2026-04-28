@@ -2,37 +2,15 @@ import { Request, Response } from 'express'
 import logger from '../logger'
 import { AllAnimeProvider } from '../providers/allanime.provider'
 import { performWriteTransaction } from '../sync'
-import { DatabaseWrapper } from '../db'
-
-interface WatchedEpisode {
-  episodeNumber: string
-  currentTime: number
-  duration: number
-  watchedAt: string
-}
-
-interface ContinueWatchingShow {
-  _id: string
-  id: string
-  name: string
-  thumbnail?: string
-  nativeName?: string
-  englishName?: string
-  episodeNumber: string
-  currentTime: number
-  duration: number
-}
-
-interface WatchingShow {
-  id: string
-  name: string
-  thumbnail?: string
-  nativeName?: string
-  englishName?: string
-  lastWatchedAt: string | null
-  type?: string
-  smType?: string
-}
+import { WatchlistRepository } from '../repositories/watchlist.repository'
+import {
+  WatchedEpisodesRepository,
+  ContinueWatchingResult,
+  UpNextResult,
+  WatchedEpisode,
+} from '../repositories/watched-episodes.repository'
+import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
+import { NotificationsRepository } from '../repositories/notifications.repository'
 
 interface CombinedContinueWatchingShow {
   _id: string
@@ -52,15 +30,14 @@ interface CombinedContinueWatchingShow {
   smType?: string
 }
 
-interface WatchlistRow {
-  id: string
+interface EpisodeNotification {
+  showId: string
   name: string
-  thumbnail: string
-  status: string
   nativeName?: string
   englishName?: string
-  type?: string
-  [key: string]: unknown
+  thumbnail: string
+  episodeNumber: string
+  id: string
 }
 
 export class WatchlistController {
@@ -69,43 +46,13 @@ export class WatchlistController {
   constructor(private provider: AllAnimeProvider) {}
 
   private async getContinueWatchingData(
-    db: DatabaseWrapper,
+    req: Request,
     limit?: number
   ): Promise<CombinedContinueWatchingShow[]> {
-    const limitClause = typeof limit === 'number' ? 'LIMIT ?' : ''
-    const queryParams: unknown[] = typeof limit === 'number' ? [limit] : []
-    const query = `
-    SELECT
-    w.id as _id,
-    w.id as id,
-    w.name as name,
-    w.thumbnail as thumbnail,
-    w.nativeName as nativeName,
-    w.englishName as englishName,
-    w.type as type,
-    sm.episodeCount,
-    sm.type as smType,
-    (SELECT COUNT(DISTINCT episodeNumber) FROM watched_episodes WHERE showId = w.id) as watchedCount,
-    we.episodeNumber, we.currentTime, we.duration, we.watchedAt
-    FROM (
-      SELECT *, ROW_NUMBER() OVER(PARTITION BY showId ORDER BY watchedAt DESC) as rn
-      FROM watched_episodes
-    ) we
-    JOIN watchlist w ON we.showId = w.id
-    LEFT JOIN shows_meta sm ON we.showId = sm.id
-    WHERE we.rn = 1 AND w.status = 'Watching'
-    ORDER BY we.watchedAt DESC
-    ${limitClause}
-    `
-    const rows: CombinedContinueWatchingShow[] = await new Promise((resolve, reject) => {
-      db.all(query, queryParams, (err: Error | null, rows: unknown) => {
-        if (err) reject(err)
-        else resolve(rows as CombinedContinueWatchingShow[])
-      })
-    })
+    const rows = await WatchedEpisodesRepository.getContinueWatching(req.db, limit)
 
     const showsNeedingEpisodes = rows.filter((show) => {
-      const watchedCount = (show.watchedCount as unknown as number) || 0
+      const watchedCount = show.watchedCount || 0
       return !show.episodeCount || (watchedCount > 0 && show.episodeCount <= watchedCount)
     })
 
@@ -123,19 +70,9 @@ export class WatchlistController {
           if (result.status === 'fulfilled' && result.value?.episodes) {
             const epCount = result.value.episodes.length
             episodeFetchResults.set(show.id, epCount)
-            try {
-              db.run('UPDATE shows_meta SET episodeCount = ? WHERE id = ?', [epCount, show.id])
-            } catch (e) {
+            ShowsMetaRepository.updateEpisodeCount(req.db, show.id, epCount).catch((e) => {
               logger.error({ err: e, showId: show.id }, 'Failed to update episode count in DB')
-            }
-          } else {
-            logger.error(
-              {
-                err: result.status === 'rejected' ? result.reason : 'No episodes',
-                showId: show.id,
-              },
-              'Failed to fetch episode count'
-            )
+            })
           }
         })
       }
@@ -152,17 +89,17 @@ export class WatchlistController {
     })
 
     setImmediate(async () => {
-      if (db.isClosedCheck()) return
+      if (req.db.isClosedCheck()) return
       const delay = () => new Promise((res) => setImmediate(res))
       for (const show of enrichedRows) {
         if (!show.type && !this.activeTypeFetches.has(show.id)) {
           this.activeTypeFetches.add(show.id)
           try {
             const meta = await this.provider.getShowMeta(show.id)
-            if (meta && meta.type && !db.isClosedCheck()) {
-              db.run('UPDATE shows_meta SET type = ? WHERE id = ?', [meta.type, show.id])
-              db.run('UPDATE watchlist SET type = ? WHERE id = ?', [meta.type, show.id])
-              db.scheduleSave()
+            if (meta && meta.type && !req.db.isClosedCheck()) {
+              await ShowsMetaRepository.updateType(req.db, show.id, meta.type)
+              await WatchlistRepository.updateType(req.db, show.id, meta.type)
+              req.db.scheduleSave()
             }
           } catch (e) {
             logger.error({ err: e, showId: show.id }, 'Lazy migration error for type')
@@ -177,47 +114,12 @@ export class WatchlistController {
     return enrichedRows
   }
 
-  private async getUpNextShowsData(db: DatabaseWrapper): Promise<CombinedContinueWatchingShow[]> {
-    const watchingShows: (WatchingShow & { episodeCount?: number })[] = await new Promise(
-      (resolve, reject) => {
-        db.all(
-          `SELECT w.id, w.name, w.thumbnail, w.nativeName, w.englishName, w.type, sm.episodeCount, sm.type as smType
-           FROM watchlist w
-           LEFT JOIN shows_meta sm ON w.id = sm.id
-           LEFT JOIN (
-              SELECT showId, MAX(watchedAt) as lastActivity
-              FROM watched_episodes
-              GROUP BY showId
-           ) we ON w.id = we.showId
-           WHERE w.status = 'Watching'
-           ORDER BY we.lastActivity DESC
-           LIMIT 15`,
-          (err: Error | null, rows: unknown) => {
-            if (err) reject(err)
-            else resolve(rows as (WatchingShow & { episodeCount?: number })[])
-          }
-        )
-      }
-    )
-
+  private async getUpNextShowsData(req: Request): Promise<CombinedContinueWatchingShow[]> {
+    const watchingShows = await WatchedEpisodesRepository.getUpNextShows(req.db)
     if (watchingShows.length === 0) return []
 
-    // Pre-fetch all watched episodes for the relevant shows in one bulk query
-    // instead of one individual DB call per show inside the batch loop (issue #12).
     const showIds = watchingShows.map((s) => s.id)
-    const placeholders = showIds.map(() => '?').join(',')
-    const allWatchedEps: (WatchedEpisode & { showId: string })[] = await new Promise(
-      (resolve, reject) => {
-        db.all(
-          `SELECT showId, episodeNumber, currentTime, duration, watchedAt FROM watched_episodes WHERE showId IN (${placeholders})`,
-          showIds,
-          (err: Error | null, rows: unknown) => {
-            if (err) reject(err)
-            else resolve(rows as (WatchedEpisode & { showId: string })[])
-          }
-        )
-      }
-    )
+    const allWatchedEps = await WatchedEpisodesRepository.getEpisodesForShows(req.db, showIds)
 
     const watchedByShow = new Map<string, WatchedEpisode[]>()
     for (const ep of allWatchedEps) {
@@ -281,9 +183,7 @@ export class WatchlistController {
   getContinueWatchingFast = async (req: Request, res: Response) => {
     try {
       const limit = parseInt(req.query.limit as string) || 10
-      // Delegate to the shared implementation with a SQL-level LIMIT applied,
-      // avoiding the duplicate enrichment logic that previously lived here.
-      const data = await this.getContinueWatchingData(req.db, limit)
+      const data = await this.getContinueWatchingData(req, limit)
       res.json(data)
     } catch {
       res.status(500).json({ error: 'DB error' })
@@ -292,7 +192,7 @@ export class WatchlistController {
 
   getContinueWatchingUpNext = async (req: Request, res: Response) => {
     try {
-      const data = await this.getUpNextShowsData(req.db)
+      const data = await this.getUpNextShowsData(req)
       res.json(data)
     } catch {
       res.status(500).json({ error: 'DB error' })
@@ -302,7 +202,7 @@ export class WatchlistController {
   getContinueWatching = async (req: Request, res: Response) => {
     try {
       const limit = parseInt(req.query.limit as string) || 10
-      const data = await this.getContinueWatchingData(req.db)
+      const data = await this.getContinueWatchingData(req)
       res.json(data.slice(0, limit))
     } catch {
       res.status(500).json({ error: 'DB error' })
@@ -314,7 +214,7 @@ export class WatchlistController {
       const page = parseInt(req.query.page as string) || 1
       const limit = parseInt(req.query.limit as string) || 10
       const offset = (page - 1) * limit
-      const data = await this.getContinueWatchingData(req.db)
+      const data = await this.getContinueWatchingData(req)
 
       res.json({
         data: data.slice(offset, offset + limit),
@@ -348,37 +248,25 @@ export class WatchlistController {
       const genresStr = Array.isArray(genres) ? JSON.stringify(genres) : genres
 
       await performWriteTransaction(req.db, (tx) => {
-        tx.run(
-          `INSERT INTO shows_meta (id, name, thumbnail, nativeName, englishName, genres, popularityScore, status, episodeCount, type)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(id) DO UPDATE SET
-             name = COALESCE(EXCLUDED.name, shows_meta.name),
-             thumbnail = COALESCE(EXCLUDED.thumbnail, shows_meta.thumbnail),
-             nativeName = COALESCE(EXCLUDED.nativeName, shows_meta.nativeName),
-             englishName = COALESCE(EXCLUDED.englishName, shows_meta.englishName),
-             genres = COALESCE(EXCLUDED.genres, shows_meta.genres),
-             popularityScore = COALESCE(EXCLUDED.popularityScore, shows_meta.popularityScore),
-             status = COALESCE(EXCLUDED.status, shows_meta.status),
-             episodeCount = COALESCE(EXCLUDED.episodeCount, shows_meta.episodeCount),
-             type = COALESCE(EXCLUDED.type, shows_meta.type)`,
-          [
-            showId,
-            showName,
-            this.provider.deobfuscateUrl(showThumbnail),
-            nativeName || '',
-            englishName || '',
-            genresStr || '',
-            popularityScore || 0,
-            status || '',
-            episodeCount || 0,
-            type || '',
-          ]
-        )
+        ShowsMetaRepository.upsert(tx, {
+          id: showId,
+          name: showName,
+          thumbnail: this.provider.deobfuscateUrl(showThumbnail),
+          nativeName,
+          englishName,
+          genres: genresStr,
+          popularityScore,
+          status,
+          episodeCount,
+          type,
+        })
 
-        tx.run(
-          `INSERT OR REPLACE INTO watched_episodes (showId, episodeNumber, watchedAt, currentTime, duration) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)`,
-          [showId, episodeNumber, currentTime, duration]
-        )
+        WatchedEpisodesRepository.upsert(tx, {
+          showId,
+          episodeNumber,
+          currentTime,
+          duration,
+        })
       })
 
       req.db.scheduleSave()
@@ -393,9 +281,8 @@ export class WatchlistController {
     const { showId } = req.body
     try {
       await performWriteTransaction(req.db, (tx) => {
-        tx.run('DELETE FROM watched_episodes WHERE showId = ?', [showId])
-        tx.run('DELETE FROM dismissed_notifications WHERE showId = ?', [showId])
-        tx.run('DELETE FROM discovered_notifications WHERE showId = ?', [showId])
+        WatchedEpisodesRepository.deleteByShow(tx, showId)
+        NotificationsRepository.deleteByShow(tx, showId)
       })
       res.json({ success: true })
     } catch {
@@ -403,101 +290,85 @@ export class WatchlistController {
     }
   }
 
-  getWatchlist = (req: Request, res: Response) => {
+  getWatchlist = async (req: Request, res: Response) => {
     const { status, page: pageStr, limit: limitStr } = req.query
     const page = parseInt(pageStr as string) || 1
     const limit = parseInt(limitStr as string) || 10
     const offset = (page - 1) * limit
 
-    let query = 'SELECT * FROM watchlist'
-    let countQuery = 'SELECT COUNT(*) as total FROM watchlist'
-    const params: (string | number)[] = []
+    try {
+      const [rows, total] = await Promise.all([
+        WatchlistRepository.getAll(req.db, status as string, limit, offset),
+        WatchlistRepository.getCount(req.db, status as string),
+      ])
 
-    if (status && status !== 'All') {
-      query += ' WHERE status = ?'
-      countQuery += ' WHERE status = ?'
-      params.push(status as string)
-    }
+      res.json({
+        data: rows.map((row) => ({ ...row, _id: row.id })),
+        total,
+        page,
+        limit,
+      })
 
-    query += ' ORDER BY rowid DESC LIMIT ? OFFSET ?'
-    params.push(limit, offset)
-
-    req.db.all(query, params, (err: Error | null, rows: unknown[]) => {
-      if (err) return res.status(500).json({ error: 'DB error', details: err.message })
-
-      const watchlistRows = rows as WatchlistRow[]
-
-      req.db.get(
-        countQuery,
-        params.slice(0, -2),
-        (countErr: Error | null, countRow: { total: number }) => {
-          if (countErr)
-            return res.status(500).json({ error: 'DB error', details: countErr.message })
-          res.json({
-            data: watchlistRows.map((row) => ({ ...row, _id: row.id })),
-            total: countRow.total,
-            page,
-            limit,
-          })
-
-          setImmediate(async () => {
-            if (req.db.isClosedCheck()) return
-            const delay = () => new Promise((res) => setImmediate(res))
-            for (const row of watchlistRows) {
-              if (!row.type && !this.activeTypeFetches.has(row.id)) {
-                this.activeTypeFetches.add(row.id)
-                try {
-                  const meta = await this.provider.getShowMeta(row.id)
-                  if (meta && meta.type && !req.db.isClosedCheck()) {
-                    req.db.run('UPDATE watchlist SET type = ? WHERE id = ?', [meta.type, row.id])
-                    req.db.run('UPDATE shows_meta SET type = ? WHERE id = ?', [meta.type, row.id])
-                    req.db.scheduleSave()
-                  }
-                } catch (e) {
-                  logger.error({ err: e, showId: row.id }, 'Watchlist lazy migration error')
-                } finally {
-                  this.activeTypeFetches.delete(row.id)
-                }
-                await delay()
+      setImmediate(async () => {
+        if (req.db.isClosedCheck()) return
+        const delay = () => new Promise((res) => setImmediate(res))
+        for (const row of rows) {
+          if (!row.type && !this.activeTypeFetches.has(row.id)) {
+            this.activeTypeFetches.add(row.id)
+            try {
+              const meta = await this.provider.getShowMeta(row.id)
+              if (meta && meta.type && !req.db.isClosedCheck()) {
+                await WatchlistRepository.updateType(req.db, row.id, meta.type)
+                await ShowsMetaRepository.updateType(req.db, row.id, meta.type)
+                req.db.scheduleSave()
               }
+            } catch (e) {
+              logger.error({ err: e, showId: row.id }, 'Watchlist lazy migration error')
+            } finally {
+              this.activeTypeFetches.delete(row.id)
             }
-          })
+            await delay()
+          }
         }
+      })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      res.status(500).json({ error: 'DB error', details: message })
+    }
+  }
+
+  checkWatchlist = async (req: Request, res: Response) => {
+    try {
+      const inWatchlist = await WatchlistRepository.exists(req.db, req.params.showId as string)
+      res.json({ inWatchlist })
+    } catch {
+      res.status(500).json({ error: 'DB error' })
+    }
+  }
+
+  getEpisodeProgress = async (req: Request, res: Response) => {
+    try {
+      const progress = await WatchedEpisodesRepository.getByShowAndEpisode(
+        req.db,
+        req.params.showId as string,
+        req.params.episodeNumber as string
       )
-    })
+      res.json(progress || { currentTime: 0, duration: 0 })
+    } catch {
+      res.status(500).json({ error: 'DB error' })
+    }
   }
 
-  checkWatchlist = (req: Request, res: Response) => {
-    req.db.get(
-      'SELECT EXISTS(SELECT 1 FROM watchlist WHERE id = ?) as inWatchlist',
-      [req.params.showId],
-      (err: Error | null, row: { inWatchlist: number }) => {
-        if (err) return res.status(500).json({ error: 'DB error' })
-        res.json({ inWatchlist: !!(row && row.inWatchlist) })
-      }
-    )
-  }
-
-  getEpisodeProgress = (req: Request, res: Response) => {
-    req.db.get(
-      'SELECT currentTime, duration FROM watched_episodes WHERE showId = ? AND episodeNumber = ?',
-      [req.params.showId, req.params.episodeNumber],
-      (err: Error | null, row: { currentTime: number; duration: number }) => {
-        if (err) return res.status(500).json({ error: 'DB error' })
-        res.json(row || { currentTime: 0, duration: 0 })
-      }
-    )
-  }
-
-  getWatchedEpisodes = (req: Request, res: Response) => {
-    req.db.all(
-      `SELECT episodeNumber FROM watched_episodes WHERE showId = ?`,
-      [req.params.showId],
-      (err: Error | null, rows: { episodeNumber: string }[]) => {
-        if (err) return res.status(500).json({ error: 'DB error' })
-        res.json(rows ? rows.map((r) => r.episodeNumber) : [])
-      }
-    )
+  getWatchedEpisodes = async (req: Request, res: Response) => {
+    try {
+      const episodes = await WatchedEpisodesRepository.getWatchedEpisodeNumbers(
+        req.db,
+        req.params.showId as string
+      )
+      res.json(episodes)
+    } catch {
+      res.status(500).json({ error: 'DB error' })
+    }
   }
 
   addToWatchlist = async (req: Request, res: Response) => {
@@ -519,18 +390,15 @@ export class WatchlistController {
 
     try {
       await performWriteTransaction(req.db, (tx) => {
-        tx.run(
-          'INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status, nativeName, englishName, type) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [
-            id,
-            name,
-            this.provider.deobfuscateUrl(thumbnail),
-            status || 'Watching',
-            nativeName || '',
-            englishName || '',
-            type || 'TV',
-          ]
-        )
+        WatchlistRepository.upsert(tx, {
+          id,
+          name,
+          thumbnail: this.provider.deobfuscateUrl(thumbnail),
+          status: status || 'Watching',
+          nativeName: nativeName || '',
+          englishName: englishName || '',
+          type: type || 'TV',
+        })
       })
 
       await req.db.saveNow()
@@ -545,10 +413,9 @@ export class WatchlistController {
     const { id } = req.body
     try {
       await performWriteTransaction(req.db, (tx) => {
-        tx.run('DELETE FROM watchlist WHERE id = ?', [id])
-        tx.run('DELETE FROM watched_episodes WHERE showId = ?', [id])
-        tx.run('DELETE FROM dismissed_notifications WHERE showId = ?', [id])
-        tx.run('DELETE FROM discovered_notifications WHERE showId = ?', [id])
+        WatchlistRepository.delete(tx, id)
+        WatchedEpisodesRepository.deleteByShow(tx, id)
+        NotificationsRepository.deleteByShow(tx, id)
       })
       res.json({ success: true })
     } catch {
@@ -560,7 +427,7 @@ export class WatchlistController {
     const { id, status } = req.body
     try {
       await performWriteTransaction(req.db, (tx) => {
-        tx.run('UPDATE watchlist SET status = ? WHERE id = ?', [status, id])
+        WatchlistRepository.updateStatus(tx, id, status)
       })
       res.json({ success: true })
     } catch {
@@ -571,98 +438,35 @@ export class WatchlistController {
   getNotifications = async (req: Request, res: Response) => {
     try {
       const db = req.db
-      const watchingShows: {
-        id: string
-        name: string
-        thumbnail: string
-        nativeName?: string
-        englishName?: string
-      }[] = await new Promise((resolve, reject) => {
-        db.all(
-          "SELECT id, name, thumbnail, nativeName, englishName FROM watchlist WHERE status = 'Watching'",
-          (err: Error | null, rows: unknown) => {
-            if (err) reject(err)
-            else
-              resolve(
-                (rows as {
-                  id: string
-                  name: string
-                  thumbnail: string
-                  nativeName?: string
-                  englishName?: string
-                }[]) || []
-              )
-          }
-        )
-      })
+      const watchingShows = await WatchlistRepository.getWatchingShows(db)
 
-      const notifications: {
-        showId: string
-        name: string
-        nativeName?: string
-        englishName?: string
-        thumbnail: string
-        episodeNumber: string
-        id: string
-      }[] = []
-
+      const notifications: EpisodeNotification[] = []
       const BATCH_SIZE = 5
+
       for (let i = 0; i < watchingShows.length; i += BATCH_SIZE) {
         const batch = watchingShows.slice(i, i + BATCH_SIZE)
         await Promise.allSettled(
           batch.map(async (show) => {
             try {
-              const [epDetails, watchedEps, dismissedEps, showMeta, discoveredEps] =
+              const [epDetails, watchedEps, dismissedEps, showStatus, discoveredEps] =
                 await Promise.all([
                   this.provider.getEpisodes(show.id, 'sub'),
-                  new Promise<{ episodeNumber: number | string }[]>((resolve, reject) => {
-                    db.all(
-                      'SELECT episodeNumber FROM watched_episodes WHERE showId = ?',
-                      [show.id],
-                      (err, rows) => {
-                        if (err) reject(err)
-                        else resolve((rows as { episodeNumber: number | string }[]) || [])
-                      }
-                    )
-                  }),
-                  new Promise<{ episodeNumber: number | string }[]>((resolve, reject) => {
-                    db.all(
-                      'SELECT episodeNumber FROM dismissed_notifications WHERE showId = ?',
-                      [show.id],
-                      (err, rows) => {
-                        if (err) reject(err)
-                        else resolve((rows as { episodeNumber: number | string }[]) || [])
-                      }
-                    )
-                  }),
-                  new Promise<{ status: string }>((resolve) => {
-                    db.get('SELECT status FROM shows_meta WHERE id = ?', [show.id], (err, row) =>
-                      resolve(row as { status: string })
-                    )
-                  }),
-                  new Promise<{ episodeNumber: number | string }[]>((resolve, reject) => {
-                    db.all(
-                      'SELECT episodeNumber FROM discovered_notifications WHERE showId = ?',
-                      [show.id],
-                      (err, rows) => {
-                        if (err) reject(err)
-                        else resolve((rows as { episodeNumber: number | string }[]) || [])
-                      }
-                    )
-                  }),
+                  WatchedEpisodesRepository.getWatchedEpisodeNumbers(db, show.id),
+                  NotificationsRepository.getDismissedByShow(db, show.id),
+                  ShowsMetaRepository.getStatus(db, show.id),
+                  NotificationsRepository.getDiscoveredByShow(db, show.id),
                 ])
 
               if (!epDetails || !epDetails.episodes || epDetails.episodes.length === 0) return
 
               if (
-                showMeta &&
-                showMeta.status &&
-                !['Ongoing', 'Releasing', 'Currently Airing'].includes(showMeta.status)
+                showStatus &&
+                !['Ongoing', 'Releasing', 'Currently Airing'].includes(showStatus)
               ) {
                 return
               }
 
-              const watchedSet = new Set(watchedEps.map((e) => e.episodeNumber.toString()))
+              const watchedSet = new Set(watchedEps.map((e) => e.toString()))
               const dismissedSet = new Set(dismissedEps.map((e) => e.episodeNumber.toString()))
               const discoveredSet = new Set(discoveredEps.map((e) => e.episodeNumber.toString()))
 
@@ -677,19 +481,8 @@ export class WatchlistController {
                 !dismissedSet.has(latestAvailable.toString()) &&
                 !discoveredSet.has(latestAvailable.toString())
               ) {
-                await new Promise<void>((resolve, reject) => {
-                  db.run(
-                    'INSERT OR IGNORE INTO discovered_notifications (showId, episodeNumber) VALUES (?, ?)',
-                    [show.id, latestAvailable.toString()],
-                    (err) => {
-                      if (err) reject(err)
-                      else {
-                        discoveredSet.add(latestAvailable.toString())
-                        resolve()
-                      }
-                    }
-                  )
-                })
+                await NotificationsRepository.addDiscovered(db, show.id, latestAvailable.toString())
+                discoveredSet.add(latestAvailable.toString())
               }
 
               Array.from(discoveredSet).forEach((epStr: string) => {
@@ -730,10 +523,7 @@ export class WatchlistController {
     const { showId, episodeNumber } = req.body
     try {
       await performWriteTransaction(req.db, (tx) => {
-        tx.run(
-          'INSERT OR IGNORE INTO dismissed_notifications (showId, episodeNumber) VALUES (?, ?)',
-          [showId, episodeNumber]
-        )
+        NotificationsRepository.addDismissed(tx, showId, episodeNumber)
       })
       res.json({ success: true })
     } catch {
@@ -745,16 +535,7 @@ export class WatchlistController {
     const { showId } = req.body
     try {
       await performWriteTransaction(req.db, (tx) => {
-        if (showId) {
-          tx.run(
-            'INSERT OR IGNORE INTO dismissed_notifications (showId, episodeNumber) SELECT showId, episodeNumber FROM discovered_notifications WHERE showId = ?',
-            [showId]
-          )
-        } else {
-          tx.run(
-            'INSERT OR IGNORE INTO dismissed_notifications (showId, episodeNumber) SELECT showId, episodeNumber FROM discovered_notifications'
-          )
-        }
+        NotificationsRepository.dismissFromDiscovered(tx, showId)
       })
       res.json({ success: true })
     } catch {
