@@ -217,6 +217,9 @@ export class DatabaseWrapper {
 
   public backup(backupPath: string) {
     try {
+      if (fs.existsSync(backupPath)) {
+        fs.rmSync(backupPath, { force: true })
+      }
       this.db.exec(`VACUUM INTO '${backupPath}'`)
     } catch (e) {
       logger.error({ err: e, backupPath }, 'Database backup failed via VACUUM INTO')

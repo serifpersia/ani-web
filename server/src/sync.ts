@@ -250,41 +250,39 @@ export async function syncUp(
     if (localVersion > remoteVersion) {
       const dbName = path.basename(dbPath)
       const syncDbPath = `${dbPath}.sync.db`
-      // VACUUM INTO creates a fully consistent snapshot that already incorporates
-      // any pending WAL frames — an explicit checkpoint before backup is not needed
-      // and introduced a race window where a concurrent write could produce an
-      // inconsistent snapshot.
-      db.backup(syncDbPath)
+      try {
+        db.backup(syncDbPath)
 
-      if (activeProvider === 'google') {
-        const folderId = await googleDriveService.ensureFolder(remoteFolderName)
-        const remoteDbFile = await googleDriveService.findFile(dbName, folderId)
+        if (activeProvider === 'google') {
+          const folderId = await googleDriveService.ensureFolder(remoteFolderName)
+          const remoteDbFile = await googleDriveService.findFile(dbName, folderId)
 
-        await googleDriveService.uploadFile(
-          syncDbPath,
-          dbName,
-          'application/x-sqlite3',
-          folderId,
-          remoteDbFile?.id
-        )
+          await googleDriveService.uploadFile(
+            syncDbPath,
+            dbName,
+            'application/x-sqlite3',
+            folderId,
+            remoteDbFile?.id
+          )
 
-        await googleDriveService.uploadFile(
-          CONFIG.LOCAL_MANIFEST_PATH,
-          CONFIG.MANIFEST_FILENAME,
-          'application/json',
-          folderId,
-          manifestId
-        )
-      } else if (activeProvider === 'rclone') {
-        await rcloneService.uploadFile(syncDbPath, remoteFolderName, dbName)
-        await rcloneService.uploadFile(
-          CONFIG.LOCAL_MANIFEST_PATH,
-          remoteFolderName,
-          CONFIG.MANIFEST_FILENAME
-        )
+          await googleDriveService.uploadFile(
+            CONFIG.LOCAL_MANIFEST_PATH,
+            CONFIG.MANIFEST_FILENAME,
+            'application/json',
+            folderId,
+            manifestId
+          )
+        } else if (activeProvider === 'rclone') {
+          await rcloneService.uploadFile(syncDbPath, remoteFolderName, dbName)
+          await rcloneService.uploadFile(
+            CONFIG.LOCAL_MANIFEST_PATH,
+            remoteFolderName,
+            CONFIG.MANIFEST_FILENAME
+          )
+        }
+      } finally {
+        if (existsSync(syncDbPath)) await fs.unlink(syncDbPath).catch(() => {})
       }
-
-      if (existsSync(syncDbPath)) await fs.unlink(syncDbPath)
 
       console.log('[SYNC_END]')
       log.info('Sync up complete.')
