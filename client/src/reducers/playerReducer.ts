@@ -11,6 +11,7 @@ export const initialState: PlayerState = {
   showMeta: {},
   episodes: [],
   watchedEpisodes: [],
+  watchlistStatus: null,
   currentEpisode: undefined,
   allMangaDetails: null,
   showCombinedDetails: false,

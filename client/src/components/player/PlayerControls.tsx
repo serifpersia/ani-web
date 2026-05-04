@@ -22,6 +22,8 @@ interface PlayerControlsProps {
   player: ReturnType<typeof useVideoPlayer>
   isAutoplayEnabled: boolean
   onAutoplayChange: (checked: boolean) => void
+  showNextEpisodeButton: boolean
+  onNextEpisode: () => void
   videoSources: VideoSource[]
   selectedSource: VideoSource | null
   selectedLink: VideoLink | null
@@ -34,6 +36,8 @@ const PlayerControls = ({
   player,
   isAutoplayEnabled,
   onAutoplayChange,
+  showNextEpisodeButton,
+  onNextEpisode,
   videoSources,
   selectedSource,
   selectedLink,
@@ -317,6 +321,15 @@ const PlayerControls = ({
 
           <div className={styles.rightControls}>
             <div className={styles.skipControls}>
+              {showNextEpisodeButton && (
+                <button
+                  className={styles.nextEpisodeBtn}
+                  onClick={onNextEpisode}
+                  title="Play next episode"
+                >
+                  Next EP
+                </button>
+              )}
               <button
                 className={styles.skipBtn}
                 onClick={() => actions.seek(-10)}

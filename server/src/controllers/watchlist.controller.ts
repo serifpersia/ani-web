@@ -339,8 +339,8 @@ export class WatchlistController {
 
   checkWatchlist = async (req: Request, res: Response) => {
     try {
-      const inWatchlist = await WatchlistRepository.exists(req.db, req.params.showId as string)
-      res.json({ inWatchlist })
+      const item = await WatchlistRepository.getById(req.db, req.params.showId as string)
+      res.json({ inWatchlist: !!item, status: item?.status ?? null })
     } catch {
       res.status(500).json({ error: 'DB error' })
     }

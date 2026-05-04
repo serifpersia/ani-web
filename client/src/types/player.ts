@@ -89,6 +89,7 @@ export interface PlayerState {
   showMeta: Partial<SimpleShowMeta & DetailedShowMeta>
   episodes: string[]
   watchedEpisodes: string[]
+  watchlistStatus: string | null
   currentEpisode?: string
   allMangaDetails: AllMangaDetail | null
   showCombinedDetails: boolean

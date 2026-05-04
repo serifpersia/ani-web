@@ -34,10 +34,12 @@ const Player: React.FC = () => {
     state,
     dispatch,
     toggleWatchlist,
+    moveToCompleted,
     setPreferredSource,
     handleToggleDetails,
     markEpisodeWatched,
     isMarkingWatched,
+    isUpdatingWatchlistStatus,
   } = usePlayerData(showId, episodeNumber)
 
   const memoizedShowMeta = useMemo(() => {
@@ -82,6 +84,8 @@ const Player: React.FC = () => {
     side: 'left' | 'right'
     visible: boolean
   } | null>(null)
+  const [showNextEpisodePrompt, setShowNextEpisodePrompt] = useState(false)
+  const [hasReachedEpisodeEnd, setHasReachedEpisodeEnd] = useState(false)
   const clickCountRef = useRef(0)
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -518,6 +522,21 @@ const Player: React.FC = () => {
     return currentIndex > -1 && currentIndex < state.episodes.length - 1
   })()
 
+  const isLastEpisode =
+    state.episodes.length > 0 &&
+    !!state.currentEpisode &&
+    state.episodes[state.episodes.length - 1] === state.currentEpisode
+  const normalizedShowStatus = (state.showMeta.status || '').trim().toLowerCase()
+  const isFinishedShow = ['finished', 'completed', 'complete', 'ended'].some((status) =>
+    normalizedShowStatus.includes(status)
+  )
+  const canMoveToCompleted =
+    state.inWatchlist &&
+    state.watchlistStatus === 'Watching' &&
+    isLastEpisode &&
+    isFinishedShow &&
+    hasReachedEpisodeEnd
+
   const isCompleted =
     state.resumeTime > 0 &&
     state.resumeDuration > 0 &&
@@ -532,6 +551,39 @@ const Player: React.FC = () => {
     state.currentEpisode && state.watchedEpisodes.includes(state.currentEpisode)
   )
   const showManualWatchedButton = state.selectedProvider !== 'allanime'
+
+  useEffect(() => {
+    const videoElement = refs.videoRef.current
+
+    setShowNextEpisodePrompt(false)
+    setHasReachedEpisodeEnd(false)
+
+    if (!videoElement || state.selectedSource?.type === 'iframe') return
+
+    const handleThresholds = () => {
+      const duration = videoElement.duration
+      const currentTime = videoElement.currentTime
+
+      if (!duration || Number.isNaN(duration)) {
+        setShowNextEpisodePrompt(false)
+        setHasReachedEpisodeEnd(false)
+        return
+      }
+
+      const progress = currentTime / duration
+      setShowNextEpisodePrompt(hasNextEpisode && progress >= 0.8)
+      setHasReachedEpisodeEnd(currentTime >= Math.max(duration * 0.98, duration - 10))
+    }
+
+    handleThresholds()
+    videoElement.addEventListener('timeupdate', handleThresholds)
+    videoElement.addEventListener('loadedmetadata', handleThresholds)
+
+    return () => {
+      videoElement.removeEventListener('timeupdate', handleThresholds)
+      videoElement.removeEventListener('loadedmetadata', handleThresholds)
+    }
+  }, [refs.videoRef, hasNextEpisode, state.currentEpisode, state.selectedSource])
 
   const handleMarkEpisodeWatched = useCallback(async () => {
     if (!showId || !state.currentEpisode || !state.showMeta.name || isMarkingWatched) return
@@ -658,6 +710,8 @@ const Player: React.FC = () => {
                   player={player}
                   isAutoplayEnabled={state.isAutoplayEnabled}
                   onAutoplayChange={handleAutoplayChange}
+                  showNextEpisodeButton={!state.showResumeModal && showNextEpisodePrompt}
+                  onNextEpisode={handleNextEpisode}
                   videoSources={state.videoSources}
                   selectedSource={state.selectedSource}
                   selectedLink={state.selectedLink}
@@ -818,6 +872,16 @@ const Player: React.FC = () => {
                       : isCurrentEpisodeWatched
                         ? 'Watched'
                         : 'Mark Watched'}
+                  </button>
+                )}
+                {canMoveToCompleted && (
+                  <button
+                    className={`${styles.watchlistBtn} ${styles.completeSeriesBtn}`}
+                    onClick={moveToCompleted}
+                    disabled={isUpdatingWatchlistStatus}
+                  >
+                    <FaCheck size={14} />
+                    {isUpdatingWatchlistStatus ? 'Saving...' : 'Move to Completed'}
                   </button>
                 )}
                 <div className={styles.toggleContainer}>

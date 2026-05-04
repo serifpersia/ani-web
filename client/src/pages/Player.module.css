@@ -106,6 +106,18 @@
   border-color: var(--color-success);
 }
 
+.completeSeriesBtn {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.38);
+  color: #d1fae5;
+}
+
+.completeSeriesBtn:hover {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(52, 211, 153, 0.55);
+  color: #ecfdf5;
+}
+
 .videoContainer {
   position: absolute;
   top: 0;

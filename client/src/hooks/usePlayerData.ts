@@ -14,10 +14,12 @@ interface UsePlayerDataReturn {
   state: PlayerState
   dispatch: React.Dispatch<Action>
   toggleWatchlist: () => Promise<void>
+  moveToCompleted: () => Promise<void>
   setPreferredSource: (sourceName: string) => Promise<void>
   handleToggleDetails: () => Promise<void>
   markEpisodeWatched: (episodeNumber: string, duration: number) => Promise<void>
   isMarkingWatched: boolean
+  isUpdatingWatchlistStatus: boolean
 }
 
 interface RawSkipInterval {
@@ -85,6 +87,7 @@ export const usePlayerData = (
         },
         episodes,
         inWatchlist: watchlistStatus.inWatchlist,
+        watchlistStatus: watchlistStatus.status ?? null,
         watchedEpisodes,
       }
     },
@@ -272,6 +275,39 @@ export const usePlayerData = (
     }
   }, [])
 
+  const { mutateAsync: updateWatchlistStatusMutation, isPending: isUpdatingWatchlistStatus } =
+    useMutation({
+      mutationFn: async ({ status }: { status: string }) => {
+        if (!showId) throw new Error('Missing showId')
+
+        const response = await fetch('/api/watchlist/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: showId, status }),
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to update watchlist status')
+        }
+
+        return status
+      },
+      onSuccess: (status) => {
+        dispatch({ type: 'SET_STATE', payload: { inWatchlist: true, watchlistStatus: status } })
+        toast.success(`Moved to ${status}`)
+        queryClient.invalidateQueries({ queryKey: ['show-data', showId] })
+        queryClient.invalidateQueries({ queryKey: ['watchlist'] })
+        queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
+        queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
+        queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+      },
+      onError: () => toast.error('Failed to update watchlist status'),
+    })
+
+  const moveToCompleted = useCallback(async () => {
+    await updateWatchlistStatusMutation({ status: 'Completed' })
+  }, [updateWatchlistStatusMutation])
+
   const { mutateAsync: markEpisodeWatchedMutation } = useMutation({
     mutationFn: async ({
       episodeNumber,
@@ -354,6 +390,7 @@ export const usePlayerData = (
       episodes: showData?.episodes || [],
       watchedEpisodes: showData?.watchedEpisodes || [],
       inWatchlist: !!showData?.inWatchlist,
+      watchlistStatus: showData?.watchlistStatus ?? uiState.watchlistStatus ?? null,
       videoSources: videoData?.videoSources || [],
       selectedSource: uiState.selectedSource || videoData?.selectedSource || null,
       selectedLink: uiState.selectedLink || videoData?.selectedLink || null,
@@ -382,9 +419,11 @@ export const usePlayerData = (
     state: state as PlayerState,
     dispatch,
     toggleWatchlist,
+    moveToCompleted,
     setPreferredSource,
     handleToggleDetails,
     markEpisodeWatched,
     isMarkingWatched: markEpisodeWatchedMutation.isPending,
+    isUpdatingWatchlistStatus,
   }
 }
