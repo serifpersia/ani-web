@@ -6,6 +6,7 @@ import { fixThumbnailUrl, formatTime } from '../../lib/utils'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 import styles from './AnimeCard.module.css'
 import useIsMobile from '../../hooks/useIsMobile'
+import { useLowEndMode } from '../../contexts/LowEndModeContext'
 
 interface Anime {
   _id: string
@@ -76,7 +77,9 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
   ({ anime, continueWatching = false, onRemove, isLCP = false, config, layout = 'vertical' }) => {
     const isMobile = useIsMobile()
     const { titlePreference } = useTitlePreference()
+    const { lowEndMode } = useLowEndMode()
     const [isLoaded, setIsLoaded] = useState(false)
+    const [isHovered, setIsHovered] = useState(false)
 
     const mergedConfig = {
       ...defaultConfig,
@@ -163,18 +166,21 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
       anime.rating?.includes('17+')
 
     return (
-      <div className={styles.cardWrapper}>
+      <div
+        className={`${styles.cardWrapper} ${lowEndMode ? styles.lowEnd : ''}`}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
         <Link to={linkTarget} className={`${styles.card} ${styles[layout]}`}>
           <div className={styles.posterContainer}>
             <img
-              src={fixThumbnailUrl(anime.thumbnail, 150, 200)}
+              src={fixThumbnailUrl(anime.thumbnail, lowEndMode ? 100 : 150, lowEndMode ? 150 : 200)}
               alt={displayTitle}
-              width="150"
-              height="200"
+              width={lowEndMode ? '100' : '150'}
+              height={lowEndMode ? '150' : '200'}
               className={`${styles.posterImg} ${isLoaded ? styles.loaded : ''}`}
-              loading={isLCP ? 'eager' : 'lazy'}
+              loading="lazy"
               decoding="async"
-              fetchPriority={isLCP ? 'high' : 'auto'}
               onLoad={() => setIsLoaded(true)}
             />
 
@@ -188,7 +194,9 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
               </>
             )}
 
-            {showAdultBadge && adultContent && <div className={styles.adultBadge}>18+</div>}
+            {showAdultBadge && adultContent && !lowEndMode && (
+              <div className={styles.adultBadge}>18+</div>
+            )}
           </div>
 
           <div className={styles.info}>
@@ -205,14 +213,16 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
               </div>
             )}
 
-            {showProgress && continueWatching && hasProgress && (
+            {showProgress && (continueWatching || lowEndMode) && hasProgress && (
               <div>
                 <div className={styles.progressContainer}>
                   <div className={styles.progressBar} style={{ width: `${progressPercent}%` }} />
                 </div>
-                <div className={styles.timestamp}>
-                  {formatTime(anime.currentTime || 0)} / {formatTime(anime.duration || 0)}
-                </div>
+                {!lowEndMode && (
+                  <div className={styles.timestamp}>
+                    {formatTime(anime.currentTime || 0)} / {formatTime(anime.duration || 0)}
+                  </div>
+                )}
               </div>
             )}
 

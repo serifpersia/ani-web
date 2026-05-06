@@ -15,6 +15,7 @@ import {
   useAllContinueWatching,
 } from '../hooks/useAnimeData'
 import { useSetting, useUpdateSetting } from '../hooks/useSettings'
+import { useLowEndMode } from '../contexts/LowEndModeContext'
 import styles from './Watchlist.module.css'
 
 const FILTERS = [
@@ -34,6 +35,7 @@ const Watchlist: React.FC = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [sortBy, setSortBy] = useState('last_added')
+  const { lowEndMode } = useLowEndMode()
 
   const [itemToRemove, setItemToRemove] = useState<{ id: string; name: string } | null>(null)
 
@@ -197,7 +199,7 @@ const Watchlist: React.FC = () => {
         <ErrorMessage message={error.message} />
       ) : (
         <>
-          <div className={styles.grid}>
+          <div className={`${styles.grid} ${lowEndMode ? styles.lowEnd : ''}`}>
             {sortedList.map((item) => (
               <div key={item._id} className={styles.itemWrapper}>
                 <AnimeCard

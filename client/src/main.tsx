@@ -5,6 +5,7 @@ import App from './App'
 import './styles/base.css'
 import { SidebarProvider } from './contexts/SidebarProvider'
 import { TitlePreferenceProvider } from './contexts/TitlePreferenceContext'
+import { LowEndModeProvider } from './contexts/LowEndModeContext'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 const queryClient = new QueryClient({
@@ -23,7 +24,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <SidebarProvider>
           <TitlePreferenceProvider>
-            <App />
+            <LowEndModeProvider>
+              <App />
+            </LowEndModeProvider>
           </TitlePreferenceProvider>
         </SidebarProvider>
       </QueryClientProvider>

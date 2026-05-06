@@ -172,3 +172,57 @@ select:focus {
 select:active {
   background-color: var(--bg-tertiary) !important;
 }
+
+/* ===== LOW END MODE ===== */
+body.low-end {
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol' !important;
+  --transition-fast: 0s !important;
+  --transition-base: 0s !important;
+  --transition-normal: 0s !important;
+  --transition-slow: 0s !important;
+  scroll-behavior: auto !important;
+}
+
+body.low-end,
+body.low-end * {
+  transition: none !important;
+  animation: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+body.low-end::before {
+  display: none !important;
+}
+
+body.low-end .text-gradient,
+body.low-end .text-gradient-accent {
+  background: none !important;
+  -webkit-background-clip: initial !important;
+  -webkit-text-fill-color: initial !important;
+  color: var(--text-primary) !important;
+}
+
+body.low-end .text-gradient-accent {
+  color: var(--accent) !important;
+}
+
+/* Hide heavy banners/backgrounds */
+body.low-end [class*='banner'],
+body.low-end [class*='bannerContainer'],
+body.low-end [class*='bannerOverlay'],
+body.low-end [class*='heroSection'] {
+  background-image: none !important;
+  background-color: var(--bg-main) !important;
+  min-height: auto !important;
+}
+
+body.low-end [class*='infoGlass'] {
+  background: var(--bg-secondary) !important;
+  backdrop-filter: none !important;
+  border: 1px solid var(--border-primary) !important;
+  box-shadow: none !important;
+}

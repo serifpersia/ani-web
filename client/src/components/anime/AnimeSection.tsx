@@ -5,6 +5,7 @@ import AnimeCard from './AnimeCard'
 import AnimeCardSkeleton from './AnimeCardSkeleton'
 import SkeletonGrid from '../common/SkeletonGrid'
 import styles from './AnimeSection.module.css'
+import { useLowEndMode } from '../../contexts/LowEndModeContext'
 
 interface Anime {
   _id: string
@@ -69,9 +70,11 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
   cardConfig,
   layout,
 }) => {
+  const { lowEndMode } = useLowEndMode()
   const carouselRef = useRef<HTMLDivElement>(null)
 
-  const defaultLayout = carousel ? 'vertical' : 'horizontal'
+  const isActuallyCarousel = carousel && !lowEndMode
+  const defaultLayout = isActuallyCarousel ? 'vertical' : 'horizontal'
   const currentLayout = layout || defaultLayout
 
   const scroll = (direction: 'left' | 'right') => {
@@ -80,7 +83,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
     const offset = clientWidth * 0.8
     carouselRef.current.scrollTo({
       left: direction === 'left' ? scrollLeft - offset : scrollLeft + offset,
-      behavior: 'smooth',
+      behavior: lowEndMode ? 'auto' : 'smooth',
     })
   }
 
@@ -115,7 +118,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
         )}
       </div>
 
-      {carousel ? (
+      {isActuallyCarousel ? (
         <div className={styles['carousel-container']}>
           <div className={styles.carousel} ref={carouselRef}>
             {loading && animeList.length === 0

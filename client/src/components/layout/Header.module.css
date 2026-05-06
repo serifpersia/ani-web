@@ -93,12 +93,32 @@
   box-shadow: var(--shadow-input-focus);
 }
 
-.searchIcon {
+.searchButton {
   position: absolute;
   right: var(--space-4);
+  background: transparent;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.searchIcon {
   color: var(--text-muted);
-  pointer-events: none;
   font-size: 1.1rem;
+  transition: all var(--transition-base);
+}
+
+.searchButton:hover .searchIcon {
+  color: var(--accent);
+  transform: scale(1.1);
+}
+
+.searchButton:active .searchIcon {
+  transform: scale(0.9);
 }
 
 .profileBtn {

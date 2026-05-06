@@ -708,8 +708,6 @@ export class AllAnimeProvider implements Provider {
               episode: firstResult.currentEpisode ? firstResult.currentEpisode + 1 : 1,
               timeUntilAiring: Math.floor((airingTime - now) / 1000),
             }
-          } else {
-            logger.debug('No countdown found')
           }
         } catch (e) {
           logger.warn({ err: e }, 'Failed to fetch schedule page')

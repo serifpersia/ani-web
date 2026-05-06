@@ -51,7 +51,6 @@
   height: 80px;
   font-size: 2.2rem;
   cursor: pointer;
-  padding-left: 4px;
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   box-shadow: var(--glass-shadow);
   will-change: transform;
@@ -62,6 +61,10 @@
   transform: translate(-50%, -50%) scale(1.1);
   border-color: var(--accent);
   box-shadow: 0 0 40px var(--accent-glow);
+}
+
+.playIconOffset {
+  transform: translateX(3px);
 }
 
 .bottomControls {
@@ -359,6 +362,70 @@
   color: rgba(255, 255, 255, 0.5);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  .playerPageLayout {
+    padding: 0;
+    gap: 0;
+  }
+  .videoPlayerWrapper {
+    border-radius: 0;
+    height: 100vh;
+    padding-top: 0;
+  }
+  .playerInfoContainer {
+    padding: 1.5rem;
+  }
+}
+
+/* Low End Mode Overrides for Player Controls */
+:global(body.low-end) .controlsOverlay {
+  background: none !important;
+  transition: none !important;
+}
+
+:global(body.low-end) .centerPlayPause,
+:global(body.low-end) .bottomControls {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: #1a1a1c;
+  box-shadow: none !important;
+  transition: none !important;
+}
+
+:global(body.low-end) .centerPlayPause:hover {
+  background: var(--accent) !important;
+}
+
+:global(body.low-end) .controlBtn.active {
+  color: var(--accent) !important;
+}
+
+:global(body.low-end) .progressBar {
+  height: 4px !important;
+  transition: none !important;
+}
+
+:global(body.low-end) .watchedBar {
+  background: var(--accent) !important;
+  box-shadow: none !important;
+}
+
+:global(body.low-end) .thumb {
+  transition: none !important;
+  box-shadow: none !important;
+}
+
+:global(body.low-end) .controlBtn:hover,
+:global(body.low-end) .nextEpisodeBtn:hover {
+  transform: none !important;
+}
+
+:global(body.low-end) .timeBubble {
+  backdrop-filter: none !important;
+  background: #111 !important;
+  transition: none !important;
 }
 
 @media (max-width: 768px) {

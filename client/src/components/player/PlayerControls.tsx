@@ -228,7 +228,7 @@ const PlayerControls = ({
         }}
         aria-label={state.isPlaying ? 'Pause' : 'Play'}
       >
-        {state.isPlaying ? <FaPause /> : <FaPlay />}
+        {state.isPlaying ? <FaPause /> : <FaPlay className={styles.playIconOffset} />}
       </button>
 
       <div className={styles.bottomControls}>

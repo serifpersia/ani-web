@@ -4,6 +4,7 @@ import { FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import { fixThumbnailUrl } from '../../lib/utils'
 import ErrorMessage from '../common/ErrorMessage'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
+import { useLowEndMode } from '../../contexts/LowEndModeContext'
 import styles from './Top10List.module.css'
 
 interface AnimeItem {
@@ -36,6 +37,7 @@ export default function Top10List({ title }: Top10ListProps) {
   const [timeframe, setTimeframe] = useState('all')
   const [isMobile, setIsMobile] = useState(false)
   const { titlePreference } = useTitlePreference()
+  const { lowEndMode } = useLowEndMode()
   const carouselRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -70,7 +72,7 @@ export default function Top10List({ title }: Top10ListProps) {
     const offset = clientWidth * 0.8
     carouselRef.current.scrollTo({
       left: direction === 'left' ? scrollLeft - offset : scrollLeft + offset,
-      behavior: 'smooth',
+      behavior: lowEndMode ? 'auto' : 'smooth',
     })
   }
 
@@ -98,27 +100,31 @@ export default function Top10List({ title }: Top10ListProps) {
       {top10List.map((item, i) => (
         <Link to={`/anime/${item._id}`} key={item._id} className={styles.item}>
           <div className={styles.rank}>#{i + 1}</div>
-          <img
-            src={fixThumbnailUrl(item.thumbnail, 130, 182)}
-            alt={item.name}
-            width="50"
-            height="70"
-            className={styles.poster}
-            loading="lazy"
-            decoding="async"
-            onError={(e) => {
-              const target = e.currentTarget as HTMLImageElement
-              target.src = '/placeholder.svg'
-            }}
-          />
+          {!lowEndMode && (
+            <img
+              src={fixThumbnailUrl(item.thumbnail, 130, 182)}
+              alt={item.name}
+              width="50"
+              height="70"
+              className={styles.poster}
+              loading="lazy"
+              decoding="async"
+              onError={(e) => {
+                const target = e.currentTarget as HTMLImageElement
+                target.src = '/placeholder.svg'
+              }}
+            />
+          )}
           <div className={styles.info}>
             <div className={styles.title} title={getDisplayTitle(item)}>
               {getDisplayTitle(item)}
             </div>
-            <div className={styles.meta}>
-              {item.availableEpisodes.sub && <span>SUB: {item.availableEpisodes.sub}</span>}
-              {item.availableEpisodes.dub && <span> DUB: {item.availableEpisodes.dub}</span>}
-            </div>
+            {!lowEndMode && (
+              <div className={styles.meta}>
+                {item.availableEpisodes.sub && <span>SUB: {item.availableEpisodes.sub}</span>}
+                {item.availableEpisodes.dub && <span> DUB: {item.availableEpisodes.dub}</span>}
+              </div>
+            )}
           </div>
         </Link>
       ))}
@@ -166,19 +172,25 @@ export default function Top10List({ title }: Top10ListProps) {
                 {top10List.map((item, i) => (
                   <Link to={`/anime/${item._id}`} key={item._id} className={styles.carouselItem}>
                     <div className={styles.carouselPoster}>
-                      <img
-                        src={fixThumbnailUrl(item.thumbnail, 130, 182)}
-                        alt={item.name}
-                        width="100"
-                        height="140"
-                        loading="lazy"
-                        decoding="async"
-                        onError={(e) => {
-                          const target = e.currentTarget as HTMLImageElement
-                          target.src = '/placeholder.svg'
-                        }}
-                      />
-                      <div className={styles.carouselRank}>#{i + 1}</div>
+                      {!lowEndMode ? (
+                        <img
+                          src={fixThumbnailUrl(item.thumbnail, 130, 182)}
+                          alt={item.name}
+                          width="100"
+                          height="140"
+                          loading="lazy"
+                          decoding="async"
+                          onError={(e) => {
+                            const target = e.currentTarget as HTMLImageElement
+                            target.src = '/placeholder.svg'
+                          }}
+                        />
+                      ) : (
+                        <div className={styles.placeholder}>
+                          <div className={styles.rankPlaceholder}>#{i + 1}</div>
+                        </div>
+                      )}
+                      {!lowEndMode && <div className={styles.carouselRank}>#{i + 1}</div>}
                     </div>
                     <div className={styles.carouselTitle} title={getDisplayTitle(item)}>
                       {getDisplayTitle(item)}

@@ -1,3 +1,6 @@
+process.setMaxListeners(100)
+import { EventEmitter } from 'events'
+EventEmitter.defaultMaxListeners = 100
 import express from 'express'
 import path from 'path'
 import cors from 'cors'
@@ -162,7 +165,7 @@ async function main() {
 
   watcher.on('change', () => {
     clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => syncUp(db, dbPath, remoteFolder), 5000)
+    debounceTimer = setTimeout(() => syncUp(db, dbPath, remoteFolder), 30000)
   })
 
   const shutdown = async (signal?: string) => {

@@ -7,6 +7,7 @@ import { Button } from '../components/common/Button'
 import ErrorMessage from '../components/common/ErrorMessage'
 import SearchableSelect from '../components/common/SearchableSelect'
 import { useSearchAnime, useGenresAndStudios } from '../hooks/useAnimeData'
+import { useLowEndMode } from '../contexts/LowEndModeContext'
 import styles from './Search.module.css'
 
 interface Option {
@@ -46,6 +47,7 @@ export default function Search() {
   const [country, setCountry] = useState('ALL')
   const [studio, setStudio] = useState('ALL')
   const [showFilters, setShowFilters] = useState(false)
+  const { lowEndMode } = useLowEndMode()
 
   const { data: metaData } = useGenresAndStudios()
   const availableGenres = metaData?.genres || []
@@ -266,7 +268,7 @@ export default function Search() {
 
       {isError && <ErrorMessage message={error?.message || 'Error'} />}
 
-      <div className={styles.resultsGrid}>
+      <div className={`${styles.resultsGrid} ${lowEndMode ? styles.lowEnd : ''}`}>
         {results.map((anime) => (
           <AnimeCard key={anime._id} anime={anime} />
         ))}

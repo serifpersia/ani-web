@@ -6,6 +6,8 @@ import GoogleAuthSettings from '../components/settings/GoogleAuthSettings'
 import WatchlistSettings from '../components/settings/WatchlistSettings'
 import RcloneSettings from '../components/settings/RcloneSettings'
 import { FaCog, FaCloud, FaDatabase, FaList } from 'react-icons/fa'
+import { useLowEndMode } from '../contexts/LowEndModeContext'
+import ToggleSwitch from '../components/common/ToggleSwitch'
 
 type SettingsTab = 'general' | 'sync' | 'watchlist' | 'database'
 
@@ -13,6 +15,7 @@ const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general')
   const [statusMessage, setStatusMessage] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { lowEndMode, setLowEndMode } = useLowEndMode()
 
   React.useEffect(() => {
     document.title = 'Settings - ani-web'
@@ -83,6 +86,30 @@ const Settings: React.FC = () => {
               <p>Configure how titles are displayed and other general preferences.</p>
               <div className={styles.settingItem}>
                 <TitlePreferenceToggle />
+              </div>
+              <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Low End Mode</h4>
+                    <p
+                      style={{
+                        margin: '0.25rem 0 0',
+                        fontSize: '0.85rem',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      Disables animations and heavy visual effects for better performance on older
+                      hardware.
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    isChecked={lowEndMode}
+                    onChange={(e) => setLowEndMode(e.target.checked)}
+                    id="low-end-mode"
+                  />
+                </div>
               </div>
             </div>
           </div>

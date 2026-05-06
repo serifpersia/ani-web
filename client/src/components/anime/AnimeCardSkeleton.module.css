@@ -84,3 +84,17 @@
     height: 12px;
   }
 }
+
+.skeletonCard.lowEnd {
+  min-height: 40px;
+  flex-direction: row;
+}
+
+.skeletonCard.lowEnd .line {
+  animation: none !important;
+  opacity: 0.3;
+}
+
+.skeletonCard.lowEnd .info {
+  padding: var(--space-2);
+}

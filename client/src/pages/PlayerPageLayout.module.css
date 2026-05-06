@@ -230,3 +230,23 @@
     padding: 1.5rem;
   }
 }
+
+/* Low End Mode Layout Overrides */
+:global(body.low-end) .playerPageLayout,
+:global(body.low-end) .episodeSidebar,
+:global(body.low-end) .playerInfoContainer {
+  animation: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  background: var(--bg-secondary) !important;
+}
+
+:global(body.low-end) .videoPlayerWrapper {
+  box-shadow: none !important;
+  border-color: var(--border-primary) !important;
+}
+
+:global(body.low-end) .episodeSidebar {
+  background: #0a0a0c !important;
+}

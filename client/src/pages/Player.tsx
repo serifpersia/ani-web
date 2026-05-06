@@ -207,10 +207,11 @@ const Player: React.FC = () => {
         import('hls.js/dist/hls.light.mjs').then((module) => {
           const Hls = module.default
           if (Hls.isSupported()) {
+            const isLowEnd = document.body.classList.contains('low-end')
             const hls = new Hls({
-              maxBufferLength: 30,
-              maxMaxBufferLength: 60,
-              maxBufferSize: 60 * 1000 * 1000,
+              maxBufferLength: isLowEnd ? 15 : 30,
+              maxMaxBufferLength: isLowEnd ? 30 : 60,
+              maxBufferSize: isLowEnd ? 25 * 1000 * 1000 : 60 * 1000 * 1000,
               startLevel: -1,
               enableWorker: true,
             })

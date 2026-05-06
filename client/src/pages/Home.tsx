@@ -17,6 +17,7 @@ import {
 
 import useIsMobile from '../hooks/useIsMobile'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
+import { useLowEndMode } from '../contexts/LowEndModeContext'
 
 const Home: React.FC = () => {
   const queryClient = useQueryClient()
@@ -28,6 +29,7 @@ const Home: React.FC = () => {
   const { data: nextPageData } = usePaginatedCurrentSeason(page + 1)
 
   const { titlePreference } = useTitlePreference()
+  const { lowEndMode } = useLowEndMode()
   const [itemToRemove, setItemToRemove] = React.useState<{ id: string; name: string } | null>(null)
   const removeWatchlistMutation = useRemoveFromWatchlist()
 
@@ -64,6 +66,7 @@ const Home: React.FC = () => {
   }, [cwFast, cwUpNext])
 
   const { data: currentSeason, isLoading: loadingSeason } = usePaginatedCurrentSeason(page)
+  const seasonLimit = 14
 
   const canGoNext =
     currentSeason && currentSeason.length >= 14 && nextPageData && nextPageData.length > 0
@@ -186,7 +189,7 @@ const Home: React.FC = () => {
           <div style={{ marginBottom: '2rem' }}>
             <AnimeSection
               title="Latest Releases"
-              animeList={latest || []}
+              animeList={latest?.slice(0, 14) || []}
               loading={loadingLatest}
               carousel
             />
@@ -288,11 +291,11 @@ const Home: React.FC = () => {
             }}
           >
             {loadingSeason ? (
-              <SkeletonGrid count={14} layout="horizontal" />
+              <SkeletonGrid count={seasonLimit} layout="horizontal" />
             ) : (
-              currentSeason?.map((anime) => (
-                <AnimeCard key={anime._id} anime={anime} layout="horizontal" />
-              ))
+              currentSeason
+                ?.slice(0, seasonLimit)
+                .map((anime) => <AnimeCard key={anime._id} anime={anime} layout="horizontal" />)
             )}
           </div>
         </section>
