@@ -69,7 +69,6 @@ const Player: React.FC = () => {
 
   const hlsInstance = useRef<Hls | null>(null)
   const isMobile = useIsMobile()
-  const wasFullscreenRef = useRef(false)
   const rafIdRef = useRef<number | null>(null)
   const seekToTimeRef = useRef<number>(0)
   const resumeTimeRef = useRef(state.resumeTime)
@@ -262,7 +261,6 @@ const Player: React.FC = () => {
         const currentIndex = state.episodes.findIndex((ep) => ep === state.currentEpisode)
         if (currentIndex > -1 && currentIndex < state.episodes.length - 1) {
           const nextEpisode = state.episodes[currentIndex + 1]
-          wasFullscreenRef.current = player.state.isFullscreen
           navigate(`/watch/${showId}/${nextEpisode}`)
         }
       }
@@ -285,11 +283,10 @@ const Player: React.FC = () => {
   ])
 
   useEffect(() => {
-    if (!state.loadingVideo && wasFullscreenRef.current) {
+    if (state.showResumeModal && player.state.isFullscreen) {
       player.actions.toggleFullscreen()
-      wasFullscreenRef.current = false
     }
-  }, [state.loadingVideo, player.actions])
+  }, [state.showResumeModal, player.state.isFullscreen, player.actions])
 
   useEffect(() => {
     if (state.showResumeModal && refs.videoRef.current) {

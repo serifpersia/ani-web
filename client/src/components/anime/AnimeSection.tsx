@@ -73,7 +73,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
   const { lowEndMode } = useLowEndMode()
   const carouselRef = useRef<HTMLDivElement>(null)
 
-  const isActuallyCarousel = carousel && !lowEndMode
+  const isActuallyCarousel = carousel
   const defaultLayout = isActuallyCarousel ? 'vertical' : 'horizontal'
   const currentLayout = layout || defaultLayout
 
