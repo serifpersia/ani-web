@@ -650,6 +650,41 @@ export class AllAnimeProvider implements Provider {
             subtitles,
             type: 'player',
           })
+        } else if (source.sourceName === 'Mp4') {
+          const decryptedUrl = this.deobfuscateStreamUrl(source.sourceUrl)
+          try {
+            const { data: embedHtml } = await axios.get(decryptedUrl, {
+              headers: {
+                'User-Agent': USER_AGENT,
+                Referer: 'https://allanime.day/',
+              },
+              timeout: 10000,
+            })
+            const match = embedHtml.match(/src:\s*"(https:\/\/.*?\.mp4)"/)
+            if (match) {
+              processedSources.push({
+                sourceName: source.sourceName,
+                links: [
+                  {
+                    resolutionStr: 'Default',
+                    link: match[1],
+                    hls: false,
+                    headers: { Referer: 'https://www.mp4upload.com/' },
+                  },
+                ],
+                type: 'player',
+              })
+              continue
+            }
+          } catch (e) {
+            logger.warn({ err: e }, `Failed to scrape Mp4Upload direct link for ${decryptedUrl}`)
+          }
+          // Fallback to iframe if scraping fails
+          processedSources.push({
+            sourceName: source.sourceName,
+            links: [{ resolutionStr: 'iframe', link: decryptedUrl, hls: false }],
+            type: 'iframe',
+          })
         } else {
           processedSources.push({
             sourceName: source.sourceName,
