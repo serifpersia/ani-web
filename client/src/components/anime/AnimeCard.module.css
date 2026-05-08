@@ -173,7 +173,8 @@
   margin-top: var(--space-1);
 }
 
-.removeBtn {
+.removeBtn,
+.infoBtn {
   position: absolute;
   top: var(--space-2);
   right: var(--space-2);
@@ -190,7 +191,8 @@
   opacity: 0;
   transition:
     opacity 0.15s ease,
-    background-color 0.15s ease;
+    background-color 0.15s ease,
+    transform 0.15s ease;
   z-index: 20;
   font-size: 1rem;
 }
@@ -199,19 +201,25 @@
   background-color: rgba(239, 68, 68, 0.9) !important;
   border-color: rgba(239, 68, 68, 0.9) !important;
   transform: scale(1.08);
-  box-shadow: none;
-  opacity: 1;
+}
+
+.infoBtn:hover {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  transform: scale(1.08);
 }
 
 .cardWrapper:hover .removeBtn,
-.card:hover .removeBtn {
+.card:hover .removeBtn,
+.cardWrapper:hover .infoBtn,
+.card:hover .infoBtn {
   opacity: 1;
 }
 
 @media (hover: none), (pointer: coarse) {
-  .removeBtn {
-    opacity: 1 !important;
-    background-color: rgba(0, 0, 0, 0.4) !important;
+  .removeBtn,
+  .infoBtn {
+    display: none; /* Only works on desktop as requested */
   }
 }
 

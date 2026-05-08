@@ -1,6 +1,7 @@
 import React, { memo, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { FaMicrophone, FaClosedCaptioning, FaTimes } from 'react-icons/fa'
+import { FaMicrophone, FaClosedCaptioning, FaTimes, FaInfo } from 'react-icons/fa'
+import AnimePopup from './AnimePopup'
 
 import { fixThumbnailUrl, formatTime } from '../../lib/utils'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
@@ -80,6 +81,31 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     const { lowEndMode } = useLowEndMode()
     const [isLoaded, setIsLoaded] = useState(false)
     const [isHovered, setIsHovered] = useState(false)
+    const [isPopupVisible, setIsPopupVisible] = useState(false)
+    const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
+    const timeoutRef = React.useRef<NodeJS.Timeout | null>(null)
+
+    const handleInfoMouseEnter = (e: React.MouseEvent) => {
+      if (isMobile) return
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      setAnchorRect(rect)
+      setIsPopupVisible(true)
+    }
+
+    const handleInfoMouseLeave = () => {
+      timeoutRef.current = setTimeout(() => {
+        setIsPopupVisible(false)
+      }, 300)
+    }
+
+    const handlePopupMouseEnter = () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    }
+
+    const handlePopupMouseLeave = () => {
+      setIsPopupVisible(false)
+    }
 
     const mergedConfig = {
       ...defaultConfig,
@@ -248,6 +274,24 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
           <button className={styles.removeBtn} onClick={handleRemoveClick} aria-label="Remove">
             <FaTimes size={10} />
           </button>
+        )}
+        {!continueWatching && !isMobile && (
+          <button
+            className={styles.infoBtn}
+            onMouseEnter={handleInfoMouseEnter}
+            onMouseLeave={handleInfoMouseLeave}
+            aria-label="Info"
+          >
+            <FaInfo size={10} />
+          </button>
+        )}
+        {isPopupVisible && anchorRect && (
+          <AnimePopup
+            showId={anime._id}
+            anchorRect={anchorRect}
+            onMouseEnter={handlePopupMouseEnter}
+            onMouseLeave={handlePopupMouseLeave}
+          />
         )}
       </div>
     )
