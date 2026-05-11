@@ -33,6 +33,12 @@ Based on a lightweight architecture, ani-web includes:
 - **User Insights:** View your personal anime watching statistics.
 - **MAL Integration:** Seamlessly import your lists from MyAnimeList.
 
+## Join ani-web Discord server
+
+Be part of the ani-web Discord Server Community where you can connect with fellow users, ask questions, and share your experiences:
+
+[![Discord Server](https://discordapp.com/api/guilds/1503322177561428038/widget.png?style=banner2)](https://discord.gg/2FTSPXCsvn)
+
 ---
 
 ## Getting Started
