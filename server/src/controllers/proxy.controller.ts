@@ -169,7 +169,6 @@ export class ProxyController {
     }
   }
 
-  // OPTIMIZED: Use 'stream' instead of 'arraybuffer'
   handleImageProxy = async (req: Request, res: Response) => {
     const { url } = req.query
     if (!url) return res.status(400).send('URL required')
@@ -187,7 +186,7 @@ export class ProxyController {
         refererValue = 'https://anilist.co/'
       } else if (targetUrl.includes('gogocdn.net')) {
         refererValue = 'https://gogoanime.lu/'
-      } else if (targetUrl.includes('wp.youtube-anime.com')) {
+      } else if (targetUrl.includes('youtube-anime.com') || targetUrl.includes('allanime.day')) {
         refererValue = 'https://allanime.day/'
       }
 
@@ -221,13 +220,11 @@ export class ProxyController {
         }
       })
 
-      // Pipe directly to response
       imageResponse.data.pipe(res)
     } catch (e) {
       if (axios.isCancel(e)) {
         return
       }
-      // Serve placeholder if proxy fails
       if (!res.headersSent) {
         this.sendPlaceholder(res)
       }

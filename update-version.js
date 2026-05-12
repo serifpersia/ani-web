@@ -18,25 +18,47 @@ const targets = [
   path.join(root, 'package-lock.json'),
   path.join(root, 'client', 'package-lock.json'),
   path.join(root, 'server', 'package-lock.json'),
+
+  path.join(root, 'README.md'),
 ]
 
-function updateJson(filePath) {
+function updateFile(filePath) {
   if (!fs.existsSync(filePath)) {
     console.warn(`Skipping missing file: ${filePath}`)
     return
   }
 
-  const raw = fs.readFileSync(filePath, 'utf8')
-  const json = JSON.parse(raw)
+  const content = fs.readFileSync(filePath, 'utf8')
 
-  if (json.version) {
-    json.version = newVersion
+  if (filePath.endsWith('.json')) {
+    const json = JSON.parse(content)
+    let updated = false
+
+    if (json.version) {
+      json.version = newVersion
+      updated = true
+    }
+
+    if (json.packages && json.packages['']) {
+      json.packages[''].version = newVersion
+      updated = true
+    }
+
+    if (updated) {
+      fs.writeFileSync(filePath, JSON.stringify(json, null, 2) + '\n')
+      console.log(`✅ Updated ${filePath}`)
+    }
+  } else if (filePath.endsWith('.md')) {
+    const badgeRegex = /img\.shields\.io\/badge\/ani--web-(\d+\.\d+\.\d+)-/
+    const newContent = content.replace(badgeRegex, `img.shields.io/badge/ani--web-${newVersion}-`)
+
+    if (content !== newContent) {
+      fs.writeFileSync(filePath, newContent)
+      console.log(`✅ Updated ${filePath}`)
+    }
   }
-
-  fs.writeFileSync(filePath, JSON.stringify(json, null, 2) + '\n')
-  console.log(`Updated ${filePath}`)
 }
 
-targets.forEach(updateJson)
+targets.forEach(updateFile)
 
 console.log(`🎉 Version bumped to ${newVersion}`)

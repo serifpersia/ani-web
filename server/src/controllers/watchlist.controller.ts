@@ -92,17 +92,31 @@ export class WatchlistController {
       if (req.db.isClosedCheck()) return
       const delay = () => new Promise((res) => setImmediate(res))
       for (const show of enrichedRows) {
-        if (!show.type && !this.activeTypeFetches.has(show.id)) {
+        const currentThumbnail = show.thumbnail || ''
+        const fixedThumbnail = this.provider.deobfuscateUrl(currentThumbnail)
+        const needsThumbnailUpdate = fixedThumbnail !== currentThumbnail
+
+        if ((!show.type || needsThumbnailUpdate) && !this.activeTypeFetches.has(show.id)) {
           this.activeTypeFetches.add(show.id)
           try {
-            const meta = await this.provider.getShowMeta(show.id)
-            if (meta && meta.type && !req.db.isClosedCheck()) {
-              await ShowsMetaRepository.updateType(req.db, show.id, meta.type)
-              await WatchlistRepository.updateType(req.db, show.id, meta.type)
-              req.db.scheduleSave()
+            let didUpdate = false
+            if (needsThumbnailUpdate && !req.db.isClosedCheck()) {
+              await WatchlistRepository.updateThumbnail(req.db, show.id, fixedThumbnail)
+              await ShowsMetaRepository.updateThumbnail(req.db, show.id, fixedThumbnail)
+              didUpdate = true
             }
+
+            if (!show.type) {
+              const meta = await this.provider.getShowMeta(show.id)
+              if (meta && meta.type && !req.db.isClosedCheck()) {
+                await ShowsMetaRepository.updateType(req.db, show.id, meta.type)
+                await WatchlistRepository.updateType(req.db, show.id, meta.type)
+                didUpdate = true
+              }
+            }
+            if (didUpdate) req.db.scheduleSave()
           } catch (e) {
-            logger.error({ err: e, showId: show.id }, 'Lazy migration error for type')
+            logger.error({ err: e, showId: show.id }, 'Lazy migration error for show')
           } finally {
             this.activeTypeFetches.delete(show.id)
           }
@@ -303,7 +317,11 @@ export class WatchlistController {
       ])
 
       res.json({
-        data: rows.map((row) => ({ ...row, _id: row.id })),
+        data: rows.map((row) => ({
+          ...row,
+          _id: row.id,
+          thumbnail: this.provider.deobfuscateUrl(row.thumbnail || ''),
+        })),
         total,
         page,
         limit,
@@ -313,15 +331,39 @@ export class WatchlistController {
         if (req.db.isClosedCheck()) return
         const delay = () => new Promise((res) => setImmediate(res))
         for (const row of rows) {
-          if (!row.type && !this.activeTypeFetches.has(row.id)) {
+          const currentThumbnail = row.thumbnail || ''
+          const fixedThumbnail = this.provider.deobfuscateUrl(currentThumbnail)
+          const needsThumbnailUpdate = fixedThumbnail !== currentThumbnail
+
+          if ((!row.type || needsThumbnailUpdate) && !this.activeTypeFetches.has(row.id)) {
             this.activeTypeFetches.add(row.id)
             try {
-              const meta = await this.provider.getShowMeta(row.id)
-              if (meta && meta.type && !req.db.isClosedCheck()) {
-                await WatchlistRepository.updateType(req.db, row.id, meta.type)
-                await ShowsMetaRepository.updateType(req.db, row.id, meta.type)
-                req.db.scheduleSave()
+              let didUpdate = false
+              if (needsThumbnailUpdate && !req.db.isClosedCheck()) {
+                await WatchlistRepository.updateThumbnail(req.db, row.id, fixedThumbnail)
+                await ShowsMetaRepository.updateThumbnail(req.db, row.id, fixedThumbnail)
+                didUpdate = true
               }
+
+              if (!row.type) {
+                const meta = await this.provider.getShowMeta(row.id)
+                if (meta && !req.db.isClosedCheck()) {
+                  if (meta.type) {
+                    await WatchlistRepository.updateType(req.db, row.id, meta.type)
+                    await ShowsMetaRepository.updateType(req.db, row.id, meta.type)
+                    didUpdate = true
+                  }
+                  if (meta.thumbnail) {
+                    const metaThumb = this.provider.deobfuscateUrl(meta.thumbnail)
+                    if (metaThumb !== fixedThumbnail) {
+                      await WatchlistRepository.updateThumbnail(req.db, row.id, metaThumb)
+                      await ShowsMetaRepository.updateThumbnail(req.db, row.id, metaThumb)
+                      didUpdate = true
+                    }
+                  }
+                }
+              }
+              if (didUpdate) req.db.scheduleSave()
             } catch (e) {
               logger.error({ err: e, showId: row.id }, 'Watchlist lazy migration error')
             } finally {

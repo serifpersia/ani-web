@@ -8,70 +8,83 @@ export const fixThumbnailUrl = (
 ): string => {
   if (!url || url.trim() === '') return '/placeholder.svg'
 
+  // If it's already a full proxy URL, just handle dimensions
   if (url.includes('/api/image-proxy')) {
     let finalUrl = url
-    if (width) finalUrl += `&w=${width}`
-    if (height) finalUrl += `&h=${height}`
+    if (width && !finalUrl.includes('w=')) {
+      const separator = finalUrl.includes('?') ? '&' : '?'
+      finalUrl += `${separator}w=${width}`
+    }
+    if (height && !finalUrl.includes('h=')) {
+      const separator = finalUrl.includes('?') ? '&' : '?'
+      finalUrl += `${separator}h=${height}`
+    }
     return finalUrl
   }
 
-  let optimizedUrl = url
-  if (url.includes('s4.anilist.co') && url.includes('/large/')) {
-    optimizedUrl = url.replace('/large/', '/medium/')
+  let finalUrl = url
+
+  // 1. Resolve host issues
+  if (finalUrl.includes('wp.youtube-anime.com')) {
+    finalUrl = finalUrl.replace('wp.youtube-anime.com', 'allanime.day')
   }
 
-  const cacheKey = `${optimizedUrl}-${width}-${height}`
+  // 2. Resolve aln host issues (confirmed working host)
+  if (finalUrl.includes('aln.youtube-anime.com')) {
+    finalUrl = finalUrl.replace(
+      /https?:\/\/allanime\.day\/aln\.youtube-anime\.com/,
+      'https://aln.youtube-anime.com'
+    )
+
+    // Fix pathing
+    if (finalUrl.includes('/images/mcovers')) {
+      finalUrl = finalUrl.replace('/images/mcovers', '/mcovers')
+    }
+    if (finalUrl.includes('/images/images2')) {
+      finalUrl = finalUrl.replace('/images/images2', '/images2')
+    }
+  }
+
+  // 3. Resolve Anilist CDN issues
+  if (finalUrl.includes('allanime.day/s4.anilist.co')) {
+    finalUrl = finalUrl.replace(
+      /https?:\/\/allanime\.day\/s4\.anilist\.co/,
+      'https://s4.anilist.co'
+    )
+  }
+
+  // Handle dimensions and proxying
+  const cacheKey = `${finalUrl}-${width}-${height}`
   if (thumbnailCache.has(cacheKey)) {
     return thumbnailCache.get(cacheKey)!
   }
 
-  let transformedUrl: string
-  if (optimizedUrl.startsWith('https://ytimgf.youtube-anime.com/images/')) {
-    transformedUrl = optimizedUrl.replace(
-      'https://ytimgf.youtube-anime.com/images/',
-      'https://wp.youtube-anime.com/aln.youtube-anime.com/'
-    )
-  } else if (optimizedUrl.startsWith('https://cdnimg.xyz')) {
-    transformedUrl = `https://wp.youtube-anime.com/${optimizedUrl.substring('https://'.length)}`
-  } else if (optimizedUrl.startsWith('https://aln.youtube-anime.com')) {
-    transformedUrl = optimizedUrl.replace(
-      'https://aln.youtube-anime.com/',
-      'https://wp.youtube-anime.com/aln.youtube-anime.com/images/'
-    )
-  } else if (optimizedUrl.startsWith('__Show__')) {
-    transformedUrl = `https://wp.youtube-anime.com/aln.youtube-anime.com/images/${optimizedUrl}`
-  } else if (optimizedUrl.startsWith('mcovers')) {
-    transformedUrl = `https://wp.youtube-anime.com/aln.youtube-anime.com/${optimizedUrl}`
-  } else if (optimizedUrl.startsWith('https://gogocdn.net')) {
-    transformedUrl = `https://wp.youtube-anime.com/${optimizedUrl.substring('https://'.length)}`
-  } else if (optimizedUrl.startsWith('http')) {
-    transformedUrl = optimizedUrl
-  } else if (optimizedUrl.startsWith('images2')) {
-    transformedUrl = `https://wp.youtube-anime.com/aln.youtube-anime.com/${optimizedUrl}`
+  let proxiedUrl: string
+  if (finalUrl.startsWith('https://s4.anilist.co')) {
+    proxiedUrl = finalUrl // No proxy for anilist
+  } else if (finalUrl.startsWith('http')) {
+    proxiedUrl = `/api/image-proxy?url=${encodeURIComponent(finalUrl)}`
+    if (width) proxiedUrl += `&w=${width}`
+    if (height) proxiedUrl += `&h=${height}`
+    else proxiedUrl += '&w=300'
   } else {
-    transformedUrl = `https://wp.youtube-anime.com/aln.youtube-anime.com/images/${optimizedUrl}`
-  }
-
-  let finalUrl: string
-  if (transformedUrl.startsWith('http')) {
-    finalUrl = `/api/image-proxy?url=${encodeURIComponent(transformedUrl)}`
-  } else {
-    finalUrl = transformedUrl
-  }
-
-  if (width || height) {
-    const separator = finalUrl.includes('?') ? '&' : '?'
-    if (width) finalUrl += `${separator}w=${width}`
-    if (height) finalUrl += `&h=${height}`
-  } else if (finalUrl.includes('image-proxy')) {
-    finalUrl += '&w=300'
+    // Relative paths from AllAnime
+    const host =
+      finalUrl.startsWith('mcovers') || finalUrl.startsWith('images2')
+        ? 'https://aln.youtube-anime.com'
+        : 'https://aln.youtube-anime.com/images'
+    const fullUrl = `${host}/${finalUrl}`
+    proxiedUrl = `/api/image-proxy?url=${encodeURIComponent(fullUrl)}`
+    if (width) proxiedUrl += `&w=${width}`
+    if (height) proxiedUrl += `&h=${height}`
+    else proxiedUrl += '&w=300'
   }
 
   if (thumbnailCache.size > MAX_CACHE_SIZE) {
     thumbnailCache.clear()
   }
-  thumbnailCache.set(cacheKey, finalUrl)
-  return finalUrl
+  thumbnailCache.set(cacheKey, proxiedUrl)
+  return proxiedUrl
 }
 
 export const formatTime = (timeInSeconds: number): string => {

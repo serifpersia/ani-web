@@ -145,19 +145,16 @@ export class AllAnimeProvider implements Provider {
         throw new Error('Encrypted data too short')
       }
 
-      // Extract IV (12 bytes starting at index 1)
       const ivPart = encryptedBuffer.subarray(1, 13)
-      // Construct 16-byte IV (ivPart + 00000002)
       const iv = Buffer.concat([ivPart, Buffer.from('00000002', 'hex')])
-
-      // Ciphertext starts at index 13 and ends 16 bytes before the end
       const ciphertext = encryptedBuffer.subarray(13, encryptedBuffer.length - 16)
 
       const decipher = crypto.createDecipheriv('aes-256-ctr', key, iv)
       let decrypted = decipher.update(ciphertext)
       decrypted = Buffer.concat([decrypted, decipher.final()])
 
-      return JSON.parse(decrypted.toString('utf8'))
+      const decryptedString = decrypted.toString('utf8')
+      return JSON.parse(decryptedString)
     } catch (error: unknown) {
       const err = error as Error
       logger.error({ err: err.message, stack: err.stack }, 'Failed to decrypt tobeparsed field')
@@ -190,19 +187,75 @@ export class AllAnimeProvider implements Provider {
   public deobfuscateUrl(obfuscatedUrl: string): string {
     if (!obfuscatedUrl) return ''
     let finalUrl = obfuscatedUrl
-    if (!obfuscatedUrl.startsWith('--') && obfuscatedUrl.includes('s4.anilist.co')) {
-      finalUrl = obfuscatedUrl.replace(
-        'https://s4.anilist.co',
-        'https://wp.youtube-anime.com/s4.anilist.co'
-      )
+    if (
+      !obfuscatedUrl.startsWith('--') &&
+      (obfuscatedUrl.includes('s4.anilist.co') || obfuscatedUrl.startsWith('http'))
+    ) {
+      // Direct access works, proxy is blocked
+      finalUrl = obfuscatedUrl
     } else if (obfuscatedUrl.startsWith('--')) {
       const deobfuscated = this._hexDecode(obfuscatedUrl.slice(2))
       if (deobfuscated.startsWith('/')) {
-        finalUrl = `https://wp.youtube-anime.com${deobfuscated}`
+        if (deobfuscated.startsWith('/s4.anilist.co')) {
+          finalUrl = `https:/${deobfuscated}`
+        } else {
+          // Use API_BASE_URL instead of the blocked proxy
+          finalUrl = `${API_BASE_URL}${deobfuscated}`
+        }
       } else {
         finalUrl = deobfuscated
       }
     }
+
+    // Handle relative markers and paths
+    if (!finalUrl.startsWith('http')) {
+      if (finalUrl.startsWith('__Show__')) {
+        finalUrl = `https://aln.youtube-anime.com/images/${finalUrl}`
+      } else if (finalUrl.startsWith('mcovers') || finalUrl.startsWith('images2')) {
+        finalUrl = `https://aln.youtube-anime.com/${finalUrl}`
+      } else if (finalUrl.startsWith('/')) {
+        finalUrl = `${API_BASE_URL}${finalUrl}`
+      }
+    }
+
+    if (finalUrl.includes('wp.youtube-anime.com') || finalUrl.includes('allanime.day')) {
+      // refererValue would be set here in the full context
+    }
+
+    // Final robust cleanup for aln host and path structure
+    if (finalUrl.includes('aln.youtube-anime.com')) {
+      // Ensure we use the correct host (remove allanime.day prefix if present)
+      finalUrl = finalUrl.replace(
+        /https?:\/\/allanime\.day\/aln\.youtube-anime\.com/,
+        'https://aln.youtube-anime.com'
+      )
+
+      // Remove incorrect /images/ prefix for mcovers/images2
+      if (finalUrl.includes('/images/mcovers')) {
+        finalUrl = finalUrl.replace('/images/mcovers', '/mcovers')
+      }
+      if (finalUrl.includes('/images/images2')) {
+        finalUrl = finalUrl.replace('/images/images2', '/images2')
+      }
+    }
+
+    // Don't use the allanime.day proxy for s4.anilist.co URLs
+    if (finalUrl.includes('allanime.day/s4.anilist.co')) {
+      finalUrl = finalUrl.replace('https://allanime.day/s4.anilist.co', 'https://s4.anilist.co')
+      finalUrl = finalUrl.replace('http://allanime.day/s4.anilist.co', 'https://s4.anilist.co')
+    }
+
+    // Strip any existing local proxy prefixes that might have been saved
+    if (finalUrl.includes('/api/image-proxy?url=')) {
+      const match = finalUrl.match(/url=([^&]+)/)
+      if (match) {
+        const unwrapped = decodeURIComponent(match[1])
+        finalUrl = unwrapped
+        // Recurse once to catch the anilist fix for the unwrapped URL
+        return this.deobfuscateUrl(finalUrl)
+      }
+    }
+
     return finalUrl
   }
 
@@ -539,12 +592,13 @@ export class AllAnimeProvider implements Provider {
     const { data: axiosResponse } = await axios.post(
       API_ENDPOINT,
       {
-        query: `query($showId: String!, $translationType: VaildTranslationTypeEnumType!, $episodeString: String!) {
-          episode(showId: $showId, translationType: $translationType, episodeString: $episodeString) {
-            sourceUrls
-          }
-        }`,
         variables: { showId, translationType: mode, episodeString: episodeNumber },
+        extensions: {
+          persistedQuery: {
+            version: 1,
+            sha256Hash: 'd405d0edd690624b66baba3068e0edc3ac90f1597d898a1ec8db4e5c43c00fec',
+          },
+        },
       },
       {
         headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
@@ -561,6 +615,7 @@ export class AllAnimeProvider implements Provider {
       priority?: number
       type?: string
     }[]
+
     if (!Array.isArray(sourceUrls)) return null
     const supportedSources = [
       'Yt-mp4',
@@ -577,131 +632,141 @@ export class AllAnimeProvider implements Provider {
     const filteredSources = sourceUrls
       .filter((s) => supportedSources.includes(s.sourceName))
       .sort((a, b) => (b.priority || 0) - (a.priority || 0))
-    const processedSources: VideoSource[] = []
-    for (const source of filteredSources) {
-      try {
-        if (['Yt-mp4', 'S-mp4', 'wixmp', 'Default'].includes(source.sourceName)) {
-          let decryptedUrl = this.deobfuscateStreamUrl(source.sourceUrl)
-          if (decryptedUrl.includes('/clock') && !decryptedUrl.includes('.json')) {
-            decryptedUrl = decryptedUrl.replace('/clock', '/clock.json')
-          }
+    const processedSources: (VideoSource | null)[] = await Promise.all(
+      filteredSources.map(async (source) => {
+        try {
           let videoLinks: VideoLink[] = []
           let subtitles: SubtitleTrack[] = []
-          if (decryptedUrl.includes('/clock.json')) {
-            const finalUrl = decryptedUrl.startsWith('http')
-              ? decryptedUrl
-              : new URL(decryptedUrl, API_BASE_URL).href
-            const resp = await axios.get(finalUrl, {
-              headers: { Referer: REFERER, 'User-Agent': USER_AGENT },
-              timeout: 10000,
-            })
-            const clockData = resp.data as RawClockData
-            if (clockData && Array.isArray(clockData.links) && clockData.links.length > 0) {
-              const linkData = clockData.links[0]
-              if (linkData.hls) {
-                const hlsResp = await axios.get(linkData.link, {
-                  headers: linkData.headers || { Referer: REFERER },
-                  responseType: 'text',
-                  timeout: 10000,
-                })
-                const lines = (hlsResp.data as string).split('\n')
-                for (let i = 0; i < lines.length; i++) {
-                  if (lines[i].startsWith('#EXT-X-STREAM-INF')) {
-                    const resMatch = lines[i].match(/RESOLUTION=\d+x(\d+)/)
-                    videoLinks.push({
-                      resolutionStr: resMatch ? `${resMatch[1]}p` : 'Auto',
-                      link: new URL(lines[i + 1], linkData.link).href,
-                      hls: true,
-                      headers: linkData.headers || { Referer: REFERER },
-                    })
-                  }
-                }
-              } else {
-                videoLinks = clockData.links.map((l) => ({
-                  resolutionStr: l.resolutionStr || 'Default',
-                  link: l.link.startsWith('/') ? `https://wp.youtube-anime.com${l.link}` : l.link,
-                  hls: !!l.hls,
-                  headers: l.headers || { Referer: REFERER },
-                }))
-              }
-              if (Array.isArray(linkData.subtitles)) {
-                subtitles = linkData.subtitles.map((s) => ({
-                  language: s.lang || s.language || 'en',
-                  label: s.label || 'Subtitle',
-                  url:
-                    s.src && s.src.startsWith('/')
-                      ? `https://wp.youtube-anime.com${s.src}`
-                      : s.src || s.url || '',
-                }))
-              }
+
+          if (['Yt-mp4', 'S-mp4', 'wixmp', 'Default'].includes(source.sourceName)) {
+            let decryptedUrl = this.deobfuscateStreamUrl(source.sourceUrl)
+            if (decryptedUrl.includes('/clock') && !decryptedUrl.includes('.json')) {
+              decryptedUrl = decryptedUrl.replace('/clock', '/clock.json')
             }
-          }
-          if (videoLinks.length === 0) {
-            videoLinks.push({
-              resolutionStr: 'Default',
-              link: decryptedUrl,
-              hls: decryptedUrl.includes('.m3u8'),
-              headers: { Referer: REFERER },
-            })
-          }
-          processedSources.push({
-            sourceName: source.sourceName,
-            links: videoLinks,
-            subtitles,
-            type: 'player',
-          })
-        } else if (source.sourceName === 'Mp4') {
-          const decryptedUrl = this.deobfuscateStreamUrl(source.sourceUrl)
-          try {
-            const { data: embedHtml } = await axios.get(decryptedUrl, {
-              headers: {
-                'User-Agent': USER_AGENT,
-                Referer: 'https://allanime.day/',
-              },
-              timeout: 10000,
-            })
-            const match = embedHtml.match(/src:\s*"(https:\/\/.*?\.mp4)"/)
-            if (match) {
-              processedSources.push({
-                sourceName: source.sourceName,
-                links: [
-                  {
-                    resolutionStr: 'Default',
-                    link: match[1],
-                    hls: false,
-                    headers: { Referer: 'https://www.mp4upload.com/' },
-                  },
-                ],
-                type: 'player',
+
+            if (decryptedUrl.includes('/clock.json')) {
+              const finalUrl = decryptedUrl.startsWith('http')
+                ? decryptedUrl
+                : new URL(decryptedUrl, API_BASE_URL).href
+              const resp = await axios.get(finalUrl, {
+                headers: { Referer: REFERER, 'User-Agent': USER_AGENT },
+                timeout: 10000,
               })
-              continue
+              const clockData = resp.data as RawClockData
+              if (clockData && Array.isArray(clockData.links) && clockData.links.length > 0) {
+                const linkData = clockData.links[0]
+                if (linkData.hls) {
+                  const hlsResp = await axios.get(linkData.link, {
+                    headers: linkData.headers || { Referer: REFERER },
+                    responseType: 'text',
+                    timeout: 10000,
+                  })
+                  const lines = (hlsResp.data as string).split('\n')
+                  for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].startsWith('#EXT-X-STREAM-INF')) {
+                      const resMatch = lines[i].match(/RESOLUTION=\d+x(\d+)/)
+                      videoLinks.push({
+                        resolutionStr: resMatch ? `${resMatch[1]}p` : 'Auto',
+                        link: new URL(lines[i + 1], linkData.link).href,
+                        hls: true,
+                        headers: linkData.headers || { Referer: REFERER },
+                      })
+                    }
+                  }
+                } else {
+                  videoLinks = clockData.links
+                    .map((l) => ({
+                      resolutionStr: l.resolutionStr || 'Default',
+                      link:
+                        l.link && l.link.startsWith('/')
+                          ? `${API_BASE_URL}${l.link}`
+                          : l.link || '',
+                      hls: !!l.hls,
+                      headers: l.headers || { Referer: REFERER },
+                    }))
+                    .filter((l) => l.link !== '')
+                }
+                if (Array.isArray(linkData.subtitles)) {
+                  subtitles = linkData.subtitles.map((s) => ({
+                    language: s.lang || s.language || 'en',
+                    label: s.label || 'Subtitle',
+                    url:
+                      s.src && s.src.startsWith('/')
+                        ? `${API_BASE_URL}${s.src}`
+                        : s.src || s.url || '',
+                  }))
+                }
+              }
             }
-          } catch (e) {
-            logger.warn({ err: e }, `Failed to scrape Mp4Upload direct link for ${decryptedUrl}`)
+            if (videoLinks.length === 0 && decryptedUrl && !decryptedUrl.includes('/clock')) {
+              videoLinks.push({
+                resolutionStr: 'Default',
+                link: decryptedUrl,
+                hls: decryptedUrl.includes('.m3u8'),
+                headers: { Referer: REFERER },
+              })
+            }
+            if (videoLinks.length > 0) {
+              return {
+                sourceName: source.sourceName,
+                links: videoLinks,
+                subtitles,
+                type: 'player',
+              }
+            }
+          } else if (source.sourceName === 'Mp4') {
+            const decryptedUrl = this.deobfuscateStreamUrl(source.sourceUrl)
+            try {
+              const { data: embedHtml } = await axios.get(decryptedUrl, {
+                headers: {
+                  'User-Agent': USER_AGENT,
+                  Referer: 'https://allanime.day/',
+                },
+                timeout: 10000,
+              })
+              const match = embedHtml.match(/src:\s*"(https:\/\/.*?\.mp4)"/)
+              if (match) {
+                return {
+                  sourceName: source.sourceName,
+                  links: [
+                    {
+                      resolutionStr: 'Default',
+                      link: match[1],
+                      hls: false,
+                      headers: { Referer: 'https://www.mp4upload.com/' },
+                    },
+                  ],
+                  type: 'player',
+                }
+              }
+            } catch (e) {
+              // Ignore scrape errors
+            }
+            return {
+              sourceName: source.sourceName,
+              links: [{ resolutionStr: 'iframe', link: decryptedUrl, hls: false }],
+              type: 'iframe',
+            }
+          } else {
+            return {
+              sourceName: source.sourceName,
+              links: [{ resolutionStr: 'iframe', link: source.sourceUrl, hls: false }],
+              type:
+                source.type === 'iframe' ||
+                source.sourceName === 'Fm-Hls' ||
+                ['Vg', 'Sw', 'Ok', 'Uni'].includes(source.sourceName)
+                  ? 'iframe'
+                  : 'player',
+            }
           }
-          // Fallback to iframe if scraping fails
-          processedSources.push({
-            sourceName: source.sourceName,
-            links: [{ resolutionStr: 'iframe', link: decryptedUrl, hls: false }],
-            type: 'iframe',
-          })
-        } else {
-          processedSources.push({
-            sourceName: source.sourceName,
-            links: [{ resolutionStr: 'iframe', link: source.sourceUrl, hls: false }],
-            type:
-              source.type === 'iframe' ||
-              source.sourceName === 'Fm-Hls' ||
-              ['Vg', 'Sw', 'Ok', 'Uni'].includes(source.sourceName)
-                ? 'iframe'
-                : 'player',
-          })
+        } catch (e) {
+          return null
         }
-      } catch (e) {
-        logger.error({ err: e }, `Failed to process source ${source.sourceName}`)
-      }
-    }
-    return processedSources.length > 0 ? processedSources : null
+        return null
+      })
+    )
+    const result = processedSources.filter((s): s is VideoSource => s !== null)
+    return result.length > 0 ? result : null
   }
 
   async getShowDetails(showId: string): Promise<ShowDetails> {
