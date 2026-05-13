@@ -188,6 +188,8 @@ export class ProxyController {
         refererValue = 'https://gogoanime.lu/'
       } else if (targetUrl.includes('youtube-anime.com') || targetUrl.includes('allanime.day')) {
         refererValue = 'https://allanime.day/'
+      } else if (targetUrl.includes('animeya.cc')) {
+        refererValue = 'https://animeya.cc/'
       }
 
       const imageResponse = await axiosInstance({

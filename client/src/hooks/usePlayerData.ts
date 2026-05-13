@@ -122,7 +122,7 @@ export const usePlayerData = (
       if (!showId || !uiState.currentEpisode) throw new Error('Missing params')
 
       let providerShowId = showId
-      if (['animepahe', '123anime'].includes(uiState.selectedProvider)) {
+      if (['animepahe', '123anime', 'animeya'].includes(uiState.selectedProvider)) {
         const names = showData?.showMeta?.names
         const searchQuery =
           uiState.currentMode === 'dub'

@@ -4,7 +4,7 @@ export type Action =
   | { type: 'SET_STATE'; payload: Partial<PlayerState> }
   | { type: 'SET_CURRENT_EPISODE'; payload: string | undefined }
   | { type: 'SET_MODE'; payload: 'sub' | 'dub' }
-  | { type: 'SET_PROVIDER'; payload: 'allanime' | 'animepahe' | '123anime' }
+  | { type: 'SET_PROVIDER'; payload: 'allanime' | 'animepahe' | '123anime' | 'animeya' }
   | { type: 'SET_OVERRIDE_SOURCE'; payload: { source: VideoSource; link: VideoLink } | null }
 
 export const initialState: PlayerState = {
@@ -27,8 +27,11 @@ export const initialState: PlayerState = {
   resumeDuration: 0,
   skipIntervals: [],
   selectedProvider:
-    (localStorage.getItem('preferredProvider') as 'allanime' | 'animepahe' | '123anime') ||
-    'allanime',
+    (localStorage.getItem('preferredProvider') as
+      | 'allanime'
+      | 'animepahe'
+      | '123anime'
+      | 'animeya') || 'allanime',
   loadingShowData: true,
   loadingVideo: false,
   loadingDetails: false,
