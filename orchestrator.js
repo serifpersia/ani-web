@@ -8,6 +8,14 @@ const axios = require('axios')
 
 const mode = process.argv[2] || 'prod'
 const isWin = os.platform() === 'win32'
+const npmCmd = isWin ? 'npm.cmd' : 'npm'
+
+const colors = {
+  reset: '\x1b[0m',
+  server: '\x1b[36m',
+  client: '\x1b[32m',
+  system: '\x1b[33m',
+}
 
 if (mode === '--version' || mode === '-v') {
   const pkg = require('./package.json')
@@ -16,6 +24,8 @@ if (mode === '--version' || mode === '-v') {
 }
 
 async function checkForUpdates() {
+  if (process.argv.includes('--no-update') || mode === 'dev') return
+
   try {
     const npmGlobalPrefix = require('child_process')
       .execSync('npm config get prefix', { encoding: 'utf8' })
@@ -37,22 +47,60 @@ async function checkForUpdates() {
     if (current !== latest) {
       console.log(
         `\n${colors.system}[Update]${colors.reset} ` +
-          `New version ${latest} available. ` +
-          `Run: npm install -g ani-web to update.\n`
+        `New version ${colors.client}${latest}${colors.reset} available (current: ${current})`
       )
+
+      if (process.stdin.isTTY) {
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+        const answer = await new Promise((resolve) => {
+          rl.question(
+            `${colors.system}[Update]${colors.reset} Would you like to perform a clean install now?Test2 (y/N) `,
+            (ans) => {
+              rl.close()
+              resolve(ans.toLowerCase())
+            }
+          )
+        })
+
+        if (answer === 'y' || answer === 'yes') {
+          console.log(`${colors.system}[Update]${colors.reset} Updating ani-web...`)
+          try {
+            require('child_process').execSync(`${npmCmd} install -g ani-web@latest`, {
+              stdio: 'inherit',
+            })
+            console.log(
+              `\n${colors.system}[Update]${colors.reset} Update successful! Please restart ani-web to apply changes.`
+            )
+            process.exit(0)
+          } catch (err) {
+            console.error(`\n${colors.system}[Update]${colors.reset} Update failed: ${err.message}`)
+            if (!isWin) {
+              console.log(
+                `${colors.system}[Update]${colors.reset} Hint: You might need to run with sudo:`
+              )
+              console.log(
+                `${colors.system}[Update]${colors.reset} ${colors.client}sudo ani-web${colors.reset}\n`
+              )
+            }
+            console.log(
+              `${colors.system}[Update]${colors.reset} Continuing with current version...\n`
+            )
+          }
+        } else {
+          console.log(
+            `${colors.system}[Update]${colors.reset} Continuing with version ${current}...\n`
+          )
+        }
+        if (process.stdin.isTTY) process.stdin.resume()
+      } else {
+        console.log(
+          `${colors.system}[Update]${colors.reset} Run: npm install -g ani-web to update.\n`
+        )
+      }
     }
   } catch (error) {
     // Silently ignore network/registry errors
   }
-}
-
-checkForUpdates()
-
-const colors = {
-  reset: '\x1b[0m',
-  server: '\x1b[36m',
-  client: '\x1b[32m',
-  system: '\x1b[33m',
 }
 
 const SERVER_DIR = path.join(__dirname, 'server')
@@ -141,40 +189,53 @@ const log = (prefix, color, data) => {
   }
 }
 
-const npmCmd = isWin ? 'npm.cmd' : 'npm'
 const spawnOpts = (cwd) => ({ stdio: 'pipe', shell: isWin, cwd })
 let serverProcess, clientProcess
 let isShuttingDown = false
 
-console.log(
-  `${colors.system}[System]${colors.reset} Starting ani-web in ${mode.toUpperCase()} mode...`
-)
-console.log(
-  `${colors.system}[System]${colors.reset} Press 'q' or 'Ctrl+C' to cleanly exit and sync data.\n`
-)
+async function main() {
+  console.log(
+    `${colors.system}[System]${colors.reset} Starting ani-web in ${mode.toUpperCase()} mode...`
+  )
+  console.log(
+    `${colors.system}[System]${colors.reset} Press 'q' or 'Ctrl+C' to cleanly exit and sync data.\n`
+  )
 
-if (mode === 'dev') {
-  serverProcess = spawn(npmCmd, ['run', 'dev'], spawnOpts(SERVER_DIR))
-  clientProcess = spawn(npmCmd, ['run', 'dev'], spawnOpts(CLIENT_DIR))
-} else {
-  const serverPath = path.join(SERVER_DIR, 'dist', 'server.js')
-  serverProcess = spawn('node', ['--max-old-space-size=256', serverPath], spawnOpts(SERVER_DIR))
-}
+  if (mode === 'dev') {
+    serverProcess = spawn(npmCmd, ['run', 'dev'], spawnOpts(SERVER_DIR))
+    clientProcess = spawn(npmCmd, ['run', 'dev'], spawnOpts(CLIENT_DIR))
+  } else {
+    const serverPath = path.join(SERVER_DIR, 'dist', 'server.js')
+    serverProcess = spawn('node', ['--max-old-space-size=256', serverPath], spawnOpts(SERVER_DIR))
+  }
 
-if (serverProcess) {
-  serverProcess.stdout.on('data', (data) => log('Server', colors.server, data))
-  serverProcess.stderr.on('data', (data) => log('Server', colors.server, data))
-  serverProcess.on('exit', (code) => {
-    if (!isShuttingDown) {
-      log('System', colors.system, `Server crashed or exited prematurely.`)
-      process.exit(code || 0)
+  if (serverProcess) {
+    serverProcess.stdout.on('data', (data) => log('Server', colors.server, data))
+    serverProcess.stderr.on('data', (data) => log('Server', colors.server, data))
+    serverProcess.on('exit', (code) => {
+      if (!isShuttingDown) {
+        log('System', colors.system, `Server crashed or exited prematurely.`)
+        process.exit(code || 0)
+      }
+    })
+  }
+
+  if (clientProcess) {
+    clientProcess.stdout.on('data', (data) => log('Client', colors.client, data))
+    clientProcess.stderr.on('data', (data) => log('Client', colors.client, data))
+  }
+
+  if (process.stdin.isTTY) {
+    process.stdin.resume()
+    readline.emitKeypressEvents(process.stdin)
+    process.stdin.setRawMode(true)
+  }
+
+  process.stdin.on('keypress', (str, key) => {
+    if (key && (key.name === 'q' || (key.ctrl && key.name === 'c'))) {
+      shutdown()
     }
   })
-}
-
-if (clientProcess) {
-  clientProcess.stdout.on('data', (data) => log('Client', colors.client, data))
-  clientProcess.stderr.on('data', (data) => log('Client', colors.client, data))
 }
 
 const shutdown = () => {
@@ -232,17 +293,10 @@ const shutdown = () => {
   }, 15000)
 }
 
-readline.emitKeypressEvents(process.stdin)
-if (process.stdin.isTTY) {
-  process.stdin.setRawMode(true)
-}
-
-process.stdin.on('keypress', (str, key) => {
-  if (key && (key.name === 'q' || (key.ctrl && key.name === 'c'))) {
-    shutdown()
-  }
-})
-
 process.on('SIGINT', () => {
   shutdown()
 })
+  ; (async () => {
+    await checkForUpdates()
+    main()
+  })()
