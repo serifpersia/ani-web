@@ -1,6 +1,6 @@
 {
   "name": "ani-web-server",
-  "version": "1.5.7",
+  "version": "1.5.8",
   "type": "commonjs",
   "engines": {
     "node": ">=22.5.0"
@@ -13,6 +13,8 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@octokit/auth-oauth-device": "^8.0.3",
+    "@octokit/rest": "^22.0.1",
     "axios": "^1.15.1",
     "axios-retry": "^4.5.0",
     "cheerio": "^1.2.0",

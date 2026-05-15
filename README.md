@@ -2,25 +2,21 @@
 
 <img src="client/public/logo.png" alt="ani-web logo" width="400"/>
 
-_Stream anime locally with no ads, no tracking, and smooth performance._
+_A local-first anime media client focused on performance, privacy, and personal library tracking._
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-8b5cf6?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![GitHub stars](https://img.shields.io/github/stars/serifpersia/ani-web.svg?style=for-the-badge&color=8b5cf6)](https://github.com/serifpersia/ani-web/stargazers)
-[![App version](https://img.shields.io/badge/ani--web-1.5.7-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/ani-web)
+[![App version](https://img.shields.io/badge/ani--web-1.5.8-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/ani-web)
 
 </div>
 
 ---
 
-**ani-web** is a lightweight Node.js application that lets you browse and watch anime through a clean and responsive frontend running entirely on your machine.
+**ani-web** is a lightweight Node.js application for browsing anime metadata, managing a personal
+watchlist, and tracking viewing progress through a clean frontend running on your own machine.
 
 <div align="center">
-  <img 
-    width="800" 
-    alt="ani-web user interface" 
-    src="https://github.com/user-attachments/assets/5a152f3b-ab8e-4303-b416-8fa2a67bb8d9"
-    style="border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); margin: 20px 0;"
-  />
+  <sub>If ani-web is useful to you, consider giving the repo a ⭐. It helps others find the project.</sub>
 </div>
 
 ## Features
@@ -28,9 +24,9 @@ _Stream anime locally with no ads, no tracking, and smooth performance._
 Based on a lightweight architecture, ani-web includes:
 
 - **Performance First:** Designed specifically to run smoothly on low-end hardware.
-- **Built-in Search & Discovery:** Easily find top trending and popular shows.
-- **Watchlist Management:** Keep track of what you're watching, completed, or planning to watch.
-- **User Insights:** View your personal anime watching statistics.
+- **Built-in Search & Discovery:** Explore trending and popular anime metadata.
+- **Watchlist Management:** Keep track of current, completed, and planned titles.
+- **User Insights:** View personal library and progress statistics.
 - **MAL Integration:** Seamlessly import your lists from MyAnimeList.
 
 ## Join ani-web Discord server
@@ -123,52 +119,76 @@ This folder contains your `.env`, database files, sync manifests, and Google tok
 
 ## Cloud Sync (Optional)
 
-**ani-web** can automatically sync your watchlist and settings to the cloud. There are two ways to set this up:
+**ani-web** can automatically sync your local data to the cloud. The app stays local-first: your
+main database is a local SQLite file, and cloud sync exports/imports the app data as JSON when
+needed.
 
-### 1. Built-in Google Drive Sync
+Sync provider priority is:
 
-To use the native Google Drive integration, you need to provide your own Google Cloud credentials:
+1. **GitHub Cloud Sync**
+2. **Google Drive Sync**
+3. **Rclone Sync**
 
-1.  Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2.  Create a new project and enable the **Google Drive API**.
-3.  Configure the **OAuth Consent Screen** (set it to "External" and add yourself as a test user).
-4.  Create **OAuth 2.0 Client IDs** (Application type: "Web application").
-5.  Add `http://localhost:3000/api/auth/google/callback` to the **Authorized redirect URIs**.
-6.  Open **ani-web**, go to **Settings** -> **Google Drive**, and enter your **Client ID** and **Client Secret**.
+If GitHub is connected, it is used first. Google Drive and Rclone remain available as fallback or
+legacy sync options.
 
-**ani-web** will automatically handle the rest, including creating your configuration and syncing your data!
+### 1. GitHub Cloud Sync
 
-### 2. Rclone Integration
+GitHub Cloud Sync is the recommended setup. It uses GitHub's device login flow, so users do not
+need to create a Google Cloud project, manage client secrets, or install external sync tools.
+
+1. Open **ani-web**.
+2. Go to **Settings** -> **Synchronization**.
+3. Click **Sign in with GitHub**.
+4. Open the shown GitHub device URL, enter the code, and approve access.
+
+ani-web will create a private GitHub repository named `aniweb-sync-data` in your account and store
+your sync data in JSON:
+
+- Production mode uses `sync.json`.
+- Development mode uses `sync.dev.json`.
+
+The app requests GitHub repository access because it needs to create and update this private sync
+repository. The GitHub token is stored locally in your ani-web app-data `.env` file.
+
+### 2. Google Drive Sync
+
+Google Drive sync is still supported. To use it, you need to provide your own Google Cloud
+credentials:
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Create a new project and enable the **Google Drive API**.
+3. Configure the **OAuth Consent Screen** (set it to "External" and add yourself as a test user).
+4. Create **OAuth 2.0 Client IDs** (Application type: "Web application").
+5. Add `http://localhost:3000/api/auth/google/callback` to the **Authorized redirect URIs**.
+6. Open **ani-web**, go to **Settings** -> **Synchronization**, and enter your **Client ID** and
+   **Client Secret** in the Google authentication section.
+
+### 3. Rclone Sync
 
 If you prefer using **Mega**, **Dropbox**, or other providers, you can use [Rclone](https://rclone.org/):
 
-1.  Install Rclone on your system and ensure it's in your PATH.
-2.  Configure a remote (any name) using `rclone config`.
-3.  In **ani-web** Settings, select your remote name from the dropdown.
+1. Install Rclone on your system and ensure it's in your PATH.
+2. Configure a remote using `rclone config`.
+3. In **ani-web**, go to **Settings** -> **Synchronization** and select your remote name from the
+   Rclone dropdown.
 
-**Note:** If Google Drive Sync is active, it will always take priority over Rclone.
+Rclone is used only when GitHub and Google Drive sync are not active.
 
 ---
 
 ## Disclaimer
 
-**ani-web does not host, upload, or manage any video content.**
+ani-web is a local-first media client. It does not host, upload, store, or distribute copyrighted
+video content.
 
-The core aim of this project is to provide a streamlined, automated interface to extract publicly accessible content from the internet. All media served through this application is hosted by external, non-affiliated third-party sources.
+Users are responsible for configuring and using the application in compliance with applicable laws
+in their jurisdiction. All trademarks, titles, artwork, metadata, and copyrighted material belong to
+their respective owners.
 
-<details>
-<summary><b> Click to read the full Legal Disclaimer & DMCA info</b></summary>
-<br>
-
-- **The Browser Analogy:** Think of `ani-web` as a specialized web browser. While a standard web browser makes hundreds of requests to download a site's HTML, CSS, ads, and trackers, this project simply makes requests specifically targeted at the media content served by those sites.
-- **User Responsibility:** A browser is merely a tool, and the legality of its use depends entirely on the user. This software is provided "as-is", and it is to be used at the user's own risk, in accordance with their local laws and government regulations. The developer is not responsible for what users choose to access.
-- **DMCA & Copyright:** Because `ani-web` operates entirely via client-side access mechanisms and hosts absolutely zero content, any DMCA takedown notices or copyright infringement claims must be directed to the external, third-party services that actually host the files.
-</details>
+This project is provided for personal library management, metadata browsing, and local application
+experimentation. The maintainers do not endorse or encourage copyright infringement.
 
 ## License
 
 This project is open-source and licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
-
-<div align="center">
-  <i>If you find this project helpful, please consider giving it a ⭐ on GitHub!</i>
-</div>

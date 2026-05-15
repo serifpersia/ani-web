@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import logger from '../logger'
 import { googleDriveService } from '../google'
+import { githubSyncService } from '../github-sync'
 import { DatabaseWrapper } from '../db'
 import { initializeDatabase, syncDownOnBoot, initSyncProvider } from '../sync'
 import { CONFIG } from '../config'
@@ -59,6 +60,52 @@ export class AuthController {
       })
     } catch {
       res.status(500).json({ error: 'Failed to fetch Rclone settings' })
+    }
+  }
+
+  getGitHubAuthStatus = async (_req: Request, res: Response) => {
+    try {
+      const user = await githubSyncService.getUserProfile()
+      res.json({
+        authenticated: !!user,
+        user,
+        device: githubSyncService.getDeviceState(),
+        clientId: process.env.GITHUB_CLIENT_ID || '',
+        usingDefaultClientId: !process.env.GITHUB_CLIENT_ID,
+      })
+    } catch (error) {
+      logger.error({ err: error }, 'Failed to fetch GitHub auth status')
+      res.json({
+        authenticated: false,
+        user: null,
+        device: githubSyncService.getDeviceState(),
+        clientId: process.env.GITHUB_CLIENT_ID || '',
+        usingDefaultClientId: !process.env.GITHUB_CLIENT_ID,
+      })
+    }
+  }
+
+  startGitHubDeviceAuth = async (req: Request, res: Response) => {
+    try {
+      const state = await githubSyncService.startDeviceAuth(req.db, this.runSyncSequence)
+      res.json(state)
+    } catch (error) {
+      logger.error({ err: error }, 'Failed to start GitHub device auth')
+      res.status(500).json({ error: 'Failed to start GitHub authentication' })
+    }
+  }
+
+  pollGitHubDeviceAuth = (_req: Request, res: Response) => {
+    res.json(githubSyncService.getDeviceState())
+  }
+
+  logoutGitHub = async (_req: Request, res: Response) => {
+    try {
+      await githubSyncService.logout()
+      res.json({ success: true })
+    } catch (error) {
+      logger.error({ err: error }, 'Failed to sign out of GitHub')
+      res.status(500).json({ error: 'Failed to sign out of GitHub' })
     }
   }
 

@@ -4,6 +4,7 @@ import path from 'path'
 import logger from './logger'
 import { googleDriveService } from './google'
 import { rcloneService } from './rclone'
+import { githubSyncService } from './github-sync'
 import { CONFIG } from './config'
 import { DatabaseWrapper } from './db'
 import { dbGet } from './utils/db-utils'
@@ -37,9 +38,15 @@ class Mutex {
 
 const syncMutex = new Mutex()
 let isSyncing = false
-let activeProvider: 'google' | 'rclone' | 'none' = 'none'
+let activeProvider: 'github' | 'google' | 'rclone' | 'none' = 'none'
 
 export async function initSyncProvider(): Promise<void> {
+  if (githubSyncService.isAuthenticated()) {
+    activeProvider = 'github'
+    log.info('Sync Provider: GitHub')
+    return
+  }
+
   if (googleDriveService.isAuthenticated()) {
     activeProvider = 'google'
     log.info('Sync Provider: Google Drive API')
@@ -77,7 +84,9 @@ async function getRemoteManifestVersion(
   remoteFolder: string
 ): Promise<{ version: number; fileId?: string }> {
   try {
-    if (activeProvider === 'google') {
+    if (activeProvider === 'github') {
+      return { version: await githubSyncService.getRemoteVersion() }
+    } else if (activeProvider === 'google') {
       const folderId = await googleDriveService.ensureFolder(remoteFolder)
       const file = await googleDriveService.findFile(CONFIG.MANIFEST_FILENAME, folderId)
       if (!file) return { version: 0 }
@@ -145,6 +154,15 @@ export async function syncDownOnBoot(
     log.info(`Sync Check: Local v${localVersion} vs Remote v${remoteVersion}`)
 
     if (remoteVersion > localVersion) {
+      if (activeProvider === 'github') {
+        console.log(`[SYNC_START] Importing GitHub sync data (Remote v${remoteVersion})`)
+        const importedVersion = await githubSyncService.syncDown(db)
+        await setLocalManifestVersion(importedVersion || remoteVersion)
+        console.log('[SYNC_END]')
+        log.info('GitHub sync down complete.')
+        return false
+      }
+
       console.log(`[SYNC_START] Downloading remote database (Remote v${remoteVersion})`)
       await closeMainDb()
 
@@ -251,7 +269,11 @@ export async function syncUp(
       const dbName = path.basename(dbPath)
       const syncDbPath = `${dbPath}.sync.db`
       try {
-        db.backup(syncDbPath)
+        if (activeProvider === 'github') {
+          await githubSyncService.syncUp(db)
+        } else {
+          db.backup(syncDbPath)
+        }
 
         if (activeProvider === 'google') {
           const folderId = await googleDriveService.ensureFolder(remoteFolderName)

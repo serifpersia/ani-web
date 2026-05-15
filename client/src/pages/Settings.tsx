@@ -1,7 +1,9 @@
 import React, { useState, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Button } from '../components/common/Button'
 import TitlePreferenceToggle from '../components/common/TitlePreferenceToggle'
 import styles from './Settings.module.css'
+import GitHubSyncSettings from '../components/settings/GitHubSyncSettings'
 import GoogleAuthSettings from '../components/settings/GoogleAuthSettings'
 import WatchlistSettings from '../components/settings/WatchlistSettings'
 import RcloneSettings from '../components/settings/RcloneSettings'
@@ -12,7 +14,13 @@ import ToggleSwitch from '../components/common/ToggleSwitch'
 type SettingsTab = 'general' | 'sync' | 'watchlist' | 'database'
 
 const Settings: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialTab = searchParams.get('tab') as SettingsTab | null
+  const [activeTab, setActiveTab] = useState<SettingsTab>(
+    initialTab && ['general', 'sync', 'watchlist', 'database'].includes(initialTab)
+      ? initialTab
+      : 'general'
+  )
   const [statusMessage, setStatusMessage] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { lowEndMode, setLowEndMode } = useLowEndMode()
@@ -20,6 +28,18 @@ const Settings: React.FC = () => {
   React.useEffect(() => {
     document.title = 'Settings - ani-web'
   }, [])
+
+  React.useEffect(() => {
+    const tab = searchParams.get('tab') as SettingsTab | null
+    if (tab && ['general', 'sync', 'watchlist', 'database'].includes(tab)) {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
+
+  const selectTab = (tab: SettingsTab) => {
+    setActiveTab(tab)
+    setSearchParams(tab === 'general' ? {} : { tab })
+  }
 
   const handleBackup = async () => {
     setStatusMessage('Backing up database...')
@@ -117,6 +137,7 @@ const Settings: React.FC = () => {
       case 'sync':
         return (
           <div className={styles.tabContent}>
+            <GitHubSyncSettings />
             <GoogleAuthSettings />
             <RcloneSettings />
           </div>
@@ -166,25 +187,25 @@ const Settings: React.FC = () => {
         <aside className={styles.sidebar}>
           <button
             className={`${styles.sidebarItem} ${activeTab === 'general' ? styles.active : ''}`}
-            onClick={() => setActiveTab('general')}
+            onClick={() => selectTab('general')}
           >
             <FaCog /> <span>General</span>
           </button>
           <button
             className={`${styles.sidebarItem} ${activeTab === 'sync' ? styles.active : ''}`}
-            onClick={() => setActiveTab('sync')}
+            onClick={() => selectTab('sync')}
           >
             <FaCloud /> <span>Synchronization</span>
           </button>
           <button
             className={`${styles.sidebarItem} ${activeTab === 'watchlist' ? styles.active : ''}`}
-            onClick={() => setActiveTab('watchlist')}
+            onClick={() => selectTab('watchlist')}
           >
             <FaList /> <span>Watchlist</span>
           </button>
           <button
             className={`${styles.sidebarItem} ${activeTab === 'database' ? styles.active : ''}`}
-            onClick={() => setActiveTab('database')}
+            onClick={() => selectTab('database')}
           >
             <FaDatabase /> <span>Database</span>
           </button>

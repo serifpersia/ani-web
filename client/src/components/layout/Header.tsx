@@ -1,23 +1,44 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { FaBars, FaSearch, FaGoogle } from 'react-icons/fa'
+import { useQuery } from '@tanstack/react-query'
+import { FaBars, FaCloud, FaGithub, FaSearch } from 'react-icons/fa'
 import NotificationBell from './NotificationBell'
 import Logo from '../common/Logo'
 import { useSidebar } from '../../hooks/useSidebar'
 import styles from './Header.module.css'
-import GenericModal from '../common/GenericModal'
 
 interface UserProfile {
   name: string
-  picture: string
-  email: string
+  picture?: string
+  email?: string
+  provider: 'github' | 'google' | 'none'
 }
 
-const fetchUser = async (): Promise<UserProfile | null> => {
-  const res = await fetch('/api/auth/user')
-  if (!res.ok) return null
-  return res.json()
+const fetchSyncProfile = async (): Promise<UserProfile | null> => {
+  const githubRes = await fetch('/api/auth/github/status')
+  if (githubRes.ok) {
+    const github = await githubRes.json()
+    if (github.authenticated && github.user) {
+      return {
+        name: github.user.name || github.user.login,
+        picture: github.user.avatarUrl,
+        provider: 'github',
+      }
+    }
+  }
+
+  const googleRes = await fetch('/api/auth/user')
+  if (!googleRes.ok) return null
+
+  const google = await googleRes.json()
+  if (!google) return null
+
+  return {
+    name: google.name,
+    picture: google.picture,
+    email: google.email,
+    provider: 'google',
+  }
 }
 
 const Header: React.FC = () => {
@@ -25,20 +46,18 @@ const Header: React.FC = () => {
   const [query, setQuery] = useState('')
   const [visible, setVisible] = useState(true)
   const [isSearchFocused, setIsSearchFocused] = useState(false)
-  const [showConfigModal, setShowConfigModal] = useState(false)
   const navigate = useNavigate()
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const queryClient = useQueryClient()
   const HIDE_DELAY_MS = 3000
 
   const { data: user } = useQuery<UserProfile | null>({
-    queryKey: ['user'],
-    queryFn: fetchUser,
+    queryKey: ['sync-profile'],
+    queryFn: fetchSyncProfile,
+    staleTime: 30000,
   })
 
   useEffect(() => {
     const handleScroll = () => {
-      const currentScrollY = window.scrollY
       setVisible(true)
 
       if (hideTimerRef.current) {
@@ -61,44 +80,10 @@ const Header: React.FC = () => {
     }
   }, [isSearchFocused])
 
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
-        queryClient.setQueryData(['user'], event.data.user)
-      }
-    }
-    window.addEventListener('message', handleMessage)
-    return () => window.removeEventListener('message', handleMessage)
-  }, [queryClient])
-
   const handleSearch = (e?: React.FormEvent) => {
     e?.preventDefault()
     if (query.trim()) {
       navigate(`/search?query=${encodeURIComponent(query.trim())}`)
-    }
-  }
-
-  const handleSignIn = async () => {
-    try {
-      const configRes = await fetch('/api/auth/config-status')
-      const { hasConfig } = await configRes.json()
-
-      if (!hasConfig) {
-        setShowConfigModal(true)
-        return
-      }
-
-      const res = await fetch('/api/auth/google')
-      const { url } = await res.json()
-      if (url) {
-        const width = 500,
-          height = 600
-        const left = window.screen.width / 2 - width / 2
-        const top = window.screen.height / 2 - height / 2
-        window.open(url, 'GoogleAuth', `width=${width},height=${height},top=${top},left=${left}`)
-      }
-    } catch (e) {
-      console.error(e)
     }
   }
 
@@ -131,49 +116,21 @@ const Header: React.FC = () => {
 
         <NotificationBell />
 
-        {user ? (
-          <Link to="/settings" className={styles.profileBtn} aria-label="View Profile">
+        <Link to="/settings?tab=sync" className={styles.profileBtn} aria-label="Sync settings">
+          {user?.picture ? (
             <img
               src={user.picture}
-              alt="Profile"
+              alt={user.name}
               className={styles.profileImg}
               referrerPolicy="no-referrer"
             />
-          </Link>
-        ) : (
-          <button
-            onClick={handleSignIn}
-            className={styles.signInBtn}
-            aria-label="Sign in with Google"
-          >
-            <FaGoogle />
-          </button>
-        )}
+          ) : user?.provider === 'github' ? (
+            <FaGithub />
+          ) : (
+            <FaCloud />
+          )}
+        </Link>
       </div>
-
-      <GenericModal
-        isOpen={showConfigModal}
-        onClose={() => setShowConfigModal(false)}
-        title="Configuration Required"
-      >
-        <p>Google Client ID/Secret missing. Please configure in settings.</p>
-        <div
-          style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}
-        >
-          <button className="btn-secondary" onClick={() => setShowConfigModal(false)}>
-            Close
-          </button>
-          <button
-            className="btn-primary"
-            onClick={() => {
-              setShowConfigModal(false)
-              navigate('/settings')
-            }}
-          >
-            Settings
-          </button>
-        </div>
-      </GenericModal>
     </header>
   )
 }
