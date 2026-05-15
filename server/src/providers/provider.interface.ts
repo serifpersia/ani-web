@@ -39,6 +39,7 @@ export interface VideoSource {
   links: VideoLink[]
   subtitles?: SubtitleTrack[]
   type?: 'player' | 'iframe'
+  actualEpisodeNumber?: string
 }
 
 export interface EpisodeDetails {

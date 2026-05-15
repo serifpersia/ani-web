@@ -76,6 +76,7 @@ export interface VideoSource {
   subtitles?: SubtitleTrack[]
   type?: 'player' | 'iframe'
   sandbox?: string
+  actualEpisodeNumber?: string
 }
 
 export interface SkipInterval {
@@ -110,4 +111,5 @@ export interface PlayerState {
   loadingDetails: boolean
   error: string | null
   detailsError: string | null
+  fetchedEpisodeNumber?: string
 }

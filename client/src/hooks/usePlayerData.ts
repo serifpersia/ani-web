@@ -220,6 +220,7 @@ export const usePlayerData = (
         resumeDuration,
         showResumeModal: resumeTime > 5 && sourceToSelect?.type !== 'iframe',
         skipIntervals,
+        fetchedEpisodeNumber: uiState.currentEpisode,
       }
     },
     enabled: !!showId && !!uiState.currentEpisode && !!showData?.showMeta?.name,
@@ -402,6 +403,7 @@ export const usePlayerData = (
       loadingVideo,
       loadingDetails,
       error: error ? (error as Error).message : null,
+      fetchedEpisodeNumber: videoData?.fetchedEpisodeNumber,
     }
   }, [
     uiState,

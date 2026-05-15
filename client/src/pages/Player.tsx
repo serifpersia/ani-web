@@ -252,6 +252,28 @@ const Player: React.FC = () => {
     }
   }, [state.selectedSource, state.selectedLink, refs.videoRef, actions, state.loadingVideo])
 
+  // Sync URL if provider reports a different actual episode number (e.g. 0 -> 1 fallback)
+  useEffect(() => {
+    if (state.loadingVideo) return
+    const actualEp = state.selectedSource?.actualEpisodeNumber
+    const fetchedEp = state.fetchedEpisodeNumber
+
+    // Only sync if the data we are looking at actually belongs to the episode in the URL
+    if (actualEp && episodeNumber && fetchedEp === episodeNumber && actualEp !== episodeNumber) {
+      console.log(`[Sync] Redirecting from episode ${episodeNumber} to ${actualEp}`)
+      navigate(`/watch/${showId}/${actualEp}`, { replace: true })
+      dispatch({ type: 'SET_CURRENT_EPISODE', payload: actualEp })
+    }
+  }, [
+    state.selectedSource?.actualEpisodeNumber,
+    state.fetchedEpisodeNumber,
+    episodeNumber,
+    showId,
+    navigate,
+    dispatch,
+    state.loadingVideo,
+  ])
+
   useEffect(() => {
     const videoElement = refs.videoRef.current
     if (!videoElement) return

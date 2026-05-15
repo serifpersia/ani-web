@@ -54,6 +54,7 @@ interface AnimeyaCardProps {
   title: string
   cover: string
   type: string
+  episodes?: number
 }
 
 export class AnimeyaProvider implements Provider {
@@ -159,8 +160,8 @@ export class AnimeyaProvider implements Provider {
     throw lastErr!
   }
 
-  private parseRSCStream(html: string): unknown[] {
-    const lines: unknown[] = []
+  private parseRSCStream(html: string): Map<string, unknown> {
+    const streamMap = new Map<string, unknown>()
     const regex = /self\.__next_f\.push\(\[(\d+|0),"((?:[^"\\]|\\.)*)"\]\)/g
     let m: RegExpExecArray | null
     while ((m = regex.exec(html)) !== null) {
@@ -173,14 +174,42 @@ export class AnimeyaProvider implements Provider {
       if (typeof raw !== 'string') continue
       const idx = raw.indexOf(':')
       if (idx === -1) continue
+      const id = raw.substring(0, idx)
       const val = raw.substring(idx + 1)
       try {
-        lines.push(val.trim().startsWith('[') || val.trim().startsWith('{') ? JSON.parse(val) : val)
+        streamMap.set(
+          id,
+          val.trim().startsWith('[') || val.trim().startsWith('{') ? JSON.parse(val) : val
+        )
       } catch {
-        lines.push(val)
+        streamMap.set(id, val)
       }
     }
-    return lines
+    return streamMap
+  }
+
+  private resolveRSC(obj: unknown, streamMap: Map<string, unknown>, depth = 0): unknown {
+    if (depth > 20 || !obj) return obj
+    if (typeof obj === 'string' && obj.startsWith('$L')) {
+      const id = obj.substring(2)
+      const resolved = streamMap.get(id)
+      if (resolved) {
+        return this.resolveRSC(resolved, streamMap, depth + 1)
+      }
+      return obj
+    }
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.resolveRSC(item, streamMap, depth))
+    }
+    if (typeof obj === 'object') {
+      const record = obj as Record<string, unknown>
+      const newObj: Record<string, unknown> = {}
+      for (const key in record) {
+        newObj[key] = this.resolveRSC(record[key], streamMap, depth)
+      }
+      return newObj
+    }
+    return obj
   }
 
   private deepSearch(
@@ -209,6 +238,11 @@ export class AnimeyaProvider implements Provider {
         return null
       const slug = node.href.split('/watch/')[1]
       if (!slug) return null
+
+      // Reject slugs that look like random IDs/hashes (e.g., NFwLCK4XiFNCHARLX)
+      // Real slugs on Animeya usually have multiple words and dashes.
+      if (!slug.includes('-') && slug.length > 12) return null
+
       const props: AnimeyaCardProps = { slug, title: 'Unknown', cover: '', type: 'TV' }
       const coverNodes = this.deepSearch(
         node,
@@ -231,14 +265,17 @@ export class AnimeyaProvider implements Provider {
       if (!props.cover && typeof coverNode?.image === 'string') props.cover = coverNode.image
       if (!props.cover && typeof coverNode?.bannerImage === 'string')
         props.cover = coverNode.bannerImage
+
       const titleNodes = this.deepSearch(
         node,
         (o) =>
           !!(
-            o?.title &&
-            typeof o.title === 'object' &&
-            (typeof (o.title as Record<string, unknown>).english === 'string' ||
-              typeof (o.title as Record<string, unknown>).romaji === 'string')
+            (o?.title &&
+              typeof o.title === 'object' &&
+              (typeof (o.title as Record<string, unknown>).english === 'string' ||
+                typeof (o.title as Record<string, unknown>).romaji === 'string' ||
+                typeof (o.title as Record<string, unknown>).native === 'string')) ||
+            typeof o?.name === 'string'
           )
       )
       const titleNode = titleNodes[0] as Record<string, unknown> | undefined
@@ -246,11 +283,33 @@ export class AnimeyaProvider implements Provider {
         const t = titleNode.title as Record<string, unknown>
         props.title =
           (t.english as string) || (t.romaji as string) || (t.native as string) || 'Unknown'
+      } else if (typeof titleNode?.name === 'string') {
+        props.title = titleNode.name
       }
+
+      if (!props.title || props.title === 'Unknown') {
+        // Try to find any string that might be a title
+        const potentialTitles = this.deepSearch(node, (o) => typeof o?.children === 'string')
+        if (potentialTitles.length > 0) {
+          props.title = (potentialTitles[0] as { children: string }).children
+        }
+      }
+
       if (!props.cover) {
         const serialized = JSON.stringify(node).replace(/\\\//g, '/')
         const m = serialized.match(/https?:\/\/[^"\s]+anilistcdn[^"\s]+\.(?:jpg|jpeg|png|webp)/i)
         if (m) props.cover = m[0]
+      }
+
+      // Try to find episode count in badge
+      const badgeNodes = this.deepSearch(
+        node,
+        (o) => !!(o?.['data-slot'] === 'badge' && Array.isArray(o?.children))
+      )
+      if (badgeNodes.length > 0) {
+        const bn = badgeNodes[0] as Record<string, unknown>
+        const count = (bn.children as unknown[]).find((c) => typeof c === 'number')
+        if (typeof count === 'number') props.episodes = count
       }
       if (!props.cover && !props.title) return null
       return props
@@ -324,41 +383,129 @@ export class AnimeyaProvider implements Provider {
   }
 
   async search(options: SearchOptions): Promise<Show[]> {
-    try {
-      const query = options.query || ''
-      if (!query) return []
+    const query = options.query || ''
+    if (!query) return []
 
-      const res = await this.fetchRetry(
-        `https://animeya.cc/browser?search=${encodeURIComponent(query)}`
-      )
+    const performSearch = async (q: string) => {
+      const url = `https://animeya.cc/browser?search=${encodeURIComponent(q)}`
+      const res = await this.fetchRetry(url)
+
       const html = await res.text()
-      const rscObjects = this.parseRSCStream(html)
+      const rscMap = this.parseRSCStream(html)
+
       const results: Show[] = []
       const seen = new Set<string>()
 
-      for (const obj of rscObjects) {
-        this.deepSearch(
-          obj,
-          (o) => !!(o?.href && typeof o.href === 'string' && o.href.startsWith('/watch/'))
-        ).forEach((n) => {
-          const c = this.extractCard(n as Record<string, unknown>)
-          if (c && !seen.has(c.slug)) {
-            seen.add(c.slug)
-            results.push({
-              _id: c.slug,
-              id: c.slug,
-              name: c.title,
-              englishName: c.title,
-              thumbnail: c.cover,
-              type: c.type || 'TV',
-              availableEpisodesDetail: {
-                sub: [],
-                dub: [],
-              },
-            })
+      for (const rawObj of rscMap.values()) {
+        const obj = this.resolveRSC(rawObj, rscMap)
+        // Prioritize finding the 'medias' array which contains the actual search results
+        const mediasLists = this.deepSearch(obj, (o) => Array.isArray(o?.medias))
+        for (const listNode of mediasLists) {
+          const medias = (listNode as Record<string, unknown>).medias as Record<string, unknown>[]
+          for (const media of medias) {
+            const slug = media.slug as string
+            if (slug && !seen.has(slug)) {
+              // Reject slugs that look like random IDs/hashes
+              if (!slug.includes('-') && slug.length > 12) continue
+
+              seen.add(slug)
+              const titleNode = media.title as Record<string, unknown> | undefined
+              const title =
+                (titleNode?.english as string) ||
+                (titleNode?.romaji as string) ||
+                (titleNode?.native as string) ||
+                'Unknown'
+              const coverNode = media.coverImage as Record<string, unknown> | undefined
+              const cover =
+                (coverNode?.extraLarge as string) ||
+                (coverNode?.large as string) ||
+                (coverNode?.medium as string) ||
+                ''
+
+              const episodeCount = (media.episodeCount as number) || (media.episodes as number) || 0
+              const episodes = Array.from({ length: episodeCount }, (_, i) => String(i + 1))
+
+              results.push({
+                _id: slug,
+                id: slug,
+                name: title,
+                englishName: title,
+                thumbnail: cover,
+                type: (media.format as string) || 'TV',
+                availableEpisodesDetail: {
+                  sub: episodes,
+                  dub: episodes,
+                },
+              })
+            }
           }
-        })
+        }
+
+        // Fallback to old extraction if medias array wasn't found
+        if (results.length === 0) {
+          this.deepSearch(
+            obj,
+            (o) => !!(o?.href && typeof o.href === 'string' && o.href.startsWith('/watch/'))
+          ).forEach((n) => {
+            const c = this.extractCard(n as Record<string, unknown>)
+            if (c && !seen.has(c.slug)) {
+              seen.add(c.slug)
+              const episodes = Array.from({ length: c.episodes || 1 }, (_, i) => String(i + 1))
+              results.push({
+                _id: c.slug,
+                id: c.slug,
+                name: c.title,
+                englishName: c.title,
+                thumbnail: c.cover,
+                type: c.type || 'TV',
+                availableEpisodesDetail: {
+                  sub: episodes,
+                  dub: episodes,
+                },
+              })
+            }
+          })
+        }
       }
+      return results
+    }
+
+    try {
+      let results = await performSearch(query)
+
+      // Fallback Level 1: Remove "Season X" or "Xth Season"
+      if (results.length === 0 && (query.includes('Season') || query.includes('season'))) {
+        const fallbackQuery = query
+          .replace(/\s+(?:Season|season)\s+\d+/gi, '')
+          .replace(/\s+\d+(?:st|nd|rd|th)\s+(?:Season|season)/gi, '')
+          .trim()
+
+        if (fallbackQuery && fallbackQuery !== query) {
+          results = await performSearch(fallbackQuery)
+        }
+      }
+
+      // Fallback Level 2: Remove everything after ":" or "(" or "-"
+      if (results.length === 0) {
+        const fallbackQuery = query.split(/[:(-]/)[0].trim()
+        if (fallbackQuery && fallbackQuery !== query) {
+          results = await performSearch(fallbackQuery)
+        }
+      }
+
+      // Fallback Level 3: Most aggressive - remove Season info AND everything after symbols
+      if (results.length === 0) {
+        const fallbackQuery = query
+          .replace(/\s+(?:Season|season)\s+\d+/gi, '')
+          .replace(/\s+\d+(?:st|nd|rd|th)\s+(?:Season|season)/gi, '')
+          .split(/[:(-]/)[0]
+          .trim()
+
+        if (fallbackQuery && fallbackQuery !== query) {
+          results = await performSearch(fallbackQuery)
+        }
+      }
+
       return results
     } catch (error) {
       logger.error({ err: error }, 'Animeya search failed')
@@ -369,7 +516,8 @@ export class AnimeyaProvider implements Provider {
   private async getInfoInternal(slug: string): Promise<AnimeyaShowInfo> {
     const res = await this.fetchRetry(`https://animeya.cc/watch/${slug}`)
     const html = await res.text()
-    const rscObjects = this.parseRSCStream(html)
+    const rscMap = this.parseRSCStream(html)
+
     const details: AnimeyaShowInfo = {
       id: slug,
       title: slug,
@@ -390,7 +538,8 @@ export class AnimeyaProvider implements Provider {
       /404:\s*This page could not be found\./i.test(htmlTitle) ||
       /404:\s*This page could not be found\./i.test(html)
 
-    for (const obj of rscObjects) {
+    for (const rawObj of rscMap.values()) {
+      const obj = this.resolveRSC(rawObj, rscMap)
       const epLists = this.deepSearch(
         obj,
         (o) =>
@@ -402,13 +551,16 @@ export class AnimeyaProvider implements Provider {
       ) as AnimeyaEpisode[][]
 
       if (epLists.length > 0) {
-        epLists.sort((a, b) => b.length - a.length)
-        details.episodes = epLists[0].map((ep) => ({
-          id: ep.id,
-          episodeNumber: ep.episodeNumber,
-          title: ep.title,
-          isFiller: ep.isFiller,
-        }))
+        for (const list of epLists) {
+          details.episodes.push(
+            ...list.map((ep) => ({
+              id: ep.id,
+              episodeNumber: ep.episodeNumber,
+              title: ep.title,
+              isFiller: ep.isFiller,
+            }))
+          )
+        }
       }
       if (details.title === slug && !notFoundPage) {
         const titleNodes = this.deepSearch(
@@ -541,7 +693,12 @@ export class AnimeyaProvider implements Provider {
   ): Promise<VideoSource[] | null> {
     try {
       const info = await this.getInfoInternal(showId)
-      const episode = info.episodes.find((ep) => String(ep.episodeNumber) === episodeNumber)
+      let episode = info.episodes.find((ep) => String(ep.episodeNumber) === episodeNumber)
+
+      if (!episode && episodeNumber === '0') {
+        episode = info.episodes.find((ep) => String(ep.episodeNumber) === '1')
+      }
+
       if (!episode || !episode.id) return null
 
       const sourcesData = await this.getEpisodeSourcesInternal(String(episode.id))
@@ -577,6 +734,7 @@ export class AnimeyaProvider implements Provider {
               label: s.label || 'English',
               url: s.url,
             })),
+            actualEpisodeNumber: String(episode.episodeNumber),
           })
         } else if (source.name === 'Mp4') {
           try {
@@ -599,12 +757,14 @@ export class AnimeyaProvider implements Provider {
                   label: s.label || 'English',
                   url: s.url,
                 })),
+                actualEpisodeNumber: String(episode.episodeNumber),
               })
             } else {
               processedSources.push({
                 sourceName: source.name,
                 type: 'iframe',
                 links: [{ resolutionStr: 'iframe', link: source.url, hls: false }],
+                actualEpisodeNumber: String(episode.episodeNumber),
               })
             }
           } catch {
@@ -612,6 +772,7 @@ export class AnimeyaProvider implements Provider {
               sourceName: source.name,
               type: 'iframe',
               links: [{ resolutionStr: 'iframe', link: source.url, hls: false }],
+              actualEpisodeNumber: String(episode.episodeNumber),
             })
           }
         } else if (source.name === 'Ok') {
@@ -619,6 +780,7 @@ export class AnimeyaProvider implements Provider {
             sourceName: source.name,
             type: 'iframe',
             links: [{ resolutionStr: 'iframe', link: source.url, hls: false }],
+            actualEpisodeNumber: String(episode.episodeNumber),
           })
         } else if (
           source.type === 'EMBED' ||
@@ -642,6 +804,7 @@ export class AnimeyaProvider implements Provider {
                   label: s.label || 'English',
                   url: s.url,
                 })),
+                actualEpisodeNumber: String(episode.episodeNumber),
               })
             } else {
               processedSources.push({
@@ -654,6 +817,7 @@ export class AnimeyaProvider implements Provider {
                     hls: false,
                   },
                 ],
+                actualEpisodeNumber: String(episode.episodeNumber),
               })
             }
           } catch {
@@ -667,6 +831,7 @@ export class AnimeyaProvider implements Provider {
                   hls: false,
                 },
               ],
+              actualEpisodeNumber: String(episode.episodeNumber),
             })
           }
         }
