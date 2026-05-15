@@ -178,15 +178,39 @@ export class AnimePaheProvider implements Provider {
 
   private async getEpisodeSession(showId: string, episodeNumber: string): Promise<string | null> {
     const cacheKey = `animepahe_epmap_${showId}`
-    const cachedMap = this.cache.get<Record<string, string>>(cacheKey)
+    let cachedMap = this.cache.get<Record<string, string>>(cacheKey)
 
-    if (cachedMap && cachedMap[episodeNumber]) {
+    if (!cachedMap) {
+      await this.getEpisodes(showId)
+      cachedMap = this.cache.get<Record<string, string>>(cacheKey)
+    }
+
+    if (!cachedMap) return null
+
+    if (cachedMap[episodeNumber]) {
       return cachedMap[episodeNumber]
     }
 
-    await this.getEpisodes(showId)
-    const freshMap = this.cache.get<Record<string, string>>(cacheKey)
-    return freshMap?.[episodeNumber] || null
+    const requestedNum = parseFloat(episodeNumber)
+    const keys = Object.keys(cachedMap)
+    for (const key of keys) {
+      if (parseFloat(key) === requestedNum) {
+        return cachedMap[key]
+      }
+    }
+
+    const sortedKeys = keys.sort((a, b) => Number(a) - Number(b))
+    const minEp = Number(sortedKeys[0])
+
+    if (requestedNum < minEp) {
+      const index = Math.floor(requestedNum) - 1
+      if (index >= 0 && index < sortedKeys.length) {
+        const actualEpNum = sortedKeys[index]
+        return cachedMap[actualEpNum]
+      }
+    }
+
+    return null
   }
 
   async getStreamUrls(showId: string, episodeNumber: string): Promise<VideoSource[] | null> {
@@ -297,7 +321,6 @@ export class AnimePaheProvider implements Provider {
     }
   }
 
-  // Interfaces implementation
   async getShowMeta(showId: string): Promise<Partial<Show> | null> {
     return null
   }
