@@ -33,8 +33,7 @@ Based on a lightweight architecture, ani-web includes:
 
 Be part of the ani-web Discord Server Community where you can connect with fellow users, ask questions, and share your experiences:
 
-[![Discord Server](https://discordapp.com/api/guilds/1503322177561428038/widget.png?style=banner2)](https://discord.gg/2FTSPXCsvn)
-
+[![Discord](https://invidget.switchblade.xyz/2FTSPXCsvn)](https://discord.gg/2FTSPXCsvn)
 ---
 
 ## Getting Started
