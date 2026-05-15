@@ -47,7 +47,7 @@ async function checkForUpdates() {
     if (current !== latest) {
       console.log(
         `\n${colors.system}[Update]${colors.reset} ` +
-        `New version ${colors.client}${latest}${colors.reset} available (current: ${current})`
+          `New version ${colors.client}${latest}${colors.reset} available (current: ${current})`
       )
 
       if (process.stdin.isTTY) {
@@ -296,7 +296,7 @@ const shutdown = () => {
 process.on('SIGINT', () => {
   shutdown()
 })
-  ; (async () => {
-    await checkForUpdates()
-    main()
-  })()
+;(async () => {
+  await checkForUpdates()
+  main()
+})()

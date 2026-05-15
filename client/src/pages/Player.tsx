@@ -909,12 +909,11 @@ const Player: React.FC = () => {
                   <ToggleSwitch
                     id="mode-switch"
                     isChecked={state.currentMode === 'dub'}
-                    onChange={(e) =>
-                      dispatch({
-                        type: 'SET_STATE',
-                        payload: { currentMode: e.target.checked ? 'dub' : 'sub' },
-                      })
-                    }
+                    onChange={(e) => {
+                      const mode = e.target.checked ? 'dub' : 'sub'
+                      dispatch({ type: 'SET_MODE', payload: mode })
+                      localStorage.setItem('preferredMode', mode)
+                    }}
                   />
                   <span>DUB</span>
                 </div>

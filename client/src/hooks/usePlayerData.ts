@@ -8,7 +8,7 @@ import type {
   SkipInterval,
   PlayerState,
 } from '../types/player'
-import { playerReducer, initialState, type Action } from '../reducers/playerReducer'
+import { playerReducer, createInitialState, type Action } from '../reducers/playerReducer'
 
 interface UsePlayerDataReturn {
   state: PlayerState
@@ -43,7 +43,7 @@ export const usePlayerData = (
   showId: string | undefined,
   episodeNumber: string | undefined
 ): UsePlayerDataReturn => {
-  const [uiState, dispatch] = useReducer(playerReducer, initialState)
+  const [uiState, dispatch] = useReducer(playerReducer, undefined, createInitialState)
   const queryClient = useQueryClient()
 
   useEffect(() => {
@@ -124,10 +124,22 @@ export const usePlayerData = (
       let providerShowId = showId
       if (['animepahe', '123anime', 'animeya'].includes(uiState.selectedProvider)) {
         const names = showData?.showMeta?.names
+        // AlAnime's `name` field is often the native Japanese script (e.g. "ブリーチ"
+        // for Bleach), which gets mapped to names.romaji. Sending katakana/kanji to
+        // other providers causes them to search for the transliteration ("Burichi")
+        // and return no results. Guard against this by only using romaji when it is
+        // pure ASCII, otherwise fall back to the English name.
+        const isAscii = (s: string) => {
+          for (let i = 0; i < s.length; i++) {
+            if (s.charCodeAt(i) > 127) return false
+          }
+          return true
+        }
+        const romajiName = names?.romaji && isAscii(names.romaji) ? names.romaji : null
+        const englishName =
+          names?.english || showData?.showMeta?.englishName || showData?.showMeta?.name
         const searchQuery =
-          uiState.currentMode === 'dub'
-            ? names?.english || showData?.showMeta?.name
-            : names?.romaji || showData?.showMeta?.name
+          uiState.currentMode === 'dub' ? englishName || romajiName : romajiName || englishName
 
         if (searchQuery) {
           const searchResults = await fetchApi(
@@ -140,17 +152,49 @@ export const usePlayerData = (
               name?: string
               title?: string
             }
-            // Prefer results that match the current mode in their title
-            const filtered = (searchResults as SearchResult[]).find((s) => {
-              const title = (s.name || s.title || '').toLowerCase()
-              if (uiState.currentMode === 'dub') {
-                return title.includes('dub')
-              } else {
-                return !title.includes('dub') || title.includes('sub')
+            // Score each result by title closeness to the search query AND
+            // whether it matches the current sub/dub mode.
+            // Scoring:
+            //   +4  exact title match (case-insensitive)
+            //   +2  title starts with query
+            //   +1  title contains query
+            //   +0  id starts with normalised query slug
+            //   -10 wrong mode (dub result when sub wanted, or vice versa)
+            const qLower = (searchQuery as string).toLowerCase().trim()
+            const toSlug = (s: string) =>
+              s
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '')
+            const qSlug = toSlug(qLower)
+
+            let bestMatch: SearchResult = searchResults[0]
+            let bestScore = -Infinity
+
+            for (const s of searchResults as SearchResult[]) {
+              const title = (s.name || s.title || '').toLowerCase().trim()
+              const sid = (s.id || '').toLowerCase()
+              const isDubResult =
+                title.includes('(dub)') || title.endsWith(' dub') || sid.endsWith('-dub')
+              const wantDub = uiState.currentMode === 'dub'
+
+              let score = 0
+              if (title === qLower) score += 4
+              else if (title.startsWith(qLower)) score += 2
+              else if (title.includes(qLower)) score += 1
+              else if (sid.startsWith(qSlug)) score += 0
+
+              // Heavy penalty for wrong mode so a correct-mode partial match
+              // beats an exact wrong-mode match
+              if (isDubResult !== wantDub) score -= 10
+
+              if (score > bestScore) {
+                bestScore = score
+                bestMatch = s
               }
-            })
-            const match = filtered || searchResults[0]
-            providerShowId = match.session || match.id
+            }
+
+            providerShowId = bestMatch.session || bestMatch.id
           }
         }
       }

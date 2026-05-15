@@ -62,6 +62,48 @@ export class _123AnimeProvider implements Provider {
       .replace(/^-+|-+$/g, '')
   }
 
+  /**
+   * Picks the best-matching show from a list of search results by comparing
+   * how closely each result's title / id matches the query.
+   * Scoring (highest wins):
+   *   3 – id/slug exact match
+   *   2 – title exact match (case-insensitive)
+   *   1 – title starts with query
+   *   0 – title contains query word (partial)
+   *  -1 – no match (but still returned as last resort)
+   */
+  private bestMatch(results: Show[], query: string): Show {
+    const q = query.toLowerCase().trim()
+    const qSlug = this.normalizeSlugForSearch(q)
+
+    let best = results[0]
+    let bestScore = -1
+
+    for (const s of results) {
+      const id = (s.id || s._id || '').toLowerCase()
+      const title = (s.name || '').toLowerCase()
+      let score = -1
+
+      if (id === qSlug || id === q) {
+        score = 3
+      } else if (title === q) {
+        score = 2
+      } else if (title.startsWith(q)) {
+        score = 1
+      } else if (title.includes(q) || id.startsWith(qSlug)) {
+        score = 0
+      }
+
+      if (score > bestScore) {
+        bestScore = score
+        best = s
+        if (score === 3) break // can't do better
+      }
+    }
+
+    return best
+  }
+
   private extractSlugFromUrl(url?: string): string | null {
     if (!url) return null
     try {
@@ -132,7 +174,9 @@ export class _123AnimeProvider implements Provider {
       }
 
       const results = await this.search({ query: showId.replace(/ /g, '-') })
-      const show = results.find((s) => s.id === showId || s._id === showId)
+      const show =
+        results.find((s) => s.id === showId || s._id === showId) ||
+        (results.length > 0 ? this.bestMatch(results, showId) : undefined)
 
       if (!show || !show.availableEpisodesDetail) {
         return null
@@ -163,7 +207,8 @@ export class _123AnimeProvider implements Provider {
       }
 
       const match =
-        searchResults.find((s) => s.id === showId || s._id === showId) || searchResults[0]
+        searchResults.find((s) => s.id === showId || s._id === showId) ||
+        this.bestMatch(searchResults, showId)
       const animeId = match.id || match._id
 
       const url = `${BASE_URL}/episode-stream?id=${animeId}&ep=${episodeNumber}`

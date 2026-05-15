@@ -7,7 +7,18 @@ export type Action =
   | { type: 'SET_PROVIDER'; payload: 'allanime' | 'animepahe' | '123anime' | 'animeya' }
   | { type: 'SET_OVERRIDE_SOURCE'; payload: { source: VideoSource; link: VideoLink } | null }
 
-export const initialState: PlayerState = {
+const getPreferredMode = (): 'sub' | 'dub' => {
+  return localStorage.getItem('preferredMode') === 'dub' ? 'dub' : 'sub'
+}
+
+const getPreferredProvider = (): PlayerState['selectedProvider'] => {
+  const provider = localStorage.getItem('preferredProvider')
+  return provider === 'animepahe' || provider === '123anime' || provider === 'animeya'
+    ? provider
+    : 'allanime'
+}
+
+export const createInitialState = (): PlayerState => ({
   showMeta: {},
   episodes: [],
   watchedEpisodes: [],
@@ -15,7 +26,7 @@ export const initialState: PlayerState = {
   currentEpisode: undefined,
   allMangaDetails: null,
   showCombinedDetails: false,
-  currentMode: 'sub',
+  currentMode: getPreferredMode(),
   inWatchlist: false,
   videoSources: [],
   selectedSource: null,
@@ -26,18 +37,15 @@ export const initialState: PlayerState = {
   resumeTime: 0,
   resumeDuration: 0,
   skipIntervals: [],
-  selectedProvider:
-    (localStorage.getItem('preferredProvider') as
-      | 'allanime'
-      | 'animepahe'
-      | '123anime'
-      | 'animeya') || 'allanime',
+  selectedProvider: getPreferredProvider(),
   loadingShowData: true,
   loadingVideo: false,
   loadingDetails: false,
   error: null,
   detailsError: null,
-}
+})
+
+export const initialState: PlayerState = createInitialState()
 
 export function playerReducer(state: PlayerState, action: Action): PlayerState {
   switch (action.type) {
@@ -46,7 +54,13 @@ export function playerReducer(state: PlayerState, action: Action): PlayerState {
     case 'SET_CURRENT_EPISODE':
       return { ...state, currentEpisode: action.payload }
     case 'SET_MODE':
-      return { ...state, currentMode: action.payload }
+      return {
+        ...state,
+        currentMode: action.payload,
+        videoSources: [],
+        selectedSource: null,
+        selectedLink: null,
+      }
     case 'SET_PROVIDER':
       return { ...state, selectedProvider: action.payload }
     case 'SET_OVERRIDE_SOURCE':
