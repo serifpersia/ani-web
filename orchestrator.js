@@ -54,7 +54,7 @@ async function checkForUpdates() {
         const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
         const answer = await new Promise((resolve) => {
           rl.question(
-            `${colors.system}[Update]${colors.reset} Would you like to perform a clean install now?Test2 (y/N) `,
+            `${colors.system}[Update]${colors.reset} Would you like to perform a clean install now? (y/N) `,
             (ans) => {
               rl.close()
               resolve(ans.toLowerCase())
