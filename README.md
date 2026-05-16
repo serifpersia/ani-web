@@ -6,7 +6,7 @@ _A local-first anime media client focused on performance, privacy, and personal 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-8b5cf6?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![GitHub stars](https://img.shields.io/github/stars/serifpersia/ani-web.svg?style=for-the-badge&color=8b5cf6)](https://github.com/serifpersia/ani-web/stargazers)
-[![App version](https://img.shields.io/badge/ani--web-1.5.9-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/ani-web)
+[![App version](https://img.shields.io/badge/ani--web-1.6.0-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/ani-web)
 
 </div>
 
@@ -80,7 +80,7 @@ cd ani-web
 Use provided run scripts that offer a menu to choose between a **Development** or **Production** setup. To run a development environment manually:
 
 1. Run `npm install` to install core dependencies.
-2. Run `npm run setup` to install development tools (Vite, TypeScript, etc).
+2. Run `npm run install:client` to install frontend tools (Vite, React, etc).
 3. Run `npm run build` to build the source code.
 
 **On Linux / macOS:**

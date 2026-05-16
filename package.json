@@ -1,6 +1,6 @@
 {
   "name": "ani-web",
-  "version": "1.5.9",
+  "version": "1.6.0",
   "description": "A web application for watching anime.",
   "main": "orchestrator.js",
   "bin": {
@@ -10,12 +10,12 @@
     "node": ">=22.5.0"
   },
   "scripts": {
-    "setup": "npm install --prefix client && npm install --prefix server",
+    "install:client": "npm install --prefix client",
     "build": "npm run build --prefix client && npm run build --prefix server",
     "start": "node orchestrator.js prod",
     "dev": "node orchestrator.js dev",
     "client": "npm start --prefix client",
-    "server": "npm start --prefix server",
+    "server": "npm run start --prefix server",
     "preview": "node orchestrator.js prod",
     "lighthouse": "npm run lighthouse --prefix client",
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -44,6 +44,8 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@octokit/auth-oauth-device": "^8.0.3",
+    "@octokit/rest": "^22.0.1",
     "axios": "^1.15.1",
     "axios-retry": "^4.5.0",
     "cheerio": "^1.2.0",
@@ -63,7 +65,20 @@
     "encoding-sniffer": "^1.0.2"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/compression": "^1.8.1",
+    "@types/cors": "^2.8.19",
+    "@types/crypto-js": "^4.2.2",
+    "@types/express": "^5.0.0",
+    "@types/multer": "^2.1.0",
+    "@types/node": "^25.6.0",
+    "@types/xml2js": "^0.4.14",
     "eslint": "^10.2.1",
-    "prettier": "^3.8.3"
+    "globals": "^17.5.0",
+    "nodemon": "^3.1.14",
+    "prettier": "^3.8.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.18.1"
   }
 }

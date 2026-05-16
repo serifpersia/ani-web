@@ -1,6 +1,6 @@
 {
   "name": "ani-web-server",
-  "version": "1.5.9",
+  "version": "1.6.0",
   "type": "commonjs",
   "engines": {
     "node": ">=22.5.0"
@@ -12,43 +12,8 @@
     "format": "prettier --write .",
     "lint": "eslint ."
   },
-  "dependencies": {
-    "@octokit/auth-oauth-device": "^8.0.3",
-    "@octokit/rest": "^22.0.1",
-    "axios": "^1.15.1",
-    "axios-retry": "^4.5.0",
-    "cheerio": "^1.2.0",
-    "chokidar": "^5.0.0",
-    "compression": "^1.8.1",
-    "cors": "^2.8.5",
-    "crypto-js": "^4.2.0",
-    "dotenv": "^17.4.2",
-    "express": "^5.1.0",
-    "multer": "^2.0.2",
-    "node-cache": "^5.1.2",
-    "pino": "^10.3.1",
-    "pino-pretty": "^13.1.1",
-    "xml2js": "^0.6.2"
-  },
   "overrides": {
     "encoding-sniffer": "^1.0.2",
     "glob": "^13.0.0"
-  },
-  "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@types/compression": "^1.8.1",
-    "@types/cors": "^2.8.19",
-    "@types/crypto-js": "^4.2.2",
-    "@types/express": "^5.0.0",
-    "@types/multer": "^2.1.0",
-    "@types/node": "^25.6.0",
-    "@types/xml2js": "^0.4.14",
-    "eslint": "^10.2.1",
-    "globals": "^17.5.0",
-    "nodemon": "^3.1.14",
-    "prettier": "^3.8.3",
-    "ts-node": "^10.9.2",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.18.1"
   }
 }
