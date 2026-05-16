@@ -115,14 +115,16 @@ interface PaginatedAnimeResponse {
   limit: number
 }
 
-export const useInfiniteWatchlist = (status: string) => {
+export const useInfiniteWatchlist = (status: string, filters: string = '') => {
   return useInfiniteQuery<PaginatedAnimeResponse, Error, { pages: Anime[]; pageParams: unknown[] }>(
     {
-      queryKey: ['watchlist', status],
+      queryKey: ['watchlist', status, filters],
       queryFn: async ({ pageParam = 1 }) => {
-        const response = await fetchApi(
-          `/api/watchlist?status=${status}&page=${pageParam}&limit=14`
-        )
+        const params = new URLSearchParams(filters)
+        params.set('status', status)
+        params.set('page', String(pageParam))
+        params.set('limit', '14')
+        const response = await fetchApi(`/api/watchlist?${params.toString()}`)
         return response
       },
       initialPageParam: 1,
@@ -140,12 +142,15 @@ export const useInfiniteWatchlist = (status: string) => {
   )
 }
 
-export const useAllContinueWatching = () => {
+export const useAllContinueWatching = (filters: string = '') => {
   return useInfiniteQuery<PaginatedAnimeResponse, Error, { pages: Anime[]; pageParams: unknown[] }>(
     {
-      queryKey: ['allContinueWatching'],
+      queryKey: ['allContinueWatching', filters],
       queryFn: async ({ pageParam = 1 }) => {
-        const response = await fetchApi(`/api/continue-watching/all?page=${pageParam}&limit=14`)
+        const params = new URLSearchParams(filters)
+        params.set('page', String(pageParam))
+        params.set('limit', '14')
+        const response = await fetchApi(`/api/continue-watching/all?${params.toString()}`)
         return response
       },
       initialPageParam: 1,
@@ -243,7 +248,7 @@ export const useClearAllNotifications = () => {
   })
 }
 export const useGenresAndStudios = () => {
-  return useQuery<{ genres: string[]; studios: string[] }>({
+  return useQuery<{ genres: string[]; tags: string[]; studios: string[] }>({
     queryKey: ['genresAndStudios'],
     queryFn: () => fetchApi('/api/genres-and-tags'),
     staleTime: 1000 * 60 * 60, // 1 hour

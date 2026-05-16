@@ -11,6 +11,7 @@ import {
 } from '../repositories/watched-episodes.repository'
 import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
 import { NotificationsRepository } from '../repositories/notifications.repository'
+import { SearchOptions } from '../providers/provider.interface'
 
 interface CombinedContinueWatchingShow {
   _id: string
@@ -40,10 +41,148 @@ interface EpisodeNotification {
   id: string
 }
 
+interface WatchlistFilterOptions {
+  query?: string
+  type?: string
+  season?: string
+  year?: string
+  country?: string
+  translation?: string
+  genres?: string
+  excludeGenres?: string
+  tags?: string
+  excludeTags?: string
+  studios?: string
+  sortBy?: string
+  titlePreference?: 'name' | 'nativeName' | 'englishName'
+}
+
 export class WatchlistController {
   private activeTypeFetches = new Set<string>()
 
   constructor(private provider: AllAnimeProvider) {}
+
+  private normalizeFilterValue(value: unknown): string | undefined {
+    if (typeof value !== 'string') return undefined
+    const trimmed = value.trim()
+    return trimmed && trimmed !== 'ALL' ? trimmed : undefined
+  }
+
+  private getWatchlistFilters(query: Request['query']): WatchlistFilterOptions {
+    return {
+      query: this.normalizeFilterValue(query.query),
+      type: this.normalizeFilterValue(query.type),
+      season: this.normalizeFilterValue(query.season),
+      year: this.normalizeFilterValue(query.year),
+      country: this.normalizeFilterValue(query.country),
+      translation: this.normalizeFilterValue(query.translation),
+      genres: this.normalizeFilterValue(query.genres),
+      excludeGenres: this.normalizeFilterValue(query.excludeGenres),
+      tags: this.normalizeFilterValue(query.tags),
+      excludeTags: this.normalizeFilterValue(query.excludeTags),
+      studios: this.normalizeFilterValue(query.studios),
+      sortBy: this.normalizeFilterValue(query.sortBy),
+      titlePreference: ['name', 'nativeName', 'englishName'].includes(String(query.titlePreference))
+        ? (query.titlePreference as 'name' | 'nativeName' | 'englishName')
+        : 'name',
+    }
+  }
+
+  private hasProviderFilters(filters: WatchlistFilterOptions): boolean {
+    return !!(
+      filters.season ||
+      filters.year ||
+      filters.country ||
+      filters.translation ||
+      filters.genres ||
+      filters.excludeGenres ||
+      filters.tags ||
+      filters.excludeTags ||
+      filters.studios
+    )
+  }
+
+  private matchesLocalFilters<
+    T extends { name?: string; nativeName?: string; englishName?: string; type?: string },
+  >(row: T, filters: WatchlistFilterOptions): boolean {
+    if (filters.query) {
+      const needle = filters.query.toLowerCase()
+      const haystack = [row.name, row.nativeName, row.englishName]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      if (!haystack.includes(needle)) return false
+    }
+
+    if (filters.type && row.type !== filters.type) return false
+
+    return true
+  }
+
+  private sortFilteredRows<T extends { name?: string; nativeName?: string; englishName?: string }>(
+    rows: T[],
+    filters: WatchlistFilterOptions
+  ): T[] {
+    const getSortTitle = (row: T) => {
+      const preferredTitle = filters.titlePreference ? row[filters.titlePreference] : undefined
+      return preferredTitle || row.name || ''
+    }
+
+    if (filters.sortBy === 'name_asc') {
+      return [...rows].sort((a, b) => getSortTitle(a).localeCompare(getSortTitle(b)))
+    }
+    if (filters.sortBy === 'name_desc') {
+      return [...rows].sort((a, b) => getSortTitle(b).localeCompare(getSortTitle(a)))
+    }
+    return rows
+  }
+
+  private async getProviderMatchedIds(filters: WatchlistFilterOptions): Promise<Set<string>> {
+    if (!this.hasProviderFilters(filters)) return new Set()
+
+    const searchOptions: SearchOptions = {
+      season: filters.season,
+      year: filters.year,
+      country: filters.country,
+      translation: filters.translation,
+      genres: filters.genres,
+      excludeGenres: filters.excludeGenres,
+      tags: filters.tags,
+      excludeTags: filters.excludeTags,
+      studios: filters.studios,
+    }
+
+    const ids = new Set<string>()
+    const maxPages = 25
+
+    for (let page = 1; page <= maxPages; page += 1) {
+      const results = await this.provider.search({ ...searchOptions, page: String(page) })
+      for (const show of results) ids.add(show._id)
+      if (results.length < 28) break
+      await new Promise((res) => setImmediate(res))
+    }
+
+    return ids
+  }
+
+  private async filterWatchlistRows<
+    T extends {
+      id: string
+      name?: string
+      nativeName?: string
+      englishName?: string
+      type?: string
+    },
+  >(rows: T[], filters: WatchlistFilterOptions): Promise<T[]> {
+    let filtered = rows.filter((row) => this.matchesLocalFilters(row, filters))
+
+    if (this.hasProviderFilters(filters)) {
+      const matchedIds = await this.getProviderMatchedIds(filters)
+      filtered = filtered.filter((row) => matchedIds.has(row.id))
+    }
+
+    return this.sortFilteredRows(filtered, filters)
+  }
 
   private async getContinueWatchingData(
     req: Request,
@@ -228,7 +367,8 @@ export class WatchlistController {
       const page = parseInt(req.query.page as string) || 1
       const limit = parseInt(req.query.limit as string) || 10
       const offset = (page - 1) * limit
-      const data = await this.getContinueWatchingData(req)
+      const filters = this.getWatchlistFilters(req.query)
+      const data = await this.filterWatchlistRows(await this.getContinueWatchingData(req), filters)
 
       res.json({
         data: data.slice(offset, offset + limit),
@@ -309,12 +449,12 @@ export class WatchlistController {
     const page = parseInt(pageStr as string) || 1
     const limit = parseInt(limitStr as string) || 10
     const offset = (page - 1) * limit
+    const filters = this.getWatchlistFilters(req.query)
 
     try {
-      const [rows, total] = await Promise.all([
-        WatchlistRepository.getAll(req.db, status as string, limit, offset),
-        WatchlistRepository.getCount(req.db, status as string),
-      ])
+      const allRows = await WatchlistRepository.getAll(req.db, status as string)
+      const filteredRows = await this.filterWatchlistRows(allRows, filters)
+      const rows = filteredRows.slice(offset, offset + limit)
 
       res.json({
         data: rows.map((row) => ({
@@ -322,7 +462,7 @@ export class WatchlistController {
           _id: row.id,
           thumbnail: this.provider.deobfuscateUrl(row.thumbnail || ''),
         })),
-        total,
+        total: filteredRows.length,
         page,
         limit,
       })
