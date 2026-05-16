@@ -33,68 +33,89 @@ async function checkForUpdates() {
     const scriptPath = path.resolve(__dirname)
     const isGlobalInstall = scriptPath.includes(npmGlobalPrefix)
 
-    if (!isGlobalInstall) return
-
     const pkg = require('./package.json')
     const current = pkg.version
 
-    const { data } = await axios.get('https://registry.npmjs.org/ani-web/latest', {
-      timeout: 3000,
-      headers: { 'User-Agent': 'ani-web-cli' },
-    })
-    const latest = data.version
+    if (isGlobalInstall) {
+      const { data } = await axios.get('https://registry.npmjs.org/ani-web/latest', {
+        timeout: 3000,
+        headers: { 'User-Agent': 'ani-web-cli' },
+      })
+      const latest = data.version
 
-    if (current !== latest) {
-      console.log(
-        `\n${colors.system}[Update]${colors.reset} ` +
-          `New version ${colors.client}${latest}${colors.reset} available (current: ${current})`
-      )
+      if (current !== latest) {
+        console.log(
+          `\n${colors.system}[Update]${colors.reset} ` +
+            `New version ${colors.client}${latest}${colors.reset} available (current: ${current})`
+        )
 
-      if (process.stdin.isTTY) {
-        const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-        const answer = await new Promise((resolve) => {
-          rl.question(
-            `${colors.system}[Update]${colors.reset} Would you like to perform a clean install now? (y/N) `,
-            (ans) => {
-              rl.close()
-              resolve(ans.toLowerCase())
-            }
-          )
-        })
-
-        if (answer === 'y' || answer === 'yes') {
-          console.log(`${colors.system}[Update]${colors.reset} Updating ani-web...`)
-          try {
-            require('child_process').execSync(`${npmCmd} install -g ani-web@latest`, {
-              stdio: 'inherit',
-            })
-            console.log(
-              `\n${colors.system}[Update]${colors.reset} Update successful! Please restart ani-web to apply changes.`
+        if (process.stdin.isTTY) {
+          const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+          const answer = await new Promise((resolve) => {
+            rl.question(
+              `${colors.system}[Update]${colors.reset} Would you like to perform a clean install now? (y/N) `,
+              (ans) => {
+                rl.close()
+                resolve(ans.toLowerCase())
+              }
             )
-            process.exit(0)
-          } catch (err) {
-            console.error(`\n${colors.system}[Update]${colors.reset} Update failed: ${err.message}`)
-            if (!isWin) {
+          })
+
+          if (answer === 'y' || answer === 'yes') {
+            console.log(`${colors.system}[Update]${colors.reset} Updating ani-web...`)
+            try {
+              require('child_process').execSync(`${npmCmd} install -g ani-web@latest`, {
+                stdio: 'inherit',
+              })
               console.log(
-                `${colors.system}[Update]${colors.reset} Hint: You might need to run with sudo:`
+                `\n${colors.system}[Update]${colors.reset} Update successful! Please restart ani-web to apply changes.`
               )
+              process.exit(0)
+            } catch (err) {
+              console.error(
+                `\n${colors.system}[Update]${colors.reset} Update failed: ${err.message}`
+              )
+              if (!isWin) {
+                console.log(
+                  `${colors.system}[Update]${colors.reset} Hint: You might need to run with sudo:`
+                )
+                console.log(
+                  `${colors.system}[Update]${colors.reset} ${colors.client}sudo ani-web${colors.reset}\n`
+                )
+              }
               console.log(
-                `${colors.system}[Update]${colors.reset} ${colors.client}sudo ani-web${colors.reset}\n`
+                `${colors.system}[Update]${colors.reset} Continuing with current version...\n`
               )
             }
+          } else {
             console.log(
-              `${colors.system}[Update]${colors.reset} Continuing with current version...\n`
+              `${colors.system}[Update]${colors.reset} Continuing with version ${current}...\n`
             )
           }
+          if (process.stdin.isTTY) process.stdin.resume()
         } else {
           console.log(
-            `${colors.system}[Update]${colors.reset} Continuing with version ${current}...\n`
+            `${colors.system}[Update]${colors.reset} Run: npm install -g ani-web to update.\n`
           )
         }
-        if (process.stdin.isTTY) process.stdin.resume()
-      } else {
+      }
+    } else {
+      const { data } = await axios.get(
+        'https://api.github.com/repos/serifpersia/ani-web/releases/latest',
+        { timeout: 3000 }
+      )
+      const latestDate = new Date(data.published_at)
+      const pkgDate = new Date(pkg.versionDate || 0)
+
+      if (latestDate > pkgDate) {
+        console.log(`\n${colors.system}====================================================`)
+        console.log(`${colors.system}[Update Available]${colors.reset} New version found!`)
         console.log(
-          `${colors.system}[Update]${colors.reset} Run: npm install -g ani-web to update.\n`
+          `Please download the latest release: ${colors.client}${data.html_url}${colors.reset}`
+        )
+        console.log(`Replace your current files with the new ones from the zip.`)
+        console.log(
+          `${colors.system}====================================================\n${colors.reset}`
         )
       }
     }

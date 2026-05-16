@@ -15,6 +15,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Inject Version Date
+        run: |
+          node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); pkg.versionDate = new Date().toISOString(); fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
+
       - name: Delete Existing Latest Release
         run: |
           gh release delete "latest" --yes || echo "No previous 'latest' release to delete."
@@ -88,7 +92,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to NPM
-        continue-on-error: true
-        run: npm publish --access public
+        run: |
+          PREV_VERSION=$(npm view ani-web version 2>/dev/null || echo "")
+          npm publish --access public
+          if [ -n "$PREV_VERSION" ]; then
+            npm unpublish ani-web@$PREV_VERSION --force
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
