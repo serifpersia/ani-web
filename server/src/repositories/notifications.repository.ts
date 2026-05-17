@@ -50,4 +50,22 @@ export const NotificationsRepository = {
       dbRun(db, 'DELETE FROM dismissed_notifications WHERE showId = ?', [showId]),
       dbRun(db, 'DELETE FROM discovered_notifications WHERE showId = ?', [showId]),
     ]),
+
+  deleteSpecificDismissed: (db: DatabaseWrapper, showId: string, episodeNumber: string) =>
+    dbRun(db, 'DELETE FROM dismissed_notifications WHERE showId = ? AND episodeNumber = ?', [
+      showId,
+      episodeNumber,
+    ]),
+
+  cleanupWatchedNotifications: (db: DatabaseWrapper) =>
+    Promise.all([
+      dbRun(
+        db,
+        'DELETE FROM dismissed_notifications WHERE EXISTS (SELECT 1 FROM watched_episodes we WHERE we.showId = dismissed_notifications.showId AND we.episodeNumber = dismissed_notifications.episodeNumber)'
+      ),
+      dbRun(
+        db,
+        'DELETE FROM discovered_notifications WHERE EXISTS (SELECT 1 FROM watched_episodes we WHERE we.showId = discovered_notifications.showId AND we.episodeNumber = discovered_notifications.episodeNumber)'
+      ),
+    ]),
 }

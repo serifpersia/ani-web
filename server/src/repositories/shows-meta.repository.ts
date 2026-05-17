@@ -63,4 +63,7 @@ export const ShowsMetaRepository = {
 
   updateThumbnail: (db: DatabaseWrapper, id: string, thumbnail: string) =>
     dbRun(db, 'UPDATE shows_meta SET thumbnail = ? WHERE id = ?', [thumbnail, id]),
+
+  cleanupOrphanedMeta: (db: DatabaseWrapper) =>
+    dbRun(db, 'DELETE FROM shows_meta WHERE id NOT IN (SELECT id FROM watchlist)'),
 }

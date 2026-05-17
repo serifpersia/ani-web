@@ -72,6 +72,9 @@ export const WatchedEpisodesRepository = {
   deleteByShow: (db: DatabaseWrapper, showId: string) =>
     dbRun(db, 'DELETE FROM watched_episodes WHERE showId = ?', [showId]),
 
+  cleanupOrphanedProgress: (db: DatabaseWrapper) =>
+    dbRun(db, 'DELETE FROM watched_episodes WHERE showId NOT IN (SELECT id FROM watchlist)'),
+
   getContinueWatching: (db: DatabaseWrapper, limit?: number) => {
     const limitClause = typeof limit === 'number' ? `LIMIT ${limit}` : ''
     const query = `

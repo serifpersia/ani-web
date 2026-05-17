@@ -399,6 +399,11 @@ export class WatchlistController {
     } = req.body
 
     try {
+      const inWatchlist = await WatchlistRepository.exists(req.db, showId)
+      if (!inWatchlist) {
+        return res.json({ success: true })
+      }
+
       const genresStr = Array.isArray(genres) ? JSON.stringify(genres) : genres
 
       await performWriteTransaction(req.db, (tx) => {
@@ -421,6 +426,8 @@ export class WatchlistController {
           currentTime,
           duration,
         })
+
+        NotificationsRepository.deleteSpecificDismissed(tx, showId, episodeNumber)
       })
 
       req.db.scheduleSave()

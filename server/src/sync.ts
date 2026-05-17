@@ -433,6 +433,18 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
       initOpts
     )
 
+    db.run('DELETE FROM watched_episodes WHERE showId NOT IN (SELECT id FROM watchlist)')
+    db.run('DELETE FROM dismissed_notifications WHERE showId NOT IN (SELECT id FROM watchlist)')
+    db.run('DELETE FROM discovered_notifications WHERE showId NOT IN (SELECT id FROM watchlist)')
+    db.run('DELETE FROM shows_meta WHERE id NOT IN (SELECT id FROM watchlist)')
+
+    db.run(
+      'DELETE FROM dismissed_notifications WHERE EXISTS (SELECT 1 FROM watched_episodes we WHERE we.showId = dismissed_notifications.showId AND we.episodeNumber = dismissed_notifications.episodeNumber)'
+    )
+    db.run(
+      'DELETE FROM discovered_notifications WHERE EXISTS (SELECT 1 FROM watched_episodes we WHERE we.showId = discovered_notifications.showId AND we.episodeNumber = discovered_notifications.episodeNumber)'
+    )
+
     const addCol = (tbl: string, col: string, type: string) => {
       db.all(`PRAGMA table_info(${tbl})`, (e: Error | null, r: unknown) => {
         const columns = r as { name: string }[]

@@ -60,7 +60,7 @@ jobs:
           cp -r client/dist release-package/client/
           cp -r server/dist release-package/server/
           cp client/package.json client/package-lock.json release-package/client/
-          cp server/package.json server/package-lock.json release-package/server/
+          cp server/package.json release-package/server/
           cp package.json package-lock.json release-package/
           cp LICENSE README.md release-package/
           cp orchestrator.js release-package/
