@@ -196,17 +196,33 @@ const GoogleAuthSettings: React.FC = () => {
     }
   }
 
-  const handleSignIn = () => {
-    if (authUrl) {
-      const width = 600
-      const height = 700
-      const left = window.innerWidth / 2 - width / 2
-      const top = window.innerHeight / 2 - height / 2
-      window.open(authUrl, 'GoogleAuth', `width=${width},height=${height},top=${top},left=${left}`)
-    } else {
+  const handleSignIn = async () => {
+    try {
+      const res = await fetch('/api/auth/google/login', { method: 'POST' })
+      const data = await res.json()
+
+      if (data.authenticated) {
+        window.location.reload()
+        return
+      }
+
+      if (data.url) {
+        const width = 600
+        const height = 700
+        const left = window.innerWidth / 2 - width / 2
+        const top = window.innerHeight / 2 - height / 2
+        window.open(
+          data.url,
+          'GoogleAuth',
+          `width=${width},height=${height},top=${top},left=${left}`
+        )
+      } else {
+        throw new Error('Auth URL not available')
+      }
+    } catch (error) {
       setStatusModal({
         show: true,
-        message: 'Authentication URL not available. Ensure server is configured correctly.',
+        message: 'Authentication failed. Ensure server is configured correctly.',
         type: 'error',
       })
     }

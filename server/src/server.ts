@@ -17,7 +17,7 @@ import { _123AnimeProvider as Anime123Provider } from './providers/123anime.prov
 import { AnimeyaProvider } from './providers/animeya.provider'
 import { googleDriveService } from './google'
 import { CONFIG } from './config'
-import { initializeDatabase, syncDownOnBoot, syncUp, initSyncProvider } from './sync'
+import { initializeDatabase, syncDownOnBoot, syncUp, initSyncProvider, waitForSync } from './sync'
 import { createAuthRouter } from './routes/auth.routes'
 import { createWatchlistRouter } from './routes/watchlist.routes'
 import { createDataRouter } from './routes/data.routes'
@@ -49,12 +49,15 @@ const providers = {
 let db: DatabaseWrapper
 let isShuttingDown = false
 
-async function runSyncSequence(database: DatabaseWrapper) {
+async function runSyncSequence(
+  database: DatabaseWrapper,
+  preferredProvider?: 'github' | 'google' | 'rclone' | 'none'
+) {
   const dbName = CONFIG.IS_DEV ? CONFIG.DB_NAME_DEV : CONFIG.DB_NAME_PROD
   const dbPath = path.join(CONFIG.ROOT, dbName)
   const remoteFolder = CONFIG.IS_DEV ? CONFIG.REMOTE_FOLDER_DEV : CONFIG.REMOTE_FOLDER_PROD
 
-  await initSyncProvider()
+  await initSyncProvider(preferredProvider)
 
   const didDownload = await syncDownOnBoot(database, dbPath, remoteFolder, () => {
     return new Promise<void>((resolve) => {
@@ -188,6 +191,8 @@ async function main() {
     } catch (e) {
       console.error('Sync failed:', e)
     }
+
+    await waitForSync()
 
     db.close(() => {
       console.log('[SERVER_EXIT]')

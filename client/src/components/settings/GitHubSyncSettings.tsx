@@ -161,8 +161,7 @@ const GitHubSyncSettings: React.FC = () => {
     <div className={styles.sectionCard}>
       <h3 className={styles.title}>GitHub Cloud Sync</h3>
       <p className={styles.signIn}>
-        Primary sync provider. Sync local data through a private GitHub repository named
-        aniweb-sync-data.
+        Sync local data through a private GitHub repository named aniweb-sync-data.
       </p>
 
       {authenticated && user ? (

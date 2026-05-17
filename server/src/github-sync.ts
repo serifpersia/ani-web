@@ -157,8 +157,29 @@ class GitHubSyncService {
 
   async startDeviceAuth(
     db: DatabaseWrapper,
-    runSyncSequence: (db: DatabaseWrapper) => Promise<void>
+    runSyncSequence: (
+      db: DatabaseWrapper,
+      provider?: 'github' | 'google' | 'rclone' | 'none'
+    ) => Promise<void>
   ): Promise<DeviceFlowState> {
+    if (this.isAuthenticated()) {
+      const user = await this.getUserProfile()
+      if (user) {
+        this.deviceState = {
+          status: 'success',
+          user: user,
+        }
+        const { updateEnvFile } = await import('./utils/env.utils')
+        await updateEnvFile({ SYNC_PROVIDER: 'github' })
+        await runSyncSequence(db, 'github')
+        return this.deviceState
+      } else {
+        // Token exists but is invalid/expired, clear it
+        log.warn('Saved GitHub token is invalid or expired. Clearing for new auth.')
+        await this.logout()
+      }
+    }
+
     if (this.deviceState.status === 'pending') {
       return this.deviceState
     }
@@ -229,7 +250,10 @@ class GitHubSyncService {
 
   private async runDeviceAuth(
     db: DatabaseWrapper,
-    runSyncSequence: (db: DatabaseWrapper) => Promise<void>,
+    runSyncSequence: (
+      db: DatabaseWrapper,
+      provider?: 'github' | 'google' | 'rclone' | 'none'
+    ) => Promise<void>,
     resolveVerification: () => void
   ) {
     try {
@@ -254,7 +278,7 @@ class GitHubSyncService {
       })
 
       const authentication = await auth({ type: 'oauth' })
-      await updateEnvFile({ GITHUB_TOKEN: authentication.token })
+      await updateEnvFile({ GITHUB_TOKEN: authentication.token, SYNC_PROVIDER: 'github' })
       process.env.GITHUB_TOKEN = authentication.token
 
       const user = await this.getUserProfile()
@@ -264,7 +288,7 @@ class GitHubSyncService {
       }
 
       try {
-        await runSyncSequence(db)
+        await runSyncSequence(db, 'github')
       } catch (err) {
         log.error({ err }, 'Post-GitHub-login sync failed')
       }

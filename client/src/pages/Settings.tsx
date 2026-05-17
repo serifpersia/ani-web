@@ -7,6 +7,7 @@ import GitHubSyncSettings from '../components/settings/GitHubSyncSettings'
 import GoogleAuthSettings from '../components/settings/GoogleAuthSettings'
 import WatchlistSettings from '../components/settings/WatchlistSettings'
 import RcloneSettings from '../components/settings/RcloneSettings'
+import SyncProviderSelector from '../components/settings/SyncProviderSelector'
 import { FaCog, FaCloud, FaDatabase, FaList } from 'react-icons/fa'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import ToggleSwitch from '../components/common/ToggleSwitch'
@@ -137,6 +138,7 @@ const Settings: React.FC = () => {
       case 'sync':
         return (
           <div className={styles.tabContent}>
+            <SyncProviderSelector />
             <GitHubSyncSettings />
             <GoogleAuthSettings />
             <RcloneSettings />

@@ -40,23 +40,65 @@ const syncMutex = new Mutex()
 let isSyncing = false
 let activeProvider: 'github' | 'google' | 'rclone' | 'none' = 'none'
 
-export async function initSyncProvider(): Promise<void> {
+export async function waitForSync(): Promise<void> {
+  await syncMutex.lock()
+  syncMutex.unlock()
+}
+
+export function getActiveProvider() {
+  return activeProvider
+}
+
+export async function initSyncProvider(
+  preferred?: 'github' | 'google' | 'rclone' | 'none'
+): Promise<void> {
+  const provider =
+    preferred || (process.env.SYNC_PROVIDER as 'github' | 'google' | 'rclone' | 'none' | undefined)
+
+  if (provider === 'github' && githubSyncService.isAuthenticated()) {
+    activeProvider = 'github'
+    log.info('Sync Provider: GitHub (Selected)')
+    return
+  }
+
+  if (provider === 'google' && googleDriveService.isAuthenticated()) {
+    activeProvider = 'google'
+    log.info('Sync Provider: Google Drive API (Selected)')
+    return
+  }
+
+  if (provider === 'rclone') {
+    const rcloneAvailable = await rcloneService.init()
+    if (rcloneAvailable) {
+      activeProvider = 'rclone'
+      log.info(`Sync Provider: Rclone (${rcloneService.getRemoteName()}) (Selected)`)
+      return
+    }
+  }
+
+  if (provider === 'none') {
+    activeProvider = 'none'
+    log.info('Sync Provider: None (Forced)')
+    return
+  }
+
+  // Fallback to priority if no preferred provider is authenticated
   if (githubSyncService.isAuthenticated()) {
     activeProvider = 'github'
-    log.info('Sync Provider: GitHub')
+    log.info('Sync Provider: GitHub (Fallback)')
     return
   }
 
   if (googleDriveService.isAuthenticated()) {
     activeProvider = 'google'
-    log.info('Sync Provider: Google Drive API')
+    log.info('Sync Provider: Google Drive API (Fallback)')
     return
   }
 
   const rcloneAvailable = await rcloneService.init()
   if (rcloneAvailable) {
     activeProvider = 'rclone'
-    log.info(`Sync Provider: Rclone (${rcloneService.getRemoteName()})`)
+    log.info(`Sync Provider: Rclone (${rcloneService.getRemoteName()}) (Fallback)`)
     return
   }
 
@@ -85,8 +127,10 @@ async function getRemoteManifestVersion(
 ): Promise<{ version: number; fileId?: string }> {
   try {
     if (activeProvider === 'github') {
+      if (!githubSyncService.isAuthenticated()) return { version: 0 }
       return { version: await githubSyncService.getRemoteVersion() }
     } else if (activeProvider === 'google') {
+      if (!googleDriveService.isAuthenticated()) return { version: 0 }
       const folderId = await googleDriveService.ensureFolder(remoteFolder)
       const file = await googleDriveService.findFile(CONFIG.MANIFEST_FILENAME, folderId)
       if (!file) return { version: 0 }
@@ -155,6 +199,7 @@ export async function syncDownOnBoot(
 
     if (remoteVersion > localVersion) {
       if (activeProvider === 'github') {
+        if (!githubSyncService.isAuthenticated()) return false
         console.log(`[SYNC_START] Importing GitHub sync data (Remote v${remoteVersion})`)
         const importedVersion = await githubSyncService.syncDown(db)
         await setLocalManifestVersion(importedVersion || remoteVersion)
@@ -186,6 +231,7 @@ export async function syncDownOnBoot(
         }
 
         if (activeProvider === 'google') {
+          if (!googleDriveService.isAuthenticated()) return true
           const folderId = await googleDriveService.ensureFolder(remoteFolderName)
           const remoteDb = await googleDriveService.findFile(dbName, folderId)
           const remoteManifest = await googleDriveService.findFile(
@@ -270,12 +316,14 @@ export async function syncUp(
       const syncDbPath = `${dbPath}.sync.db`
       try {
         if (activeProvider === 'github') {
+          if (!githubSyncService.isAuthenticated()) return
           await githubSyncService.syncUp(db)
         } else {
           db.backup(syncDbPath)
         }
 
         if (activeProvider === 'google') {
+          if (!googleDriveService.isAuthenticated()) return
           const folderId = await googleDriveService.ensureFolder(remoteFolderName)
           const remoteDbFile = await googleDriveService.findFile(dbName, folderId)
 

@@ -64,6 +64,15 @@ export async function updateEnvFile(updates: Record<string, string>) {
         .replace(/\n{2,}/g, '\n')
         .trim() + '\n'
     fs.writeFileSync(envPath, finalContent)
+
+    // Update process.env so the changes are reflected immediately in the running process
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === '') {
+        delete process.env[key]
+      } else {
+        process.env[key] = value
+      }
+    })
   } finally {
     releaseLock(lockHandle)
   }

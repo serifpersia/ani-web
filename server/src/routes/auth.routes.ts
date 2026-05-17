@@ -2,7 +2,12 @@ import { Router } from 'express'
 import { AuthController } from '../controllers/auth.controller'
 import { DatabaseWrapper } from '../db'
 
-export function createAuthRouter(runSyncSequence: (db: DatabaseWrapper) => Promise<void>): Router {
+export function createAuthRouter(
+  runSyncSequence: (
+    db: DatabaseWrapper,
+    provider?: 'github' | 'google' | 'rclone' | 'none'
+  ) => Promise<void>
+): Router {
   const router = Router()
   const controller = new AuthController(runSyncSequence)
 
@@ -15,7 +20,10 @@ export function createAuthRouter(runSyncSequence: (db: DatabaseWrapper) => Promi
   router.post('/github/logout', controller.logoutGitHub)
   router.get('/settings/rclone', controller.getRcloneSettings)
   router.post('/settings/rclone', controller.updateRcloneSettings)
+  router.get('/settings/sync', controller.getSyncSettings)
+  router.post('/settings/sync', controller.updateSyncProvider)
   router.get('/google', controller.getAuthUrl)
+  router.post('/google/login', controller.loginGoogle)
   router.get('/google/callback', controller.handleCallback)
   router.get('/user', controller.getUserProfile)
   router.post('/logout', controller.logout)

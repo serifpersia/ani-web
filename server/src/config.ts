@@ -93,4 +93,5 @@ export const CONFIG = {
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   GOOGLE_REDIRECT_URI: GOOGLE_REDIRECT_URI,
   RCLONE_REMOTE: process.env.RCLONE_REMOTE,
+  SYNC_PROVIDER: process.env.SYNC_PROVIDER as 'github' | 'google' | 'rclone' | 'none' | undefined,
 }

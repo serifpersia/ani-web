@@ -109,8 +109,8 @@ const RcloneSettings: React.FC = () => {
           </select>
         </div>
         <p className={styles.warning} style={{ marginTop: '12px' }}>
-          <strong>Priority Note:</strong> GitHub sync takes priority when configured, followed by
-          Google Drive. Rclone is used only when neither higher-priority provider is active.
+          <strong>Note:</strong> You can choose which provider is active using the selector at the
+          top of the page.
         </p>
       </div>
 

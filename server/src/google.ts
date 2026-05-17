@@ -33,6 +33,7 @@ const googleAxios = axios.create({
 
 export class GoogleDriveService {
   private tokens: GoogleTokenSet = {}
+  private folderIdCache: Map<string, string> = new Map()
 
   constructor() {
     if (!CONFIG.GOOGLE_CLIENT_ID) {
@@ -177,10 +178,14 @@ export class GoogleDriveService {
       fs.unlinkSync(CONFIG.TOKEN_PATH)
     }
     this.tokens = {}
+    this.folderIdCache.clear()
   }
 
   public async ensureFolder(folderName: string): Promise<string> {
     if (!this.isAuthenticated()) throw new Error('Not authenticated')
+
+    const cachedId = this.folderIdCache.get(folderName)
+    if (cachedId) return cachedId
 
     const existing = await this.findFile(
       folderName,
@@ -188,6 +193,7 @@ export class GoogleDriveService {
       'application/vnd.google-apps.folder'
     )
     if (existing) {
+      this.folderIdCache.set(folderName, existing.id)
       return existing.id
     }
 
@@ -204,7 +210,9 @@ export class GoogleDriveService {
         data: fileMetadata,
         headers: { 'Content-Type': 'application/json' },
       })
-      return res.data.id!
+      const id = res.data.id!
+      this.folderIdCache.set(folderName, id)
+      return id
     } catch (error) {
       logger.error({ err: error }, `Failed to create folder ${folderName}`)
       throw error
@@ -241,12 +249,15 @@ export class GoogleDriveService {
         },
       })
       if (res.data.files && res.data.files.length > 0) {
+        if (res.data.files.length > 1) {
+          logger.warn(`Multiple files found for ${filename}, using the most recent one.`)
+        }
         return { id: res.data.files[0].id!, name: res.data.files[0].name! }
       }
       return null
     } catch (error) {
-      logger.error({ err: error }, `Failed to find file ${filename}`)
-      return null
+      logger.error({ err: error }, `Error while searching for file ${filename}`)
+      throw error
     }
   }
 
