@@ -95,11 +95,20 @@
   transition: opacity var(--transition-base);
   opacity: 1;
 }
+.versionInfo {
+  margin-top: auto;
+  padding: var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  text-align: center;
+  opacity: 0.7;
+}
 
 @media (max-width: 768px) {
   .sidebar {
     padding: var(--space-3);
   }
+
   .sidebarHeader {
     margin-bottom: var(--space-4);
   }

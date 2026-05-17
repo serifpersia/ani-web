@@ -11,6 +11,7 @@ import SyncProviderSelector from '../components/settings/SyncProviderSelector'
 import { FaCog, FaCloud, FaDatabase, FaList } from 'react-icons/fa'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import ToggleSwitch from '../components/common/ToggleSwitch'
+import packageJson from '../../../package.json'
 
 type SettingsTab = 'general' | 'sync' | 'watchlist' | 'database'
 
@@ -25,6 +26,14 @@ const Settings: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { lowEndMode, setLowEndMode } = useLowEndMode()
+  const [telemetryEnabled, setTelemetryEnabled] = useState(
+    localStorage.getItem('telemetry_enabled') !== 'false'
+  )
+
+  const toggleTelemetry = (enabled: boolean) => {
+    setTelemetryEnabled(enabled)
+    localStorage.setItem('telemetry_enabled', String(enabled))
+  }
 
   React.useEffect(() => {
     document.title = 'Settings - ani-web'
@@ -131,6 +140,64 @@ const Settings: React.FC = () => {
                     id="low-end-mode"
                   />
                 </div>
+              </div>
+
+              <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Telemetry Tracking</h4>
+                    <p
+                      style={{
+                        margin: '0.25rem 0 0',
+                        fontSize: '0.85rem',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      Share anonymous installation data to help track active users. Collected: UUID,
+                      App Version, First Seen/Last Seen timestamps, and User Agent string. No other
+                      personal information or usage habits are collected.
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    isChecked={telemetryEnabled}
+                    onChange={(e) => toggleTelemetry(e.target.checked)}
+                    id="telemetry-enabled"
+                  />
+                </div>
+                {telemetryEnabled && (
+                  <div
+                    style={{
+                      marginTop: '0.75rem',
+                      fontSize: '0.8rem',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    <p style={{ margin: '0 0 0.5rem 0', fontWeight: 'bold' }}>
+                      Data currently being shared:
+                    </p>
+                    <div
+                      style={{
+                        background: '#1a1a1a',
+                        padding: '0.5rem',
+                        borderRadius: '4px',
+                        wordBreak: 'break-all',
+                        fontFamily: 'monospace',
+                      }}
+                    >
+                      <p style={{ margin: '0' }}>
+                        <strong>ID:</strong> {localStorage.getItem('installation_id')}
+                      </p>
+                      <p style={{ margin: '0' }}>
+                        <strong>Version:</strong> {packageJson.version}
+                      </p>
+                      <p style={{ margin: '0' }}>
+                        <strong>Browser:</strong> {navigator.userAgent.substring(0, 60)}...
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

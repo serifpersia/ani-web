@@ -4,6 +4,7 @@ import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
 import Footer from './components/layout/Footer'
 import ScrollToTopButton from './components/common/ScrollToTopButton'
+import { useTelemetry } from './hooks/useTelemetry'
 
 const Home = lazy(() => import('./pages/Home'))
 const Watchlist = lazy(() => import('./pages/Watchlist'))
@@ -26,6 +27,7 @@ const PlayerRedirect = () => {
 
 function App() {
   const { isOpen, setIsOpen } = useSidebar()
+  useTelemetry()
 
   useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {

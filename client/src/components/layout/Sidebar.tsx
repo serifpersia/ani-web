@@ -4,6 +4,7 @@ import { useSidebar } from '../../hooks/useSidebar'
 import styles from './Sidebar.module.css'
 import { FaHome, FaSearch, FaClock, FaFileImport, FaCog, FaChartPie } from 'react-icons/fa'
 import Logo from '../common/Logo'
+import packageJson from '../../../package.json'
 
 const Sidebar: React.FC = () => {
   const { isOpen, setIsOpen } = useSidebar()
@@ -51,6 +52,7 @@ const Sidebar: React.FC = () => {
             <FaCog /> Settings
           </Link>
         </nav>
+        <div className={styles.versionInfo}>v{packageJson.version}</div>
       </aside>
       {isOpen && (
         <div
