@@ -10,6 +10,14 @@ export const useTelemetry = () => {
     const isTelemetryEnabled = localStorage.getItem('telemetry_enabled') !== 'false'
     if (!isTelemetryEnabled) return
 
+    const lastPing = localStorage.getItem('last_telemetry_ping')
+    const now = Date.now()
+    const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000
+
+    if (lastPing && now - parseInt(lastPing) < TWENTY_FOUR_HOURS) {
+      return
+    }
+
     let installationId = localStorage.getItem('installation_id')
     if (!installationId) {
       installationId = uuidv4()
@@ -30,6 +38,7 @@ export const useTelemetry = () => {
             userAgent: navigator.userAgent,
           }),
         })
+        localStorage.setItem('last_telemetry_ping', now.toString())
       } catch (err) {
         console.error('Telemetry ping failed:', err)
       }
