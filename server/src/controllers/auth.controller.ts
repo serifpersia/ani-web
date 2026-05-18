@@ -178,10 +178,16 @@ export class AuthController {
   loginGoogle = async (req: Request, res: Response) => {
     try {
       if (googleDriveService.isAuthenticated()) {
-        const { updateEnvFile } = await import('../utils/env.utils')
-        await updateEnvFile({ SYNC_PROVIDER: 'google' })
-        await this.runSyncSequence(req.db, 'google')
-        return res.json({ url: null, authenticated: true })
+        const user = await googleDriveService.getUserProfile()
+        if (user) {
+          const { updateEnvFile } = await import('../utils/env.utils')
+          await updateEnvFile({ SYNC_PROVIDER: 'google' })
+          await this.runSyncSequence(req.db, 'google')
+          return res.json({ url: null, authenticated: true })
+        } else {
+          logger.warn('Google tokens found but invalid. Clearing and requesting new auth.')
+          await googleDriveService.logout()
+        }
       }
       const url = googleDriveService.getAuthUrl()
       res.json({ url, authenticated: false })

@@ -90,15 +90,26 @@ export class GoogleDriveService {
       grant_type: 'refresh_token',
     })
 
-    const { data } = await googleAxios.post<GoogleTokenSet>(
-      'https://oauth2.googleapis.com/token',
-      params.toString(),
-      {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      }
-    )
+    try {
+      const { data } = await googleAxios.post<GoogleTokenSet>(
+        'https://oauth2.googleapis.com/token',
+        params.toString(),
+        {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        }
+      )
 
-    this.saveTokens(data)
+      this.saveTokens(data)
+    } catch (error) {
+      if (
+        axios.isAxiosError(error) &&
+        (error.response?.status === 400 || error.response?.status === 401)
+      ) {
+        logger.warn('Failed to refresh Google access token. Token may be revoked. Logging out.')
+        await this.logout()
+      }
+      throw error
+    }
   }
 
   private async ensureAccessToken() {
@@ -111,13 +122,24 @@ export class GoogleDriveService {
   private async googleRequest<T>(config: AxiosRequestConfig): Promise<AxiosResponse<T>> {
     await this.ensureAccessToken()
 
-    return googleAxios.request<T>({
-      ...config,
-      headers: {
-        Authorization: `Bearer ${this.tokens.access_token}`,
-        ...(config.headers ?? {}),
-      },
-    })
+    try {
+      return await googleAxios.request<T>({
+        ...config,
+        headers: {
+          Authorization: `Bearer ${this.tokens.access_token}`,
+          ...(config.headers ?? {}),
+        },
+      })
+    } catch (error) {
+      if (
+        axios.isAxiosError(error) &&
+        (error.response?.status === 401 || error.response?.status === 403)
+      ) {
+        logger.warn('Google API request failed with auth error. Logging out.')
+        await this.logout()
+      }
+      throw error
+    }
   }
 
   public isAuthenticated(): boolean {
@@ -169,6 +191,13 @@ export class GoogleDriveService {
       return res.data
     } catch (error) {
       logger.error({ err: error }, 'Failed to fetch user profile')
+      if (
+        axios.isAxiosError(error) &&
+        (error.response?.status === 401 || error.response?.status === 403)
+      ) {
+        logger.warn('Google authentication token is invalid or expired. Logging out.')
+        await this.logout()
+      }
       return null
     }
   }

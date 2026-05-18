@@ -200,12 +200,22 @@ class GitHubSyncService {
   async getUserProfile() {
     if (!process.env.GITHUB_TOKEN) return null
 
-    const octokit = await loadOctokit(process.env.GITHUB_TOKEN)
-    const { data } = await octokit.rest.users.getAuthenticated({ headers: GITHUB_API_HEADERS })
-    return {
-      login: data.login,
-      name: data.name,
-      avatarUrl: data.avatar_url,
+    try {
+      const octokit = await loadOctokit(process.env.GITHUB_TOKEN)
+      const { data } = await octokit.rest.users.getAuthenticated({
+        headers: GITHUB_API_HEADERS,
+      })
+      return {
+        login: data.login,
+        name: data.name,
+        avatarUrl: data.avatar_url,
+      }
+    } catch (err) {
+      if (getErrorStatus(err) === 401) {
+        log.warn('GitHub token is invalid or expired. Logging out.')
+        await this.logout()
+      }
+      return null
     }
   }
 
