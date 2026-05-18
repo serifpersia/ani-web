@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="client/public/logo.png" alt="ani-web logo" width="400"/>
+<img src="repo_logo.png" alt="ani-web logo" width="400"/>
 
 _A local-first anime media client focused on performance, privacy, and personal library tracking._
 
