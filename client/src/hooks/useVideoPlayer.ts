@@ -64,6 +64,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
   const [showSourceMenu, setShowSourceMenu] = useState(false)
   const [isBuffering, setIsBuffering] = useState(false)
   const hasEnded = useRef(false)
+  const lastReportedTime = useRef<number>(-1)
 
   const buildProgressPayload = useCallback(() => {
     const video = videoRef.current
@@ -86,12 +87,14 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
 
   const sendProgressUpdate = useCallback(
     (isFinalUpdate = false) => {
-      if (hasEnded.current) return
+      if (hasEnded.current) return false
 
       const payload = buildProgressPayload()
-      if (!payload) return
+      if (!payload) return false
 
-      const video = videoRef.current!
+      const video = videoRef.current
+      if (!video) return false
+
       const isFinished = video.currentTime >= video.duration * 0.8
       let timeToReport = video.currentTime
 
@@ -99,15 +102,24 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
         timeToReport = video.duration
       }
 
-      if (timeToReport === 0 && !isFinished) return
+      if (timeToReport === 0 && !isFinished) return false
+
+      const timeDiff = Math.abs(timeToReport - lastReportedTime.current)
+      if (!isFinalUpdate && timeToReport !== video.duration && timeDiff < 5) {
+        return false
+      }
 
       payload.currentTime = timeToReport
+      lastReportedTime.current = timeToReport
 
       fetch('/api/update-progress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        keepalive: true,
       }).catch((err) => console.error('Failed to update progress:', err))
+
+      return true
     },
     [buildProgressPayload]
   )
@@ -288,9 +300,10 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
     if (!video) return
     const time = video.currentTime || 0
     const now = Date.now()
-    if (now - lastThrottledUpdateTime.current > 30000) {
-      lastThrottledUpdateTime.current = now
-      sendProgressUpdate()
+    if (now - lastThrottledUpdateTime.current > 60000) {
+      if (sendProgressUpdate()) {
+        lastThrottledUpdateTime.current = now
+      }
     }
 
     const activeSkip =
@@ -317,6 +330,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      keepalive: true,
     }).catch((err) => console.error('Failed to send final progress:', err))
   }, [buildProgressPayload])
 

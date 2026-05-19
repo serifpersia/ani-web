@@ -171,7 +171,7 @@ async function main() {
 
   watcher.on('change', () => {
     clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => syncUp(db, dbPath, remoteFolder), 30000)
+    debounceTimer = setTimeout(() => syncUp(db, dbPath, remoteFolder), 60000)
   })
 
   const shutdown = async (signal?: string) => {

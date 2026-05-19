@@ -383,6 +383,7 @@ export const usePlayerData = (
           status: showMeta.status,
           episodeCount: episodes.length,
         }),
+        keepalive: true,
       })
     },
     onSuccess: (data, variables) => {
