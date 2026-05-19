@@ -144,6 +144,26 @@ if (!CONFIG.IS_DEV) {
   })
 }
 
+app.use(
+  (
+    err: Error & { status?: number },
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
+    logger.error({ err, url: req.url, method: req.method }, 'Unhandled error')
+
+    if (res.headersSent) {
+      return next(err)
+    }
+
+    res.status(err.status || 500).json({
+      error: err.message || 'Internal Server Error',
+      status: err.status || 500,
+    })
+  }
+)
+
 async function main() {
   logger.info('DEBUG: main() started')
   const dbName = CONFIG.IS_DEV ? CONFIG.DB_NAME_DEV : CONFIG.DB_NAME_PROD

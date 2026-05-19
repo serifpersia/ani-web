@@ -7,6 +7,7 @@ import { initializeDatabase, syncDownOnBoot, initSyncProvider } from '../sync'
 import { CONFIG } from '../config'
 import { rcloneService } from '../rclone'
 import path from 'path'
+import { asyncHandler } from '../utils/async-handler'
 
 export class AuthController {
   private runSyncSequence: (
@@ -35,43 +36,34 @@ export class AuthController {
     })
   }
 
-  updateGoogleAuthSettings = async (req: Request, res: Response) => {
+  updateGoogleAuthSettings = asyncHandler(async (req: Request, res: Response) => {
     const { clientId, clientSecret } = req.body
     const { updateEnvFile } = await import('../utils/env.utils')
 
-    try {
-      const updates: Record<string, string> = {}
+    const updates: Record<string, string> = {}
 
-      if (typeof clientId === 'string') {
-        updates.GOOGLE_CLIENT_ID = clientId
-      }
-
-      if (typeof clientSecret === 'string') {
-        updates.GOOGLE_CLIENT_SECRET = clientSecret
-      }
-
-      await updateEnvFile(updates)
-      res.json({ success: true })
-    } catch (error) {
-      logger.error({ err: error }, 'Failed to update .env file')
-      res.status(500).json({ error: 'Failed to save configuration' })
+    if (typeof clientId === 'string') {
+      updates.GOOGLE_CLIENT_ID = clientId
     }
-  }
 
-  getRcloneSettings = async (_req: Request, res: Response) => {
-    try {
-      const remotes = await rcloneService.listRemotes()
-      res.json({
-        remote: CONFIG.RCLONE_REMOTE || '',
-        availableRemotes: remotes,
-        activeRemote: rcloneService.isActive() ? rcloneService.getRemoteName() : null,
-      })
-    } catch {
-      res.status(500).json({ error: 'Failed to fetch Rclone settings' })
+    if (typeof clientSecret === 'string') {
+      updates.GOOGLE_CLIENT_SECRET = clientSecret
     }
-  }
 
-  getSyncSettings = async (_req: Request, res: Response) => {
+    await updateEnvFile(updates)
+    res.json({ success: true })
+  })
+
+  getRcloneSettings = asyncHandler(async (_req: Request, res: Response) => {
+    const remotes = await rcloneService.listRemotes()
+    res.json({
+      remote: CONFIG.RCLONE_REMOTE || '',
+      availableRemotes: remotes,
+      activeRemote: rcloneService.isActive() ? rcloneService.getRemoteName() : null,
+    })
+  })
+
+  getSyncSettings = asyncHandler(async (_req: Request, res: Response) => {
     const { getActiveProvider } = await import('../sync')
     res.json({
       activeProvider: process.env.SYNC_PROVIDER || 'default',
@@ -82,24 +74,19 @@ export class AuthController {
         rclone: rcloneService.isActive(),
       },
     })
-  }
+  })
 
-  updateSyncProvider = async (req: Request, res: Response) => {
+  updateSyncProvider = asyncHandler(async (req: Request, res: Response) => {
     const { provider } = req.body
     const { updateEnvFile } = await import('../utils/env.utils')
 
-    try {
-      const value = provider === 'default' ? '' : provider
-      await updateEnvFile({ SYNC_PROVIDER: value })
-      await initSyncProvider()
-      res.json({ success: true, activeProvider: process.env.SYNC_PROVIDER || 'default' })
-    } catch (error) {
-      logger.error({ err: error }, 'Failed to update sync provider')
-      res.status(500).json({ error: 'Failed to update sync provider' })
-    }
-  }
+    const value = provider === 'default' ? '' : provider
+    await updateEnvFile({ SYNC_PROVIDER: value })
+    await initSyncProvider()
+    res.json({ success: true, activeProvider: process.env.SYNC_PROVIDER || 'default' })
+  })
 
-  getGitHubAuthStatus = async (_req: Request, res: Response) => {
+  getGitHubAuthStatus = asyncHandler(async (_req: Request, res: Response) => {
     try {
       const user = await githubSyncService.getUserProfile()
       res.json({
@@ -119,105 +106,79 @@ export class AuthController {
         usingDefaultClientId: !process.env.GITHUB_CLIENT_ID,
       })
     }
-  }
+  })
 
-  startGitHubDeviceAuth = async (req: Request, res: Response) => {
-    try {
-      const state = await githubSyncService.startDeviceAuth(req.db, this.runSyncSequence)
-      res.json(state)
-    } catch (error) {
-      logger.error({ err: error }, 'Failed to start GitHub device auth')
-      res.status(500).json({ error: 'Failed to start GitHub authentication' })
-    }
-  }
+  startGitHubDeviceAuth = asyncHandler(async (req: Request, res: Response) => {
+    const state = await githubSyncService.startDeviceAuth(req.db, this.runSyncSequence)
+    res.json(state)
+  })
 
   pollGitHubDeviceAuth = (_req: Request, res: Response) => {
     res.json(githubSyncService.getDeviceState())
   }
 
-  logoutGitHub = async (_req: Request, res: Response) => {
-    try {
-      await githubSyncService.logout()
-      const { updateEnvFile } = await import('../utils/env.utils')
-      await updateEnvFile({ SYNC_PROVIDER: '' })
-      await initSyncProvider()
-      res.json({ success: true })
-    } catch (error) {
-      logger.error({ err: error }, 'Failed to sign out of GitHub')
-      res.status(500).json({ error: 'Failed to sign out of GitHub' })
-    }
-  }
+  logoutGitHub = asyncHandler(async (_req: Request, res: Response) => {
+    await githubSyncService.logout()
+    const { updateEnvFile } = await import('../utils/env.utils')
+    await updateEnvFile({ SYNC_PROVIDER: '' })
+    await initSyncProvider()
+    res.json({ success: true })
+  })
 
-  updateRcloneSettings = async (req: Request, res: Response) => {
+  updateRcloneSettings = asyncHandler(async (req: Request, res: Response) => {
     const { remote } = req.body
     const { updateEnvFile } = await import('../utils/env.utils')
 
-    try {
-      await updateEnvFile({
-        RCLONE_REMOTE: remote,
-        SYNC_PROVIDER: 'rclone',
-      })
-      await this.runSyncSequence(req.db, 'rclone')
-      res.json({ success: true })
-    } catch (error) {
-      logger.error({ err: error }, 'Failed to update .env for Rclone')
-      res.status(500).json({ error: 'Failed to save Rclone configuration' })
-    }
-  }
+    await updateEnvFile({
+      RCLONE_REMOTE: remote,
+      SYNC_PROVIDER: 'rclone',
+    })
+    await this.runSyncSequence(req.db, 'rclone')
+    res.json({ success: true })
+  })
 
-  getAuthUrl = (_req: Request, res: Response) => {
-    try {
-      const url = googleDriveService.getAuthUrl()
-      res.json({ url })
-    } catch (error) {
-      logger.error({ err: error }, 'Failed to generate auth URL')
-      res.status(500).json({ error: 'Auth configuration error' })
-    }
-  }
+  getAuthUrl = asyncHandler(async (_req: Request, res: Response) => {
+    const url = googleDriveService.getAuthUrl()
+    res.json({ url })
+  })
 
-  loginGoogle = async (req: Request, res: Response) => {
-    try {
-      if (googleDriveService.isAuthenticated()) {
-        const user = await googleDriveService.getUserProfile()
-        if (user) {
-          const { updateEnvFile } = await import('../utils/env.utils')
-          await updateEnvFile({ SYNC_PROVIDER: 'google' })
-          await this.runSyncSequence(req.db, 'google')
-          return res.json({ url: null, authenticated: true })
-        } else {
-          logger.warn('Google tokens found but invalid. Clearing and requesting new auth.')
-          await googleDriveService.logout()
-        }
+  loginGoogle = asyncHandler(async (req: Request, res: Response) => {
+    if (googleDriveService.isAuthenticated()) {
+      const user = await googleDriveService.getUserProfile()
+      if (user) {
+        const { updateEnvFile } = await import('../utils/env.utils')
+        await updateEnvFile({ SYNC_PROVIDER: 'google' })
+        await this.runSyncSequence(req.db, 'google')
+        return res.json({ url: null, authenticated: true })
+      } else {
+        logger.warn('Google tokens found but invalid. Clearing and requesting new auth.')
+        await googleDriveService.logout()
       }
-      const url = googleDriveService.getAuthUrl()
-      res.json({ url, authenticated: false })
-    } catch (error) {
-      logger.error({ err: error }, 'Failed to handle Google login')
-      res.status(500).json({ error: 'Auth configuration error' })
     }
-  }
+    const url = googleDriveService.getAuthUrl()
+    res.json({ url, authenticated: false })
+  })
 
-  handleCallback = async (req: Request, res: Response) => {
+  handleCallback = asyncHandler(async (req: Request, res: Response) => {
     const code = req.query.code as string
     if (!code) {
       return res.status(400).send('No code provided')
     }
 
+    await googleDriveService.handleCallback(code)
+    const user = await googleDriveService.getUserProfile()
+
+    const { updateEnvFile } = await import('../utils/env.utils')
+    await updateEnvFile({ SYNC_PROVIDER: 'google' })
+
+    logger.info('User logged in. Syncing database (please wait)...')
     try {
-      await googleDriveService.handleCallback(code)
-      const user = await googleDriveService.getUserProfile()
+      await this.runSyncSequence(req.db, 'google')
+    } catch (err) {
+      logger.error({ err }, 'Post-login sync failed')
+    }
 
-      const { updateEnvFile } = await import('../utils/env.utils')
-      await updateEnvFile({ SYNC_PROVIDER: 'google' })
-
-      logger.info('User logged in. Syncing database (please wait)...')
-      try {
-        await this.runSyncSequence(req.db, 'google')
-      } catch (err) {
-        logger.error({ err }, 'Post-login sync failed')
-      }
-
-      const responseHtml = `
+    const responseHtml = `
             <html>
             <body>
             <h1>Authentication Successful</h1>
@@ -233,27 +194,19 @@ export class AuthController {
             </body>
             </html>
             `
-      res.send(responseHtml)
-    } catch (error) {
-      logger.error({ err: error }, 'Auth callback failed')
-      res.status(500).send('Authentication failed')
-    }
-  }
+    res.send(responseHtml)
+  })
 
-  getUserProfile = async (_req: Request, res: Response) => {
-    try {
-      const user = await googleDriveService.getUserProfile()
-      res.json(user)
-    } catch (error) {
-      res.json(null)
-    }
-  }
+  getUserProfile = asyncHandler(async (_req: Request, res: Response) => {
+    const user = await googleDriveService.getUserProfile()
+    res.json(user)
+  })
 
-  logout = async (_req: Request, res: Response) => {
+  logout = asyncHandler(async (_req: Request, res: Response) => {
     await googleDriveService.logout()
     const { updateEnvFile } = await import('../utils/env.utils')
     await updateEnvFile({ SYNC_PROVIDER: '' })
     await initSyncProvider()
     res.json({ success: true })
-  }
+  })
 }

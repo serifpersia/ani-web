@@ -12,6 +12,7 @@ import {
 import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
 import { NotificationsRepository } from '../repositories/notifications.repository'
 import { SearchOptions } from '../providers/provider.interface'
+import { asyncHandler } from '../utils/async-handler'
 
 interface CombinedContinueWatchingShow {
   _id: string
@@ -333,55 +334,39 @@ export class WatchlistController {
     return upNextShows
   }
 
-  getContinueWatchingFast = async (req: Request, res: Response) => {
-    try {
-      const limit = parseInt(req.query.limit as string) || 10
-      const data = await this.getContinueWatchingData(req, limit)
-      res.json(data)
-    } catch {
-      res.status(500).json({ error: 'DB error' })
-    }
-  }
+  getContinueWatchingFast = asyncHandler(async (req: Request, res: Response) => {
+    const limit = parseInt(req.query.limit as string) || 10
+    const data = await this.getContinueWatchingData(req, limit)
+    res.json(data)
+  })
 
-  getContinueWatchingUpNext = async (req: Request, res: Response) => {
-    try {
-      const data = await this.getUpNextShowsData(req)
-      res.json(data)
-    } catch {
-      res.status(500).json({ error: 'DB error' })
-    }
-  }
+  getContinueWatchingUpNext = asyncHandler(async (req: Request, res: Response) => {
+    const data = await this.getUpNextShowsData(req)
+    res.json(data)
+  })
 
-  getContinueWatching = async (req: Request, res: Response) => {
-    try {
-      const limit = parseInt(req.query.limit as string) || 10
-      const data = await this.getContinueWatchingData(req)
-      res.json(data.slice(0, limit))
-    } catch {
-      res.status(500).json({ error: 'DB error' })
-    }
-  }
+  getContinueWatching = asyncHandler(async (req: Request, res: Response) => {
+    const limit = parseInt(req.query.limit as string) || 10
+    const data = await this.getContinueWatchingData(req)
+    res.json(data.slice(0, limit))
+  })
 
-  getAllContinueWatching = async (req: Request, res: Response) => {
-    try {
-      const page = parseInt(req.query.page as string) || 1
-      const limit = parseInt(req.query.limit as string) || 10
-      const offset = (page - 1) * limit
-      const filters = this.getWatchlistFilters(req.query)
-      const data = await this.filterWatchlistRows(await this.getContinueWatchingData(req), filters)
+  getAllContinueWatching = asyncHandler(async (req: Request, res: Response) => {
+    const page = parseInt(req.query.page as string) || 1
+    const limit = parseInt(req.query.limit as string) || 10
+    const offset = (page - 1) * limit
+    const filters = this.getWatchlistFilters(req.query)
+    const data = await this.filterWatchlistRows(await this.getContinueWatchingData(req), filters)
 
-      res.json({
-        data: data.slice(offset, offset + limit),
-        total: data.length,
-        page,
-        limit,
-      })
-    } catch {
-      res.status(500).json({ error: 'DB error' })
-    }
-  }
+    res.json({
+      data: data.slice(offset, offset + limit),
+      total: data.length,
+      page,
+      limit,
+    })
+  })
 
-  updateProgress = async (req: Request, res: Response) => {
+  updateProgress = asyncHandler(async (req: Request, res: Response) => {
     const {
       showId,
       episodeNumber,
@@ -398,169 +383,143 @@ export class WatchlistController {
       episodeCount,
     } = req.body
 
-    try {
-      const inWatchlist = await WatchlistRepository.exists(req.db, showId)
-      if (!inWatchlist) {
-        return res.json({ success: true })
-      }
+    const inWatchlist = await WatchlistRepository.exists(req.db, showId)
+    if (!inWatchlist) {
+      return res.json({ success: true })
+    }
 
-      const genresStr = Array.isArray(genres) ? JSON.stringify(genres) : genres
+    const genresStr = Array.isArray(genres) ? JSON.stringify(genres) : genres
 
-      await performWriteTransaction(req.db, (tx) => {
-        ShowsMetaRepository.upsert(tx, {
-          id: showId,
-          name: showName,
-          thumbnail: this.provider.deobfuscateUrl(showThumbnail),
-          nativeName,
-          englishName,
-          genres: genresStr,
-          popularityScore,
-          status,
-          episodeCount,
-          type,
-        })
-
-        WatchedEpisodesRepository.upsert(tx, {
-          showId,
-          episodeNumber,
-          currentTime,
-          duration,
-        })
-
-        NotificationsRepository.deleteSpecificDismissed(tx, showId, episodeNumber)
+    await performWriteTransaction(req.db, (tx) => {
+      ShowsMetaRepository.upsert(tx, {
+        id: showId,
+        name: showName,
+        thumbnail: this.provider.deobfuscateUrl(showThumbnail),
+        nativeName,
+        englishName,
+        genres: genresStr,
+        popularityScore,
+        status,
+        episodeCount,
+        type,
       })
 
-      req.db.scheduleSave()
-      res.json({ success: true })
-    } catch (error) {
-      logger.error({ err: error, showId }, 'Update progress failed')
-      res.status(500).json({ error: 'DB error' })
-    }
-  }
+      WatchedEpisodesRepository.upsert(tx, {
+        showId,
+        episodeNumber,
+        currentTime,
+        duration,
+      })
 
-  removeContinueWatching = async (req: Request, res: Response) => {
+      NotificationsRepository.deleteSpecificDismissed(tx, showId, episodeNumber)
+    })
+
+    req.db.scheduleSave()
+    res.json({ success: true })
+  })
+
+  removeContinueWatching = asyncHandler(async (req: Request, res: Response) => {
     const { showId } = req.body
-    try {
-      await performWriteTransaction(req.db, (tx) => {
-        WatchedEpisodesRepository.deleteByShow(tx, showId)
-        NotificationsRepository.deleteByShow(tx, showId)
-      })
-      res.json({ success: true })
-    } catch {
-      res.status(500).json({ error: 'DB error' })
-    }
-  }
+    await performWriteTransaction(req.db, (tx) => {
+      WatchedEpisodesRepository.deleteByShow(tx, showId)
+      NotificationsRepository.deleteByShow(tx, showId)
+    })
+    res.json({ success: true })
+  })
 
-  getWatchlist = async (req: Request, res: Response) => {
+  getWatchlist = asyncHandler(async (req: Request, res: Response) => {
     const { status, page: pageStr, limit: limitStr } = req.query
     const page = parseInt(pageStr as string) || 1
     const limit = parseInt(limitStr as string) || 10
     const offset = (page - 1) * limit
     const filters = this.getWatchlistFilters(req.query)
 
-    try {
-      const allRows = await WatchlistRepository.getAll(req.db, status as string)
-      const filteredRows = await this.filterWatchlistRows(allRows, filters)
-      const rows = filteredRows.slice(offset, offset + limit)
+    const allRows = await WatchlistRepository.getAll(req.db, status as string)
+    const filteredRows = await this.filterWatchlistRows(allRows, filters)
+    const rows = filteredRows.slice(offset, offset + limit)
 
-      res.json({
-        data: rows.map((row) => ({
-          ...row,
-          _id: row.id,
-          thumbnail: this.provider.deobfuscateUrl(row.thumbnail || ''),
-        })),
-        total: filteredRows.length,
-        page,
-        limit,
-      })
+    res.json({
+      data: rows.map((row) => ({
+        ...row,
+        _id: row.id,
+        thumbnail: this.provider.deobfuscateUrl(row.thumbnail || ''),
+      })),
+      total: filteredRows.length,
+      page,
+      limit,
+    })
 
-      setImmediate(async () => {
-        if (req.db.isClosedCheck()) return
-        const delay = () => new Promise((res) => setImmediate(res))
-        for (const row of rows) {
-          const currentThumbnail = row.thumbnail || ''
-          const fixedThumbnail = this.provider.deobfuscateUrl(currentThumbnail)
-          const needsThumbnailUpdate = fixedThumbnail !== currentThumbnail
+    setImmediate(async () => {
+      if (req.db.isClosedCheck()) return
+      const delay = () => new Promise((res) => setImmediate(res))
+      for (const row of rows) {
+        const currentThumbnail = row.thumbnail || ''
+        const fixedThumbnail = this.provider.deobfuscateUrl(currentThumbnail)
+        const needsThumbnailUpdate = fixedThumbnail !== currentThumbnail
 
-          if ((!row.type || needsThumbnailUpdate) && !this.activeTypeFetches.has(row.id)) {
-            this.activeTypeFetches.add(row.id)
-            try {
-              let didUpdate = false
-              if (needsThumbnailUpdate && !req.db.isClosedCheck()) {
-                await WatchlistRepository.updateThumbnail(req.db, row.id, fixedThumbnail)
-                await ShowsMetaRepository.updateThumbnail(req.db, row.id, fixedThumbnail)
-                didUpdate = true
-              }
+        if ((!row.type || needsThumbnailUpdate) && !this.activeTypeFetches.has(row.id)) {
+          this.activeTypeFetches.add(row.id)
+          try {
+            let didUpdate = false
+            if (needsThumbnailUpdate && !req.db.isClosedCheck()) {
+              await WatchlistRepository.updateThumbnail(req.db, row.id, fixedThumbnail)
+              await ShowsMetaRepository.updateThumbnail(req.db, row.id, fixedThumbnail)
+              didUpdate = true
+            }
 
-              if (!row.type) {
-                const meta = await this.provider.getShowMeta(row.id)
-                if (meta && !req.db.isClosedCheck()) {
-                  if (meta.type) {
-                    await WatchlistRepository.updateType(req.db, row.id, meta.type)
-                    await ShowsMetaRepository.updateType(req.db, row.id, meta.type)
+            if (!row.type) {
+              const meta = await this.provider.getShowMeta(row.id)
+              if (meta && !req.db.isClosedCheck()) {
+                if (meta.type) {
+                  await WatchlistRepository.updateType(req.db, row.id, meta.type)
+                  await ShowsMetaRepository.updateType(req.db, row.id, meta.type)
+                  didUpdate = true
+                }
+                if (meta.thumbnail) {
+                  const metaThumb = this.provider.deobfuscateUrl(meta.thumbnail)
+                  if (metaThumb !== fixedThumbnail) {
+                    await WatchlistRepository.updateThumbnail(req.db, row.id, metaThumb)
+                    await ShowsMetaRepository.updateThumbnail(req.db, row.id, metaThumb)
                     didUpdate = true
-                  }
-                  if (meta.thumbnail) {
-                    const metaThumb = this.provider.deobfuscateUrl(meta.thumbnail)
-                    if (metaThumb !== fixedThumbnail) {
-                      await WatchlistRepository.updateThumbnail(req.db, row.id, metaThumb)
-                      await ShowsMetaRepository.updateThumbnail(req.db, row.id, metaThumb)
-                      didUpdate = true
-                    }
                   }
                 }
               }
-              if (didUpdate) req.db.scheduleSave()
-            } catch (e) {
-              logger.error({ err: e, showId: row.id }, 'Watchlist lazy migration error')
-            } finally {
-              this.activeTypeFetches.delete(row.id)
             }
-            await delay()
+            if (didUpdate) req.db.scheduleSave()
+          } catch (e) {
+            logger.error({ err: e, showId: row.id }, 'Watchlist lazy migration error')
+          } finally {
+            this.activeTypeFetches.delete(row.id)
           }
+          await delay()
         }
-      })
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
-      res.status(500).json({ error: 'DB error', details: message })
-    }
-  }
+      }
+    })
+  })
 
-  checkWatchlist = async (req: Request, res: Response) => {
-    try {
-      const item = await WatchlistRepository.getById(req.db, req.params.showId as string)
-      res.json({ inWatchlist: !!item, status: item?.status ?? null })
-    } catch {
-      res.status(500).json({ error: 'DB error' })
-    }
-  }
+  checkWatchlist = asyncHandler(async (req: Request, res: Response) => {
+    const item = await WatchlistRepository.getById(req.db, req.params.showId as string)
+    res.json({ inWatchlist: !!item, status: item?.status ?? null })
+  })
 
-  getEpisodeProgress = async (req: Request, res: Response) => {
-    try {
-      const progress = await WatchedEpisodesRepository.getByShowAndEpisode(
-        req.db,
-        req.params.showId as string,
-        req.params.episodeNumber as string
-      )
-      res.json(progress || { currentTime: 0, duration: 0 })
-    } catch {
-      res.status(500).json({ error: 'DB error' })
-    }
-  }
+  getEpisodeProgress = asyncHandler(async (req: Request, res: Response) => {
+    const progress = await WatchedEpisodesRepository.getByShowAndEpisode(
+      req.db,
+      req.params.showId as string,
+      req.params.episodeNumber as string
+    )
+    res.json(progress || { currentTime: 0, duration: 0 })
+  })
 
-  getWatchedEpisodes = async (req: Request, res: Response) => {
-    try {
-      const episodes = await WatchedEpisodesRepository.getWatchedEpisodeNumbers(
-        req.db,
-        req.params.showId as string
-      )
-      res.json(episodes)
-    } catch {
-      res.status(500).json({ error: 'DB error' })
-    }
-  }
+  getWatchedEpisodes = asyncHandler(async (req: Request, res: Response) => {
+    const episodes = await WatchedEpisodesRepository.getWatchedEpisodeNumbers(
+      req.db,
+      req.params.showId as string
+    )
+    res.json(episodes)
+  })
 
-  addToWatchlist = async (req: Request, res: Response) => {
+  addToWatchlist = asyncHandler(async (req: Request, res: Response) => {
     const { id, status, nativeName, englishName } = req.body
     let { name, thumbnail, type } = req.body
 
@@ -577,158 +536,129 @@ export class WatchlistController {
       }
     }
 
-    try {
-      await performWriteTransaction(req.db, (tx) => {
-        WatchlistRepository.upsert(tx, {
-          id,
-          name,
-          thumbnail: this.provider.deobfuscateUrl(thumbnail),
-          status: status || 'Watching',
-          nativeName: nativeName || '',
-          englishName: englishName || '',
-          type: type || 'TV',
-        })
+    await performWriteTransaction(req.db, (tx) => {
+      WatchlistRepository.upsert(tx, {
+        id,
+        name,
+        thumbnail: this.provider.deobfuscateUrl(thumbnail),
+        status: status || 'Watching',
+        nativeName: nativeName || '',
+        englishName: englishName || '',
+        type: type || 'TV',
       })
+    })
 
-      await req.db.saveNow()
-      res.json({ success: true })
-    } catch (error) {
-      logger.error({ err: error, id, name, payload: req.body }, 'Add to watchlist failed')
-      res.status(500).json({ error: 'DB error' })
-    }
-  }
+    await req.db.saveNow()
+    res.json({ success: true })
+  })
 
-  removeFromWatchlist = async (req: Request, res: Response) => {
+  removeFromWatchlist = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.body
-    try {
-      await performWriteTransaction(req.db, (tx) => {
-        WatchlistRepository.delete(tx, id)
-        WatchedEpisodesRepository.deleteByShow(tx, id)
-        NotificationsRepository.deleteByShow(tx, id)
-      })
-      res.json({ success: true })
-    } catch {
-      res.status(500).json({ error: 'DB error' })
-    }
-  }
+    await performWriteTransaction(req.db, (tx) => {
+      WatchlistRepository.delete(tx, id)
+      WatchedEpisodesRepository.deleteByShow(tx, id)
+      NotificationsRepository.deleteByShow(tx, id)
+    })
+    res.json({ success: true })
+  })
 
-  updateWatchlistStatus = async (req: Request, res: Response) => {
+  updateWatchlistStatus = asyncHandler(async (req: Request, res: Response) => {
     const { id, status } = req.body
-    try {
-      await performWriteTransaction(req.db, (tx) => {
-        WatchlistRepository.updateStatus(tx, id, status)
-      })
-      res.json({ success: true })
-    } catch {
-      res.status(500).json({ error: 'DB error' })
-    }
-  }
+    await performWriteTransaction(req.db, (tx) => {
+      WatchlistRepository.updateStatus(tx, id, status)
+    })
+    res.json({ success: true })
+  })
 
-  getNotifications = async (req: Request, res: Response) => {
-    try {
-      const db = req.db
-      const watchingShows = await WatchlistRepository.getWatchingShows(db)
+  getNotifications = asyncHandler(async (req: Request, res: Response) => {
+    const db = req.db
+    const watchingShows = await WatchlistRepository.getWatchingShows(db)
 
-      const notifications: EpisodeNotification[] = []
-      const BATCH_SIZE = 5
+    const notifications: EpisodeNotification[] = []
+    const BATCH_SIZE = 5
 
-      for (let i = 0; i < watchingShows.length; i += BATCH_SIZE) {
-        const batch = watchingShows.slice(i, i + BATCH_SIZE)
-        await Promise.allSettled(
-          batch.map(async (show) => {
-            try {
-              const [epDetails, watchedEps, dismissedEps, showStatus, discoveredEps] =
-                await Promise.all([
-                  this.provider.getEpisodes(show.id, 'sub'),
-                  WatchedEpisodesRepository.getWatchedEpisodeNumbers(db, show.id),
-                  NotificationsRepository.getDismissedByShow(db, show.id),
-                  ShowsMetaRepository.getStatus(db, show.id),
-                  NotificationsRepository.getDiscoveredByShow(db, show.id),
-                ])
+    for (let i = 0; i < watchingShows.length; i += BATCH_SIZE) {
+      const batch = watchingShows.slice(i, i + BATCH_SIZE)
+      await Promise.allSettled(
+        batch.map(async (show) => {
+          try {
+            const [epDetails, watchedEps, dismissedEps, showStatus, discoveredEps] =
+              await Promise.all([
+                this.provider.getEpisodes(show.id, 'sub'),
+                WatchedEpisodesRepository.getWatchedEpisodeNumbers(db, show.id),
+                NotificationsRepository.getDismissedByShow(db, show.id),
+                ShowsMetaRepository.getStatus(db, show.id),
+                NotificationsRepository.getDiscoveredByShow(db, show.id),
+              ])
 
-              if (!epDetails || !epDetails.episodes || epDetails.episodes.length === 0) return
+            if (!epDetails || !epDetails.episodes || epDetails.episodes.length === 0) return
 
-              if (
-                showStatus &&
-                !['Ongoing', 'Releasing', 'Currently Airing'].includes(showStatus)
-              ) {
-                return
-              }
-
-              const watchedSet = new Set(watchedEps.map((e) => e.toString()))
-              const dismissedSet = new Set(dismissedEps.map((e) => e.episodeNumber.toString()))
-              const discoveredSet = new Set(discoveredEps.map((e) => e.episodeNumber.toString()))
-
-              const maxWatched = Math.max(0, ...Array.from(watchedSet).map((e) => parseFloat(e)))
-              const episodes = epDetails.episodes
-              const sortedEpisodes = [...episodes].sort((a, b) => parseFloat(a) - parseFloat(b))
-              const latestAvailable = sortedEpisodes[sortedEpisodes.length - 1]
-
-              if (
-                parseFloat(latestAvailable) > maxWatched &&
-                !watchedSet.has(latestAvailable.toString()) &&
-                !dismissedSet.has(latestAvailable.toString()) &&
-                !discoveredSet.has(latestAvailable.toString())
-              ) {
-                await NotificationsRepository.addDiscovered(db, show.id, latestAvailable.toString())
-                discoveredSet.add(latestAvailable.toString())
-              }
-
-              Array.from(discoveredSet).forEach((epStr: string) => {
-                const epNum = parseFloat(epStr)
-                if (epNum > maxWatched && !watchedSet.has(epStr) && !dismissedSet.has(epStr)) {
-                  notifications.push({
-                    showId: show.id,
-                    name: show.name,
-                    nativeName: show.nativeName,
-                    englishName: show.englishName,
-                    thumbnail: this.provider.deobfuscateUrl(show.thumbnail),
-                    episodeNumber: epStr,
-                    id: `${show.id}-${epStr}`,
-                  })
-                }
-              })
-            } catch (e) {
-              logger.error({ err: e, showId: show.id }, 'Failed to fetch notifications for show')
+            if (showStatus && !['Ongoing', 'Releasing', 'Currently Airing'].includes(showStatus)) {
+              return
             }
-          })
-        )
 
-        if (i + BATCH_SIZE < watchingShows.length) {
-          await new Promise((res) => setImmediate(res))
-        }
-      }
+            const watchedSet = new Set(watchedEps.map((e) => e.toString()))
+            const dismissedSet = new Set(dismissedEps.map((e) => e.episodeNumber.toString()))
+            const discoveredSet = new Set(discoveredEps.map((e) => e.episodeNumber.toString()))
 
-      res.json(
-        notifications.sort((a, b) => parseFloat(b.episodeNumber) - parseFloat(a.episodeNumber))
+            const maxWatched = Math.max(0, ...Array.from(watchedSet).map((e) => parseFloat(e)))
+            const episodes = epDetails.episodes
+            const sortedEpisodes = [...episodes].sort((a, b) => parseFloat(a) - parseFloat(b))
+            const latestAvailable = sortedEpisodes[sortedEpisodes.length - 1]
+
+            if (
+              parseFloat(latestAvailable) > maxWatched &&
+              !watchedSet.has(latestAvailable.toString()) &&
+              !dismissedSet.has(latestAvailable.toString()) &&
+              !discoveredSet.has(latestAvailable.toString())
+            ) {
+              await NotificationsRepository.addDiscovered(db, show.id, latestAvailable.toString())
+              discoveredSet.add(latestAvailable.toString())
+            }
+
+            Array.from(discoveredSet).forEach((epStr: string) => {
+              const epNum = parseFloat(epStr)
+              if (epNum > maxWatched && !watchedSet.has(epStr) && !dismissedSet.has(epStr)) {
+                notifications.push({
+                  showId: show.id,
+                  name: show.name,
+                  nativeName: show.nativeName,
+                  englishName: show.englishName,
+                  thumbnail: this.provider.deobfuscateUrl(show.thumbnail),
+                  episodeNumber: epStr,
+                  id: `${show.id}-${epStr}`,
+                })
+              }
+            })
+          } catch (e) {
+            logger.error({ err: e, showId: show.id }, 'Failed to fetch notifications for show')
+          }
+        })
       )
-    } catch (e) {
-      logger.error({ err: e }, 'Get notifications failed')
-      res.status(500).json({ error: 'Failed to fetch notifications' })
-    }
-  }
 
-  dismissNotification = async (req: Request, res: Response) => {
+      if (i + BATCH_SIZE < watchingShows.length) {
+        await new Promise((res) => setImmediate(res))
+      }
+    }
+
+    res.json(
+      notifications.sort((a, b) => parseFloat(b.episodeNumber) - parseFloat(a.episodeNumber))
+    )
+  })
+
+  dismissNotification = asyncHandler(async (req: Request, res: Response) => {
     const { showId, episodeNumber } = req.body
-    try {
-      await performWriteTransaction(req.db, (tx) => {
-        NotificationsRepository.addDismissed(tx, showId, episodeNumber)
-      })
-      res.json({ success: true })
-    } catch {
-      res.status(500).json({ error: 'DB error' })
-    }
-  }
+    await performWriteTransaction(req.db, (tx) => {
+      NotificationsRepository.addDismissed(tx, showId, episodeNumber)
+    })
+    res.json({ success: true })
+  })
 
-  clearAllNotifications = async (req: Request, res: Response) => {
+  clearAllNotifications = asyncHandler(async (req: Request, res: Response) => {
     const { showId } = req.body
-    try {
-      await performWriteTransaction(req.db, (tx) => {
-        NotificationsRepository.dismissFromDiscovered(tx, showId)
-      })
-      res.json({ success: true })
-    } catch {
-      res.status(500).json({ error: 'DB error' })
-    }
-  }
+    await performWriteTransaction(req.db, (tx) => {
+      NotificationsRepository.dismissFromDiscovered(tx, showId)
+    })
+    res.json({ success: true })
+  })
 }

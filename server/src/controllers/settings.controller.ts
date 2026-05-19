@@ -8,6 +8,7 @@ import fs from 'fs'
 import { CONFIG } from '../config'
 import { DatabaseWrapper } from '../db'
 import { SettingsRepository } from '../repositories/settings.repository'
+import { asyncHandler } from '../utils/async-handler'
 
 interface MalAnimeItem {
   series_title: string[]
@@ -111,7 +112,7 @@ export class SettingsController {
     })
   }
 
-  importMalXml = async (req: Request, res: Response) => {
+  importMalXml = asyncHandler(async (req: Request, res: Response) => {
     if (!req.file) return res.status(400).json({ error: 'No file' })
     const { erase } = req.body
 
@@ -148,15 +149,10 @@ export class SettingsController {
       })
     }
 
-    try {
-      await performWriteTransaction(req.db, (tx) => {
-        if (erase) SettingsRepository.clearWatchlist(tx)
-        SettingsRepository.upsertWatchlistBatch(tx, showsToInsert)
-      })
-      res.json({ imported: showsToInsert.length, skipped: skippedCount })
-    } catch (dbError) {
-      logger.error({ err: dbError }, 'Import DB error')
-      res.status(500).json({ error: 'DB error' })
-    }
-  }
+    await performWriteTransaction(req.db, (tx) => {
+      if (erase) SettingsRepository.clearWatchlist(tx)
+      SettingsRepository.upsertWatchlistBatch(tx, showsToInsert)
+    })
+    res.json({ imported: showsToInsert.length, skipped: skippedCount })
+  })
 }

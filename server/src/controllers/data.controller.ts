@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { Provider } from '../providers/provider.interface'
 import { genres, tags, studios } from '../constants.json'
 import logger from '../logger'
+import { asyncHandler } from '../utils/async-handler'
 
 export class DataController {
   constructor(private providers: { [key: string]: Provider }) {}
@@ -11,32 +12,24 @@ export class DataController {
     return this.providers[providerName.toLowerCase()] || this.providers['allanime']
   }
 
-  getPopular = async (req: Request, res: Response) => {
+  getPopular = asyncHandler(async (req: Request, res: Response) => {
     const timeframe = (req.params.timeframe as string).toLowerCase() as
       | 'daily'
       | 'weekly'
       | 'monthly'
       | 'all'
-    try {
-      const data = await this.getProvider(req).getPopular(timeframe)
-      res.set('Cache-Control', 'public, max-age=300').json(data)
-    } catch {
-      res.status(500).send('Error')
-    }
-  }
+    const data = await this.getProvider(req).getPopular(timeframe)
+    res.set('Cache-Control', 'public, max-age=300').json(data)
+  })
 
-  getSchedule = async (req: Request, res: Response) => {
-    try {
-      const data = await this.getProvider(req).getSchedule(
-        new Date(req.params.date + 'T00:00:00.000Z')
-      )
-      res.set('Cache-Control', 'public, max-age=300').json(data)
-    } catch {
-      res.status(500).send('Error')
-    }
-  }
+  getSchedule = asyncHandler(async (req: Request, res: Response) => {
+    const data = await this.getProvider(req).getSchedule(
+      new Date(req.params.date + 'T00:00:00.000Z')
+    )
+    res.set('Cache-Control', 'public, max-age=300').json(data)
+  })
 
-  getSkipTimes = async (req: Request, res: Response) => {
+  getSkipTimes = asyncHandler(async (req: Request, res: Response) => {
     try {
       const data = await this.getProvider(req).getSkipTimes(
         req.params.showId as string,
@@ -46,9 +39,9 @@ export class DataController {
     } catch {
       res.json({ found: false, results: [] })
     }
-  }
+  })
 
-  getVideo = async (req: Request, res: Response) => {
+  getVideo = asyncHandler(async (req: Request, res: Response) => {
     try {
       const urls = await this.getProvider(req).getStreamUrls(
         req.query.showId as string,
@@ -62,76 +55,53 @@ export class DataController {
       logger.error({ err: e, provider: req.query.provider }, 'Provider video fetch failed')
       res.json([])
     }
-  }
+  })
 
-  getEpisodes = async (req: Request, res: Response) => {
-    try {
-      res.json(
-        await this.getProvider(req).getEpisodes(
-          req.query.showId as string,
-          req.query.mode as 'sub' | 'dub'
-        )
+  getEpisodes = asyncHandler(async (req: Request, res: Response) => {
+    res.json(
+      await this.getProvider(req).getEpisodes(
+        req.query.showId as string,
+        req.query.mode as 'sub' | 'dub'
       )
-    } catch {
-      res.status(500).send('Error')
-    }
-  }
+    )
+  })
 
-  search = async (req: Request, res: Response) => {
-    try {
-      res.json(await this.getProvider(req).search(req.query))
-    } catch {
-      res.status(500).send('Error')
-    }
-  }
+  search = asyncHandler(async (req: Request, res: Response) => {
+    res.json(await this.getProvider(req).search(req.query))
+  })
 
-  getSeasonal = async (req: Request, res: Response) => {
-    try {
-      const page = parseInt(req.query.page as string) || 1
-      res.json(await this.getProvider(req).getSeasonal(page))
-    } catch {
-      res.status(500).send('Error')
-    }
-  }
+  getSeasonal = asyncHandler(async (req: Request, res: Response) => {
+    const page = parseInt(req.query.page as string) || 1
+    res.json(await this.getProvider(req).getSeasonal(page))
+  })
 
-  getLatestReleases = async (req: Request, res: Response) => {
-    try {
-      res.json(await this.getProvider(req).getLatestReleases())
-    } catch {
-      res.status(500).send('Error')
-    }
-  }
+  getLatestReleases = asyncHandler(async (req: Request, res: Response) => {
+    res.json(await this.getProvider(req).getLatestReleases())
+  })
 
-  getShowMeta = async (req: Request, res: Response) => {
-    try {
-      const [meta, details] = await Promise.all([
-        this.getProvider(req).getShowMeta(req.params.id as string),
-        this.getProvider(req)
-          .getShowDetails(req.params.id as string)
-          .catch(() => ({})),
-      ])
-      const merged = { ...meta, ...details }
-      res.json(merged)
-    } catch {
-      res.status(500).send('Error')
-    }
-  }
+  getShowMeta = asyncHandler(async (req: Request, res: Response) => {
+    const [meta, details] = await Promise.all([
+      this.getProvider(req).getShowMeta(req.params.id as string),
+      this.getProvider(req)
+        .getShowDetails(req.params.id as string)
+        .catch(() => ({})),
+    ])
+    const merged = { ...meta, ...details }
+    res.json(merged)
+  })
 
-  getShowDetails = async (req: Request, res: Response) => {
-    try {
-      res.json(await this.getProvider(req).getShowDetails(req.params.id as string))
-    } catch {
+  getShowDetails = asyncHandler(async (req: Request, res: Response) => {
+    const details = await this.getProvider(req).getShowDetails(req.params.id as string)
+    if (!details) {
       res.status(404).send('Not found')
+      return
     }
-  }
+    res.json(details)
+  })
 
-  getAllmangaDetails = async (req: Request, res: Response) => {
-    try {
-      res.json(await this.getProvider(req).getAllmangaDetails(req.params.id as string))
-    } catch {
-      res.status(500).send('Error')
-    }
-  }
+  getAllmangaDetails = asyncHandler(async (req: Request, res: Response) => {
+    res.json(await this.getProvider(req).getAllmangaDetails(req.params.id as string))
+  })
 
   getGenresAndTags = (_req: Request, res: Response) => {
     res.json({ genres, tags, studios })
