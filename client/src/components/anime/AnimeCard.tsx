@@ -20,6 +20,7 @@ interface Anime {
   episodeNumber?: number
   currentTime?: number
   duration?: number
+  showId?: string
   nextEpisodeToWatch?: string
   newEpisodesCount?: number
   watchedCount?: number
@@ -165,12 +166,19 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
       return epCount || undefined
     })()
 
-    const progressString =
-      anime.watchedCount !== undefined && (displayEpisodeCount || anime.watchedCount)
-        ? `EP ${anime.watchedCount} / ${displayEpisodeCount ?? anime.watchedCount}`
-        : continueWatching && episodeToPlay
-          ? `EP ${episodeToPlay}`
-          : null
+    const progressString = (() => {
+      if (continueWatching && episodeToPlay) {
+        return displayEpisodeCount
+          ? `EP ${episodeToPlay} / ${displayEpisodeCount}`
+          : `EP ${episodeToPlay}`
+      }
+
+      if (anime.watchedCount !== undefined && (displayEpisodeCount || anime.watchedCount)) {
+        return `EP ${anime.watchedCount} / ${displayEpisodeCount ?? anime.watchedCount}`
+      }
+
+      return null
+    })()
 
     const posterEls = mergedConfig.elements?.poster
     const infoEls = mergedConfig.elements?.info
