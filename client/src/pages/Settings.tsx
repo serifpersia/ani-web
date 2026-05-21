@@ -12,6 +12,7 @@ import { FaCog, FaCloud, FaDatabase, FaList } from 'react-icons/fa'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import ToggleSwitch from '../components/common/ToggleSwitch'
 import packageJson from '../../../package.json'
+import { deleteTelemetryData } from '../hooks/useTelemetry'
 
 type SettingsTab = 'general' | 'sync' | 'watchlist' | 'database'
 
@@ -33,6 +34,9 @@ const Settings: React.FC = () => {
   const toggleTelemetry = (enabled: boolean) => {
     setTelemetryEnabled(enabled)
     localStorage.setItem('telemetry_enabled', String(enabled))
+    if (!enabled) {
+      deleteTelemetryData()
+    }
   }
 
   React.useEffect(() => {

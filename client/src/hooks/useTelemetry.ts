@@ -5,6 +5,32 @@ import packageJson from '../../package.json'
 const TELEMETRY_URL =
   'https://script.google.com/macros/s/AKfycby22WnleAQdi4NP-s_PMrKCVoQdCEgydOqITiNhlCIpVG1zSoBo9dlh2iXpMcfpyf-7/exec'
 
+const getPrivacyFriendlyUserAgent = () => {
+  const ua = navigator.userAgent
+  let browser = 'Unknown Browser'
+  let os = 'Unknown OS'
+
+  if (ua.includes('Firefox')) browser = 'Firefox'
+  else if (ua.includes('SamsungBrowser')) browser = 'Samsung Browser'
+  else if (ua.includes('Opera') || ua.includes('OPR')) browser = 'Opera'
+  else if (ua.includes('Trident')) browser = 'Internet Explorer'
+  else if (ua.includes('Edge')) browser = 'Edge'
+  else if (ua.includes('Chrome')) browser = 'Chrome'
+  else if (ua.includes('Safari')) browser = 'Safari'
+
+  if (ua.includes('Windows')) os = 'Windows'
+  else if (ua.includes('Mac')) os = 'MacOS'
+  else if (ua.includes('Linux')) os = 'Linux'
+  else if (ua.includes('Android')) os = 'Android'
+  else if (ua.includes('iPhone') || ua.includes('iPad') || ua.includes('iPod')) os = 'iOS'
+
+  return `${browser} on ${os}`
+}
+
+export const deleteTelemetryData = async () => {
+  localStorage.removeItem('last_telemetry_ping')
+}
+
 export const useTelemetry = () => {
   useEffect(() => {
     const isTelemetryEnabled = localStorage.getItem('telemetry_enabled') !== 'false'
@@ -35,7 +61,7 @@ export const useTelemetry = () => {
           body: JSON.stringify({
             id: installationId,
             version: packageJson.version,
-            userAgent: navigator.userAgent,
+            userAgent: getPrivacyFriendlyUserAgent(),
           }),
         })
         localStorage.setItem('last_telemetry_ping', now.toString())
