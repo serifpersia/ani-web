@@ -52,6 +52,8 @@ jobs:
 
       - name: Build Application
         run: npm run build
+        env:
+          VITE_TELEMETRY_URL: ${{ secrets.TELEMETRY_URL }}
 
       - name: Create Release Archive
         run: |
@@ -100,3 +102,4 @@ jobs:
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          VITE_TELEMETRY_URL: ${{ secrets.TELEMETRY_URL }}

@@ -6,9 +6,9 @@ _A local-first anime media client focused on performance, privacy, and personal 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-8b5cf6?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![GitHub stars](https://img.shields.io/github/stars/serifpersia/ani-web.svg?style=for-the-badge&color=8b5cf6)](https://github.com/serifpersia/ani-web/stargazers)
-[![App version](https://img.shields.io/badge/ani--web-1.6.8-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/ani-web)
+[![App version](https://img.shields.io/badge/ani--web-1.7.0-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/ani-web)
 
-![Users](https://ani-web-users-badge-v2.ramiserifpersia.workers.dev)
+![Users](https://ani-web-users-badge-v3.ramiserifpersia.workers.dev)
 
 </div>
 

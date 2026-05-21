@@ -2,8 +2,7 @@ import { useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import packageJson from '../../package.json'
 
-const TELEMETRY_URL =
-  'https://script.google.com/macros/s/AKfycby22WnleAQdi4NP-s_PMrKCVoQdCEgydOqITiNhlCIpVG1zSoBo9dlh2iXpMcfpyf-7/exec'
+const TELEMETRY_URL = import.meta.env.VITE_TELEMETRY_URL
 
 const getPrivacyFriendlyUserAgent = () => {
   const ua = navigator.userAgent
@@ -34,7 +33,7 @@ export const deleteTelemetryData = async () => {
 export const useTelemetry = () => {
   useEffect(() => {
     const isTelemetryEnabled = localStorage.getItem('telemetry_enabled') !== 'false'
-    if (!isTelemetryEnabled) return
+    if (!isTelemetryEnabled || !TELEMETRY_URL) return
 
     const lastPing = localStorage.getItem('last_telemetry_ping')
     const now = Date.now()
