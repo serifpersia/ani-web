@@ -102,6 +102,12 @@ main {
   z-index: 1;
 }
 
+@media (max-width: 600px) {
+  main {
+    padding: var(--space-3);
+  }
+}
+
 /* ===== SECTION ===== */
 .section-title {
   font-size: var(--font-size-lg);

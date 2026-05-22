@@ -57,6 +57,23 @@ export const usePaginatedCurrentSeason = (page: number) => {
   })
 }
 
+export const usePaginatedSearchAnime = (
+  searchQueryString: string,
+  page: number,
+  limit: number = 14
+) => {
+  return useQuery<Anime[]>({
+    queryKey: ['searchAnime', searchQueryString, page, limit],
+    queryFn: async () => {
+      const params = new URLSearchParams(searchQueryString)
+      params.set('page', page.toString())
+      params.set('limit', limit.toString())
+      return fetchApi(`/api/search?${params.toString()}`)
+    },
+    enabled: searchQueryString != null,
+  })
+}
+
 export const useContinueWatchingFast = (limit?: number) => {
   const url = limit ? `/api/continue-watching/fast?limit=${limit}` : '/api/continue-watching/fast'
   return useQuery<Anime[]>({
@@ -78,33 +95,6 @@ export const useContinueWatching = (limit?: number) => {
   return useQuery<Anime[]>({
     queryKey: ['continueWatching', { limit }],
     queryFn: () => fetchApi(url),
-  })
-}
-
-interface SearchResult {
-  results: Anime[]
-  totalPages: number
-  currentPage: number
-}
-
-export const useSearchAnime = (searchQueryString: string) => {
-  return useInfiniteQuery<SearchResult, Error>({
-    queryKey: ['searchAnime', searchQueryString],
-    queryFn: async ({ pageParam }: { pageParam?: unknown }) => {
-      const params = new URLSearchParams(searchQueryString)
-      params.set('page', ((pageParam as number) || 1).toString())
-      const data = await fetchApi(`/api/search?${params.toString()}`)
-      return {
-        results: data,
-        totalPages: 1,
-        currentPage: (pageParam as number) || 1,
-      }
-    },
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) => {
-      return lastPage.results.length > 0 ? lastPage.currentPage + 1 : undefined
-    },
-    enabled: searchQueryString != null,
   })
 }
 
@@ -142,6 +132,24 @@ export const useInfiniteWatchlist = (status: string, filters: string = '') => {
   )
 }
 
+export const usePaginatedWatchlist = (
+  status: string,
+  filters: string = '',
+  page: number,
+  limit: number = 14
+) => {
+  return useQuery<PaginatedAnimeResponse>({
+    queryKey: ['watchlist', status, filters, page, limit],
+    queryFn: async () => {
+      const params = new URLSearchParams(filters)
+      params.set('status', status)
+      params.set('page', String(page))
+      params.set('limit', String(limit))
+      return fetchApi(`/api/watchlist?${params.toString()}`)
+    },
+  })
+}
+
 export const useAllContinueWatching = (filters: string = '') => {
   return useInfiniteQuery<PaginatedAnimeResponse, Error, { pages: Anime[]; pageParams: unknown[] }>(
     {
@@ -166,6 +174,22 @@ export const useAllContinueWatching = (filters: string = '') => {
       }),
     }
   )
+}
+
+export const usePaginatedAllContinueWatching = (
+  filters: string = '',
+  page: number,
+  limit: number = 14
+) => {
+  return useQuery<PaginatedAnimeResponse>({
+    queryKey: ['allContinueWatching', filters, page, limit],
+    queryFn: async () => {
+      const params = new URLSearchParams(filters)
+      params.set('page', String(page))
+      params.set('limit', String(limit))
+      return fetchApi(`/api/continue-watching/all?${params.toString()}`)
+    },
+  })
 }
 
 export const useRemoveFromWatchlist = () => {

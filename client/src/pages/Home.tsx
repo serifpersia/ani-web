@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useCallback, useRef } from 'react'
+import React, { useEffect, useMemo, useCallback, useRef, useState } from 'react'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
 import { FaHistory, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
+import { Button } from '../components/common/Button'
 import AnimeSection from '../components/anime/AnimeSection'
 import Top10List from '../components/anime/Top10List'
 import Schedule from '../components/anime/Schedule'
@@ -14,16 +15,18 @@ import {
   useContinueWatchingUpNext,
   useRemoveFromWatchlist,
 } from '../hooks/useAnimeData'
-
-import useIsMobile from '../hooks/useIsMobile'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
+import styles from './Home.module.css'
+
+type ActiveTab = 'latest' | 'season' | 'popular'
 
 const Home: React.FC = () => {
   const queryClient = useQueryClient()
-  const isMobile = useIsMobile()
-  const isTablet = useIsMobile(1024)
   const [page, setPage] = React.useState(1)
+  const [activeTab, setActiveTab] = useState(
+    () => (localStorage.getItem('home_activeTab') as ActiveTab) || 'latest'
+  )
   const seasonalRef = useRef<HTMLDivElement>(null)
 
   const { data: nextPageData } = usePaginatedCurrentSeason(page + 1)
@@ -36,6 +39,10 @@ const Home: React.FC = () => {
   useEffect(() => {
     document.title = 'Home - ani-web'
   }, [])
+
+  useEffect(() => {
+    localStorage.setItem('home_activeTab', activeTab)
+  }, [activeTab])
 
   const { data: latest, isLoading: loadingLatest } = useLatestReleases()
   const { data: cwFast, isLoading: loadingFast } = useContinueWatchingFast(14)
@@ -106,200 +113,167 @@ const Home: React.FC = () => {
     [itemToRemove, removeCw, removeWatchlistMutation]
   )
 
-  return (
-    <div style={{ paddingBottom: '2rem' }}>
-      <div
-        style={{
-          display: isTablet ? 'flex' : 'grid',
-          gridTemplateColumns: isTablet ? undefined : '1fr 320px',
-          flexDirection: isTablet ? 'column' : undefined,
-          gap: '2rem',
-          padding: isMobile ? '1rem' : '1.5rem',
-          alignItems: isTablet ? undefined : 'start',
-        }}
-      >
-        {isTablet && (
-          <section>
-            <Top10List title="Top 10 Popular" />
-          </section>
-        )}
+  const tabs: { key: ActiveTab; label: string }[] = [
+    { key: 'latest', label: 'Latest Releases' },
+    { key: 'season', label: 'Current Season' },
+    { key: 'popular', label: 'Top 10 Popular' },
+  ]
 
-        <div style={{ minWidth: '0' }}>
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'latest':
+        return (
           <AnimeSection
-            title="Continue Watching"
-            animeList={cwList || []}
-            continueWatching
-            onRemove={handleRemove}
-            showSeeMore={cwList !== undefined && cwList.length > 0}
-            loading={loadingFast}
-            emptyState={
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '4rem 2rem',
-                  backgroundColor: 'var(--bg-secondary)',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border-secondary)',
-                  textAlign: 'center',
-                  gap: '1rem',
-                  width: '100%',
-                  minHeight: '280px',
-                }}
-              >
-                <FaHistory
-                  size={40}
-                  style={{ color: 'var(--accent)', opacity: 0.6, marginBottom: '0.5rem' }}
-                />
-                <div>
-                  <h3
-                    style={{
-                      fontSize: '1.2rem',
-                      fontWeight: 'var(--font-weight-semibold)',
-                      marginBottom: '0.4rem',
-                      color: 'var(--text-primary)',
-                    }}
-                  >
-                    Nothing is here...
-                  </h3>
-                  <p
-                    style={{
-                      fontSize: '0.9rem',
-                      color: 'var(--text-secondary)',
-                      maxWidth: '300px',
-                    }}
-                  >
-                    You haven't watched anything yet. Start exploring and watch something first!
-                  </p>
-                </div>
-              </div>
-            }
+            title="Latest Releases"
+            animeList={latest?.slice(0, 14) || []}
+            loading={loadingLatest}
+            carousel
           />
-        </div>
-
-        {!isTablet && (
-          <aside>
-            <Top10List title="Top 10 Popular" />
-          </aside>
-        )}
-
-        <section style={{ gridColumn: isTablet ? undefined : '1 / -1' }}>
-          <div style={{ marginBottom: '2rem' }}>
-            <AnimeSection
-              title="Latest Releases"
-              animeList={latest?.slice(0, 14) || []}
-              loading={loadingLatest}
-              carousel
-            />
-          </div>
-
-          <div
-            className="section-header"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 'var(--space-6)',
-            }}
-            ref={seasonalRef}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div className="section-title" style={{ marginBottom: 0 }}>
-                Current Season
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '10px',
-                  alignItems: 'center',
-                  background: 'var(--bg-secondary)',
-                  padding: '4px 8px',
-                  borderRadius: '20px',
-                  border: '1px solid var(--border-secondary)',
-                }}
-              >
-                <button
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--text-primary)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '4px',
-                    opacity: page === 1 ? 0.3 : 1,
-                  }}
-                  onClick={() => {
-                    if (page > 1) {
-                      setPage((p) => p - 1)
+        )
+      case 'season':
+        return (
+          <section style={{ marginBottom: '2.5rem' }}>
+            <div className={styles['section-header']} ref={seasonalRef}>
+              <div className={styles['title-wrapper']}>
+                <div className="section-title" style={{ marginBottom: 0 }}>
+                  Current Season
+                </div>
+                <div className={styles['pagination-controls']}>
+                  <button
+                    className={styles['nav-button']}
+                    onClick={() => {
+                      if (page > 1) {
+                        setPage((p) => p - 1)
+                        if (seasonalRef.current) {
+                          const y =
+                            seasonalRef.current.getBoundingClientRect().top + window.scrollY - 120
+                          window.scrollTo({ top: y, behavior: 'smooth' })
+                        }
+                      }
+                    }}
+                    disabled={page === 1}
+                    style={{ opacity: page === 1 ? 0.3 : 1 }}
+                  >
+                    <FaChevronLeft size={14} />
+                  </button>
+                  <span className={styles['page-info']}>{page}</span>
+                  <button
+                    className={styles['nav-button']}
+                    onClick={() => {
+                      setPage((p) => p + 1)
                       if (seasonalRef.current) {
                         const y =
                           seasonalRef.current.getBoundingClientRect().top + window.scrollY - 120
                         window.scrollTo({ top: y, behavior: 'smooth' })
                       }
-                    }
-                  }}
-                  disabled={page === 1}
-                >
-                  <FaChevronLeft size={14} />
-                </button>
-                <span
-                  style={{
-                    fontSize: '0.85rem',
-                    fontWeight: 'var(--font-weight-bold)',
-                    minWidth: '20px',
-                    textAlign: 'center',
-                  }}
-                >
-                  {page}
-                </span>
-                <button
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--text-primary)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '4px',
-                    opacity: canGoNext ? 1 : 0.3,
-                  }}
-                  onClick={() => {
-                    setPage((p) => p + 1)
-                    if (seasonalRef.current) {
-                      const y =
-                        seasonalRef.current.getBoundingClientRect().top + window.scrollY - 120
-                      window.scrollTo({ top: y, behavior: 'smooth' })
-                    }
-                  }}
-                  disabled={!canGoNext}
-                >
-                  <FaChevronRight size={14} />
-                </button>
+                    }}
+                    disabled={!canGoNext}
+                    style={{ opacity: canGoNext ? 1 : 0.3 }}
+                  >
+                    <FaChevronRight size={14} />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
 
+            <div
+              className={`grid-container ${styles.seasonGrid}`}
+              style={{
+                minHeight: '300px',
+                alignContent: 'start',
+              }}
+            >
+              {loadingSeason ? (
+                <SkeletonGrid count={seasonLimit} />
+              ) : (
+                currentSeason
+                  ?.slice(0, seasonLimit)
+                  .map((anime) => <AnimeCard key={anime._id} anime={anime} />)
+              )}
+            </div>
+          </section>
+        )
+      case 'popular':
+        return <Top10List title="Top 10 Popular" />
+      default:
+        return null
+    }
+  }
+
+  return (
+    <div style={{ paddingBottom: '2rem' }}>
+      {/* ── Continue Watching ── */}
+      <AnimeSection
+        title="Continue Watching"
+        animeList={cwList || []}
+        continueWatching
+        carousel
+        onRemove={handleRemove}
+        showSeeMore={cwList !== undefined && cwList.length > 0}
+        loading={loadingFast}
+        emptyState={
           <div
-            className="grid-container"
             style={{
-              minHeight: '300px',
-              alignContent: 'start',
-              gridTemplateColumns: isTablet ? undefined : 'repeat(7, 1fr)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '4rem 2rem',
+              backgroundColor: 'var(--bg-secondary)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-secondary)',
+              textAlign: 'center',
+              gap: '1rem',
+              width: '100%',
+              minHeight: '280px',
             }}
           >
-            {loadingSeason ? (
-              <SkeletonGrid count={seasonLimit} layout="horizontal" />
-            ) : (
-              currentSeason
-                ?.slice(0, seasonLimit)
-                .map((anime) => <AnimeCard key={anime._id} anime={anime} layout="horizontal" />)
-            )}
+            <FaHistory
+              size={40}
+              style={{ color: 'var(--accent)', opacity: 0.6, marginBottom: '0.5rem' }}
+            />
+            <div>
+              <h3
+                style={{
+                  fontSize: '1.2rem',
+                  fontWeight: 'var(--font-weight-semibold)',
+                  marginBottom: '0.4rem',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                Nothing is here...
+              </h3>
+              <p
+                style={{
+                  fontSize: '0.9rem',
+                  color: 'var(--text-secondary)',
+                  maxWidth: '300px',
+                }}
+              >
+                You haven't watched anything yet. Start exploring and watch something first!
+              </p>
+            </div>
           </div>
-        </section>
+        }
+      />
+
+      {/* ── Tab Selector ── */}
+      <div className={styles.tabBar}>
+        {tabs.map((tab) => (
+          <Button
+            key={tab.key}
+            variant={activeTab === tab.key ? 'primary' : 'secondary'}
+            size="sm"
+            className={`${styles.tabButton} ${activeTab === tab.key ? styles.tabActive : ''}`}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            {tab.label}
+          </Button>
+        ))}
       </div>
+
+      {/* ── Tab Content ── */}
+      <div className={styles.tabContent}>{renderTabContent()}</div>
 
       <Schedule />
 

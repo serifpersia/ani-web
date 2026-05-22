@@ -1,0 +1,117 @@
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+}
+
+.title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.pagination-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: var(--bg-secondary);
+  padding: 4px 8px;
+  borderradius: 20px;
+  border: 1px solid var(--border-secondary);
+}
+
+.nav-button {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  transition: opacity 0.2s;
+}
+
+.nav-button:disabled {
+  cursor: not-allowed;
+}
+
+.page-info {
+  font-size: 0.85rem;
+  font-weight: var(--font-weight-bold);
+  min-width: 20px;
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+
+  .title-wrapper {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* ===== CURRENT SEASON RESPONSIVE GRID ===== */
+.seasonGrid {
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--space-4);
+}
+
+@media (max-width: 1200px) {
+  .seasonGrid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .seasonGrid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .seasonGrid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-2);
+  }
+}
+
+@media (max-width: 480px) {
+  .seasonGrid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+}
+
+/* ===== TAB BAR ===== */
+.tabBar {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 600px) {
+  .tabBar {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .tabButton {
+    width: 100%;
+    justify-content: flex-start !important;
+    padding-left: var(--space-4) !important;
+  }
+}
+
+.tabButton {
+  border-radius: 20px !important;
+}
+
+.tabActive {
+  box-shadow: var(--shadow-md);
+}

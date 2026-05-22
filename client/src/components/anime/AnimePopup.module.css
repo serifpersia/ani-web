@@ -119,55 +119,79 @@
   padding: var(--space-4);
   border-top: 1px solid var(--border-secondary);
   background-color: var(--bg-tertiary);
-}
-
-.actions {
   display: flex;
+  flex-direction: column;
   gap: var(--space-2);
 }
 
+.primaryAction {
+  width: 100%;
+}
+
 .watchBtn {
-  flex: 2;
-  padding: var(--space-2);
+  width: 100%;
+  height: 48px;
   background-color: var(--accent);
   color: white;
   border: none;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   font-weight: var(--font-weight-bold);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
   text-decoration: none;
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-base);
 }
 
 .watchBtn:hover {
   background-color: var(--accent-dark);
+  transform: translateY(-1px);
 }
 
+.secondaryActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.watchlistBtn,
 .detailsBtn {
   flex: 1;
-  padding: var(--space-2);
-  background-color: var(--bg-elevated);
-  color: var(--text-primary);
-  border: 1px solid var(--border-secondary);
-  border-radius: var(--radius-full);
-  font-weight: var(--font-weight-semibold);
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: var(--space-2);
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
   cursor: pointer;
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
   transition: all 0.2s;
   text-decoration: none;
-  font-size: var(--font-size-sm);
+  white-space: nowrap;
 }
 
+.watchlistBtn:hover,
 .detailsBtn:hover {
   background-color: var(--bg-secondary);
   border-color: var(--accent);
+  color: var(--accent);
+}
+
+.watchlistBtn.active {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.watchlistBtn.active:hover {
+  background-color: var(--accent-dark);
+  border-color: var(--accent-dark);
 }
 
 .loading {

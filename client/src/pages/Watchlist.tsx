@@ -1,8 +1,16 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { FaChevronDown, FaChevronUp, FaFilter, FaSearch, FaTrash } from 'react-icons/fa'
+import {
+  FaChevronDown,
+  FaChevronUp,
+  FaFilter,
+  FaSearch,
+  FaTrash,
+  FaChevronLeft,
+  FaChevronRight,
+} from 'react-icons/fa'
 
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
@@ -12,9 +20,9 @@ import { Button } from '../components/common/Button'
 import SearchableSelect from '../components/common/SearchableSelect'
 
 import {
-  useInfiniteWatchlist,
+  usePaginatedWatchlist,
   useRemoveFromWatchlist,
-  useAllContinueWatching,
+  usePaginatedAllContinueWatching,
   useGenresAndStudios,
 } from '../hooks/useAnimeData'
 import { useSetting, useUpdateSetting } from '../hooks/useSettings'
@@ -91,6 +99,7 @@ const Watchlist: React.FC = () => {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
+  const [page, setPage] = useState(parseInt(searchParams.get('page') || '1'))
   const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'last_added')
   const [query, setQuery] = useState(searchParams.get('query') || '')
   const [type, setType] = useState(searchParams.get('type') || 'ALL')
@@ -114,12 +123,14 @@ const Watchlist: React.FC = () => {
   const availableGenres = metaData?.genres || []
   const availableStudios = metaData?.studios || []
   const availableTags = metaData?.tags || []
+  const gridRef = useRef<HTMLDivElement>(null)
 
   const [itemToRemove, setItemToRemove] = useState<{ id: string; name: string } | null>(null)
 
   const isCW = filterBy === 'Continue Watching'
   const watchlistQueryString = useMemo(() => {
     const params = new URLSearchParams(searchParams)
+    params.delete('page')
     params.set('titlePreference', titlePreference)
     return params.toString()
   }, [searchParams, titlePreference])
@@ -128,30 +139,22 @@ const Watchlist: React.FC = () => {
     data: cwData,
     isLoading: loadingCW,
     error: errorCW,
-    fetchNextPage: fetchNextCW,
-    hasNextPage: hasNextCW,
-    isFetchingNextPage: isFetchingNextCW,
-  } = useAllContinueWatching(watchlistQueryString)
+  } = usePaginatedAllContinueWatching(watchlistQueryString, page, 14)
 
   const {
     data: wlData,
     isLoading: loadingWL,
     error: errorWL,
-    fetchNextPage: fetchNextWL,
-    hasNextPage: hasNextWL,
-    isFetchingNextPage: isFetchingNextWL,
-  } = useInfiniteWatchlist(filterBy, watchlistQueryString)
+  } = usePaginatedWatchlist(filterBy, watchlistQueryString, page, 14)
 
-  const list = useMemo(() => {
-    return isCW ? cwData?.pages || [] : wlData?.pages || []
-  }, [isCW, cwData, wlData])
+  const { data: nextCwData } = usePaginatedAllContinueWatching(watchlistQueryString, page + 1, 14)
+  const { data: nextWlData } = usePaginatedWatchlist(filterBy, watchlistQueryString, page + 1, 14)
 
+  const list = useMemo(() => (isCW ? cwData?.data : wlData?.data) || [], [isCW, cwData, wlData])
+  const total = useMemo(() => (isCW ? cwData?.total : wlData?.total) || 0, [isCW, cwData, wlData])
   const isLoading = isCW ? loadingCW : loadingWL
   const error = isCW ? errorCW : errorWL
-
-  const fetchNextPage = isCW ? fetchNextCW : fetchNextWL
-  const hasNextPage = isCW ? hasNextCW : hasNextWL
-  const isFetchingNextPage = isCW ? isFetchingNextCW : isFetchingNextWL
+  const nextPageData = isCW ? nextCwData : nextWlData
 
   useEffect(() => {
     setQuery(searchParams.get('query') || '')
@@ -164,28 +167,8 @@ const Watchlist: React.FC = () => {
     setStudio(searchParams.get('studios') || 'ALL')
     setTag(searchParams.get('tags') || 'ALL')
     setGenreStates(getGenreStateFromParams(searchParams))
+    setPage(parseInt(searchParams.get('page') || '1'))
   }, [searchParams])
-
-  useEffect(() => {
-    let ticking = false
-    const handleScroll = () => {
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          if (
-            window.innerHeight + window.scrollY >= document.body.offsetHeight - 800 &&
-            hasNextPage &&
-            !isFetchingNextPage
-          ) {
-            fetchNextPage()
-          }
-          ticking = false
-        })
-        ticking = true
-      }
-    }
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -246,7 +229,7 @@ const Watchlist: React.FC = () => {
     ...availableTags.map((t) => ({ value: t, label: t })),
   ]
 
-  const applyFilters = (nextSortBy = sortBy) => {
+  const applyFilters = (nextSortBy = sortBy, newPage = 1) => {
     const params = new URLSearchParams()
     if (query.trim()) params.set('query', query.trim())
     if (nextSortBy !== 'last_added') params.set('sortBy', nextSortBy)
@@ -268,7 +251,20 @@ const Watchlist: React.FC = () => {
     if (genres.length > 0) params.set('genres', genres.join(','))
     if (excludeGenres.length > 0) params.set('excludeGenres', excludeGenres.join(','))
 
+    if (newPage > 1) params.set('page', newPage.toString())
+
     setSearchParams(params)
+    if (newPage !== page) {
+      setPage(newPage)
+    }
+  }
+
+  const handlePageChange = (newPage: number) => {
+    applyFilters(sortBy, newPage)
+    if (gridRef.current) {
+      const y = gridRef.current.getBoundingClientRect().top + window.scrollY - 100
+      window.scrollTo({ top: y, behavior: 'smooth' })
+    }
   }
 
   const resetFilters = () => {
@@ -283,6 +279,7 @@ const Watchlist: React.FC = () => {
     setTag('ALL')
     setGenreStates({})
     setSearchParams(new URLSearchParams())
+    setPage(1)
   }
 
   const toggleGenre = (genre: string) => {
@@ -329,6 +326,8 @@ const Watchlist: React.FC = () => {
     updateStatus.mutate({ id, status })
   }
 
+  const canGoNext = list.length >= 14 && nextPageData && nextPageData.data.length > 0
+
   return (
     <div className="page-container">
       <header className={styles.header}>
@@ -342,12 +341,12 @@ const Watchlist: React.FC = () => {
             <button
               key={f}
               className={`${styles.filterBtn} ${filterBy === f ? styles.active : ''}`}
-              onClick={() =>
+              onClick={() => {
                 navigate({
                   pathname: `/watchlist/${f}`,
                   search: searchParams.toString(),
                 })
-              }
+              }}
             >
               {f}
             </button>
@@ -360,7 +359,7 @@ const Watchlist: React.FC = () => {
             onChange={(e) => {
               const nextSortBy = e.currentTarget.value
               setSortBy(nextSortBy)
-              applyFilters(nextSortBy)
+              applyFilters(nextSortBy, page)
             }}
           >
             <option value="last_added">Recently Added</option>
@@ -503,55 +502,107 @@ const Watchlist: React.FC = () => {
         </div>
       </div>
 
+      <div className={styles.resultsHeader} ref={gridRef}>
+        <h3 className={styles.resultsTitle}>
+          {isCW ? 'Continue Watching' : filterBy}
+          <span className={styles.itemCount}>({total} items)</span>
+        </h3>
+
+        {total > 0 && (
+          <div className={styles.pagination}>
+            <button
+              className={styles.pageBtn}
+              onClick={() => handlePageChange(page - 1)}
+              disabled={page === 1 || isLoading}
+            >
+              <FaChevronLeft size={14} />
+            </button>
+            <span className={styles.pageInfo}>
+              Page <strong>{page}</strong>
+            </span>
+            <button
+              className={styles.pageBtn}
+              onClick={() => handlePageChange(page + 1)}
+              disabled={!canGoNext || isLoading}
+            >
+              <FaChevronRight size={14} />
+            </button>
+          </div>
+        )}
+      </div>
+
       {isLoading ? (
         <SkeletonGrid />
       ) : error ? (
         <ErrorMessage message={error.message} />
       ) : (
-        <>
-          <div className={`${styles.grid} ${lowEndMode ? styles.lowEnd : ''}`}>
-            {sortedList.map((item) => (
-              <div key={item._id} className={styles.itemWrapper}>
-                <AnimeCard
-                  anime={item}
-                  continueWatching={isCW}
-                  onRemove={() => handleRemove(item.id, item.name)}
-                  layout="horizontal"
-                />
-                {!isCW && (
-                  <div className={styles.cardActions}>
-                    <select
-                      className={styles.statusSelect}
-                      value={item.status}
-                      onChange={(e) =>
-                        updateStatus.mutate({ id: item.id, status: e.currentTarget.value })
-                      }
-                    >
-                      {STATUS_OPTIONS.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      className={styles.removeBtn}
-                      onClick={() => handleRemove(item.id, item.name)}
-                      title="Remove from Watchlist"
-                    >
-                      <FaTrash size={12} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-          {isFetchingNextPage && <SkeletonGrid count={6} />}
-        </>
+        <div className={`${styles.grid} ${lowEndMode ? styles.lowEnd : ''}`}>
+          {sortedList.map((item) => (
+            <div key={item._id} className={styles.itemWrapper}>
+              <AnimeCard
+                anime={item}
+                continueWatching={isCW}
+                onRemove={() => handleRemove(item.id, item.name)}
+                layout="vertical"
+              />
+              {!isCW && (
+                <div className={styles.cardActions}>
+                  <select
+                    className={styles.statusSelect}
+                    value={item.status}
+                    onChange={(e) =>
+                      updateStatus.mutate({ id: item.id, status: e.currentTarget.value })
+                    }
+                  >
+                    {STATUS_OPTIONS.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className={styles.removeBtn}
+                    onClick={() => handleRemove(item.id, item.name)}
+                    title="Remove from Watchlist"
+                  >
+                    <FaTrash size={12} />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       )}
 
       {!isLoading && sortedList.length === 0 && (
         <div className={styles.emptyState}>
           <p>No anime found in this list.</p>
+        </div>
+      )}
+
+      {total > 0 && (
+        <div className={styles.bottomPagination}>
+          <div className={styles.pagination}>
+            <button
+              className={styles.pageBtn}
+              onClick={() => handlePageChange(page - 1)}
+              disabled={page === 1 || isLoading}
+            >
+              <FaChevronLeft size={14} />
+              <span>Previous</span>
+            </button>
+            <span className={styles.pageInfo}>
+              Page <strong>{page}</strong>
+            </span>
+            <button
+              className={styles.pageBtn}
+              onClick={() => handlePageChange(page + 1)}
+              disabled={!canGoNext || isLoading}
+            >
+              <span>Next</span>
+              <FaChevronRight size={14} />
+            </button>
+          </div>
         </div>
       )}
 

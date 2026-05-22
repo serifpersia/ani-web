@@ -1,13 +1,15 @@
 .scheduleSection {
-  padding: var(--space-6);
+  margin-bottom: 2.5rem;
 }
 
-.daySelector {
+.sectionHeader {
   display: flex;
-  justify-content: center;
-  gap: var(--space-3);
-  margin-bottom: 2rem;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-6);
+  gap: var(--space-4);
   flex-wrap: wrap;
+  row-gap: var(--space-3);
 }
 
 .dayBtn {
@@ -60,10 +62,12 @@
   color: rgba(255, 255, 255, 0.85);
 }
 
-.carouselHeader {
+.daySelector {
   display: flex;
-  justify-content: flex-start;
-  margin-bottom: var(--space-2);
+  justify-content: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-6);
 }
 
 .navArrows {

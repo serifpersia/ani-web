@@ -1,12 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { FaSearch, FaFilter, FaChevronDown, FaChevronUp } from 'react-icons/fa'
+import {
+  FaSearch,
+  FaFilter,
+  FaChevronDown,
+  FaChevronUp,
+  FaChevronLeft,
+  FaChevronRight,
+} from 'react-icons/fa'
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
 import { Button } from '../components/common/Button'
 import ErrorMessage from '../components/common/ErrorMessage'
 import SearchableSelect from '../components/common/SearchableSelect'
-import { useSearchAnime, useGenresAndStudios } from '../hooks/useAnimeData'
+import { usePaginatedSearchAnime, useGenresAndStudios } from '../hooks/useAnimeData'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import styles from './Search.module.css'
 
@@ -40,31 +47,62 @@ const countryOptions: Option[] = [
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [query, setQuery] = useState(searchParams.get('query') || '')
+  const [page, setPage] = useState(parseInt(searchParams.get('page') || '1'))
 
-  const [type, setType] = useState('ALL')
-  const [season, setSeason] = useState('ALL')
-  const [year, setYear] = useState('ALL')
-  const [country, setCountry] = useState('ALL')
-  const [studio, setStudio] = useState('ALL')
+  const [type, setType] = useState(searchParams.get('type') || 'ALL')
+  const [season, setSeason] = useState(searchParams.get('season') || 'ALL')
+  const [year, setYear] = useState(searchParams.get('year') || 'ALL')
+  const [country, setCountry] = useState(searchParams.get('country') || 'ALL')
+  const [studio, setStudio] = useState(searchParams.get('studios') || 'ALL')
   const [showFilters, setShowFilters] = useState(false)
   const { lowEndMode } = useLowEndMode()
+  const resultsRef = useRef<HTMLDivElement>(null)
 
   const { data: metaData } = useGenresAndStudios()
   const availableGenres = metaData?.genres || []
   const availableStudios = metaData?.studios || []
 
-  const [genreStates, setGenreStates] = useState<{ [key: string]: 'include' | 'exclude' }>({})
+  const [genreStates, setGenreStates] = useState<{ [key: string]: 'include' | 'exclude' }>(() => {
+    const states: { [key: string]: 'include' | 'exclude' } = {}
+    const genres = searchParams.get('genres')?.split(',') || []
+    const exclude = searchParams.get('excludeGenres')?.split(',') || []
+    genres.forEach((g) => g && (states[g] = 'include'))
+    exclude.forEach((g) => g && (states[g] = 'exclude'))
+    return states
+  })
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, error } =
-    useSearchAnime(searchParams.toString())
-  const results = data?.pages.flatMap((p) => p.results) || []
+  // We only pass filters that are NOT 'page' to usePaginatedSearchAnime
+  const filterParams = new URLSearchParams(searchParams)
+  filterParams.delete('page')
+  const filterString = filterParams.toString()
+
+  const {
+    data: results = [],
+    isLoading,
+    isError,
+    error,
+  } = usePaginatedSearchAnime(filterString, page, 14)
+
+  const { data: nextPageData } = usePaginatedSearchAnime(filterString, page + 1, 14)
 
   useEffect(() => {
     setQuery(searchParams.get('query') || '')
+    setType(searchParams.get('type') || 'ALL')
+    setSeason(searchParams.get('season') || 'ALL')
+    setYear(searchParams.get('year') || 'ALL')
+    setCountry(searchParams.get('country') || 'ALL')
     setStudio(searchParams.get('studios') || 'ALL')
+    setPage(parseInt(searchParams.get('page') || '1'))
+
+    const states: { [key: string]: 'include' | 'exclude' } = {}
+    const genres = searchParams.get('genres')?.split(',') || []
+    const exclude = searchParams.get('excludeGenres')?.split(',') || []
+    genres.forEach((g) => g && (states[g] = 'include'))
+    exclude.forEach((g) => g && (states[g] = 'exclude'))
+    setGenreStates(states)
   }, [searchParams])
 
-  const handleSearch = () => {
+  const handleSearch = (newPage = 1) => {
     const params = new URLSearchParams()
     if (query.trim()) params.set('query', query.trim())
 
@@ -84,7 +122,20 @@ export default function Search() {
     if (genres.length > 0) params.set('genres', genres.join(','))
     if (exclude.length > 0) params.set('excludeGenres', exclude.join(','))
 
+    if (newPage > 1) params.set('page', newPage.toString())
+
     setSearchParams(params)
+    if (newPage !== page) {
+      setPage(newPage)
+    }
+  }
+
+  const handlePageChange = (newPage: number) => {
+    handleSearch(newPage)
+    if (resultsRef.current) {
+      const y = resultsRef.current.getBoundingClientRect().top + window.scrollY - 100
+      window.scrollTo({ top: y, behavior: 'smooth' })
+    }
   }
 
   const toggleGenre = (genre: string) => {
@@ -100,27 +151,6 @@ export default function Search() {
     })
   }
 
-  useEffect(() => {
-    let ticking = false
-    const onScroll = () => {
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          if (
-            window.innerHeight + window.scrollY >= document.body.offsetHeight - 500 &&
-            hasNextPage &&
-            !isFetchingNextPage
-          ) {
-            fetchNextPage()
-          }
-          ticking = false
-        })
-        ticking = true
-      }
-    }
-    window.addEventListener('scroll', onScroll)
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
-
   const currentYear = new Date().getFullYear()
   const yearOptions: Option[] = [
     { value: 'ALL', label: 'All Years' },
@@ -134,6 +164,8 @@ export default function Search() {
     { value: 'ALL', label: 'All Studios' },
     ...availableStudios.map((s) => ({ value: s, label: s })),
   ]
+
+  const canGoNext = results.length >= 14 && nextPageData && nextPageData.length > 0
 
   return (
     <div className="page-container">
@@ -157,7 +189,7 @@ export default function Search() {
             />
           </div>
           <div className={styles.searchActions}>
-            <Button onClick={handleSearch} className={styles.searchBtn}>
+            <Button onClick={() => handleSearch()} className={styles.searchBtn}>
               Search
             </Button>
             <button
@@ -259,7 +291,7 @@ export default function Search() {
             >
               Reset All
             </Button>
-            <Button onClick={handleSearch} className={styles.applyBtn}>
+            <Button onClick={() => handleSearch()} className={styles.applyBtn}>
               Apply Filters
             </Button>
           </div>
@@ -268,11 +300,40 @@ export default function Search() {
 
       {isError && <ErrorMessage message={error?.message || 'Error'} />}
 
+      <div className={styles.resultsHeader} ref={resultsRef}>
+        <h2 className={styles.resultsTitle}>
+          {query ? `Search Results for "${query}"` : 'Discover Anime'}
+        </h2>
+
+        {results.length > 0 && (
+          <div className={styles.pagination}>
+            <button
+              className={styles.pageBtn}
+              onClick={() => handlePageChange(page - 1)}
+              disabled={page === 1 || isLoading}
+            >
+              <FaChevronLeft size={14} />
+            </button>
+            <span className={styles.pageInfo}>
+              Page <strong>{page}</strong>
+            </span>
+            <button
+              className={styles.pageBtn}
+              onClick={() => handlePageChange(page + 1)}
+              disabled={!canGoNext || isLoading}
+            >
+              <FaChevronRight size={14} />
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className={`${styles.resultsGrid} ${lowEndMode ? styles.lowEnd : ''}`}>
-        {results.map((anime) => (
-          <AnimeCard key={anime._id} anime={anime} />
-        ))}
-        {(isLoading || isFetchingNextPage) && <SkeletonGrid />}
+        {isLoading ? (
+          <SkeletonGrid />
+        ) : (
+          results.map((anime) => <AnimeCard key={anime._id} anime={anime} />)
+        )}
       </div>
 
       {!isLoading && results.length === 0 && (
@@ -280,6 +341,32 @@ export default function Search() {
           <FaSearch size={48} className={styles.noResultsIcon} />
           <h3>No results found</h3>
           <p>Try adjusting your search or filters to find what you're looking for.</p>
+        </div>
+      )}
+
+      {results.length > 0 && (
+        <div className={styles.bottomPagination}>
+          <div className={styles.pagination}>
+            <button
+              className={styles.pageBtn}
+              onClick={() => handlePageChange(page - 1)}
+              disabled={page === 1 || isLoading}
+            >
+              <FaChevronLeft size={14} />
+              <span>Previous</span>
+            </button>
+            <span className={styles.pageInfo}>
+              Page <strong>{page}</strong>
+            </span>
+            <button
+              className={styles.pageBtn}
+              onClick={() => handlePageChange(page + 1)}
+              disabled={!canGoNext || isLoading}
+            >
+              <span>Next</span>
+              <FaChevronRight size={14} />
+            </button>
+          </div>
         </div>
       )}
     </div>

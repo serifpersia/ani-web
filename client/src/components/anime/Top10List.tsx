@@ -1,8 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import type { MouseEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { FaChevronLeft, FaChevronRight } from 'react-icons/fa'
+import { FaChevronLeft, FaChevronRight, FaInfo } from 'react-icons/fa'
 import { fixThumbnailUrl } from '../../lib/utils'
 import ErrorMessage from '../common/ErrorMessage'
+import AnimePopup from './AnimePopup'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 import { useLowEndMode } from '../../contexts/LowEndModeContext'
 import styles from './Top10List.module.css'
@@ -34,18 +36,42 @@ export default function Top10List({ title }: Top10ListProps) {
   const [top10List, setTop10List] = useState<AnimeItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [timeframe, setTimeframe] = useState('all')
-  const [isMobile, setIsMobile] = useState(false)
+  const [timeframe, setTimeframe] = useState(() => {
+    return localStorage.getItem('top10_timeframe') || 'all'
+  })
   const { titlePreference } = useTitlePreference()
   const { lowEndMode } = useLowEndMode()
   const carouselRef = useRef<HTMLDivElement>(null)
+  const [isPopupVisible, setIsPopupVisible] = useState(false)
+  const [hoveredShowId, setHoveredShowId] = useState('')
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleInfoMouseEnter = useCallback((e: MouseEvent, showId: string) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setAnchorRect(rect)
+    setHoveredShowId(showId)
+    setIsPopupVisible(true)
+  }, [])
+
+  const handleInfoMouseLeave = useCallback(() => {
+    timeoutRef.current = setTimeout(() => {
+      setIsPopupVisible(false)
+    }, 300)
+  }, [])
+
+  const handlePopupMouseEnter = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+  }, [])
+
+  const handlePopupMouseLeave = useCallback(() => {
+    setIsPopupVisible(false)
+  }, [])
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 1024)
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
-  }, [])
+    localStorage.setItem('top10_timeframe', timeframe)
+  }, [timeframe])
 
   useEffect(() => {
     const fetchTop10List = async () => {
@@ -62,7 +88,6 @@ export default function Top10List({ title }: Top10ListProps) {
         setLoading(false)
       }
     }
-
     fetchTop10List()
   }, [timeframe])
 
@@ -77,75 +102,38 @@ export default function Top10List({ title }: Top10ListProps) {
   }
 
   const getDisplayTitle = (item: AnimeItem) => {
-    if (titlePreference === 'name') return item.name
     if (titlePreference === 'nativeName') return item.nativeName || item.name
     if (titlePreference === 'englishName') return item.englishName || item.name
     return item.name
   }
 
-  const renderSkeletons = () => (
-    <div className={isMobile ? styles.carousel : styles.list}>
-      {Array.from({ length: 10 }).map((_, i) => (
-        <div key={i} className={styles.skeletonItem}>
-          <div className={styles.skeletonRank}></div>
-          <div className={styles.skeletonPoster}></div>
-          <div className={styles.skeletonText}></div>
-        </div>
-      ))}
-    </div>
-  )
-
-  const renderContent = () => (
-    <div className={isMobile ? styles.carousel : styles.list}>
-      {top10List.map((item, i) => (
-        <Link to={`/anime/${item._id}`} key={item._id} className={styles.item}>
-          <div className={styles.rank}>#{i + 1}</div>
-          {!lowEndMode && (
-            <img
-              src={fixThumbnailUrl(item.thumbnail, 130, 182)}
-              alt={item.name}
-              width="50"
-              height="70"
-              className={styles.poster}
-              loading="lazy"
-              decoding="async"
-              onError={(e) => {
-                const target = e.currentTarget as HTMLImageElement
-                target.src = '/placeholder.svg'
-              }}
-            />
-          )}
-          <div className={styles.info}>
-            <div className={styles.title} title={getDisplayTitle(item)}>
-              {getDisplayTitle(item)}
-            </div>
-            {!lowEndMode && (
-              <div className={styles.meta}>
-                {item.availableEpisodes.sub && <span>SUB: {item.availableEpisodes.sub}</span>}
-                {item.availableEpisodes.dub && <span> DUB: {item.availableEpisodes.dub}</span>}
-              </div>
-            )}
-          </div>
-        </Link>
-      ))}
-    </div>
-  )
-
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <h3>{title}</h3>
-        <div className={styles.headerRight}>
-          {isMobile && top10List.length > 0 && (
-            <div className={styles.navArrows}>
-              <button className={styles.navBtn} onClick={() => scroll('left')}>
-                <FaChevronLeft />
-              </button>
-              <button className={styles.navBtn} onClick={() => scroll('right')}>
-                <FaChevronRight />
-              </button>
-            </div>
-          )}
+    <section style={{ marginBottom: '2.5rem' }}>
+      {/* Header — matches AnimeSection header style */}
+      <div className={styles['section-header']}>
+        <div className={styles['title-wrapper']}>
+          <div className="section-title" style={{ marginBottom: 0 }}>
+            {title}
+          </div>
+          <div className={styles['nav-arrows']}>
+            <button
+              className={styles['nav-button']}
+              onClick={() => scroll('left')}
+              aria-label="Scroll left"
+            >
+              <FaChevronLeft />
+            </button>
+            <button
+              className={styles['nav-button']}
+              onClick={() => scroll('right')}
+              aria-label="Scroll right"
+            >
+              <FaChevronRight />
+            </button>
+          </div>
+        </div>
+
+        <div className={styles['header-actions']}>
           <select
             className={styles.timeSelect}
             value={timeframe}
@@ -160,50 +148,64 @@ export default function Top10List({ title }: Top10ListProps) {
         </div>
       </div>
 
+      {/* Carousel */}
       {loading ? (
-        renderSkeletons()
+        <div className={styles.carousel}>
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={i} className={styles.carouselItem}>
+              <div className={styles.skeletonPoster} />
+              <div className={styles.skeletonText} />
+            </div>
+          ))}
+        </div>
       ) : error ? (
         <ErrorMessage message={error} />
       ) : (
-        <>
-          {isMobile ? (
-            <div className={styles.carouselContainer}>
-              <div className={styles.carousel} ref={carouselRef}>
-                {top10List.map((item, i) => (
-                  <Link to={`/anime/${item._id}`} key={item._id} className={styles.carouselItem}>
-                    <div className={styles.carouselPoster}>
-                      {!lowEndMode ? (
-                        <img
-                          src={fixThumbnailUrl(item.thumbnail, 130, 182)}
-                          alt={item.name}
-                          width="100"
-                          height="140"
-                          loading="lazy"
-                          decoding="async"
-                          onError={(e) => {
-                            const target = e.currentTarget as HTMLImageElement
-                            target.src = '/placeholder.svg'
-                          }}
-                        />
-                      ) : (
-                        <div className={styles.placeholder}>
-                          <div className={styles.rankPlaceholder}>#{i + 1}</div>
-                        </div>
-                      )}
-                      {!lowEndMode && <div className={styles.carouselRank}>#{i + 1}</div>}
-                    </div>
-                    <div className={styles.carouselTitle} title={getDisplayTitle(item)}>
-                      {getDisplayTitle(item)}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ) : (
-            renderContent()
-          )}
-        </>
+        <div className={styles.carouselContainer}>
+          <div className={styles.carousel} ref={carouselRef}>
+            {top10List.map((item, i) => (
+              <Link to={`/anime/${item._id}`} key={item._id} className={styles.carouselItem}>
+                <div className={styles.carouselPoster}>
+                  <img
+                    src={fixThumbnailUrl(item.thumbnail, 130, 182)}
+                    alt={getDisplayTitle(item)}
+                    width="100"
+                    height="140"
+                    loading="lazy"
+                    decoding="async"
+                    onError={(e) => {
+                      const target = e.currentTarget as HTMLImageElement
+                      target.src = '/placeholder.svg'
+                    }}
+                  />
+                  <div className={styles.carouselRank}>#{i + 1}</div>
+                </div>
+                <div className={styles.carouselTitle} title={getDisplayTitle(item)}>
+                  {getDisplayTitle(item)}
+                </div>
+                <button
+                  className={styles.infoBtn}
+                  onMouseEnter={(e) => handleInfoMouseEnter(e, item._id)}
+                  onMouseLeave={handleInfoMouseLeave}
+                  onClick={(e) => e.preventDefault()}
+                  aria-label="Info"
+                >
+                  <FaInfo size={14} />
+                </button>
+              </Link>
+            ))}
+          </div>
+        </div>
       )}
-    </div>
+
+      {isPopupVisible && anchorRect && (
+        <AnimePopup
+          showId={hoveredShowId}
+          anchorRect={anchorRect}
+          onMouseEnter={handlePopupMouseEnter}
+          onMouseLeave={handlePopupMouseLeave}
+        />
+      )}
+    </section>
   )
 }

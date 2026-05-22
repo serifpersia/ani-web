@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { FaStar, FaPlay, FaCalendarAlt, FaTv } from 'react-icons/fa'
+import { FaStar, FaPlay, FaCalendarAlt, FaTv, FaPlus, FaCheck } from 'react-icons/fa'
 import { Link } from 'react-router-dom'
 import { useAnimeInfoData } from '../../hooks/useAnimeInfoData'
 import styles from './AnimePopup.module.css'
@@ -18,10 +18,11 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
   onMouseEnter,
   onMouseLeave,
 }) => {
-  const { showMeta, loadingMeta } = useAnimeInfoData(showId)
+  const { showMeta, loadingMeta, inWatchlist, toggleWatchlist } = useAnimeInfoData(showId)
 
   const position = useMemo(() => {
     const popupWidth = 320
+
     const padding = 20
     const screenWidth = window.innerWidth
 
@@ -107,11 +108,24 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
             </div>
 
             <div className={styles.footer}>
-              <div className={styles.actions}>
+              <div className={styles.primaryAction}>
                 <Link to={`/watch/${showId}`} className={styles.watchBtn}>
-                  <FaPlay size={12} />
+                  <FaPlay size={14} />
                   Watch now
                 </Link>
+              </div>
+              <div className={styles.secondaryActions}>
+                <button
+                  className={`${styles.watchlistBtn} ${inWatchlist ? styles.active : ''}`}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    toggleWatchlist()
+                  }}
+                >
+                  {inWatchlist ? <FaCheck size={12} /> : <FaPlus size={12} />}
+                  <span>{inWatchlist ? 'Remove' : 'Watchlist'}</span>
+                </button>
                 <Link to={`/anime/${showId}`} className={styles.detailsBtn}>
                   Read more
                 </Link>

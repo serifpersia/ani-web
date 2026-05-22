@@ -68,6 +68,7 @@ export interface SearchOptions {
   year?: string
   sortBy?: string
   page?: string
+  limit?: string
   type?: string
   country?: string
   translation?: string

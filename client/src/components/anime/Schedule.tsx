@@ -88,7 +88,31 @@ const Schedule: React.FC = () => {
 
   return (
     <div className={styles.scheduleSection}>
-      <h2 className="section-title">Episode Schedule</h2>
+      <div className={styles.sectionHeader}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <h2 className="section-title" style={{ marginBottom: 0 }}>
+            Episode Schedule
+          </h2>
+          {scheduleData.length > 0 && (
+            <div className={styles.navArrows}>
+              <button
+                className={styles.navButton}
+                onClick={() => scroll('left')}
+                aria-label="Scroll left"
+              >
+                <FaChevronLeft />
+              </button>
+              <button
+                className={styles.navButton}
+                onClick={() => scroll('right')}
+                aria-label="Scroll right"
+              >
+                <FaChevronRight />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
       <div className={styles.daySelector}>
         {getDayButtons().map((dayButton) => (
@@ -101,27 +125,6 @@ const Schedule: React.FC = () => {
             <span className={styles.dayDate}>{dayButton.formattedDate}</span>
           </button>
         ))}
-      </div>
-
-      <div className={styles.carouselHeader}>
-        {scheduleData.length > 0 && (
-          <div className={styles.navArrows}>
-            <button
-              className={styles.navButton}
-              onClick={() => scroll('left')}
-              aria-label="Scroll left"
-            >
-              <FaChevronLeft />
-            </button>
-            <button
-              className={styles.navButton}
-              onClick={() => scroll('right')}
-              aria-label="Scroll right"
-            >
-              <FaChevronRight />
-            </button>
-          </div>
-        )}
       </div>
 
       <div className={styles.carouselContainer}>

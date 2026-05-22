@@ -325,6 +325,7 @@ export class AllAnimeProvider implements Provider {
       year,
       sortBy,
       page,
+      limit,
       type,
       country,
       translation,
@@ -347,7 +348,7 @@ export class AllAnimeProvider implements Provider {
     if (excludeTags) searchObj.excludeTags = (excludeTags as string).split(',')
     const variables = {
       search: searchObj,
-      limit: 28,
+      limit: parseInt(limit as string) || 14,
       page: parseInt(page as string) || 1,
       translationType: translation && translation !== 'ALL' ? translation : 'sub',
       countryOrigin: country && country !== 'ALL' ? country : 'ALL',

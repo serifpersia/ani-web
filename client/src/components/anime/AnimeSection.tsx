@@ -74,7 +74,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
   const carouselRef = useRef<HTMLDivElement>(null)
 
   const isActuallyCarousel = carousel
-  const defaultLayout = isActuallyCarousel ? 'vertical' : 'horizontal'
+  const defaultLayout = 'vertical'
   const currentLayout = layout || defaultLayout
 
   const scroll = (direction: 'left' | 'right') => {
@@ -92,7 +92,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
   return (
     <section style={{ marginBottom: '2.5rem' }}>
       <div className={styles['section-header']}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div className={styles['title-wrapper']}>
           <div className="section-title" style={{ marginBottom: 0 }}>
             {title}
           </div>
@@ -108,39 +108,45 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
           )}
         </div>
         {showSeeMore && (
-          <Link
-            to="/watchlist/Continue Watching"
-            className="btn-secondary"
-            style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}
-          >
-            View All
-          </Link>
+          <div className={styles['header-actions']}>
+            <Link
+              to="/watchlist/Continue Watching"
+              className="btn-secondary"
+              style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}
+            >
+              View All
+            </Link>
+          </div>
         )}
       </div>
 
       {isActuallyCarousel ? (
-        <div className={styles['carousel-container']}>
-          <div className={styles.carousel} ref={carouselRef}>
-            {loading && animeList.length === 0
-              ? Array.from({ length: 7 }).map((_, i) => (
-                  <div key={i} className={styles['carousel-card']}>
-                    <AnimeCardSkeleton layout={currentLayout} />
-                  </div>
-                ))
-              : animeList.map((anime, index) => (
-                  <div key={anime._id} className={styles['carousel-card']}>
-                    <AnimeCard
-                      anime={anime}
-                      continueWatching={continueWatching}
-                      onRemove={onRemove}
-                      isLCP={index < 4 && title === 'Latest Releases'}
-                      config={cardConfig}
-                      layout={currentLayout}
-                    />
-                  </div>
-                ))}
+        !loading && animeList.length === 0 && emptyState ? (
+          <div>{emptyState}</div>
+        ) : (
+          <div className={styles['carousel-container']}>
+            <div className={styles.carousel} ref={carouselRef}>
+              {loading && animeList.length === 0
+                ? Array.from({ length: 7 }).map((_, i) => (
+                    <div key={i} className={styles['carousel-card']}>
+                      <AnimeCardSkeleton layout={currentLayout} />
+                    </div>
+                  ))
+                : animeList.map((anime, index) => (
+                    <div key={anime._id} className={styles['carousel-card']}>
+                      <AnimeCard
+                        anime={anime}
+                        continueWatching={continueWatching}
+                        onRemove={onRemove}
+                        isLCP={index < 4 && title === 'Latest Releases'}
+                        config={cardConfig}
+                        layout={currentLayout}
+                      />
+                    </div>
+                  ))}
+            </div>
           </div>
-        </div>
+        )
       ) : (
         <div className="grid-container">
           {loading && animeList.length === 0 ? (
