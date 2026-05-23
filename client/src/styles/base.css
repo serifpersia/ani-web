@@ -9,6 +9,7 @@
 
 html {
   scroll-behavior: smooth;
+  color-scheme: dark;
 }
 
 body {
@@ -21,6 +22,23 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  color-scheme: dark;
+}
+
+html,
+body,
+.app-container,
+header,
+main,
+footer,
+.posterWrapper,
+.dot,
+.genreTag {
+  --darkreader-inline-bgcolor: none !important;
+  --darkreader-inline-bgimage: none !important;
+  --darkreader-inline-bordercolor: none !important;
+  --darkreader-inline-color: none !important;
+  background-color: transparent;
 }
 
 body::before {

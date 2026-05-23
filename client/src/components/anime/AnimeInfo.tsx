@@ -74,9 +74,10 @@ export default function AnimeInfo() {
   }
 
   const bannerUrl = useMemo(() => {
+    if (showMeta?.bannerImage) return fixThumbnailUrl(showMeta.bannerImage)
     if (!showMeta?.thumbnail) return ''
     return fixThumbnailUrl(showMeta.thumbnail, 1200, 450)
-  }, [showMeta?.thumbnail])
+  }, [showMeta?.bannerImage, showMeta?.thumbnail])
 
   if (loadingMeta || !showMeta?.name) {
     return (

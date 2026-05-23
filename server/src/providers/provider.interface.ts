@@ -5,6 +5,7 @@ export interface Show {
   nativeName?: string
   englishName?: string
   thumbnail?: string
+  bannerImage?: string
   description?: string
   type?: string
   availableEpisodesDetail?: {

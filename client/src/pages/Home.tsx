@@ -8,12 +8,14 @@ import Schedule from '../components/anime/Schedule'
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
 import RemoveConfirmationModal from '../components/common/RemoveConfirmationModal'
+import SpotlightBanner from '../components/anime/SpotlightBanner'
 import {
   useLatestReleases,
   usePaginatedCurrentSeason,
   useContinueWatchingFast,
   useContinueWatchingUpNext,
   useRemoveFromWatchlist,
+  usePopularAnime,
 } from '../hooks/useAnimeData'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
@@ -45,6 +47,7 @@ const Home: React.FC = () => {
   }, [activeTab])
 
   const { data: latest, isLoading: loadingLatest } = useLatestReleases()
+  const { data: popularWeekly } = usePopularAnime('weekly')
   const { data: cwFast, isLoading: loadingFast } = useContinueWatchingFast(14)
   const { data: cwUpNext, isLoading: loadingUpNext } = useContinueWatchingUpNext()
   const loadingCw = loadingFast || loadingUpNext
@@ -202,6 +205,7 @@ const Home: React.FC = () => {
 
   return (
     <div style={{ paddingBottom: '2rem' }}>
+      <SpotlightBanner animeList={popularWeekly || []} />
       {/* ── Continue Watching ── */}
       <AnimeSection
         title="Continue Watching"

@@ -32,6 +32,13 @@ const fetchApi = async (url: string) => {
   return response.json()
 }
 
+export const usePopularAnime = (timeframe: string) => {
+  return useQuery<Anime[]>({
+    queryKey: ['popular', timeframe],
+    queryFn: () => fetchApi(`/api/popular/${timeframe}`),
+  })
+}
+
 export const useLatestReleases = () => {
   return useQuery<Anime[]>({
     queryKey: ['latestReleases'],
