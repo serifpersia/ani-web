@@ -5,13 +5,10 @@ import type { DetailedShowMeta } from '../types/player'
 
 interface UseAnimeInfoDataReturn {
   showMeta: DetailedShowMeta | undefined
-  allMangaDetails: Record<string, string | number | null> | null
   inWatchlist: boolean
   loadingMeta: boolean
-  loadingDetails: boolean
   error: string | null
   toggleWatchlist: () => Promise<void>
-  handleToggleDetails: () => Promise<void>
 }
 
 const fetchApi = async (url: string) => {
@@ -51,12 +48,6 @@ export function useAnimeInfoData(showId: string | undefined): UseAnimeInfoDataRe
       }
     },
     enabled: !!showId,
-  })
-
-  const { data: allMangaDetails, isLoading: loadingDetails } = useQuery({
-    queryKey: ['allmanga-details', showId],
-    queryFn: () => fetchApi(`/api/allmanga-details/${showId}`),
-    enabled: false, // Manual trigger
   })
 
   const { mutateAsync: toggleWatchlistMutation } = useMutation({
@@ -111,21 +102,11 @@ export function useAnimeInfoData(showId: string | undefined): UseAnimeInfoDataRe
     await toggleWatchlistMutation({ wasIn: !!showData.inWatchlist, showMeta: showData.showMeta })
   }, [showId, showData, toggleWatchlistMutation])
 
-  const handleToggleDetails = useCallback(async () => {
-    queryClient.prefetchQuery({
-      queryKey: ['allmanga-details', showId],
-      queryFn: () => fetchApi(`/api/allmanga-details/${showId}`),
-    })
-  }, [showId, queryClient])
-
   return {
     showMeta: showData?.showMeta,
-    allMangaDetails: allMangaDetails ?? null,
     inWatchlist: !!showData?.inWatchlist,
     loadingMeta,
-    loadingDetails,
     error: showDataError ? (showDataError as Error).message : null,
     toggleWatchlist,
-    handleToggleDetails,
   }
 }

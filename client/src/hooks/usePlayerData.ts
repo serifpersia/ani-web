@@ -271,11 +271,7 @@ export const usePlayerData = (
   })
 
   // 3. Additional Details Query
-  const { data: detailsData, isLoading: loadingDetails } = useQuery({
-    queryKey: ['show-details', showId],
-    queryFn: () => fetchApi(`/api/show-details/${showId}`),
-    enabled: !!showId && !!showData?.showMeta?.name,
-  })
+  const loadingDetails = false
 
   const { mutateAsync: toggleWatchlistMutation } = useMutation({
     mutationFn: async ({ wasIn, showMeta }: { wasIn: boolean; showMeta: DetailedShowMeta }) => {
@@ -413,15 +409,7 @@ export const usePlayerData = (
 
   const handleToggleDetails = useCallback(async () => {
     dispatch({ type: 'SET_STATE', payload: { showCombinedDetails: !uiState.showCombinedDetails } })
-    if (uiState.showCombinedDetails || uiState.allMangaDetails) return
-
-    try {
-      const data = await fetchApi(`/api/allmanga-details/${showId}`)
-      dispatch({ type: 'SET_STATE', payload: { allMangaDetails: data } })
-    } catch (e) {
-      console.warn(e)
-    }
-  }, [showId, uiState.showCombinedDetails, uiState.allMangaDetails])
+  }, [uiState.showCombinedDetails])
 
   // DERIVED STATE
   const state = useMemo(() => {
@@ -430,7 +418,6 @@ export const usePlayerData = (
       ...uiState,
       showMeta: {
         ...(showData?.showMeta || {}),
-        ...(detailsData || {}),
         name: showData?.showMeta?.name, // Preserve original name
       },
       episodes: showData?.episodes || [],
@@ -454,7 +441,6 @@ export const usePlayerData = (
     uiState,
     showData,
     videoData,
-    detailsData,
     loadingShowData,
     loadingVideo,
     loadingDetails,

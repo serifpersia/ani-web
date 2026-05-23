@@ -17,7 +17,7 @@
   align-items: center;
   background: var(--bg-secondary);
   padding: 4px 8px;
-  borderradius: 20px;
+  border-radius: 20px;
   border: 1px solid var(--border-secondary);
 }
 

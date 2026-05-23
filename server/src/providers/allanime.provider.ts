@@ -10,10 +10,7 @@ import {
   VideoLink,
   SubtitleTrack,
   SearchOptions,
-  ShowDetails,
-  AllmangaDetails,
 } from './provider.interface'
-import * as cheerio from 'cheerio'
 import NodeCache from 'node-cache'
 
 const API_BASE_URL = 'https://allanime.day'
@@ -490,34 +487,59 @@ export class AllAnimeProvider implements Provider {
   }
 
   async getShowMeta(showId: string): Promise<Partial<Show> | null> {
-    const response = await axios.post(
+    const { data: axiosResponse } = await axios.post(
       API_ENDPOINT,
       {
-        query: `query($showId: String!) { show(_id: $showId) { _id, name, thumbnail, banner, nativeName, englishName, type, availableEpisodesDetail, score, isAdult } }`,
-        variables: { showId },
+        variables: { _id: showId },
+        extensions: {
+          persistedQuery: {
+            version: 1,
+            sha256Hash: '043448386c7a686bc2aabfbb6b80f6074e795d350df48015023b079527b0848a',
+          },
+        },
       },
       {
         headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
         timeout: 15000,
       }
     )
-    const responseData = response.data
+    const responseData = axiosResponse
     if (responseData?.data?.tobeparsed) {
       responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
     }
-    const show = responseData.data.show
+    const show = responseData.data?.show
     if (show) {
       return {
         _id: show._id,
         name: show.name,
-        thumbnail: this.deobfuscateUrl(show.thumbnail),
+        thumbnail: this.deobfuscateUrl(show.thumbnail || ''),
         bannerImage: show.banner,
+        description: show.description,
+        genres: show.genres ? show.genres.map((g: string) => ({ name: g })) : [],
+        tags: show.tags ? show.tags.map((t: string) => ({ name: t })) : [],
         nativeName: show.nativeName,
         englishName: show.englishName,
         type: show.type,
+        availableEpisodes: show.availableEpisodes,
         availableEpisodesDetail: show.availableEpisodesDetail,
+        episodeCount: show.episodeCount,
+        episodeDuration: show.episodeDuration,
         score: show.score,
+        averageScore: show.averageScore,
         isAdult: show.isAdult,
+        status: show.status,
+        studios: show.studios ? show.studios.map((s: string) => ({ name: s })) : [],
+        airedStart: show.airedStart,
+        airedEnd: show.airedEnd,
+        rating: show.rating,
+        country: show.countryOfOrigin,
+        season: show.season,
+        names: {
+          romaji: show.name,
+          english: show.englishName,
+          native: show.nativeName,
+          synonyms: show.altNames,
+        },
       }
     }
     return null
@@ -769,77 +791,5 @@ export class AllAnimeProvider implements Provider {
     )
     const result = processedSources.filter((s): s is VideoSource => s !== null)
     return result.length > 0 ? result : null
-  }
-
-  async getShowDetails(showId: string): Promise<ShowDetails> {
-    const response = await axios.post(
-      API_ENDPOINT,
-      {
-        query: `query($showId: String!) { show(_id: $showId) { name } }`,
-        variables: { showId },
-      },
-      {
-        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-        timeout: 10000,
-      }
-    )
-    const responseData = response.data
-    if (responseData?.data?.tobeparsed) {
-      responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
-    }
-    const showName = responseData?.data?.show?.name as string
-    if (!showName) throw new Error('Show not found')
-    const scheduleSearchUrl = `https://animeschedule.net/api/v3/anime?q=${encodeURIComponent(showName)}`
-    const scheduleResponse = await axios.get(scheduleSearchUrl, { timeout: 10000 })
-    const firstResult = scheduleResponse.data?.anime?.[0]
-    if (firstResult) {
-      if (firstResult.status === 'Ongoing') {
-        try {
-          const pageResponse = await axios.get(
-            `https://animeschedule.net/anime/${firstResult.route}`,
-            { timeout: 10000 }
-          )
-          const countdownMatch = (pageResponse.data as string).match(
-            /countdown-time" datetime="([^"]*)"/
-          )
-          if (countdownMatch) {
-            firstResult.nextEpisodeAirDate = countdownMatch[1]
-            const airingTime = new Date(countdownMatch[1]).getTime()
-            const now = Date.now()
-            firstResult.nextAiring = {
-              episode: firstResult.currentEpisode ? firstResult.currentEpisode + 1 : 1,
-              timeUntilAiring: Math.floor((airingTime - now) / 1000),
-            }
-          }
-        } catch (e) {
-          logger.warn({ err: e }, 'Failed to fetch schedule page')
-        }
-      }
-      return firstResult as ShowDetails
-    }
-    throw new Error('Not Found on Schedule')
-  }
-
-  async getAllmangaDetails(showId: string): Promise<AllmangaDetails> {
-    const url = `https://allmanga.to/bangumi/${showId}`
-    const response = await axios.get(url, {
-      headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-    })
-    const $ = cheerio.load(response.data)
-    const details: AllmangaDetails = {
-      Rating: 'N/A',
-      Season: 'N/A',
-      Episodes: 'N/A',
-      Date: 'N/A',
-      'Original Broadcast': 'N/A',
-    }
-    $('.info-season').each((_i, elem) => {
-      const label = $(elem).find('h4').text().trim() as keyof AllmangaDetails
-      const value = $(elem).find('li').text().trim()
-      if (Object.prototype.hasOwnProperty.call(details, label)) {
-        details[label] = value
-      }
-    })
-    return details
   }
 }

@@ -304,46 +304,6 @@
   color: var(--accent-light) !important;
 }
 
-/* External Links */
-.externalLinksSection {
-  margin-top: var(--space-6);
-  padding: var(--space-8);
-  background: var(--bg-secondary);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border-primary);
-}
-
-.externalLinksTitle {
-  font-size: var(--font-size-md);
-  margin-bottom: var(--space-6);
-  color: var(--text-primary);
-}
-
-.externalLinksGrid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-}
-
-.websiteLink {
-  padding: 0.8rem 1.5rem;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  text-decoration: none;
-  transition: all var(--transition-fast);
-  font-weight: 600;
-}
-
-.websiteLink:hover {
-  background: var(--accent);
-  color: white;
-  border-color: var(--accent);
-  transform: translateY(-2px);
-}
-
 /* Loading & Skeletons */
 .loadingDetails {
   display: flex;

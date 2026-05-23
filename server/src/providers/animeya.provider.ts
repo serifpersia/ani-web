@@ -7,8 +7,6 @@ import {
   EpisodeDetails,
   SkipIntervals,
   SearchOptions,
-  ShowDetails,
-  AllmangaDetails,
   VideoLink,
   SubtitleTrack,
 } from './provider.interface'
@@ -883,19 +881,5 @@ export class AnimeyaProvider implements Provider {
 
   async getSkipTimes(): Promise<SkipIntervals> {
     return { found: false, results: [] }
-  }
-
-  async getShowDetails(): Promise<ShowDetails> {
-    return { status: 'Unknown' }
-  }
-
-  async getAllmangaDetails(): Promise<AllmangaDetails> {
-    return {
-      Rating: 'N/A',
-      Season: 'N/A',
-      Episodes: 'N/A',
-      Date: 'N/A',
-      'Original Broadcast': 'N/A',
-    }
   }
 }

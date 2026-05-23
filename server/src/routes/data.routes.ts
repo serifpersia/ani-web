@@ -81,8 +81,6 @@ export function createDataRouter(
     ),
     controller.getShowMeta
   )
-  router.get('/show-details/:id', controller.getShowDetails)
-  router.get('/allmanga-details/:id', controller.getAllmangaDetails)
   router.get('/genres-and-tags', controller.getGenresAndTags)
 
   return router

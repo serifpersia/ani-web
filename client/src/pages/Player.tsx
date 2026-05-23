@@ -17,14 +17,7 @@ import { ProviderSelector } from '../components/player/SourceSelector'
 import useVideoPlayer from '../hooks/useVideoPlayer'
 import { usePlayerData } from '../hooks/usePlayerData'
 import type { VideoLink, SubtitleTrack } from '../types/player'
-
-const ensureHttpProtocol = (url: string): string => {
-  if (!url) return url
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return url
-  }
-  return `https://${url}`
-}
+import AnimeMetaDetails from '../components/anime/AnimeMetaDetails'
 
 const Player: React.FC = () => {
   const { id: showId, episodeNumber } = useParams<{ id: string; episodeNumber?: string }>()
@@ -320,9 +313,9 @@ const Player: React.FC = () => {
   const displayTitle = useMemo(() => {
     if (!state.showMeta || state.loadingShowData) return 'Loading...'
     const { name, names } = state.showMeta
-    if (titlePreference === 'name' && name) return name
-    if (titlePreference === 'nativeName' && names?.native) return names.native
-    if (titlePreference === 'englishName' && names?.english) return names.english
+    if (titlePreference === 'name') return name || 'Loading...'
+    if (titlePreference === 'nativeName') return names?.native || name || 'Loading...'
+    if (titlePreference === 'englishName') return names?.english || name || 'Loading...'
     return name || 'Loading...'
   }, [state.showMeta, titlePreference, state.loadingShowData])
 
@@ -953,174 +946,7 @@ const Player: React.FC = () => {
           </button>
 
           {state.showCombinedDetails && (
-            <>
-              {state.loadingDetails ? (
-                <p className={styles.loadingDetails}>Loading details...</p>
-              ) : (
-                <>
-                  <div className={styles.detailsGridContainer}>
-                    {state.showMeta.mediaTypes?.[0] && (
-                      <div className={styles.detailItem}>
-                        <strong>Type</strong>
-                        <span>{state.showMeta.mediaTypes[0].name}</span>
-                      </div>
-                    )}
-                    {state.showMeta.status && (
-                      <div className={styles.detailItem}>
-                        <strong>Status</strong>
-                        <span className={styles.animeStatus}>{state.showMeta.status}</span>
-                      </div>
-                    )}
-                    {state.showMeta.stats?.averageScore && (
-                      <div className={styles.detailItem}>
-                        <strong>Score</strong>
-                        <span>{state.showMeta.stats.averageScore}</span>
-                      </div>
-                    )}
-                    {state.showMeta.studios && state.showMeta.studios.length > 0 && (
-                      <div className={styles.detailItem}>
-                        <strong>Studios</strong>
-                        <span>{state.showMeta.studios.map((s) => s.name).join(', ')}</span>
-                      </div>
-                    )}
-                    {state.showMeta.sources?.[0] && (
-                      <div className={styles.detailItem}>
-                        <strong>Source</strong>
-                        <span>{state.showMeta.sources[0].name}</span>
-                      </div>
-                    )}
-                    {state.showMeta.lengthMin && (
-                      <div className={styles.detailItem}>
-                        <strong>Episode Length</strong>
-                        <span>{state.showMeta.lengthMin} min</span>
-                      </div>
-                    )}
-                    {state.showMeta.names?.english && (
-                      <div className={styles.detailItem}>
-                        <strong>English Title</strong>
-                        <span>{state.showMeta.names.english}</span>
-                      </div>
-                    )}
-                    {state.showMeta.names?.native && (
-                      <div className={styles.detailItem}>
-                        <strong>Native Title</strong>
-                        <span>{state.showMeta.names.native}</span>
-                      </div>
-                    )}
-                    {state.showMeta.genres && (
-                      <div className={styles.detailItem}>
-                        <strong>Genres</strong>
-                        <div className={styles.genresList}>
-                          {state.showMeta.genres.map((g) => (
-                            <span key={g.name} className={styles.genreTag}>
-                              {g.name}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {state.allMangaDetails?.Rating && (
-                      <div className={styles.detailItem}>
-                        <strong>Rating</strong>
-                        <span>{state.allMangaDetails.Rating}</span>
-                      </div>
-                    )}
-                    {state.allMangaDetails?.Season && (
-                      <div className={styles.detailItem}>
-                        <strong>Season</strong>
-                        <span>{state.allMangaDetails.Season}</span>
-                      </div>
-                    )}
-                    {state.allMangaDetails?.Episodes && (
-                      <div className={styles.detailItem}>
-                        <strong>Episodes</strong>
-                        <span>{state.allMangaDetails.Episodes}</span>
-                      </div>
-                    )}
-                    {state.allMangaDetails?.Date && (
-                      <div className={styles.detailItem}>
-                        <strong>Date</strong>
-                        <span>{state.allMangaDetails.Date}</span>
-                      </div>
-                    )}
-                    {state.allMangaDetails?.['Original Broadcast'] && (
-                      <div className={styles.detailItem}>
-                        <strong>Original Broadcast</strong>
-                        <span>{state.allMangaDetails['Original Broadcast']}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {state.showMeta.websites && (
-                    <div className={styles.externalLinksSection}>
-                      <strong>External Links</strong>
-                      <div className={styles.externalLinksGrid}>
-                        {state.showMeta.websites.official && (
-                          <a
-                            href={ensureHttpProtocol(state.showMeta.websites.official)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={styles.websiteLink}
-                          >
-                            Official
-                          </a>
-                        )}
-                        {state.showMeta.websites.mal && (
-                          <a
-                            href={ensureHttpProtocol(state.showMeta.websites.mal)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={styles.websiteLink}
-                          >
-                            MAL
-                          </a>
-                        )}
-                        {state.showMeta.websites.aniList && (
-                          <a
-                            href={ensureHttpProtocol(state.showMeta.websites.aniList)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={styles.websiteLink}
-                          >
-                            AniList
-                          </a>
-                        )}
-                        {state.showMeta.websites.kitsu && (
-                          <a
-                            href={ensureHttpProtocol(state.showMeta.websites.kitsu)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={styles.websiteLink}
-                          >
-                            Kitsu
-                          </a>
-                        )}
-                        {state.showMeta.websites.animePlanet && (
-                          <a
-                            href={ensureHttpProtocol(state.showMeta.websites.animePlanet)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={styles.websiteLink}
-                          >
-                            Anime-Planet
-                          </a>
-                        )}
-                        {state.showMeta.websites.anidb && (
-                          <a
-                            href={ensureHttpProtocol(state.showMeta.websites.anidb)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={styles.websiteLink}
-                          >
-                            AniDB
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </>
+            <AnimeMetaDetails showMeta={state.showMeta} styles={styles} />
           )}
         </div>
       </div>

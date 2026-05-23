@@ -80,27 +80,8 @@ export class DataController {
   })
 
   getShowMeta = asyncHandler(async (req: Request, res: Response) => {
-    const [meta, details] = await Promise.all([
-      this.getProvider(req).getShowMeta(req.params.id as string),
-      this.getProvider(req)
-        .getShowDetails(req.params.id as string)
-        .catch(() => ({})),
-    ])
-    const merged = { ...meta, ...details }
-    res.json(merged)
-  })
-
-  getShowDetails = asyncHandler(async (req: Request, res: Response) => {
-    const details = await this.getProvider(req).getShowDetails(req.params.id as string)
-    if (!details) {
-      res.status(404).send('Not found')
-      return
-    }
-    res.json(details)
-  })
-
-  getAllmangaDetails = asyncHandler(async (req: Request, res: Response) => {
-    res.json(await this.getProvider(req).getAllmangaDetails(req.params.id as string))
+    const meta = await this.getProvider(req).getShowMeta(req.params.id as string)
+    res.json(meta || {})
   })
 
   getGenresAndTags = (_req: Request, res: Response) => {

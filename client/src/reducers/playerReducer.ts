@@ -24,7 +24,6 @@ export const createInitialState = (): PlayerState => ({
   watchedEpisodes: [],
   watchlistStatus: null,
   currentEpisode: undefined,
-  allMangaDetails: null,
   showCombinedDetails: false,
   currentMode: getPreferredMode(),
   inWatchlist: false,

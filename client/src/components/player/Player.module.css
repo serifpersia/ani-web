@@ -300,28 +300,6 @@
   transform: translateY(-1px);
 }
 
-.websiteLink {
-  color: var(--text-secondary);
-  background: rgba(255, 255, 255, 0.05);
-  padding: 0.5rem 1.25rem;
-  border-radius: var(--radius-lg);
-  font-size: 0.85rem;
-  font-weight: 600;
-  transition: all var(--transition-normal);
-  text-decoration: none;
-  text-align: center;
-  border: 1px solid var(--glass-border);
-  white-space: nowrap;
-}
-
-.websiteLink:hover {
-  background: var(--accent);
-  color: white;
-  border-color: var(--accent);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px var(--accent-glow);
-}
-
 .loadingDetails {
   color: var(--text-muted);
   font-style: italic;

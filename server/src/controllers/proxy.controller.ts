@@ -242,7 +242,11 @@ export class ProxyController {
 
     for (const p of possiblePaths) {
       if (fs.existsSync(p)) {
-        return res.status(200).sendFile(p)
+        return res.sendFile(p, (err) => {
+          if (err && !res.headersSent) {
+            res.status(404).send('Not Found')
+          }
+        })
       }
     }
 

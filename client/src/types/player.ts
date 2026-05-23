@@ -35,24 +35,39 @@ export interface DetailedShowMeta {
     english: string
     native: string
   }
-  websites: {
-    official: string
-    mal: string
-    aniList: string
-    kitsu: string
-    animePlanet: string
-    anidb: string
-    streams: { platform: string; url: string; name: string }[]
-  }
   nextEpisodeAirDate?: string
-}
-
-export interface AllMangaDetail {
-  Rating: string
-  Season: string
-  Episodes: string
-  Date: string
-  'Original Broadcast': string
+  bannerImage?: string | null
+  availableEpisodes?: {
+    sub?: number
+    dub?: number
+    raw?: number
+  }
+  availableEpisodesDetail?: {
+    sub?: string[]
+    dub?: string[]
+    raw?: string[]
+  }
+  episodeCount?: string | number | null
+  episodeDuration?: string | number | null
+  averageScore?: number | null
+  airedStart?: {
+    year?: number
+    month?: number
+    date?: number
+  } | null
+  airedEnd?: {
+    year?: number
+    month?: number
+    date?: number
+  } | null
+  country?: string | null
+  rating?: string | null
+  season?: {
+    quarter?: string
+    season?: string
+    title?: string
+    year?: number
+  } | null
 }
 
 export interface VideoLink {
@@ -92,7 +107,6 @@ export interface PlayerState {
   watchedEpisodes: string[]
   watchlistStatus: string | null
   currentEpisode?: string
-  allMangaDetails: AllMangaDetail | null
   showCombinedDetails: boolean
   currentMode: 'sub' | 'dub'
   inWatchlist: boolean

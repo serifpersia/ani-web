@@ -2,6 +2,12 @@ export interface Show {
   _id: string
   id?: string
   name: string
+  names?: {
+    romaji?: string
+    english?: string
+    native?: string
+    synonyms?: string[]
+  }
   nativeName?: string
   englishName?: string
   thumbnail?: string
@@ -11,11 +17,27 @@ export interface Show {
   availableEpisodesDetail?: {
     sub?: string[]
     dub?: string[]
+    raw?: string[]
   }
+  availableEpisodes?: {
+    sub?: number
+    dub?: number
+    raw?: number
+  }
+  episodeCount?: string | number | null
+  episodeDuration?: string | number | null
+  averageScore?: number | null
   score?: number
   isAdult?: boolean
   rating?: string
   genres?: { name: string }[]
+  tags?: { name: string }[]
+  studios?: { name: string }[]
+  status?: string
+  airedStart?: Record<string, unknown> | null
+  airedEnd?: Record<string, unknown> | null
+  country?: string | null
+  season?: Record<string, unknown> | null
   nextAiring?: {
     episode: number
     timeUntilAiring: number
@@ -80,23 +102,6 @@ export interface SearchOptions {
   studios?: string
 }
 
-export interface ShowDetails {
-  status: string
-  nextEpisodeAirDate?: string
-  nextAiring?: {
-    episode: number
-    timeUntilAiring: number
-  }
-}
-
-export interface AllmangaDetails {
-  Rating: string
-  Season: string
-  Episodes: string
-  Date: string
-  'Original Broadcast': string
-}
-
 export interface Provider {
   name: string
   search(options: SearchOptions): Promise<Show[]>
@@ -112,6 +117,4 @@ export interface Provider {
     mode: 'sub' | 'dub'
   ): Promise<VideoSource[] | null>
   getSkipTimes(showId: string, episodeNumber: string): Promise<SkipIntervals>
-  getShowDetails(showId: string): Promise<ShowDetails>
-  getAllmangaDetails(showId: string): Promise<AllmangaDetails>
 }
