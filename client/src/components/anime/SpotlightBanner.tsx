@@ -6,6 +6,7 @@ import type { Anime } from '../../hooks/useAnimeData'
 import { fixThumbnailUrl } from '../../lib/utils'
 import styles from './SpotlightBanner.module.css'
 import { useLowEndMode } from '../../contexts/LowEndModeContext'
+import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 
 interface SpotlightBannerProps {
   animeList: Anime[]
@@ -29,22 +30,39 @@ const fetchShowMeta = async (id: string): Promise<ShowMeta> => {
 
 const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [lastScrollTime, setLastScrollTime] = useState(0)
   const { lowEndMode } = useLowEndMode()
+  const { titlePreference } = useTitlePreference()
   const navigate = useNavigate()
-  const top5 = animeList.slice(0, 5)
+  const top6 = animeList.slice(0, 6)
+
+  const getTitle = (anime: Anime) => {
+    switch (titlePreference) {
+      case 'nativeName':
+        return anime.nativeName || anime.name
+      case 'englishName':
+        return anime.englishName || anime.name
+      default:
+        return anime.name
+    }
+  }
 
   const nextSlide = useCallback(() => {
-    setCurrentIndex((prev) => (prev + 1) % top5.length)
-  }, [top5.length])
+    setCurrentIndex((prev) => (prev + 1) % top6.length)
+  }, [top6.length])
+
+  const prevSlide = useCallback(() => {
+    setCurrentIndex((prev) => (prev - 1 + top6.length) % top6.length)
+  }, [top6.length])
 
   useEffect(() => {
-    if (top5.length === 0) return
+    if (top6.length === 0) return
     const timer = setInterval(nextSlide, 10000)
     return () => clearInterval(timer)
-  }, [nextSlide, top5.length])
+  }, [nextSlide, top6.length])
 
   const metaQueries = useQueries({
-    queries: top5.map((anime) => ({
+    queries: top6.map((anime) => ({
       queryKey: ['spotlight-meta', anime._id],
       queryFn: () => fetchShowMeta(anime._id),
       enabled: !!anime._id,
@@ -54,10 +72,30 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
     })),
   })
 
-  if (top5.length === 0) return null
+  if (top6.length === 0) return null
 
-  const anime = top5[currentIndex]
+  const anime = top6[currentIndex]
   const meta: ShowMeta = metaQueries[currentIndex]?.data ?? {}
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && Math.abs(e.deltaY) > 20) {
+      const now = Date.now()
+      if (now - lastScrollTime < 500) {
+        e.preventDefault()
+        e.stopPropagation()
+        return
+      }
+
+      e.preventDefault()
+      e.stopPropagation()
+      setLastScrollTime(now)
+      if (e.deltaY > 0) {
+        nextSlide()
+      } else if (e.deltaY < 0) {
+        prevSlide()
+      }
+    }
+  }
 
   const rawDesc = meta.description ?? ''
   const synopsis = rawDesc.replace(/<[^>]*>?/gm, '').trim()
@@ -72,7 +110,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   }
 
   return (
-    <div className={styles.bannerContainer}>
+    <div className={styles.bannerContainer} onWheel={handleWheel}>
       <div
         className={styles.posterWrapper}
         style={{ boxShadow: !lowEndMode ? '0 10px 30px rgba(0,0,0,0.5)' : 'none' }}
@@ -80,13 +118,18 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
         <img
           key={currentIndex}
           src={bannerSrc}
-          alt={anime.name}
+          alt={getTitle(anime)}
           className={`${styles.posterImage} ${!lowEndMode ? styles.fadeIn : ''}`}
         />
         <div className={styles.overlay}>
           <div className={styles.content}>
-            <div className={styles.yearTag}>{new Date().getFullYear()}</div>
-            <h2 className={styles.title}>{anime.name}</h2>
+            <h2 
+              className={styles.title} 
+              onClick={() => navigate(`/anime/${anime._id}`)}
+              style={{ cursor: 'pointer' }}
+            >
+              {getTitle(anime)}
+            </h2>
 
             {genres.length > 0 && (
               <div className={styles.genres}>
@@ -110,7 +153,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
           </div>
 
           <div className={styles.carouselControls}>
-            {top5.map((_, index) => (
+            {top6.map((_, index) => (
               <div
                 key={index}
                 className={`${styles.dot} ${index === currentIndex ? styles.activeDot : ''}`}

@@ -66,6 +66,12 @@
 .title {
   font-size: 2.5rem;
   margin-bottom: 0.75rem;
+  transition: color var(--transition-base);
+  cursor: pointer;
+}
+
+.title:hover {
+  color: var(--accent-light);
 }
 
 .genres {
