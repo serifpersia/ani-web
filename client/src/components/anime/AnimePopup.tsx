@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { FaStar, FaPlay, FaCalendarAlt, FaTv, FaPlus, FaCheck } from 'react-icons/fa'
+import { FaStar, FaPlay, FaTv, FaPlus, FaCheck } from 'react-icons/fa'
 import { Link } from 'react-router-dom'
 import { useAnimeInfoData } from '../../hooks/useAnimeInfoData'
+import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 import styles from './AnimePopup.module.css'
 
 interface AnimePopupProps {
@@ -19,6 +20,15 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
   onMouseLeave,
 }) => {
   const { showMeta, loadingMeta, inWatchlist, toggleWatchlist } = useAnimeInfoData(showId)
+  const { titlePreference } = useTitlePreference()
+
+  const displayTitle = useMemo(() => {
+    if (!showMeta?.name) return ''
+    if (titlePreference === 'name') return showMeta.name
+    if (titlePreference === 'nativeName') return showMeta.names?.native || showMeta.name
+    if (titlePreference === 'englishName') return showMeta.names?.english || showMeta.name
+    return showMeta.name
+  }, [showMeta, titlePreference])
 
   const position = useMemo(() => {
     const popupWidth = 320
@@ -61,10 +71,7 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
         ) : showMeta ? (
           <>
             <div className={styles.header}>
-              <div className={styles.title}>{showMeta.name}</div>
-              {showMeta.names?.english && (
-                <div className={styles.altTitle}>{showMeta.names.english}</div>
-              )}
+              <div className={styles.title}>{displayTitle}</div>
             </div>
 
             <div className={styles.body}>
