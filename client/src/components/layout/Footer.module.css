@@ -1,0 +1,21 @@
+.footer {
+  padding: var(--space-8) var(--space-4);
+  border-top: 1px solid var(--border-primary);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  margin-top: auto;
+}
+
+.footer a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: var(--font-weight-medium);
+  transition: color var(--transition-fast);
+}
+
+.footer a:hover {
+  color: var(--accent-light);
+}
