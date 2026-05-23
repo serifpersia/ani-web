@@ -3,7 +3,7 @@ import { useQueryClient, useMutation } from '@tanstack/react-query'
 import { FaHistory, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import { Button } from '../components/common/Button'
 import AnimeSection from '../components/anime/AnimeSection'
-import Top10List from '../components/anime/Top10List'
+import TrendingList from '../components/anime/TrendingList'
 import Schedule from '../components/anime/Schedule'
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
@@ -11,6 +11,7 @@ import RemoveConfirmationModal from '../components/common/RemoveConfirmationModa
 import SpotlightBanner from '../components/anime/SpotlightBanner'
 import {
   useLatestReleases,
+  useInfiniteLatestReleases,
   usePaginatedCurrentSeason,
   useContinueWatchingFast,
   useContinueWatchingUpNext,
@@ -46,7 +47,29 @@ const Home: React.FC = () => {
     localStorage.setItem('home_activeTab', activeTab)
   }, [activeTab])
 
-  const { data: latest, isLoading: loadingLatest } = useLatestReleases()
+  const {
+    data: latestInfinite,
+    isLoading: loadingLatestInfinite,
+    fetchNextPage: fetchMoreLatest,
+    hasNextPage: hasMoreLatest,
+    isFetchingNextPage: fetchingMoreLatest,
+  } = useInfiniteLatestReleases(14)
+
+  const latestList = useMemo(() => {
+    return latestInfinite?.pages.flatMap((page) => page) || []
+  }, [latestInfinite])
+
+  const handleLatestScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      if (!hasMoreLatest || fetchingMoreLatest || loadingLatestInfinite) return
+      const { scrollLeft, clientWidth, scrollWidth } = e.currentTarget
+      if (scrollLeft + clientWidth > scrollWidth * 0.7) {
+        fetchMoreLatest()
+      }
+    },
+    [hasMoreLatest, fetchingMoreLatest, loadingLatestInfinite, fetchMoreLatest]
+  )
+
   const { data: popularWeekly } = usePopularAnime('weekly')
   const { data: cwFast, isLoading: loadingFast } = useContinueWatchingFast(14)
   const { data: cwUpNext, isLoading: loadingUpNext } = useContinueWatchingUpNext()
@@ -119,7 +142,7 @@ const Home: React.FC = () => {
   const tabs: { key: ActiveTab; label: string }[] = [
     { key: 'latest', label: 'Latest Releases' },
     { key: 'season', label: 'Current Season' },
-    { key: 'popular', label: 'Top 10 Popular' },
+    { key: 'popular', label: 'Trending' },
   ]
 
   const renderTabContent = () => {
@@ -128,9 +151,11 @@ const Home: React.FC = () => {
         return (
           <AnimeSection
             title="Latest Releases"
-            animeList={latest?.slice(0, 14) || []}
-            loading={loadingLatest}
+            animeList={latestList}
+            loading={loadingLatestInfinite}
             carousel
+            onScroll={handleLatestScroll}
+            isFetchingNextPage={fetchingMoreLatest}
           />
         )
       case 'season':
@@ -197,7 +222,7 @@ const Home: React.FC = () => {
           </section>
         )
       case 'popular':
-        return <Top10List title="Top 10 Popular" />
+        return <TrendingList title="Trending" />
       default:
         return null
     }

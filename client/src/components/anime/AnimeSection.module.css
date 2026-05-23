@@ -65,9 +65,10 @@
   display: flex;
   gap: 15px;
   overflow-x: auto;
-  scroll-behavior: smooth;
   scrollbar-width: none; /* Hide scrollbar for Firefox */
   padding-bottom: 10px;
+  scroll-snap-type: x mandatory;
+  overflow-anchor: none;
 }
 
 .carousel::-webkit-scrollbar {
@@ -77,6 +78,7 @@
 .carousel-card {
   flex: 0 0 calc((100% - (6 * 15px)) / 7); /* Show exactly 7 cards */
   min-width: 150px;
+  scroll-snap-align: start;
 }
 
 @media (max-width: 1200px) {

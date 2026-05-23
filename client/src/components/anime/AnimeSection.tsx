@@ -56,6 +56,8 @@ interface AnimeSectionProps {
   carousel?: boolean
   cardConfig?: AnimeSectionConfig
   layout?: 'vertical' | 'horizontal'
+  onScroll?: (e: React.UIEvent<HTMLDivElement>) => void
+  isFetchingNextPage?: boolean
 }
 
 const AnimeSection: React.FC<AnimeSectionProps> = ({
@@ -69,6 +71,8 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
   carousel,
   cardConfig,
   layout,
+  onScroll,
+  isFetchingNextPage,
 }) => {
   const { lowEndMode } = useLowEndMode()
   const carouselRef = useRef<HTMLDivElement>(null)
@@ -98,10 +102,24 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
           </div>
           {carousel && animeList.length > 0 && (
             <div className={styles['nav-arrows']}>
-              <button className={styles['nav-button']} onClick={() => scroll('left')}>
+              <button
+                className={styles['nav-button']}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  scroll('left')
+                }}
+              >
                 <FaChevronLeft />
               </button>
-              <button className={styles['nav-button']} onClick={() => scroll('right')}>
+              <button
+                className={styles['nav-button']}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  scroll('right')
+                }}
+              >
                 <FaChevronRight />
               </button>
             </div>
@@ -125,7 +143,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
           <div>{emptyState}</div>
         ) : (
           <div className={styles['carousel-container']}>
-            <div className={styles.carousel} ref={carouselRef}>
+            <div className={styles.carousel} ref={carouselRef} onScroll={onScroll}>
               {loading && animeList.length === 0
                 ? Array.from({ length: 7 }).map((_, i) => (
                     <div key={i} className={styles['carousel-card']}>
@@ -144,6 +162,11 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
                       />
                     </div>
                   ))}
+              {isFetchingNextPage && (
+                <div className={styles['carousel-card']}>
+                  <AnimeCardSkeleton layout={currentLayout} />
+                </div>
+              )}
             </div>
           </div>
         )

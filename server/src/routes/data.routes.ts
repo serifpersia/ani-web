@@ -40,7 +40,8 @@ export function createDataRouter(
     '/popular/:timeframe',
     makeCacheMiddleware(
       apiCache,
-      (req) => `popular-${(req.params.timeframe as string).toLowerCase()}`
+      (req) =>
+        `popular-${(req.params.timeframe as string).toLowerCase()}-${req.query.page || 1}-${req.query.size || 10}`
     ),
     controller.getPopular
   )
@@ -53,7 +54,11 @@ export function createDataRouter(
 
   router.get(
     '/latest-releases',
-    makeCacheMiddleware(apiCache, () => 'latest-releases', 300),
+    makeCacheMiddleware(
+      apiCache,
+      (req) => `latest-releases-${req.query.page || 1}-${req.query.size || 14}`,
+      300
+    ),
     controller.getLatestReleases
   )
 

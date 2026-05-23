@@ -123,8 +123,8 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
         />
         <div className={styles.overlay}>
           <div className={styles.content}>
-            <h2 
-              className={styles.title} 
+            <h2
+              className={styles.title}
               onClick={() => navigate(`/anime/${anime._id}`)}
               style={{ cursor: 'pointer' }}
             >

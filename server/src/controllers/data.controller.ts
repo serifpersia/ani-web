@@ -18,7 +18,9 @@ export class DataController {
       | 'weekly'
       | 'monthly'
       | 'all'
-    const data = await this.getProvider(req).getPopular(timeframe)
+    const page = parseInt(req.query.page as string) || 1
+    const size = parseInt(req.query.size as string) || 10
+    const data = await this.getProvider(req).getPopular(timeframe, page, size)
     res.set('Cache-Control', 'public, max-age=300').json(data)
   })
 
@@ -76,7 +78,9 @@ export class DataController {
   })
 
   getLatestReleases = asyncHandler(async (req: Request, res: Response) => {
-    res.json(await this.getProvider(req).getLatestReleases())
+    const page = parseInt(req.query.page as string) || 1
+    const size = parseInt(req.query.size as string) || 14
+    res.json(await this.getProvider(req).getLatestReleases(page, size))
   })
 
   getShowMeta = asyncHandler(async (req: Request, res: Response) => {

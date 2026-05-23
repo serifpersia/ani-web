@@ -863,23 +863,27 @@ export class AnimeyaProvider implements Provider {
     }
   }
 
-  async getPopular(timeframe: 'daily' | 'weekly' | 'monthly' | 'all'): Promise<Show[]> {
+  async getPopular(
+    _timeframe: 'daily' | 'weekly' | 'monthly' | 'all',
+    _page?: number,
+    _size?: number
+  ): Promise<Show[]> {
     return []
   }
 
-  async getSchedule(date: Date): Promise<Show[]> {
+  async getSchedule(_date: Date): Promise<Show[]> {
     return []
   }
 
-  async getSeasonal(page: number): Promise<Show[]> {
+  async getSeasonal(_page: number): Promise<Show[]> {
     return []
   }
 
-  async getLatestReleases(): Promise<Show[]> {
+  async getLatestReleases(_page?: number, _size?: number): Promise<Show[]> {
     return []
   }
 
-  async getSkipTimes(): Promise<SkipIntervals> {
+  async getSkipTimes(_showId: string, _episodeNumber: string): Promise<SkipIntervals> {
     return { found: false, results: [] }
   }
 }

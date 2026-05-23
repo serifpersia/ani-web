@@ -105,10 +105,14 @@ export interface SearchOptions {
 export interface Provider {
   name: string
   search(options: SearchOptions): Promise<Show[]>
-  getPopular(timeframe: 'daily' | 'weekly' | 'monthly' | 'all'): Promise<Show[]>
+  getPopular(
+    timeframe: 'daily' | 'weekly' | 'monthly' | 'all',
+    page?: number,
+    size?: number
+  ): Promise<Show[]>
   getSchedule(date: Date): Promise<Show[]>
   getSeasonal(page: number): Promise<Show[]>
-  getLatestReleases(): Promise<Show[]>
+  getLatestReleases(page?: number, size?: number): Promise<Show[]>
   getShowMeta(showId: string): Promise<Partial<Show> | null>
   getEpisodes(showId: string, mode: 'sub' | 'dub'): Promise<EpisodeDetails | null>
   getStreamUrls(

@@ -25,12 +25,17 @@ interface Anime {
   newEpisodesCount?: number
   watchedCount?: number
   episodeCount?: number
+  availableEpisodes?: {
+    sub?: number
+    dub?: number
+  }
   availableEpisodesDetail?: {
     sub?: string[]
     dub?: string[]
   }
   isAdult?: boolean
   rating?: string
+  rank?: number
 }
 
 interface AnimeCardConfig {
@@ -73,10 +78,19 @@ interface AnimeCardProps {
   isLCP?: boolean
   config?: AnimeCardConfig
   layout?: 'vertical' | 'horizontal'
+  rank?: number
 }
 
 const AnimeCard: React.FC<AnimeCardProps> = memo(
-  ({ anime, continueWatching = false, onRemove, isLCP = false, config, layout = 'vertical' }) => {
+  ({
+    anime,
+    continueWatching = false,
+    onRemove,
+    isLCP = false,
+    config,
+    layout = 'vertical',
+    rank,
+  }) => {
     const isMobile = useIsMobile()
     const { titlePreference } = useTitlePreference()
     const { lowEndMode } = useLowEndMode()
@@ -128,7 +142,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     const hasNewEpisodes = (anime.newEpisodesCount || 0) > 0
     const hasProgress = (anime.currentTime || 0) > 0 && (anime.duration || 0) > 0
 
-    const displayTitle = anime[titlePreference] || anime.name
+    const displayTitle = (anime[titlePreference as keyof Anime] as string) || anime.name
 
     const progressRatio = (anime.currentTime || 0) / (anime.duration || 1)
 
@@ -231,6 +245,8 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             {showAdultBadge && adultContent && !lowEndMode && (
               <div className={styles.adultBadge}>18+</div>
             )}
+
+            {rank !== undefined && <div className={styles.rankBadge}>#{rank}</div>}
           </div>
 
           <div className={styles.info}>
@@ -262,16 +278,16 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
 
             {showMeta && (
               <div className={styles.metaRow}>
-                {anime.availableEpisodesDetail?.sub && (
+                {(anime.availableEpisodesDetail?.sub || anime.availableEpisodes?.sub) && (
                   <div className={styles.metaItem}>
                     <FaClosedCaptioning size={10} />
-                    {anime.availableEpisodesDetail.sub.length}
+                    {anime.availableEpisodesDetail?.sub?.length ?? anime.availableEpisodes?.sub}
                   </div>
                 )}
-                {anime.availableEpisodesDetail?.dub && (
+                {(anime.availableEpisodesDetail?.dub || anime.availableEpisodes?.dub) && (
                   <div className={styles.metaItem}>
                     <FaMicrophone size={10} />
-                    {anime.availableEpisodesDetail.dub.length}
+                    {anime.availableEpisodesDetail?.dub?.length ?? anime.availableEpisodes?.dub}
                   </div>
                 )}
               </div>
@@ -290,7 +306,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             onMouseLeave={handleInfoMouseLeave}
             aria-label="Info"
           >
-            <FaInfo size={10} />
+            <FaInfo size={11} />
           </button>
         )}
         {isPopupVisible && anchorRect && (

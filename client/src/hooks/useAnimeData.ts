@@ -39,10 +39,41 @@ export const usePopularAnime = (timeframe: string) => {
   })
 }
 
+export const usePaginatedPopularAnime = (timeframe: string, page: number, size: number = 7) => {
+  return useQuery<Anime[]>({
+    queryKey: ['popular', timeframe, page, size],
+    queryFn: () => fetchApi(`/api/popular/${timeframe}?page=${page}&size=${size}`),
+  })
+}
+
+export const useInfinitePopularAnime = (timeframe: string, size: number = 7) => {
+  return useInfiniteQuery<Anime[]>({
+    queryKey: ['popularInfinite', timeframe, size],
+    queryFn: ({ pageParam = 1 }) =>
+      fetchApi(`/api/popular/${timeframe}?page=${pageParam as number}&size=${size}`),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage: Anime[], allPages) => {
+      return lastPage.length >= size ? allPages.length + 1 : undefined
+    },
+  })
+}
+
 export const useLatestReleases = () => {
   return useQuery<Anime[]>({
     queryKey: ['latestReleases'],
     queryFn: () => fetchApi('/api/latest-releases'),
+  })
+}
+
+export const useInfiniteLatestReleases = (size: number = 14) => {
+  return useInfiniteQuery<Anime[]>({
+    queryKey: ['latestReleasesInfinite', size],
+    queryFn: ({ pageParam = 1 }) =>
+      fetchApi(`/api/latest-releases?page=${pageParam as number}&size=${size}`),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage: Anime[], allPages) => {
+      return lastPage.length >= size ? allPages.length + 1 : undefined
+    },
   })
 }
 

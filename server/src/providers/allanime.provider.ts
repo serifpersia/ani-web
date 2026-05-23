@@ -353,7 +353,11 @@ export class AllAnimeProvider implements Provider {
     return this._fetchShows(variables)
   }
 
-  async getPopular(timeframe: 'daily' | 'weekly' | 'monthly' | 'all'): Promise<Show[]> {
+  async getPopular(
+    timeframe: 'daily' | 'weekly' | 'monthly' | 'all',
+    page: number = 1,
+    size: number = 10
+  ): Promise<Show[]> {
     let dateRange = 0
     switch (timeframe) {
       case 'daily':
@@ -368,8 +372,8 @@ export class AllAnimeProvider implements Provider {
     }
     const variables = {
       type: 'anime',
-      size: 10,
-      page: 1,
+      size,
+      page,
       allowAdult: false,
       allowUnknown: false,
       dateRange,
@@ -475,11 +479,11 @@ export class AllAnimeProvider implements Provider {
     return this._fetchShows(variables)
   }
 
-  async getLatestReleases(): Promise<Show[]> {
+  async getLatestReleases(page: number = 1, size: number = 14): Promise<Show[]> {
     const variables = {
       search: { sortBy: 'Latest_Update', allowAdult: false },
-      limit: 14,
-      page: 1,
+      limit: size,
+      page,
       translationType: 'sub',
       countryOrigin: 'JP',
     }

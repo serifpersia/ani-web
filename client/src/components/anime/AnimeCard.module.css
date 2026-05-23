@@ -125,6 +125,20 @@
   padding: 5px 10px;
 }
 
+.rankBadge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #ffd700;
+  font-size: 13px;
+  font-weight: var(--font-weight-bold);
+  padding: 3px 8px;
+  border-radius: 4px;
+  backdrop-filter: blur(4px);
+  z-index: 2;
+}
+
 .metaRow {
   display: flex;
   align-items: center;
@@ -194,7 +208,7 @@
     background-color 0.15s ease,
     transform 0.15s ease;
   z-index: 20;
-  font-size: 1rem;
+  font-size: 14px;
 }
 
 .removeBtn:hover {
