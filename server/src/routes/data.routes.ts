@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express'
 import { DataController } from '../controllers/data.controller'
-import { Provider } from '../providers/provider.interface'
+import { Provider, Show } from '../providers/provider.interface'
 import NodeCache from 'node-cache'
 
 function makeCacheMiddleware(
@@ -82,7 +82,9 @@ export function createDataRouter(
       apiCache,
       (req) => `meta-${req.params.id}`,
       3600,
-      (d) => !!d
+      (d) =>
+        !!d &&
+        (typeof (d as Show).bannerImage === 'string' || typeof (d as Show).description === 'string')
     ),
     controller.getShowMeta
   )

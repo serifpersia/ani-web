@@ -66,9 +66,12 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
       queryKey: ['spotlight-meta', anime._id],
       queryFn: () => fetchShowMeta(anime._id),
       enabled: !!anime._id,
-      staleTime: 1000 * 60 * 10, // 10 min
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 10,
       retry: 3,
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+      refetchOnMount: true,
+      refetchOnWindowFocus: true,
     })),
   })
 
