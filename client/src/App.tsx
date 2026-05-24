@@ -5,6 +5,8 @@ import Sidebar from './components/layout/Sidebar'
 import Footer from './components/layout/Footer'
 import ScrollToTopButton from './components/common/ScrollToTopButton'
 import { useTelemetry } from './hooks/useTelemetry'
+import VirtualKeyboard from './components/common/VirtualKeyboard'
+import { useVirtualKeyboard } from './hooks/useVirtualKeyboard'
 
 const Home = lazy(() => import('./pages/Home'))
 const Watchlist = lazy(() => import('./pages/Watchlist'))
@@ -27,6 +29,7 @@ const PlayerRedirect = () => {
 
 function App() {
   const { isOpen, setIsOpen } = useSidebar()
+  const virtualKeyboard = useVirtualKeyboard()
   useTelemetry()
 
   useEffect(() => {
@@ -101,6 +104,11 @@ function App() {
       </main>
       <Footer />
       <ScrollToTopButton />
+      <VirtualKeyboard
+        activeInputRef={virtualKeyboard.activeInputRef}
+        isVisible={virtualKeyboard.isVisible}
+        onClose={virtualKeyboard.hide}
+      />
     </div>
   )
 }

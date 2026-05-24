@@ -13,6 +13,11 @@ import { useLowEndMode } from '../contexts/LowEndModeContext'
 import ToggleSwitch from '../components/common/ToggleSwitch'
 import packageJson from '../../../package.json'
 import { deleteTelemetryData } from '../hooks/useTelemetry'
+import {
+  getVirtualKeyboardEnabled,
+  VIRTUAL_KEYBOARD_ENABLED_CHANGE_EVENT,
+  VIRTUAL_KEYBOARD_ENABLED_KEY,
+} from '../hooks/useVirtualKeyboard'
 
 type SettingsTab = 'general' | 'sync' | 'watchlist' | 'database'
 
@@ -30,6 +35,7 @@ const Settings: React.FC = () => {
   const [telemetryEnabled, setTelemetryEnabled] = useState(
     localStorage.getItem('telemetry_enabled') !== 'false'
   )
+  const [virtualKeyboardEnabled, setVirtualKeyboardEnabled] = useState(getVirtualKeyboardEnabled)
 
   const toggleTelemetry = (enabled: boolean) => {
     setTelemetryEnabled(enabled)
@@ -37,6 +43,12 @@ const Settings: React.FC = () => {
     if (!enabled) {
       deleteTelemetryData()
     }
+  }
+
+  const toggleVirtualKeyboard = (enabled: boolean) => {
+    setVirtualKeyboardEnabled(enabled)
+    localStorage.setItem(VIRTUAL_KEYBOARD_ENABLED_KEY, String(enabled))
+    window.dispatchEvent(new CustomEvent(VIRTUAL_KEYBOARD_ENABLED_CHANGE_EVENT))
   }
 
   React.useEffect(() => {
@@ -142,6 +154,30 @@ const Settings: React.FC = () => {
                     isChecked={lowEndMode}
                     onChange={(e) => setLowEndMode(e.target.checked)}
                     id="low-end-mode"
+                  />
+                </div>
+              </div>
+
+              <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Virtual Keyboard</h4>
+                    <p
+                      style={{
+                        margin: '0.25rem 0 0',
+                        fontSize: '0.85rem',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      Shows an on-screen keyboard when text search fields are focused.
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    isChecked={virtualKeyboardEnabled}
+                    onChange={(e) => toggleVirtualKeyboard(e.target.checked)}
+                    id="virtual-keyboard-enabled"
                   />
                 </div>
               </div>

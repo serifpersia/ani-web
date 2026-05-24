@@ -5,6 +5,7 @@ import { FaBars, FaCloud, FaGithub, FaSearch } from 'react-icons/fa'
 import NotificationBell from './NotificationBell'
 import Logo from '../common/Logo'
 import { useSidebar } from '../../hooks/useSidebar'
+import { hideVirtualKeyboard } from '../../hooks/useVirtualKeyboard'
 import styles from './Header.module.css'
 
 interface UserProfile {
@@ -82,6 +83,7 @@ const Header: React.FC = () => {
 
   const handleSearch = (e?: React.FormEvent) => {
     e?.preventDefault()
+    hideVirtualKeyboard()
     if (query.trim()) {
       navigate(`/search?query=${encodeURIComponent(query.trim())}`)
     }
@@ -102,6 +104,7 @@ const Header: React.FC = () => {
         <form onSubmit={handleSearch} className={styles.searchContainer}>
           <input
             type="text"
+            data-virtual-keyboard="true"
             className={styles.searchInput}
             placeholder="Search anime..."
             value={query}

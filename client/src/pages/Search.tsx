@@ -15,6 +15,7 @@ import ErrorMessage from '../components/common/ErrorMessage'
 import SearchableSelect from '../components/common/SearchableSelect'
 import { usePaginatedSearchAnime, useGenresAndStudios } from '../hooks/useAnimeData'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
+import { hideVirtualKeyboard } from '../hooks/useVirtualKeyboard'
 import styles from './Search.module.css'
 
 interface Option {
@@ -103,6 +104,8 @@ export default function Search() {
   }, [searchParams])
 
   const handleSearch = (newPage = 1) => {
+    hideVirtualKeyboard()
+
     const params = new URLSearchParams()
     if (query.trim()) params.set('query', query.trim())
 
@@ -181,6 +184,8 @@ export default function Search() {
           <div className={styles.inputIconWrapper}>
             <FaSearch className={styles.searchIcon} />
             <input
+              type="text"
+              data-virtual-keyboard="true"
               className={styles.searchInput}
               placeholder="Search by title, character, or studio..."
               value={query}

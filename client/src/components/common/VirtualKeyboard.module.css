@@ -1,0 +1,172 @@
+.keyboard {
+  position: fixed;
+  z-index: 5000;
+  width: min(var(--keyboard-width), calc(100vw - 24px));
+  overflow: hidden;
+  color: var(--text-primary);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    rgba(15, 15, 17, 0.97);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.46);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  user-select: none;
+}
+
+.small {
+  --keyboard-width: 500px;
+  --key-size: 34px;
+  --key-font: 0.8rem;
+  --keyboard-gap: 5px;
+}
+
+.medium {
+  --keyboard-width: 650px;
+  --key-size: 42px;
+  --key-font: 0.95rem;
+  --keyboard-gap: 7px;
+}
+
+.large {
+  --keyboard-width: 820px;
+  --key-size: 52px;
+  --key-font: 1.08rem;
+  --keyboard-gap: 9px;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.dragHandle {
+  flex: 1;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: move;
+}
+
+.grip {
+  width: 22px;
+  height: 14px;
+  background-image: radial-gradient(currentColor 1px, transparent 1px);
+  background-size: 6px 6px;
+  opacity: 0.8;
+}
+
+.topButton,
+.key {
+  border: 1px solid var(--border-secondary);
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.08s ease;
+}
+
+.topButton {
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+}
+
+.topButton:hover,
+.key:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.26);
+}
+
+.topButton:active,
+.key:active {
+  transform: translateY(1px);
+}
+
+.closeButton {
+  width: 34px;
+  padding: 0;
+}
+
+.keys {
+  display: grid;
+  gap: var(--keyboard-gap);
+  padding: var(--space-3);
+  justify-items: center;
+}
+
+.row {
+  display: flex;
+  justify-content: center;
+  gap: var(--keyboard-gap);
+  width: 100%;
+  max-width: calc((var(--key-size) * 10) + (var(--key-size) * 1.75) + (var(--keyboard-gap) * 10));
+}
+
+.key {
+  min-width: var(--key-size);
+  height: var(--key-size);
+  border-radius: var(--radius-sm);
+  font-size: var(--key-font);
+  font-weight: var(--font-weight-semibold);
+}
+
+.wideKey {
+  min-width: calc(var(--key-size) * 1.75);
+}
+
+.extraWideKey {
+  min-width: calc(var(--key-size) * 2.3);
+}
+
+.spaceKey {
+  flex: 1;
+  max-width: calc(
+    (var(--key-size) * 10) + (var(--key-size) * 1.75) + (var(--keyboard-gap) * 10) -
+      (var(--key-size) * 5.5) - (var(--keyboard-gap) * 4)
+  );
+}
+
+.spaceIcon {
+  width: 14%;
+  height: 12px;
+  border-bottom: 2px solid currentColor;
+  display: inline-block;
+  opacity: 0.9;
+}
+
+.activeKey {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+}
+
+@media (max-width: 700px) {
+  .keyboard {
+    left: 8px !important;
+    width: calc(100vw - 16px);
+  }
+
+  .small,
+  .medium,
+  .large {
+    --key-size: 31px;
+    --keyboard-gap: 4px;
+    --key-font: 0.76rem;
+  }
+
+  .dragHandle span {
+    display: none;
+  }
+}
