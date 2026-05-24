@@ -1,5 +1,6 @@
 import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import {
   FaPlay,
   FaPlus,
@@ -12,7 +13,9 @@ import {
 } from 'react-icons/fa'
 import { useState, useMemo } from 'react'
 import { useAnimeInfoData } from '../../hooks/useAnimeInfoData'
+import { useAddToQueue, useQueue, useRemoveFromQueue } from '../../hooks/useAnimeData'
 import { fixThumbnailUrl } from '../../lib/utils'
+import { getSuggestedEpisode } from '../../lib/queue'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 import styles from './AnimeInfo.module.css'
 import AnimeMetaDetails from './AnimeMetaDetails'
@@ -22,8 +25,17 @@ export default function AnimeInfo() {
   const navigate = useNavigate()
   const { titlePreference } = useTitlePreference()
   const [showDetails, setShowDetails] = useState(false)
+  const [queueConfirmed, setQueueConfirmed] = useState(false)
 
   const { showMeta, loadingMeta, toggleWatchlist, inWatchlist } = useAnimeInfoData(showId)
+  const { data: queue = [] } = useQueue()
+  const addQueue = useAddToQueue()
+  const removeQueue = useRemoveFromQueue()
+  const { data: suggestedEpisode } = useQuery({
+    queryKey: ['suggestedEpisode', showId],
+    queryFn: () => getSuggestedEpisode(showId as string),
+    enabled: !!showId,
+  })
 
   const getDisplayTitle = () => {
     if (!showMeta?.name) return ''
@@ -35,6 +47,35 @@ export default function AnimeInfo() {
 
   const handleStartWatching = () => {
     if (showId) navigate(`/watch/${showId}`)
+  }
+
+  const queuedItem = useMemo(() => {
+    if (!showId || !suggestedEpisode) return undefined
+    return queue.find(
+      (item) => item.showId === showId && item.episodeNumber === suggestedEpisode.episodeNumber
+    )
+  }, [queue, showId, suggestedEpisode])
+
+  const handleQueueToggle = async () => {
+    if (!showId || !showMeta) return
+    const suggestion = suggestedEpisode || (await getSuggestedEpisode(showId))
+
+    if (queuedItem) {
+      removeQueue.mutate({ showId, episodeNumber: queuedItem.episodeNumber })
+      return
+    }
+
+    setQueueConfirmed(true)
+    addQueue.mutate({
+      showId,
+      episodeNumber: suggestion.episodeNumber,
+      showName: showMeta.name || showMeta.names?.romaji,
+      showThumbnail: showMeta.thumbnail,
+      nativeName: showMeta.names?.native,
+      englishName: showMeta.names?.english,
+      type: showMeta.type,
+    })
+    window.setTimeout(() => setQueueConfirmed(false), 1000)
   }
 
   const bannerUrl = useMemo(() => {
@@ -135,6 +176,13 @@ export default function AnimeInfo() {
               >
                 {inWatchlist ? <FaCheck size={14} /> : <FaPlus size={14} />}
                 {inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
+              </button>
+              <button
+                className={`${styles.watchlistBtn} ${queuedItem || queueConfirmed ? styles.active : ''}`}
+                onClick={handleQueueToggle}
+              >
+                {queuedItem || queueConfirmed ? <FaCheck size={14} /> : <FaPlus size={14} />}
+                {queuedItem || queueConfirmed ? 'Queued' : 'Queue'}
               </button>
             </div>
           </div>

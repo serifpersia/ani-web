@@ -1,6 +1,15 @@
 import React, { useEffect, useMemo, useCallback, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
-import { FaHistory, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
+import {
+  FaBars,
+  FaChevronDown,
+  FaChevronLeft,
+  FaChevronRight,
+  FaChevronUp,
+  FaHistory,
+  FaTimes,
+} from 'react-icons/fa'
 import { Button } from '../components/common/Button'
 import AnimeSection from '../components/anime/AnimeSection'
 import TrendingList from '../components/anime/TrendingList'
@@ -17,12 +26,62 @@ import {
   useContinueWatchingUpNext,
   useRemoveFromWatchlist,
   usePopularAnime,
+  useQueue,
+  useRemoveFromQueue,
 } from '../hooks/useAnimeData'
+import type { QueueItem } from '../hooks/useAnimeData'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
-import { useLowEndMode } from '../contexts/LowEndModeContext'
+import { fixThumbnailUrl } from '../lib/utils'
 import styles from './Home.module.css'
 
 type ActiveTab = 'latest' | 'season' | 'popular'
+
+interface QuickQueueItemProps {
+  item: QueueItem
+  onRemove: (item: QueueItem) => void
+}
+
+const QuickQueueItem = ({ item, onRemove }: QuickQueueItemProps) => {
+  const navigate = useNavigate()
+  const { titlePreference } = useTitlePreference()
+
+  const displayTitle =
+    (item[titlePreference as keyof QueueItem] as string) || item.name || 'Unknown show'
+
+  return (
+    <div className={styles.quickQueueItem}>
+      <button className={styles.quickQueueDrag} type="button" aria-label="Drag queue item">
+        <FaBars />
+      </button>
+      <img
+        className={styles.quickQueueThumb}
+        src={fixThumbnailUrl(item.thumbnail || '', 72, 96)}
+        alt={displayTitle}
+        onError={(event) => {
+          event.currentTarget.src = '/placeholder.svg'
+        }}
+      />
+      <div className={styles.quickQueueMeta}>
+        <button
+          className={styles.quickQueueName}
+          type="button"
+          onClick={() => navigate(`/watch/${item.showId}/${item.episodeNumber}`)}
+        >
+          {displayTitle}
+        </button>
+        <div className={styles.quickQueueEpisode}>Episode {item.episodeNumber}</div>
+      </div>
+      <button
+        className={styles.quickQueueRemove}
+        type="button"
+        onClick={() => onRemove(item)}
+        aria-label={`Remove ${displayTitle} episode ${item.episodeNumber} from queue`}
+      >
+        <FaTimes />
+      </button>
+    </div>
+  )
+}
 
 const Home: React.FC = () => {
   const queryClient = useQueryClient()
@@ -35,9 +94,11 @@ const Home: React.FC = () => {
   const { data: nextPageData } = usePaginatedCurrentSeason(page + 1)
 
   const { titlePreference } = useTitlePreference()
-  const { lowEndMode } = useLowEndMode()
   const [itemToRemove, setItemToRemove] = React.useState<{ id: string; name: string } | null>(null)
+  const [isQueueOpen, setIsQueueOpen] = useState(true)
   const removeWatchlistMutation = useRemoveFromWatchlist()
+  const { data: queue = [] } = useQueue()
+  const removeQueue = useRemoveFromQueue()
 
   useEffect(() => {
     document.title = 'Home - ani-web'
@@ -139,6 +200,13 @@ const Home: React.FC = () => {
     [itemToRemove, removeCw, removeWatchlistMutation]
   )
 
+  const handleQueueRemove = useCallback(
+    (item: QueueItem) => {
+      removeQueue.mutate({ showId: item.showId, episodeNumber: item.episodeNumber })
+    },
+    [removeQueue]
+  )
+
   const tabs: { key: ActiveTab; label: string }[] = [
     { key: 'latest', label: 'Latest Releases' },
     { key: 'season', label: 'Current Season' },
@@ -231,6 +299,29 @@ const Home: React.FC = () => {
   return (
     <div style={{ paddingBottom: '2rem' }}>
       <SpotlightBanner animeList={popularWeekly || []} />
+      {queue.length > 0 && (
+        <section className={styles.quickQueue}>
+          <button
+            type="button"
+            className={styles.quickQueueHeader}
+            onClick={() => setIsQueueOpen((open) => !open)}
+          >
+            <span className={styles.quickQueueTitle}>
+              Quick Queue
+              <span className={styles.queueBadge}>{queue.length}</span>
+            </span>
+            {isQueueOpen ? <FaChevronUp /> : <FaChevronDown />}
+          </button>
+
+          {isQueueOpen && (
+            <div className={styles.quickQueueList}>
+              {queue.map((item) => (
+                <QuickQueueItem key={item.id} item={item} onRemove={handleQueueRemove} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
       {/* ── Continue Watching ── */}
       <AnimeSection
         title="Continue Watching"

@@ -54,6 +54,24 @@ export const WatchedEpisodesRepository = {
     return rows.map((r) => r.episodeNumber)
   },
 
+  getByShow: (db: DatabaseWrapper, showId: string) =>
+    dbAll<WatchedEpisode>(
+      db,
+      'SELECT showId, episodeNumber, currentTime, duration, watchedAt FROM watched_episodes WHERE showId = ? ORDER BY CAST(episodeNumber AS REAL) ASC',
+      [showId]
+    ),
+
+  getLatestResumeProgress: (db: DatabaseWrapper, showId: string) =>
+    dbGet<WatchedEpisode>(
+      db,
+      `SELECT showId, episodeNumber, currentTime, duration, watchedAt
+       FROM watched_episodes
+       WHERE showId = ? AND currentTime > 5 AND (duration <= 0 OR currentTime < duration * 0.8)
+       ORDER BY watchedAt DESC
+       LIMIT 1`,
+      [showId]
+    ),
+
   upsert: (
     db: DatabaseWrapper,
     data: {

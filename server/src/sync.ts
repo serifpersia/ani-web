@@ -420,6 +420,12 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
       initOpts
     )
     db.run(
+      `CREATE TABLE IF NOT EXISTS queue (id INTEGER PRIMARY KEY, showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, queue_order INTEGER NOT NULL)`,
+      undefined,
+      undefined,
+      initOpts
+    )
+    db.run(
       `CREATE TABLE IF NOT EXISTS settings (key TEXT NOT NULL, value TEXT, PRIMARY KEY (key))`,
       undefined,
       undefined,
@@ -480,11 +486,25 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
       undefined,
       initOpts
     )
+    db.run(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_show_episode ON queue(showId, episodeNumber)`,
+      undefined,
+      undefined,
+      initOpts
+    )
+    db.run(
+      `CREATE INDEX IF NOT EXISTS idx_queue_order ON queue(queue_order)`,
+      undefined,
+      undefined,
+      initOpts
+    )
 
     db.run('DELETE FROM watched_episodes WHERE showId NOT IN (SELECT id FROM watchlist)')
     db.run('DELETE FROM dismissed_notifications WHERE showId NOT IN (SELECT id FROM watchlist)')
     db.run('DELETE FROM discovered_notifications WHERE showId NOT IN (SELECT id FROM watchlist)')
-    db.run('DELETE FROM shows_meta WHERE id NOT IN (SELECT id FROM watchlist)')
+    db.run(
+      'DELETE FROM shows_meta WHERE id NOT IN (SELECT id FROM watchlist) AND id NOT IN (SELECT showId FROM queue)'
+    )
 
     db.run(
       'DELETE FROM dismissed_notifications WHERE EXISTS (SELECT 1 FROM watched_episodes we WHERE we.showId = dismissed_notifications.showId AND we.episodeNumber = dismissed_notifications.episodeNumber)'

@@ -11,11 +11,15 @@ import useIsMobile from '../hooks/useIsMobile'
 import type Hls from 'hls.js'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import PlayerControls from '../components/player/PlayerControls'
+import QueueDrawer from '../components/player/QueueDrawer'
+import queueDrawerStyles from '../components/player/QueueDrawer.module.css'
 import EpisodeList from '../components/player/EpisodeList'
 import SourceSelector from '../components/player/SourceSelector'
 import { ProviderSelector } from '../components/player/SourceSelector'
 import useVideoPlayer from '../hooks/useVideoPlayer'
 import { usePlayerData } from '../hooks/usePlayerData'
+import { useQueue, useRemoveFromQueue } from '../hooks/useAnimeData'
+import type { QueueItem } from '../hooks/useAnimeData'
 import type { VideoLink, SubtitleTrack } from '../types/player'
 import AnimeMetaDetails from '../components/anime/AnimeMetaDetails'
 
@@ -78,8 +82,16 @@ const Player: React.FC = () => {
   } | null>(null)
   const [showNextEpisodePrompt, setShowNextEpisodePrompt] = useState(false)
   const [hasReachedEpisodeEnd, setHasReachedEpisodeEnd] = useState(false)
+  const [isQueueDrawerOpen, setIsQueueDrawerOpen] = useState(false)
+  const [queueCountdown, setQueueCountdown] = useState<number | null>(null)
+  const [pendingQueueTransition, setPendingQueueTransition] = useState<{
+    nextItem: QueueItem | null
+    playedItem: QueueItem | null
+  } | null>(null)
   const clickCountRef = useRef(0)
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const { data: queue = [] } = useQueue()
+  const removeQueue = useRemoveFromQueue()
 
   const handlePlayerClick = useCallback(
     (e: React.MouseEvent) => {
@@ -272,7 +284,29 @@ const Player: React.FC = () => {
     if (!videoElement) return
     const handleVideoEnd = () => {
       actions.onEnded()
-      if (state.isAutoplayEnabled) {
+
+      const itemToRemove = queue.find(
+        (item) => item.showId === showId && item.episodeNumber === state.currentEpisode
+      )
+
+      if (queue.length > 0) {
+        const activeQueueIndex = queue.findIndex(
+          (item) => item.showId === showId && item.episodeNumber === state.currentEpisode
+        )
+
+        const nextItem = activeQueueIndex >= 0 ? queue[activeQueueIndex + 1] || null : queue[0]
+
+        setPendingQueueTransition({ nextItem, playedItem: itemToRemove || null })
+        setQueueCountdown(2)
+      } else if (itemToRemove) {
+        removeQueue.mutate({
+          showId: itemToRemove.showId,
+          episodeNumber: itemToRemove.episodeNumber,
+        })
+      }
+
+      // Standard autoplay only if queue is totally empty
+      if (state.isAutoplayEnabled && queue.length === 0) {
         const currentIndex = state.episodes.findIndex((ep) => ep === state.currentEpisode)
         if (currentIndex > -1 && currentIndex < state.episodes.length - 1) {
           const nextEpisode = state.episodes[currentIndex + 1]
@@ -295,7 +329,37 @@ const Player: React.FC = () => {
     refs.videoRef,
     actions,
     player.state.isFullscreen,
+    queue,
+    removeQueue,
   ])
+
+  useEffect(() => {
+    if (!pendingQueueTransition || queueCountdown === null) return
+
+    if (queueCountdown <= 0) {
+      const { nextItem, playedItem } = pendingQueueTransition
+      setPendingQueueTransition(null)
+      setQueueCountdown(null)
+
+      if (playedItem) {
+        removeQueue.mutate({
+          showId: playedItem.showId,
+          episodeNumber: playedItem.episodeNumber,
+        })
+      }
+
+      if (nextItem) {
+        navigate(`/watch/${nextItem.showId}/${nextItem.episodeNumber}`)
+      }
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      setQueueCountdown((value) => (value === null ? null : value - 1))
+    }, 1000)
+
+    return () => window.clearTimeout(timer)
+  }, [pendingQueueTransition, queueCountdown, navigate, removeQueue])
 
   useEffect(() => {
     if (state.showResumeModal && player.state.isFullscreen) {
@@ -522,13 +586,33 @@ const Player: React.FC = () => {
   }
 
   const handleNextEpisode = () => {
-    const currentIndex = state.episodes.findIndex((ep) => ep === state.currentEpisode)
-    if (currentIndex > -1 && currentIndex < state.episodes.length - 1) {
-      const nextEpisode = state.episodes[currentIndex + 1]
-      navigate(`/watch/${showId}/${nextEpisode}`)
+    if (queue && queue.length > 0) {
+      const nextItem = queue[0]
+      navigate(`/watch/${nextItem.showId}/${nextItem.episodeNumber}`)
+    } else {
+      const currentIndex = state.episodes.findIndex((ep) => ep === state.currentEpisode)
+      if (currentIndex > -1 && currentIndex < state.episodes.length - 1) {
+        const nextEpisode = state.episodes[currentIndex + 1]
+        navigate(`/watch/${showId}/${nextEpisode}`)
+      }
     }
     dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } })
   }
+
+  const handleQueueTransition = useCallback(() => {
+    if (queue.length > 0) {
+      const itemToRemove = queue[0]
+      player.actions.onEnded()
+      removeQueue.mutate({
+        showId: itemToRemove.showId,
+        episodeNumber: itemToRemove.episodeNumber,
+      })
+      if (queue.length > 1) {
+        const nextItem = queue[1]
+        navigate(`/watch/${nextItem.showId}/${nextItem.episodeNumber}`)
+      }
+    }
+  }, [queue, player.actions, removeQueue, navigate])
 
   const hasNextEpisode = (() => {
     const currentIndex = state.episodes.findIndex((ep) => ep === state.currentEpisode)
@@ -723,7 +807,9 @@ const Player: React.FC = () => {
                   player={player}
                   isAutoplayEnabled={state.isAutoplayEnabled}
                   onAutoplayChange={handleAutoplayChange}
-                  showNextEpisodeButton={!state.showResumeModal && showNextEpisodePrompt}
+                  showNextEpisodeButton={
+                    !state.showResumeModal && showNextEpisodePrompt && queue.length === 0
+                  }
                   onNextEpisode={handleNextEpisode}
                   videoSources={state.videoSources}
                   selectedSource={state.selectedSource}
@@ -744,9 +830,11 @@ const Player: React.FC = () => {
                   }}
                   loadingVideo={state.loadingVideo}
                   skipIntervals={state.skipIntervals}
+                  onToggleQueue={() => setIsQueueDrawerOpen((open) => !open)}
+                  queue={queue}
+                  onQueueAction={handleQueueTransition}
                 />
-              )}
-
+              )}{' '}
               {!isVideoLoading && state.videoSources.length > 0 && (
                 <video
                   ref={refs.videoRef}
@@ -754,7 +842,17 @@ const Player: React.FC = () => {
                   onPlay={actions.onPlay}
                   onPause={actions.onPause}
                   onLoadedMetadata={actions.onLoadedMetadata}
-                  onTimeUpdate={actions.onTimeUpdate}
+                  onTimeUpdate={() => {
+                    actions.onTimeUpdate()
+                    if (
+                      pendingQueueTransition &&
+                      refs.videoRef.current &&
+                      refs.videoRef.current.currentTime < refs.videoRef.current.duration - 1
+                    ) {
+                      setPendingQueueTransition(null)
+                      setQueueCountdown(null)
+                    }
+                  }}
                   onProgress={actions.onProgress}
                   onVolumeChange={actions.onVolumeChange}
                   onWaiting={actions.onWaiting}
@@ -762,6 +860,15 @@ const Player: React.FC = () => {
                 />
               )}
             </>
+          )}
+          <QueueDrawer
+            isOpen={isQueueDrawerOpen}
+            onClose={() => setIsQueueDrawerOpen(false)}
+            currentShowId={showId}
+            currentEpisode={state.currentEpisode}
+          />
+          {queueCountdown !== null && pendingQueueTransition?.nextItem && (
+            <div className={queueDrawerStyles.countdown}>Queue next in {queueCountdown}s</div>
           )}
         </div>
 

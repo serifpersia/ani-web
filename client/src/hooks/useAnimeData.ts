@@ -24,6 +24,19 @@ export interface Anime {
   rating?: string
 }
 
+export interface QueueItem {
+  id: number
+  _id: string
+  showId: string
+  episodeNumber: string
+  queue_order: number
+  name?: string
+  nativeName?: string
+  englishName?: string
+  thumbnail?: string
+  type?: string
+}
+
 const fetchApi = async (url: string) => {
   const response = await fetch(url)
   if (!response.ok) {
@@ -133,6 +146,104 @@ export const useContinueWatching = (limit?: number) => {
   return useQuery<Anime[]>({
     queryKey: ['continueWatching', { limit }],
     queryFn: () => fetchApi(url),
+  })
+}
+
+export const useQueue = () => {
+  return useQuery<QueueItem[]>({
+    queryKey: ['queue'],
+    queryFn: () => fetchApi('/api/queue'),
+  })
+}
+
+export const useAddToQueue = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (item: {
+      showId: string
+      episodeNumber: string
+      showName?: string
+      showThumbnail?: string
+      nativeName?: string
+      englishName?: string
+      type?: string
+    }) => {
+      const response = await fetch('/api/queue/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item),
+      })
+      if (!response.ok) throw new Error('Failed to update queue')
+      return response.json() as Promise<{ success: boolean; queued: boolean }>
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['queue'] })
+    },
+  })
+}
+
+export const useRemoveFromQueue = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (item: { showId: string; episodeNumber: string }) => {
+      const response = await fetch('/api/queue/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item),
+      })
+      if (!response.ok) throw new Error('Failed to remove queue item')
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['queue'] })
+    },
+  })
+}
+
+export const useClearQueue = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/queue/clear', { method: 'POST' })
+      if (!response.ok) throw new Error('Failed to clear queue')
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['queue'] })
+    },
+  })
+}
+
+export const useReorderQueue = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (items: Pick<QueueItem, 'id' | 'showId' | 'episodeNumber'>[]) => {
+      const response = await fetch('/api/queue/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+      })
+      if (!response.ok) throw new Error('Failed to reorder queue')
+    },
+    onMutate: async (items) => {
+      await queryClient.cancelQueries({ queryKey: ['queue'] })
+      const previousQueue = queryClient.getQueryData<QueueItem[]>(['queue'])
+      queryClient.setQueryData<QueueItem[]>(['queue'], (old) => {
+        if (!old) return old
+        const byId = new Map(old.map((item) => [item.id, item]))
+        return items
+          .map((item, index) => {
+            const existing = byId.get(item.id)
+            return existing ? { ...existing, queue_order: index } : undefined
+          })
+          .filter((item): item is QueueItem => !!item)
+      })
+      return { previousQueue }
+    },
+    onError: (_error, _items, context) => {
+      if (context?.previousQueue) queryClient.setQueryData(['queue'], context.previousQueue)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['queue'] })
+    },
   })
 }
 
@@ -313,6 +424,6 @@ export const useGenresAndStudios = () => {
   return useQuery<{ genres: string[]; tags: string[]; studios: string[] }>({
     queryKey: ['genresAndStudios'],
     queryFn: () => fetchApi('/api/genres-and-tags'),
-    staleTime: 1000 * 60 * 60, // 1 hour
+    staleTime: 1000 * 60 * 60,
   })
 }

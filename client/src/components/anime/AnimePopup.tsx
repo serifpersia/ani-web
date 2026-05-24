@@ -1,9 +1,11 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { FaStar, FaPlay, FaTv, FaPlus, FaCheck } from 'react-icons/fa'
 import { Link } from 'react-router-dom'
 import { useAnimeInfoData } from '../../hooks/useAnimeInfoData'
+import { useQueue, useAddToQueue, useRemoveFromQueue } from '../../hooks/useAnimeData'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
+import { getSuggestedEpisode } from '../../lib/queue'
 import styles from './AnimePopup.module.css'
 
 interface AnimePopupProps {
@@ -20,7 +22,38 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
   onMouseLeave,
 }) => {
   const { showMeta, loadingMeta, inWatchlist, toggleWatchlist } = useAnimeInfoData(showId)
+  const { data: queue = [] } = useQueue()
+  const addQueue = useAddToQueue()
+  const removeQueue = useRemoveFromQueue()
+  const [queueConfirmed, setQueueConfirmed] = useState(false)
   const { titlePreference } = useTitlePreference()
+
+  const suggestedEpisode = useMemo(() => null, []) // Simplified for now as we don't have suggested episode hook easily available here
+
+  const queuedItem = useMemo(() => {
+    return queue.find((item) => item.showId === showId)
+  }, [queue, showId])
+
+  const handleQueueToggle = async () => {
+    if (!showMeta) return
+    if (queuedItem) {
+      removeQueue.mutate({ showId, episodeNumber: queuedItem.episodeNumber })
+      return
+    }
+
+    const suggestion = await getSuggestedEpisode(showId)
+    setQueueConfirmed(true)
+    addQueue.mutate({
+      showId,
+      episodeNumber: suggestion.episodeNumber,
+      showName: showMeta.name || showMeta.names?.romaji,
+      showThumbnail: showMeta.thumbnail,
+      nativeName: showMeta.names?.native,
+      englishName: showMeta.names?.english,
+      type: showMeta.type,
+    })
+    window.setTimeout(() => setQueueConfirmed(false), 1000)
+  }
 
   const displayTitle = useMemo(() => {
     if (!showMeta?.name) return ''
@@ -132,6 +165,17 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
                 >
                   {inWatchlist ? <FaCheck size={12} /> : <FaPlus size={12} />}
                   <span>{inWatchlist ? 'Remove' : 'Watchlist'}</span>
+                </button>
+                <button
+                  className={`${styles.watchlistBtn} ${queuedItem || queueConfirmed ? styles.active : ''}`}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    handleQueueToggle()
+                  }}
+                >
+                  {queuedItem || queueConfirmed ? <FaCheck size={12} /> : <FaPlus size={12} />}
+                  <span>{queuedItem || queueConfirmed ? 'Queued' : 'Queue'}</span>
                 </button>
                 <Link to={`/anime/${showId}`} className={styles.detailsBtn}>
                   Read more

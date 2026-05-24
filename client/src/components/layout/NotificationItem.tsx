@@ -1,10 +1,10 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { FaTimes } from 'react-icons/fa'
+import { FaCheck, FaPlus, FaTimes } from 'react-icons/fa'
 import { fixThumbnailUrl } from '../../lib/utils'
 import type { Notification } from '../../hooks/useAnimeData'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
-import { useDismissNotification } from '../../hooks/useAnimeData'
+import { useAddToQueue, useDismissNotification } from '../../hooks/useAnimeData'
 import styles from './Notification.module.css'
 
 interface NotificationItemProps {
@@ -13,6 +13,8 @@ interface NotificationItemProps {
 
 const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => {
   const dismissMutation = useDismissNotification()
+  const addQueueMutation = useAddToQueue()
+  const [justQueued, setJustQueued] = React.useState(false)
 
   const handleDismiss = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -28,6 +30,25 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => 
       showId: notification.showId,
       episodeNumber: notification.episodeNumber,
     })
+  }
+
+  const handleQueue = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setJustQueued(true)
+    addQueueMutation.mutate({
+      showId: notification.showId,
+      episodeNumber: notification.episodeNumber,
+      showName: notification.name,
+      showThumbnail: notification.thumbnail,
+      nativeName: notification.nativeName,
+      englishName: notification.englishName,
+    })
+    dismissMutation.mutate({
+      showId: notification.showId,
+      episodeNumber: notification.episodeNumber,
+    })
+    window.setTimeout(() => setJustQueued(false), 1000)
   }
 
   const { titlePreference } = useTitlePreference()
@@ -53,6 +74,13 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification }) => 
         <span className={styles.itemTitle}>{displayTitle}</span>
         <span className={styles.itemMeta}>New Episode {notification.episodeNumber}</span>
       </div>
+      <button
+        className={`${styles.removeItem} ${styles.queueItem}`}
+        onClick={handleQueue}
+        aria-label="Add notification to queue"
+      >
+        {justQueued ? <FaCheck /> : <FaPlus />}
+      </button>
       <button
         className={styles.removeItem}
         onClick={handleDismiss}

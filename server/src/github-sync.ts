@@ -17,6 +17,7 @@ const GITHUB_API_HEADERS = {
 const SYNC_TABLES = [
   'watchlist',
   'watched_episodes',
+  'queue',
   'settings',
   'shows_meta',
   'sync_metadata',

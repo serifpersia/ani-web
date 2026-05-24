@@ -11,6 +11,7 @@ import {
 } from '../repositories/watched-episodes.repository'
 import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
 import { NotificationsRepository } from '../repositories/notifications.repository'
+import { QueueRepository } from '../repositories/queue.repository'
 import { SearchOptions } from '../providers/provider.interface'
 import { asyncHandler } from '../utils/async-handler'
 
@@ -500,6 +501,120 @@ export class WatchlistController {
   checkWatchlist = asyncHandler(async (req: Request, res: Response) => {
     const item = await WatchlistRepository.getById(req.db, req.params.showId as string)
     res.json({ inWatchlist: !!item, status: item?.status ?? null })
+  })
+
+  getQueue = asyncHandler(async (req: Request, res: Response) => {
+    const rows = await QueueRepository.getAll(req.db)
+    res.json(
+      rows.map((row) => ({
+        ...row,
+        _id: row.showId,
+        id: row.id,
+        thumbnail: this.provider.deobfuscateUrl(row.thumbnail || ''),
+      }))
+    )
+  })
+
+  addToQueue = asyncHandler(async (req: Request, res: Response) => {
+    const { showId, episodeNumber, showName, showThumbnail, nativeName, englishName, type } =
+      req.body
+
+    if (!showId || !episodeNumber) {
+      return res.status(400).json({ error: 'showId and episodeNumber are required' })
+    }
+
+    const existing = await QueueRepository.getByEpisode(req.db, showId, String(episodeNumber))
+
+    await performWriteTransaction(req.db, (tx) => {
+      if (showName || showThumbnail || nativeName || englishName || type) {
+        ShowsMetaRepository.upsert(tx, {
+          id: showId,
+          name: showName || '',
+          thumbnail: this.provider.deobfuscateUrl(showThumbnail || ''),
+          nativeName,
+          englishName,
+          type,
+        })
+      }
+
+      if (existing) {
+        QueueRepository.removeEpisode(tx, showId, String(episodeNumber))
+      } else {
+        QueueRepository.addToEnd(tx, showId, String(episodeNumber))
+      }
+    })
+
+    req.db.scheduleSave()
+    res.json({ success: true, queued: !existing })
+  })
+
+  removeFromQueue = asyncHandler(async (req: Request, res: Response) => {
+    const { showId, episodeNumber } = req.body
+    await performWriteTransaction(req.db, (tx) => {
+      QueueRepository.removeEpisode(tx, showId, String(episodeNumber))
+    })
+    res.json({ success: true })
+  })
+
+  clearQueue = asyncHandler(async (req: Request, res: Response) => {
+    await performWriteTransaction(req.db, (tx) => {
+      QueueRepository.clear(tx)
+    })
+    res.json({ success: true })
+  })
+
+  reorderQueue = asyncHandler(async (req: Request, res: Response) => {
+    const { items } = req.body
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ error: 'items must be an array' })
+    }
+
+    await performWriteTransaction(req.db, (tx) => {
+      QueueRepository.reorder(tx, items)
+    })
+    res.json({ success: true })
+  })
+
+  getSuggestedQueueEpisode = asyncHandler(async (req: Request, res: Response) => {
+    const showId = req.params.showId as string
+    const resumeProgress = await WatchedEpisodesRepository.getLatestResumeProgress(req.db, showId)
+
+    if (resumeProgress) {
+      return res.json({
+        showId,
+        episodeNumber: resumeProgress.episodeNumber,
+        resumeTime: resumeProgress.currentTime || 0,
+      })
+    }
+
+    const [watchedEpisodes, episodeData] = await Promise.all([
+      WatchedEpisodesRepository.getByShow(req.db, showId),
+      this.provider.getEpisodes(showId, 'sub').catch(() => null),
+    ])
+
+    const watchedSet = new Set(watchedEpisodes.map((ep) => ep.episodeNumber.toString()))
+    const episodes = episodeData?.episodes?.length
+      ? [...episodeData.episodes].sort((a, b) => parseFloat(a) - parseFloat(b))
+      : []
+
+    const finishedEpisodes = watchedEpisodes
+      .filter((ep) => ep.duration > 0 && ep.currentTime >= ep.duration * 0.8)
+      .map((ep) => parseFloat(ep.episodeNumber))
+      .filter((ep) => !Number.isNaN(ep))
+
+    const nextAfterFinished =
+      finishedEpisodes.length > 0 ? String(Math.max(...finishedEpisodes) + 1) : undefined
+
+    const episodeNumber =
+      (nextAfterFinished &&
+      episodes.includes(nextAfterFinished) &&
+      !watchedSet.has(nextAfterFinished)
+        ? nextAfterFinished
+        : episodes.find((ep) => !watchedSet.has(ep))) ||
+      episodes[0] ||
+      '1'
+
+    res.json({ showId, episodeNumber, resumeTime: 0 })
   })
 
   getEpisodeProgress = asyncHandler(async (req: Request, res: Response) => {

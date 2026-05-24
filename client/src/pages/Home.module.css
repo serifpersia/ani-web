@@ -115,3 +115,127 @@
 .tabActive {
   box-shadow: var(--shadow-md);
 }
+
+.quickQueue {
+  margin: 0 0 2.5rem;
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+
+.quickQueueHeader {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.quickQueueTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-weight: 800;
+}
+
+.queueBadge {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: white;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.quickQueueList {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding: 0 var(--space-5) var(--space-5);
+}
+
+.quickQueueItem {
+  width: 240px;
+  flex: 0 0 240px;
+  display: grid;
+  grid-template-columns: 24px 54px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+}
+
+.quickQueueDrag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  cursor: grab;
+  border: none;
+  background: transparent;
+}
+
+.quickQueueThumb {
+  width: 54px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+}
+
+.quickQueueMeta {
+  min-width: 0;
+}
+
+.quickQueueName {
+  display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.quickQueueEpisode {
+  margin-top: 0.25rem;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.quickQueueRemove {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border-secondary);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quickQueueRemove:hover {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}

@@ -211,6 +211,10 @@
   color: #ff4d4f;
 }
 
+.queueItem:hover {
+  color: var(--color-success);
+}
+
 .emptyState {
   padding: 2.5rem 1rem;
   text-align: center;

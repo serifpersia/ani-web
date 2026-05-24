@@ -65,5 +65,8 @@ export const ShowsMetaRepository = {
     dbRun(db, 'UPDATE shows_meta SET thumbnail = ? WHERE id = ?', [thumbnail, id]),
 
   cleanupOrphanedMeta: (db: DatabaseWrapper) =>
-    dbRun(db, 'DELETE FROM shows_meta WHERE id NOT IN (SELECT id FROM watchlist)'),
+    dbRun(
+      db,
+      'DELETE FROM shows_meta WHERE id NOT IN (SELECT id FROM watchlist) AND id NOT IN (SELECT showId FROM queue)'
+    ),
 }
