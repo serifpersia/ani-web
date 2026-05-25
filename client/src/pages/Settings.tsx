@@ -239,6 +239,42 @@ const Settings: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {localStorage.getItem('agreedToViewMature') === 'true' && (
+                <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '1rem' }}>Mature Content</h4>
+                      <p
+                        style={{
+                          margin: '0.25rem 0 0',
+                          fontSize: '0.85rem',
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        You have previously agreed to view 18+ content. Toggle this off to re-enable
+                        the blur gate and filtering.
+                      </p>
+                    </div>
+                    <ToggleSwitch
+                      isChecked={true}
+                      onChange={(e) => {
+                        if (!e.target.checked) {
+                          localStorage.removeItem('agreedToViewMature')
+                          window.location.reload()
+                        }
+                      }}
+                      id="mature-content-enabled"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )

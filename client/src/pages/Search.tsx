@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   FaSearch,
@@ -13,6 +13,7 @@ import SkeletonGrid from '../components/common/SkeletonGrid'
 import { Button } from '../components/common/Button'
 import ErrorMessage from '../components/common/ErrorMessage'
 import SearchableSelect from '../components/common/SearchableSelect'
+import ToggleSwitch from '../components/common/ToggleSwitch'
 import { usePaginatedSearchAnime, useGenresAndStudios } from '../hooks/useAnimeData'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import { hideVirtualKeyboard } from '../hooks/useVirtualKeyboard'
@@ -85,6 +86,20 @@ export default function Search() {
   } = usePaginatedSearchAnime(filterString, page, 14)
 
   const { data: nextPageData } = usePaginatedSearchAnime(filterString, page + 1, 14)
+
+  const [showMature, setShowMature] = useState(false)
+
+  const filteredResults = React.useMemo(() => {
+    if (showMature) return results
+    return results.filter((anime) => {
+      const isAdult =
+        anime.isAdult ||
+        anime.rating === 'R+' ||
+        anime.rating === 'Rx' ||
+        anime.rating?.includes('17+')
+      return !isAdult
+    })
+  }, [results, showMature])
 
   useEffect(() => {
     setQuery(searchParams.get('query') || '')
@@ -263,6 +278,19 @@ export default function Search() {
                 />
               </div>
             )}
+            <div className={styles.filterItem}>
+              <label>Content</label>
+              <div style={{ display: 'flex', alignItems: 'center', height: '40px', gap: '8px' }}>
+                <ToggleSwitch
+                  isChecked={showMature}
+                  onChange={(e) => setShowMature(e.target.checked)}
+                  id="search-mature-toggle"
+                />
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  Show mature content
+                </span>{' '}
+              </div>
+            </div>
           </div>
 
           {availableGenres.length > 0 && (
@@ -292,6 +320,7 @@ export default function Search() {
                 setYear('ALL')
                 setCountry('ALL')
                 setStudio('ALL')
+                setShowMature(false)
               }}
             >
               Reset All
@@ -310,7 +339,7 @@ export default function Search() {
           {query ? `Search Results for "${query}"` : 'Discover Anime'}
         </h2>
 
-        {results.length > 0 && (
+        {filteredResults.length > 0 && (
           <div className={styles.pagination}>
             <button
               className={styles.pageBtn}
@@ -337,11 +366,11 @@ export default function Search() {
         {isLoading ? (
           <SkeletonGrid />
         ) : (
-          results.map((anime) => <AnimeCard key={anime._id} anime={anime} />)
+          filteredResults.map((anime) => <AnimeCard key={anime._id} anime={anime} />)
         )}
       </div>
 
-      {!isLoading && results.length === 0 && (
+      {!isLoading && filteredResults.length === 0 && (
         <div className={styles.noResults}>
           <FaSearch size={48} className={styles.noResultsIcon} />
           <h3>No results found</h3>
@@ -349,7 +378,7 @@ export default function Search() {
         </div>
       )}
 
-      {results.length > 0 && (
+      {filteredResults.length > 0 && (
         <div className={styles.bottomPagination}>
           <div className={styles.pagination}>
             <button

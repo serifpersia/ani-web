@@ -2,6 +2,8 @@ import React, { memo, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { FaMicrophone, FaClosedCaptioning, FaTimes, FaInfo } from 'react-icons/fa'
 import AnimePopup from './AnimePopup'
+import GenericModal from '../common/GenericModal'
+import { Button } from '../common/Button'
 
 import { fixThumbnailUrl, formatTime } from '../../lib/utils'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
@@ -213,20 +215,47 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
       anime.rating === 'Rx' ||
       anime.rating?.includes('17+')
 
+    const [isAgreedToViewMature, setIsAgreedToViewMature] = React.useState(
+      localStorage.getItem('agreedToViewMature') === 'true'
+    )
+    const [showModal, setShowModal] = React.useState(false)
+
+    const handleConfirmViewMature = () => {
+      localStorage.setItem('agreedToViewMature', 'true')
+      setIsAgreedToViewMature(true)
+      setShowModal(false)
+    }
+
+    const shouldBlur = adultContent && !isAgreedToViewMature
+
     return (
       <div
         className={`${styles.cardWrapper} ${lowEndMode ? styles.lowEnd : ''}`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <Link to={linkTarget} className={`${styles.card} ${styles[layout]}`}>
+        <Link
+          to={linkTarget}
+          className={`${styles.card} ${styles[layout]}`}
+          onClick={(e) => {
+            if (shouldBlur) {
+              e.preventDefault()
+              setShowModal(true)
+            }
+          }}
+        >
           <div className={styles.posterContainer}>
+            {shouldBlur && (
+              <div className={`${styles.matureOverlay} ${lowEndMode ? styles.flat : ''}`}></div>
+            )}
             <img
               src={fixThumbnailUrl(anime.thumbnail, lowEndMode ? 100 : 150, lowEndMode ? 150 : 200)}
               alt={displayTitle}
               width={lowEndMode ? '100' : '150'}
               height={lowEndMode ? '150' : '200'}
-              className={`${styles.posterImg} ${isLoaded ? styles.loaded : ''}`}
+              className={`${styles.posterImg} ${isLoaded ? styles.loaded : ''} ${
+                shouldBlur && !lowEndMode ? styles.blurred : ''
+              }`}
               loading="lazy"
               decoding="async"
               onLoad={() => setIsLoaded(true)}
@@ -242,8 +271,8 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
               </>
             )}
 
-            {showAdultBadge && adultContent && !lowEndMode && (
-              <div className={styles.adultBadge}>18+</div>
+            {showAdultBadge && adultContent && (
+              <div className={`${styles.adultBadge} ${shouldBlur ? styles.gated : ''}`}>18+</div>
             )}
 
             {rank !== undefined && <div className={styles.rankBadge}>#{rank}</div>}
@@ -294,12 +323,42 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             )}
           </div>
         </Link>
+        {showModal && (
+          <GenericModal
+            isOpen={showModal}
+            title="Content Warning"
+            onClose={() => setShowModal(false)}
+          >
+            <div style={{ padding: '1rem', textAlign: 'center' }}>
+              <p>This title contains mature content intended for adult audiences.</p>
+              <p>
+                By proceeding, you confirm that you are of legal age and wish to view this content.
+              </p>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '1rem' }}>
+                You can reset this preference at any time in the <strong>Settings</strong> page.
+              </p>
+              <div
+                style={{
+                  marginTop: '1rem',
+                  display: 'flex',
+                  gap: '10px',
+                  justifyContent: 'center',
+                }}
+              >
+                <Button variant="secondary" onClick={() => setShowModal(false)}>
+                  Go Back
+                </Button>
+                <Button onClick={handleConfirmViewMature}>I Agree</Button>
+              </div>
+            </div>
+          </GenericModal>
+        )}
         {showRemoveBtn && (
           <button className={styles.removeBtn} onClick={handleRemoveClick} aria-label="Remove">
             <FaTimes size={10} />
           </button>
         )}
-        {!continueWatching && !isMobile && (
+        {!continueWatching && !isMobile && !shouldBlur && (
           <button
             className={styles.infoBtn}
             onMouseEnter={handleInfoMouseEnter}
