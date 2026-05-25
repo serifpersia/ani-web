@@ -57,9 +57,9 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
 
   useEffect(() => {
     if (top6.length === 0) return
-    const timer = setInterval(nextSlide, 10000)
-    return () => clearInterval(timer)
-  }, [nextSlide, top6.length])
+    const timer = setTimeout(nextSlide, 10000)
+    return () => clearTimeout(timer)
+  }, [currentIndex, nextSlide, top6.length])
 
   const metaQueries = useQueries({
     queries: top6.map((anime) => ({
@@ -80,26 +80,6 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   const anime = top6[currentIndex]
   const meta: ShowMeta = metaQueries[currentIndex]?.data ?? {}
 
-  const handleWheel = (e: React.WheelEvent) => {
-    if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && Math.abs(e.deltaY) > 20) {
-      const now = Date.now()
-      if (now - lastScrollTime < 500) {
-        e.preventDefault()
-        e.stopPropagation()
-        return
-      }
-
-      e.preventDefault()
-      e.stopPropagation()
-      setLastScrollTime(now)
-      if (e.deltaY > 0) {
-        nextSlide()
-      } else if (e.deltaY < 0) {
-        prevSlide()
-      }
-    }
-  }
-
   const rawDesc = meta.description ?? ''
   const synopsis = rawDesc.replace(/<[^>]*>?/gm, '').trim()
   const genres: { name: string }[] = meta.genres ?? []
@@ -112,8 +92,20 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
     navigate(`/watch/${anime._id}`)
   }
 
+  const handleWheel = (e: React.WheelEvent) => {
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && Math.abs(e.deltaY) > 5) {
+      e.preventDefault()
+      e.stopPropagation()
+      const now = Date.now()
+      if (now - lastScrollTime < 300) return
+      setLastScrollTime(now)
+      if (e.deltaY > 0) nextSlide()
+      else prevSlide()
+    }
+  }
+
   return (
-    <div className={styles.bannerContainer} onWheel={handleWheel}>
+    <div className={styles.bannerContainer}>
       <div
         className={styles.posterWrapper}
         style={{ boxShadow: !lowEndMode ? '0 10px 30px rgba(0,0,0,0.5)' : 'none' }}
@@ -155,7 +147,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
             </Button>
           </div>
 
-          <div className={styles.carouselControls}>
+          <div className={styles.carouselControls} onWheel={handleWheel}>
             {top6.map((_, index) => (
               <div
                 key={index}

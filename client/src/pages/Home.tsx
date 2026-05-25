@@ -28,6 +28,7 @@ import {
   usePopularAnime,
   useQueue,
   useRemoveFromQueue,
+  useReorderQueue,
 } from '../hooks/useAnimeData'
 import type { QueueItem } from '../hooks/useAnimeData'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
@@ -39,9 +40,20 @@ type ActiveTab = 'latest' | 'season' | 'popular'
 interface QuickQueueItemProps {
   item: QueueItem
   onRemove: (item: QueueItem) => void
+  onDragStart: (e: React.DragEvent) => void
+  onDragEnter: (e: React.DragEvent) => void
+  onDragEnd: (e: React.DragEvent) => void
+  isDragging: boolean
 }
 
-const QuickQueueItem = ({ item, onRemove }: QuickQueueItemProps) => {
+const QuickQueueItem = ({
+  item,
+  onRemove,
+  onDragStart,
+  onDragEnter,
+  onDragEnd,
+  isDragging,
+}: QuickQueueItemProps) => {
   const navigate = useNavigate()
   const { titlePreference } = useTitlePreference()
 
@@ -49,7 +61,14 @@ const QuickQueueItem = ({ item, onRemove }: QuickQueueItemProps) => {
     (item[titlePreference as keyof QueueItem] as string) || item.name || 'Unknown show'
 
   return (
-    <div className={styles.quickQueueItem}>
+    <div
+      className={`${styles.quickQueueItem} ${isDragging ? styles.dragging : ''}`}
+      draggable
+      onDragStart={onDragStart}
+      onDragEnter={onDragEnter}
+      onDragOver={(e) => e.preventDefault()}
+      onDragEnd={onDragEnd}
+    >
       <button className={styles.quickQueueDrag} type="button" aria-label="Drag queue item">
         <FaBars />
       </button>
@@ -97,8 +116,16 @@ const Home: React.FC = () => {
   const [itemToRemove, setItemToRemove] = React.useState<{ id: string; name: string } | null>(null)
   const [isQueueOpen, setIsQueueOpen] = useState(true)
   const removeWatchlistMutation = useRemoveFromWatchlist()
-  const { data: queue = [] } = useQueue()
+  const { data: queueData = [] } = useQueue()
+  const [localQueue, setLocalQueue] = React.useState<QueueItem[]>([])
+  const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null)
+
   const removeQueue = useRemoveFromQueue()
+  const reorderQueue = useReorderQueue()
+
+  useEffect(() => {
+    setLocalQueue(queueData)
+  }, [queueData])
 
   useEffect(() => {
     document.title = 'Home - ani-web'
@@ -207,6 +234,34 @@ const Home: React.FC = () => {
     [removeQueue]
   )
 
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index)
+  }
+
+  const handleDragEnter = (index: number) => {
+    if (draggedIndex === null || draggedIndex === index) return
+
+    const newQueue = [...localQueue]
+    const draggedItem = newQueue[draggedIndex]
+    newQueue.splice(draggedIndex, 1)
+    newQueue.splice(index, 0, draggedItem)
+    setDraggedIndex(index)
+    setLocalQueue(newQueue)
+  }
+
+  const handleDragEnd = () => {
+    if (draggedIndex !== null) {
+      reorderQueue.mutate(
+        localQueue.map((item) => ({
+          id: item.id,
+          showId: item.showId,
+          episodeNumber: item.episodeNumber,
+        }))
+      )
+    }
+    setDraggedIndex(null)
+  }
+
   const tabs: { key: ActiveTab; label: string }[] = [
     { key: 'latest', label: 'Latest Releases' },
     { key: 'season', label: 'Current Season' },
@@ -299,7 +354,7 @@ const Home: React.FC = () => {
   return (
     <div style={{ paddingBottom: '2rem' }}>
       <SpotlightBanner animeList={popularWeekly || []} />
-      {queue.length > 0 && (
+      {localQueue.length > 0 && (
         <section className={styles.quickQueue}>
           <button
             type="button"
@@ -308,15 +363,23 @@ const Home: React.FC = () => {
           >
             <span className={styles.quickQueueTitle}>
               Quick Queue
-              <span className={styles.queueBadge}>{queue.length}</span>
+              <span className={styles.queueBadge}>{localQueue.length}</span>
             </span>
             {isQueueOpen ? <FaChevronUp /> : <FaChevronDown />}
           </button>
 
           {isQueueOpen && (
             <div className={styles.quickQueueList}>
-              {queue.map((item) => (
-                <QuickQueueItem key={item.id} item={item} onRemove={handleQueueRemove} />
+              {localQueue.map((item, index) => (
+                <QuickQueueItem
+                  key={item.id}
+                  item={item}
+                  onRemove={handleQueueRemove}
+                  onDragStart={() => handleDragStart(index)}
+                  onDragEnter={() => handleDragEnter(index)}
+                  onDragEnd={handleDragEnd}
+                  isDragging={draggedIndex === index}
+                />
               ))}
             </div>
           )}

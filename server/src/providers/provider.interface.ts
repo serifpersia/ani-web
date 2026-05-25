@@ -27,7 +27,8 @@ export interface Show {
   episodeCount?: string | number | null
   episodeDuration?: string | number | null
   averageScore?: number | null
-  score?: number
+  score?: number | null
+  year?: number | null
   isAdult?: boolean
   rating?: string
   genres?: { name: string }[]

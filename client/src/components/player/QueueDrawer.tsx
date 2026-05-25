@@ -1,7 +1,12 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { FaBars, FaListUl, FaTimes } from 'react-icons/fa'
-import { useClearQueue, useQueue, useRemoveFromQueue } from '../../hooks/useAnimeData'
+import {
+  useClearQueue,
+  useQueue,
+  useRemoveFromQueue,
+  useReorderQueue,
+} from '../../hooks/useAnimeData'
 import type { QueueItem } from '../../hooks/useAnimeData'
 import { fixThumbnailUrl } from '../../lib/utils'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
@@ -18,16 +23,35 @@ interface QueueItemProps {
   item: QueueItem
   isActive: boolean
   onRemove: (item: QueueItem) => void
+  onDragStart: (e: React.DragEvent) => void
+  onDragEnter: (e: React.DragEvent) => void
+  onDragEnd: (e: React.DragEvent) => void
+  isDragging: boolean
 }
 
-const QueueItem = ({ item, isActive, onRemove }: QueueItemProps) => {
+const QueueItem = ({
+  item,
+  isActive,
+  onRemove,
+  onDragStart,
+  onDragEnter,
+  onDragEnd,
+  isDragging,
+}: QueueItemProps) => {
   const { titlePreference } = useTitlePreference()
 
   const displayTitle =
     (item[titlePreference as keyof QueueItem] as string) || item.name || 'Unknown show'
 
   return (
-    <div className={`${styles.item} ${isActive ? styles.active : ''}`}>
+    <div
+      className={`${styles.item} ${isActive ? styles.active : ''} ${isDragging ? styles.dragging : ''}`}
+      draggable
+      onDragStart={onDragStart}
+      onDragEnter={onDragEnter}
+      onDragOver={(e) => e.preventDefault()}
+      onDragEnd={onDragEnd}
+    >
       <div className={styles.dragHandle}>
         <FaBars />
       </div>
@@ -58,9 +82,17 @@ const QueueItem = ({ item, isActive, onRemove }: QueueItemProps) => {
 }
 
 const QueueDrawer = ({ isOpen, onClose, currentShowId, currentEpisode }: QueueDrawerProps) => {
-  const { data: queue = [] } = useQueue()
+  const { data: queueData = [] } = useQueue()
+  const [localQueue, setLocalQueue] = React.useState<QueueItem[]>([])
+  const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null)
+
   const removeQueue = useRemoveFromQueue()
   const clearQueue = useClearQueue()
+  const reorderQueue = useReorderQueue()
+
+  React.useEffect(() => {
+    setLocalQueue(queueData)
+  }, [queueData])
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -76,6 +108,35 @@ const QueueDrawer = ({ isOpen, onClose, currentShowId, currentEpisode }: QueueDr
     removeQueue.mutate({ showId: item.showId, episodeNumber: item.episodeNumber })
   }
 
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index)
+  }
+
+  const handleDragEnter = (index: number) => {
+    if (draggedIndex === null || draggedIndex === index) return
+
+    const newQueue = [...localQueue]
+    const draggedItem = newQueue[draggedIndex]
+    newQueue.splice(draggedIndex, 1)
+    newQueue.splice(index, 0, draggedItem)
+    setDraggedIndex(index)
+    setLocalQueue(newQueue)
+  }
+
+  const handleDragEnd = () => {
+    if (draggedIndex !== null) {
+      // Reorder API call
+      reorderQueue.mutate(
+        localQueue.map((item) => ({
+          id: item.id,
+          showId: item.showId,
+          episodeNumber: item.episodeNumber,
+        }))
+      )
+    }
+    setDraggedIndex(null)
+  }
+
   return (
     <>
       {isOpen && <div className={styles.overlay} onClick={onClose} />}
@@ -86,7 +147,7 @@ const QueueDrawer = ({ isOpen, onClose, currentShowId, currentEpisode }: QueueDr
             Queue
           </div>
           <div className={styles.actions}>
-            {queue.length > 0 && (
+            {localQueue.length > 0 && (
               <button className={styles.clearBtn} type="button" onClick={() => clearQueue.mutate()}>
                 Clear All
               </button>
@@ -102,16 +163,20 @@ const QueueDrawer = ({ isOpen, onClose, currentShowId, currentEpisode }: QueueDr
           </div>
         </div>
 
-        {queue.length === 0 ? (
+        {localQueue.length === 0 ? (
           <div className={styles.empty}>Your queue is empty.</div>
         ) : (
           <div className={styles.list}>
-            {queue.map((item) => (
+            {localQueue.map((item, index) => (
               <QueueItem
                 key={item.id}
                 item={item}
                 isActive={item.showId === currentShowId && item.episodeNumber === currentEpisode}
                 onRemove={handleRemove}
+                onDragStart={() => handleDragStart(index)}
+                onDragEnter={() => handleDragEnter(index)}
+                onDragEnd={handleDragEnd}
+                isDragging={draggedIndex === index}
               />
             ))}
           </div>

@@ -162,6 +162,13 @@
   gap: var(--space-3);
   overflow-x: auto;
   padding: 0 var(--space-5) var(--space-5);
+  user-select: none;
+}
+
+.quickQueueItem.dragging {
+  opacity: 0.5;
+  background: var(--bg-secondary);
+  border-style: dashed;
 }
 
 .quickQueueItem {
