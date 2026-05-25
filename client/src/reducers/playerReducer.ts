@@ -4,7 +4,10 @@ export type Action =
   | { type: 'SET_STATE'; payload: Partial<PlayerState> }
   | { type: 'SET_CURRENT_EPISODE'; payload: string | undefined }
   | { type: 'SET_MODE'; payload: 'sub' | 'dub' }
-  | { type: 'SET_PROVIDER'; payload: 'allanime' | 'animepahe' | '123anime' | 'animeya' }
+  | {
+      type: 'SET_PROVIDER'
+      payload: 'allanime' | 'animepahe' | '123anime' | 'animeya' | 'megaplay'
+    }
   | { type: 'SET_OVERRIDE_SOURCE'; payload: { source: VideoSource; link: VideoLink } | null }
 
 const getPreferredMode = (): 'sub' | 'dub' => {
@@ -13,9 +16,11 @@ const getPreferredMode = (): 'sub' | 'dub' => {
 
 const getPreferredProvider = (): PlayerState['selectedProvider'] => {
   const provider = localStorage.getItem('preferredProvider')
-  return provider === 'animepahe' || provider === '123anime' || provider === 'animeya'
-    ? provider
-    : 'allanime'
+  const validProviders: string[] = ['allanime', 'megaplay', 'animeya', 'animepahe', '123anime']
+  if (provider && validProviders.includes(provider)) {
+    return provider as PlayerState['selectedProvider']
+  }
+  return 'allanime'
 }
 
 export const createInitialState = (): PlayerState => ({
