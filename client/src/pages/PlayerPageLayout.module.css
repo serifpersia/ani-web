@@ -153,6 +153,8 @@
     max-height: 500px;
     position: static;
     order: 2;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .playerMain {
