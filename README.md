@@ -6,7 +6,7 @@ _A local-first anime media client focused on performance, privacy, and personal 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-8b5cf6?style=for-the-badge)](https://opensource.org/licenses/MIT)
 ![Github stars](https://img.shields.io/github/stars/serifpersia/ani-web.svg?style=for-the-badge&color=8b5cf6)
-[![App version](https://img.shields.io/badge/ani--web-1.8.1-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/ani-web)
+[![App version](https://img.shields.io/badge/ani--web-1.8.2-8b5cf6?style=for-the-badge)](https://github.com/serifpersia/ani-web)
 
 ![Users](https://ani-web-users-badge-v3.ramiserifpersia.workers.dev)
 
@@ -60,7 +60,7 @@ You can run **ani-web** on your Android device using the [Termux](https://termux
 1. **Install Termux:** Download and install it from [F-Droid](https://f-droid.org/en/packages/com.termux/) or the [Termux website](https://termux.dev/).
 2. **Update packages:**
    ```bash
-   pkg update
+   pkg update && pkg upgrade
    ```
    *Press `y` and `Enter` when prompted to confirm updates.*
 3. **Install Node.js:**
