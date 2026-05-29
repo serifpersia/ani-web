@@ -53,6 +53,32 @@ npm install -g ani-web
 
 > **Note:** After the one-time setup, you can start the application anytime, from any directory, by simply opening a terminal and typing `ani-web`.
 
+### 📱 Android Installation (Termux)
+
+You can run **ani-web** on your Android device using the [Termux](https://termux.dev/) app. No root is required.
+
+1. **Install Termux:** Download and install it from [F-Droid](https://f-droid.org/en/packages/com.termux/) or the [Termux website](https://termux.dev/).
+2. **Update packages:**
+   ```bash
+   pkg update
+   ```
+   *Press `y` and `Enter` when prompted to confirm updates.*
+3. **Install Node.js:**
+   ```bash
+   pkg install nodejs
+   ```
+   *Press `y` and `Enter` when prompted.*
+4. **Install ani-web:**
+   ```bash
+   npm install -g ani-web
+   ```
+5. **Run the app:**
+   ```bash
+   ani-web
+   ```
+
+Once running, you can access the interface by navigating to `http://localhost:3000/` in your mobile browser.
+
 ---
 
 ## Uninstalling
