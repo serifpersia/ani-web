@@ -17,6 +17,7 @@ export function createSettingsRouter(
   router.get('/settings', controller.getSettings)
   router.post('/settings', controller.updateSettings)
   router.get('/backup-db', controller.backupDatabase)
+  router.get('/installation-id', controller.getInstallationId)
 
   const restoreStorage = multer({
     storage: multer.diskStorage({

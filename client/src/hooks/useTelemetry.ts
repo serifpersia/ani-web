@@ -43,14 +43,28 @@ export const useTelemetry = () => {
       return
     }
 
-    let installationId = localStorage.getItem('installation_id')
-    if (!installationId) {
-      installationId = uuidv4()
-      localStorage.setItem('installation_id', installationId)
-    }
-
     const sendPing = async () => {
       try {
+        let installationId = localStorage.getItem('installation_id')
+
+        if (!installationId || installationId.length === 36) {
+          try {
+            const res = await fetch('/api/installation-id')
+            const data = await res.json()
+            if (data.id) {
+              installationId = data.id
+              localStorage.setItem('installation_id', installationId!)
+            }
+          } catch (err) {
+            console.error('Failed to fetch hardware ID:', err)
+          }
+        }
+
+        if (!installationId) {
+          installationId = uuidv4()
+          localStorage.setItem('installation_id', installationId)
+        }
+
         await fetch(TELEMETRY_URL, {
           method: 'POST',
           mode: 'no-cors',

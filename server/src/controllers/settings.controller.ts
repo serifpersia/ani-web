@@ -9,6 +9,7 @@ import { CONFIG } from '../config'
 import { DatabaseWrapper } from '../db'
 import { SettingsRepository } from '../repositories/settings.repository'
 import { asyncHandler } from '../utils/async-handler'
+import { getMachineId } from '../utils/machine-id'
 
 interface MalAnimeItem {
   series_title: string[]
@@ -155,4 +156,13 @@ export class SettingsController {
     })
     res.json({ imported: showsToInsert.length, skipped: skippedCount })
   })
+
+  getInstallationId = (_req: Request, res: Response) => {
+    try {
+      res.json({ id: getMachineId() })
+    } catch (err) {
+      logger.error({ err }, 'Failed to get machine ID')
+      res.status(500).json({ error: 'Failed to get machine ID' })
+    }
+  }
 }

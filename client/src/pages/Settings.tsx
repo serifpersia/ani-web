@@ -195,9 +195,10 @@ const Settings: React.FC = () => {
                         color: 'var(--text-secondary)',
                       }}
                     >
-                      Share anonymous installation data to help track active users. Collected: UUID,
-                      App Version, First Seen/Last Seen timestamps, and User Agent string. No other
-                      personal information or usage habits are collected.
+                      Share anonymous installation data to help track active users. Collected:
+                      Hardware-based Anonymous ID, App Version, First Seen/Last Seen timestamps, and
+                      User Agent string. No other personal information or usage habits are
+                      collected.
                     </p>
                   </div>
                   <ToggleSwitch
