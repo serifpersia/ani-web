@@ -35,10 +35,18 @@ interface AnimePaheVideoSource {
   audio: string | null
 }
 
+interface AnimePaheApiResponse<T> {
+  data?: T[]
+  results?: T[]
+  items?: T[]
+  last_page?: number
+  lastPage?: number
+}
+
 export class AnimePaheProvider implements Provider {
   name = 'AnimePahe'
-  private base = 'https://animepahe.pw'
-  private apiBase = 'https://animepahe.pw/api'
+  private readonly BASE_URL = 'https://animepahe.pw'
+  private readonly API_URL = 'https://animepahe.pw/api'
 
   private cache: NodeCache
 
@@ -46,7 +54,7 @@ export class AnimePaheProvider implements Provider {
     this.cache = cache
   }
 
-  private getHeaders(isApi: boolean = false): Record<string, string> {
+  private getRequestHeaders(isApi: boolean = false): Record<string, string> {
     const cookies = {
       __ddg1_: '5H0114JE1p0wQHdJiV2O',
       __ddg2_: 'FxnuwLkvPnXSQtPE',
@@ -57,8 +65,8 @@ export class AnimePaheProvider implements Provider {
       __ddgmark_: 'slbgrX6Jj2jTxuo2',
     }
 
-    const cookieString = Object.entries(cookies)
-      .map(([key, val]) => `${key}=${val}`)
+    const cookieStr = Object.entries(cookies)
+      .map(([k, v]) => `${k}=${v}`)
       .join('; ')
 
     const headers: Record<string, string> = {
@@ -67,9 +75,9 @@ export class AnimePaheProvider implements Provider {
       Accept:
         'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
       'Accept-Language': 'en-US,en;q=0.9',
-      Referer: 'https://animepahe.pw/',
-      Origin: 'https://animepahe.pw',
-      Cookie: cookieString,
+      Referer: `${this.BASE_URL}/`,
+      Origin: this.BASE_URL,
+      Cookie: cookieStr,
     }
 
     if (isApi) {
@@ -80,50 +88,48 @@ export class AnimePaheProvider implements Provider {
     return headers
   }
 
-  private async get(url: string, isApi: boolean = false): Promise<string> {
+  private async fetchText(url: string, isApi: boolean = false): Promise<string> {
     try {
       const response = await fetch(url, {
         method: 'GET',
-        headers: this.getHeaders(isApi),
+        headers: this.getRequestHeaders(isApi),
       })
 
       const text = await response.text()
 
       if (!response.ok) {
         if (response.status === 403 || text.includes('DDoS-Guard')) {
-          logger.error(
-            'DDoS-Guard blocked the request! Your ANIMEPAHE_COOKIES in .env are likely expired.'
-          )
+          logger.error('DDoS-Guard blocked the request! Check AnimePahe cookies.')
         }
         throw new Error(`HTTP ${response.status}`)
       }
 
       return text
     } catch (error) {
-      const err = error as Error
-      logger.error({ url, err: err.message }, 'AnimePahe Fetch failed')
+      logger.error({ url, error: (error as Error).message }, 'AnimePahe Fetch failed')
       throw error
     }
   }
 
-  private async getJson(url: string): Promise<Record<string, unknown> | unknown[]> {
-    const data = await this.get(url, true)
+  private async fetchJson<T>(url: string): Promise<T | null> {
+    const data = await this.fetchText(url, true)
     try {
-      return JSON.parse(data)
+      return JSON.parse(data) as T
     } catch {
-      logger.error({ url }, 'Failed to parse JSON (likely blocked by bot protection)')
-      return {}
+      logger.error({ url }, 'Failed to parse AnimePahe JSON')
+      return null
     }
   }
 
   async search(options: SearchOptions): Promise<Show[]> {
     try {
-      const query = options.query || ''
-      const url = `${this.apiBase}?m=search&q=${encodeURIComponent(query)}`
-      const data = (await this.getJson(url)) as Record<string, unknown>
+      const q = options.query || ''
+      const url = `${this.API_URL}?m=search&q=${encodeURIComponent(q)}`
+      const data = await this.fetchJson<AnimePaheApiResponse<AnimePaheSearchResult>>(url)
+      if (!data) return []
 
-      const animeRows = (data.data || data.results || data.items || []) as AnimePaheSearchResult[]
-      return animeRows.map((a) => ({
+      const items = (data.data || data.results || data.items || []) as AnimePaheSearchResult[]
+      return items.map((a) => ({
         _id: a.session,
         id: a.session,
         name: a.title || a.name || '',
@@ -138,18 +144,24 @@ export class AnimePaheProvider implements Provider {
     }
   }
 
-  async getEpisodes(showId: string): Promise<EpisodeDetails | null> {
+  async getEpisodes(showId: string, _mode: 'sub' | 'dub'): Promise<EpisodeDetails | null> {
     try {
-      const firstPageUrl = `${this.apiBase}?m=release&id=${showId}&sort=episode_asc&page=1`
-      const firstPageData = (await this.getJson(firstPageUrl)) as Record<string, unknown>
+      const firstPageUrl = `${this.API_URL}?m=release&id=${showId}&sort=episode_asc&page=1`
+      const firstPageData =
+        await this.fetchJson<AnimePaheApiResponse<AnimePaheEpisode>>(firstPageUrl)
+      if (!firstPageData) return null
 
       let episodes = (firstPageData.data || firstPageData.results || []) as AnimePaheEpisode[]
       const lastPage = Number(firstPageData.last_page || firstPageData.lastPage || 1)
 
       for (let p = 2; p <= lastPage; p++) {
-        const pageUrl = `${this.apiBase}?m=release&id=${showId}&sort=episode_asc&page=${p}`
-        const pageData = (await this.getJson(pageUrl)) as Record<string, unknown>
-        episodes = episodes.concat((pageData.data || pageData.results || []) as AnimePaheEpisode[])
+        const pageUrl = `${this.API_URL}?m=release&id=${showId}&sort=episode_asc&page=${p}`
+        const pageData = await this.fetchJson<AnimePaheApiResponse<AnimePaheEpisode>>(pageUrl)
+        if (pageData) {
+          episodes = episodes.concat(
+            (pageData.data || pageData.results || []) as AnimePaheEpisode[]
+          )
+        }
       }
 
       const episodeMap: Record<string, string> = {}
@@ -179,65 +191,71 @@ export class AnimePaheProvider implements Provider {
     let cachedMap = this.cache.get<Record<string, string>>(cacheKey)
 
     if (!cachedMap) {
-      await this.getEpisodes(showId)
+      await this.getEpisodes(showId, 'sub')
       cachedMap = this.cache.get<Record<string, string>>(cacheKey)
     }
 
     if (!cachedMap) return null
+    if (cachedMap[episodeNumber]) return cachedMap[episodeNumber]
 
-    if (cachedMap[episodeNumber]) {
-      return cachedMap[episodeNumber]
-    }
-
-    const requestedNum = parseFloat(episodeNumber)
+    const target = parseFloat(episodeNumber)
     const keys = Object.keys(cachedMap)
+
     for (const key of keys) {
-      if (parseFloat(key) === requestedNum) {
-        return cachedMap[key]
-      }
+      if (parseFloat(key) === target) return cachedMap[key]
     }
 
-    const sortedKeys = keys.sort((a, b) => Number(a) - Number(b))
-    const minEp = Number(sortedKeys[0])
+    // Fallback search
+    const sorted = keys.sort((a, b) => Number(a) - Number(b))
+    const first = Number(sorted[0])
 
-    if (requestedNum < minEp) {
-      const index = Math.floor(requestedNum) - 1
-      if (index >= 0 && index < sortedKeys.length) {
-        const actualEpNum = sortedKeys[index]
-        return cachedMap[actualEpNum]
-      }
+    if (target < first) {
+      const idx = Math.floor(target) - 1
+      if (idx >= 0 && idx < sorted.length) return cachedMap[sorted[idx]]
     }
 
     return null
   }
 
-  async getStreamUrls(showId: string, episodeNumber: string): Promise<VideoSource[] | null> {
+  async getStreamUrls(
+    showId: string,
+    episodeNumber: string,
+    mode: 'sub' | 'dub'
+  ): Promise<VideoSource[] | null> {
     try {
       const epSession = await this.getEpisodeSession(showId, episodeNumber)
       if (!epSession) return null
 
       const sources = await this.getSources(showId, epSession)
-      const videoSources: VideoSource[] = []
+      const results: VideoSource[] = []
+
+      const isDubSource = (audio: string) => audio.includes('eng') || audio.includes('dub')
 
       for (const src of sources) {
-        const label = src.fansub
-          ? `${src.quality || 'Auto'} - ${src.fansub} (${src.audio || 'jpn'})`
-          : `${src.quality || 'Auto'} - ${src.audio || 'jpn'}`
+        const audio = (src.audio || '').toLowerCase()
+        const sourceMode = isDubSource(audio) ? 'dub' : 'sub'
 
-        videoSources.push({
+        if (sourceMode !== mode) continue
+
+        const label = src.fansub
+          ? `${src.quality || 'Auto'} - ${src.fansub} (${sourceMode.toUpperCase()})`
+          : `${src.quality || 'Auto'} (${sourceMode.toUpperCase()})`
+
+        results.push({
           sourceName: label,
           links: [
             {
               resolutionStr: src.quality || 'Auto',
-              link: src.url,
+              link: `/api/embed-proxy?url=${encodeURIComponent(src.url)}`,
               hls: false,
             },
           ],
           type: 'iframe',
+          actualEpisodeNumber: episodeNumber,
         })
       }
 
-      return videoSources.length > 0 ? videoSources : null
+      return results.length > 0 ? results : null
     } catch {
       return null
     }
@@ -248,8 +266,8 @@ export class AnimePaheProvider implements Provider {
     episodeSession: string
   ): Promise<AnimePaheVideoSource[]> {
     try {
-      const playUrl = `${this.base}/play/${animeSession}/${episodeSession}`
-      const html = await this.get(playUrl)
+      const playUrl = `${this.BASE_URL}/play/${animeSession}/${episodeSession}`
+      const html = await this.fetchText(playUrl)
       const $ = cheerio.load(html)
 
       const sources: AnimePaheVideoSource[] = []
@@ -258,10 +276,10 @@ export class AnimePaheProvider implements Provider {
         const src = $(el).attr('data-src')?.trim()
         if (!src || !/kwik/i.test(src)) return
 
-        const resolution = $(el).attr('data-resolution') || $(el).attr('data-res')
+        const res = $(el).attr('data-resolution') || $(el).attr('data-res')
         sources.push({
           url: src,
-          quality: resolution ? (resolution.endsWith('p') ? resolution : `${resolution}p`) : null,
+          quality: res ? (res.endsWith('p') ? res : `${res}p`) : null,
           fansub: $(el).attr('data-fansub') ?? null,
           audio: $(el).attr('data-audio') ?? null,
         })
@@ -269,8 +287,8 @@ export class AnimePaheProvider implements Provider {
 
       const unique = Array.from(new Map(sources.map((s) => [s.url, s])).values())
       unique.sort((a, b) => {
-        const qa = a.quality ? parseInt(a.quality) || 0 : 0
-        const qb = b.quality ? parseInt(b.quality) || 0 : 0
+        const qa = parseInt(a.quality || '0') || 0
+        const qb = parseInt(b.quality || '0') || 0
         return qb - qa
       })
 
@@ -280,46 +298,11 @@ export class AnimePaheProvider implements Provider {
     }
   }
 
-  async resolveKwik(kwikUrl: string): Promise<{ m3u8: string; referer: string }> {
-    try {
-      const fetchUrl = kwikUrl.replace('/e/', '/f/')
-      const response = await fetch(fetchUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          Referer: 'https://animepahe.pw/',
-        },
-      })
-
-      const html = await response.text()
-
-      if (html.includes('Just a moment')) {
-        throw new Error('Kwik triggered a Cloudflare challenge.')
-      }
-
-      const directMatch = html.match(/(?:source|file)\s*:\s*['"]([^'"]+\.m3u8)['"]/)
-      if (directMatch) return { m3u8: directMatch[1], referer: kwikUrl }
-
-      const packedMatch = html.match(/'([^']{50,})'\.split\('\|'\)/)
-      if (packedMatch) {
-        const parts = packedMatch[1].split('|')
-        const hash = parts.find((p) => p.length === 64 && /^[a-f0-9]+$/.test(p))
-        const domain = parts.find((p) => p.includes('owocdn'))
-
-        if (hash) {
-          const cdn = domain || 'na.owocdn.top'
-          return { m3u8: `https://${cdn}/stream/01/${hash}/uwu.m3u8`, referer: kwikUrl }
-        }
-      }
-
-      throw new Error('Could not regex m3u8 link from Kwik HTML')
-    } catch (err) {
-      const error = err as Error
-      logger.error({ err: error.message }, 'Kwik Resolve failed')
-      return { m3u8: '', referer: kwikUrl }
-    }
+  async resolveKwik(_kwikUrl: string): Promise<{ m3u8: string; referer: string }> {
+    return { m3u8: '', referer: '' }
   }
 
-  async getShowMeta(showId: string): Promise<Partial<Show> | null> {
+  async getShowMeta(_showId: string): Promise<Partial<Show> | null> {
     return null
   }
   async getPopular(
@@ -338,7 +321,6 @@ export class AnimePaheProvider implements Provider {
   async getLatestReleases(_page?: number, _size?: number): Promise<Show[]> {
     return []
   }
-
   async getSkipTimes(_showId: string, _episodeNumber: string): Promise<SkipIntervals> {
     return { found: false, results: [] }
   }

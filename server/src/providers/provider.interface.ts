@@ -115,11 +115,11 @@ export interface Provider {
   getSeasonal(page: number): Promise<Show[]>
   getLatestReleases(page?: number, size?: number): Promise<Show[]>
   getShowMeta(showId: string): Promise<Partial<Show> | null>
-  getEpisodes(showId: string, mode: 'sub' | 'dub'): Promise<EpisodeDetails | null>
+  getEpisodes(showId: string, mode?: 'sub' | 'dub'): Promise<EpisodeDetails | null>
   getStreamUrls(
     showId: string,
     episodeNumber: string,
-    mode: 'sub' | 'dub'
+    mode?: 'sub' | 'dub'
   ): Promise<VideoSource[] | null>
   getSkipTimes(showId: string, episodeNumber: string): Promise<SkipIntervals>
 }

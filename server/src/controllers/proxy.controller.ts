@@ -25,6 +25,32 @@ export const axiosInstance = axios.create({
 axiosRetry(axiosInstance, { retries: 3, retryDelay: axiosRetry.exponentialDelay })
 
 export class ProxyController {
+  private static readonly KWIK_DOMAINS = new Set(['kwik.cx', 'kwik.si', 'kwik.pro'])
+  private static readonly ANIMEPAHE_URL = 'https://animepahe.pw/'
+
+  private abortWhenClientLeaves(res: Response, abortController: AbortController) {
+    res.on('close', () => {
+      if (!res.writableEnded) {
+        abortController.abort()
+      }
+    })
+  }
+
+  private validateKwikUrl(value: unknown): URL | null {
+    if (typeof value !== 'string') return null
+    try {
+      const url = new URL(value)
+      const isSecure = url.protocol === 'https:'
+      const isKwik = ProxyController.KWIK_DOMAINS.has(url.hostname.toLowerCase())
+      const isEmbedPath = /^\/e\/[A-Za-z0-9_-]+$/.test(url.pathname)
+      const noAuthOrQuery = !url.username && !url.password && !url.search && !url.hash
+
+      return isSecure && isKwik && isEmbedPath && noAuthOrQuery ? url : null
+    } catch {
+      return null
+    }
+  }
+
   handleProxy = async (req: Request, res: Response) => {
     const { url, referer } = req.query
     if (!url) return res.status(400).send('URL required')
@@ -34,9 +60,7 @@ export class ProxyController {
     const cacheKey = `m3u8-${urlStr}-${refererStr}`
 
     const abortController = new AbortController()
-    req.on('close', () => {
-      abortController.abort()
-    })
+    this.abortWhenClientLeaves(res, abortController)
 
     try {
       const headers: Record<string, string> = {
@@ -62,32 +86,29 @@ export class ProxyController {
         })
 
         const baseUrl = new URL(urlStr)
+        const proxiedMediaUrl = (targetUrl: string) =>
+          `/api/proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererStr)}`
+        const needsProxy = Boolean(refererStr)
+
         const rewritten = resp.data
           .split('\n')
-          .map((l: string) => {
-            const line = l.trim()
-            if (!line) return l
+          .map((line: string) => {
+            const trimmed = line.trim()
+            if (!trimmed) return line
 
-            if (line.startsWith('#')) {
-              return line.replace(/URI="([^"]+)"/g, (match, uri) => {
-                const fullUri = new URL(uri, baseUrl).href
-                if (fullUri.includes('.m3u8')) {
-                  return `URI="/api/proxy?url=${encodeURIComponent(fullUri)}&referer=${encodeURIComponent(refererStr)}"`
-                }
-                return `URI="${fullUri}"`
+            if (trimmed.startsWith('#')) {
+              return trimmed.replace(/URI="([^"]+)"/g, (_, uri) => {
+                const absolute = new URL(uri, baseUrl).href
+                return `URI="${needsProxy || absolute.includes('.m3u8') ? proxiedMediaUrl(absolute) : absolute}"`
               })
             }
 
-            const fullUrl = new URL(line, baseUrl).href
-            if (fullUrl.includes('.m3u8')) {
-              return `/api/proxy?url=${encodeURIComponent(fullUrl)}&referer=${encodeURIComponent(refererStr)}`
-            }
-            return fullUrl
+            const absolute = new URL(trimmed, baseUrl).href
+            return needsProxy || absolute.includes('.m3u8') ? proxiedMediaUrl(absolute) : absolute
           })
           .join('\n')
 
         proxyCache.set(cacheKey, rewritten)
-
         res
           .set('Content-Type', 'application/vnd.apple.mpegurl')
           .set('Access-Control-Allow-Origin', '*')
@@ -134,11 +155,92 @@ export class ProxyController {
         resp.data.pipe(res)
       }
     } catch (e) {
-      if (axios.isCancel(e)) {
-        return
-      }
+      if (axios.isCancel(e)) return
       if (!res.headersSent) res.status(500).send('Proxy error')
     }
+  }
+
+  handleEmbedProxy = async (req: Request, res: Response) => {
+    const kwikUrl = this.validateKwikUrl(req.query.url)
+    if (!kwikUrl) return res.status(400).send('Invalid or unsupported gateway URL')
+
+    const abortController = new AbortController()
+    this.abortWhenClientLeaves(res, abortController)
+
+    try {
+      const { data: originalHtml } = await axiosInstance.get<string>(kwikUrl.href, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
+          Referer: ProxyController.ANIMEPAHE_URL,
+          Origin: 'https://animepahe.pw',
+        },
+        responseType: 'text',
+        signal: abortController.signal,
+      })
+
+      const patched = this.applyKwikPatches(originalHtml, kwikUrl)
+      if (!patched) return res.status(502).send('Failed to patch video gateway')
+
+      return res
+        .status(200)
+        .set('Content-Type', 'text/html; charset=utf-8')
+        .set('Cache-Control', 'private, max-age=120')
+        .send(patched)
+    } catch (e) {
+      if (axios.isCancel(e)) return
+      if (!res.headersSent) res.status(502).send('Gateway proxy error')
+    }
+  }
+
+  private applyKwikPatches(html: string, kwikUrl: URL): string | null {
+    const safeReferer = JSON.stringify(kwikUrl.href).replace(/</g, '\\u003c')
+
+    const patched = html.replace(
+      /\b(src|href|url)\s*[=:]\s*(["']?)(\/\/[^"'>)]+|\/(?!\/)[^"'>)]*)\2/gi,
+      (match, attr, quote, path) => {
+        const full = path.startsWith('//') ? `https:${path}` : `${kwikUrl.origin}${path}`
+        const prefix = match.startsWith('url') ? `url(` : `${attr}=`
+        const suffix = match.startsWith('url') ? `)` : ''
+        return `${prefix}${quote}${full}${quote}${suffix}`
+      }
+    )
+
+    const iconProxy = `/api/proxy?url=${encodeURIComponent(`${kwikUrl.origin}/app/js/vendor/plyr.svg`)}&referer=${encodeURIComponent(kwikUrl.href)}`
+    const plyrPatch = `<script>if(window.Plyr) Plyr.defaults.iconUrl=${JSON.stringify(iconProxy).replace(/</g, '\\u003c')};</script>`
+
+    const hlsPatch = `<script>
+      (function() {
+        var hook = function() {
+          if (!window.Hls) return;
+          var original = Hls.prototype.loadSource;
+          Hls.prototype.loadSource = function(src) {
+            if (typeof src === 'string' && src.includes('.m3u8')) {
+              src = window.location.origin + '/api/proxy?url=' + encodeURIComponent(src) + '&referer=' + encodeURIComponent(${safeReferer});
+            }
+            return original.call(this, src);
+          };
+        };
+        if (window.Hls) hook();
+        else {
+          var observer = new MutationObserver(function() {
+            if (window.Hls) { hook(); observer.disconnect(); }
+          });
+          observer.observe(document.documentElement, { childList: true, subtree: true });
+        }
+      })();
+    </script>`
+
+    const beforePlyr = patched.replace(
+      /(<script[^>]+\/plyr\.min\.js[^>]*><\/script>)/i,
+      `$1${plyrPatch}`
+    )
+    const final = beforePlyr.replace(
+      /(<script[^>]+hls(?:\.min)?\.js[^>]*><\/script>)/i,
+      `$1${hlsPatch}`
+    )
+
+    return final === html ? null : final
   }
 
   handleSubtitleProxy = async (req: Request, res: Response) => {
@@ -146,9 +248,7 @@ export class ProxyController {
     if (!url) return res.status(400).send('URL required')
 
     const abortController = new AbortController()
-    req.on('close', () => {
-      abortController.abort()
-    })
+    this.abortWhenClientLeaves(res, abortController)
 
     try {
       const headers: Record<string, string> = {
@@ -174,9 +274,7 @@ export class ProxyController {
     if (!url) return res.status(400).send('URL required')
 
     const abortController = new AbortController()
-    req.on('close', () => {
-      abortController.abort()
-    })
+    this.abortWhenClientLeaves(res, abortController)
 
     try {
       const targetUrl = url as string

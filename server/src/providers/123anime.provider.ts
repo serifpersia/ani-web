@@ -120,25 +120,29 @@ export class _123AnimeProvider implements Provider {
     try {
       const rawQuery = options.query || ''
       const query = rawQuery.replace(/[""]/g, '').replace(/[']/g, '').replace(/\s+/g, ' ').trim()
-      const url = `${BASE_URL}/search?keyword=${encodeURIComponent(query)}`
-      const response = await fetch(url)
 
-      if (!response.ok) {
-        logger.warn({ url, status: response.status }, '123Anime search failed with non-200 status')
-        return []
+      const performSearch = async (q: string): Promise<ApiAnime[]> => {
+        const url = `${BASE_URL}/search?keyword=${encodeURIComponent(q)}`
+        const response = await fetch(url)
+        if (!response.ok) return []
+        const data = (await response.json()) as { success: boolean; data?: ApiAnime[] }
+        if (!data.success || !data.data) return []
+        
+        return data.data.filter((anime) => anime.title !== 'Dogge')
       }
 
-      const data = (await response.json()) as {
-        success: boolean
-        data?: ApiAnime[]
-        error?: string
+      let results = await performSearch(query)
+
+      if (results.length === 0) {
+        if (query.includes(':')) {
+          results = await performSearch(query.split(':')[0].trim())
+        }
+        if (results.length === 0 && query.includes('-')) {
+          results = await performSearch(query.split('-')[0].trim())
+        }
       }
 
-      if (!data.success || !data.data) {
-        return []
-      }
-
-      return (data.data || []).map((anime: ApiAnime) => {
+      return results.map((anime: ApiAnime) => {
         const imageUrl = anime.thumbnail || anime.image || anime.poster
         const slugFromUrl = this.extractSlugFromUrl(imageUrl)
         const titleForSlug = anime.japanese_title || anime.title
