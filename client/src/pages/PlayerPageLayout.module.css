@@ -173,6 +173,10 @@
     gap: 1.5rem;
   }
 
+  .episodeSidebar {
+    display: none;
+  }
+
   .playerMain {
     gap: 1.5rem;
   }

@@ -7,6 +7,7 @@ import { fixThumbnailUrl } from '../../lib/utils'
 import styles from './SpotlightBanner.module.css'
 import { useLowEndMode } from '../../contexts/LowEndModeContext'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
+import useIsMobile from '../../hooks/useIsMobile'
 
 interface SpotlightBannerProps {
   animeList: Anime[]
@@ -32,6 +33,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [lastScrollTime, setLastScrollTime] = useState(0)
   const { lowEndMode } = useLowEndMode()
+  const isMobile = useIsMobile()
   const { titlePreference } = useTitlePreference()
   const navigate = useNavigate()
   const top6 = animeList.slice(0, 6)
@@ -83,6 +85,8 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   const rawDesc = meta.description ?? ''
   const synopsis = rawDesc.replace(/<[^>]*>?/gm, '').trim()
   const genres: { name: string }[] = meta.genres ?? []
+  const visibleGenres = genres.slice(0, isMobile ? 2 : 4)
+  const visibleSynopsis = isMobile ? synopsis.slice(0, 120) : synopsis
 
   const bannerSrc = meta.bannerImage
     ? fixThumbnailUrl(meta.bannerImage)
@@ -126,9 +130,9 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
               {getTitle(anime)}
             </h2>
 
-            {genres.length > 0 && (
+            {visibleGenres.length > 0 && (
               <div className={styles.genres}>
-                {genres.slice(0, 4).map((g) => (
+                {visibleGenres.map((g) => (
                   <span key={g.name} className={styles.genreTag}>
                     {g.name}
                   </span>
@@ -136,13 +140,13 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
               </div>
             )}
 
-            {synopsis && (
+            {visibleSynopsis && (
               <p className={styles.summary}>
-                {synopsis.length > 200 ? synopsis.slice(0, 200) + '…' : synopsis}
+                {visibleSynopsis.length < synopsis.length ? visibleSynopsis + '…' : visibleSynopsis}
               </p>
             )}
 
-            <Button variant="primary" size="lg" onClick={handleWatch}>
+            <Button variant="primary" size={isMobile ? 'md' : 'lg'} onClick={handleWatch}>
               Watch Now
             </Button>
           </div>

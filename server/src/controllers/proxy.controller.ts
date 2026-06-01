@@ -231,14 +231,42 @@ export class ProxyController {
       })();
     </script>`
 
+    const endBridgePatch = `<script>
+      (function() {
+        var notified = false;
+        var notifyEnded = function() {
+          if (notified) return;
+          notified = true;
+          window.parent.postMessage({ type: 'ANI_WEB_MEDIA_ENDED' }, window.location.origin);
+        };
+
+        var attachToVideos = function(root) {
+          var scope = root || document;
+          var videos = scope.querySelectorAll ? scope.querySelectorAll('video') : [];
+          Array.prototype.forEach.call(videos, function(video) {
+            if (video.dataset && video.dataset.aniWebEndedBridge === 'true') return;
+            if (video.dataset) video.dataset.aniWebEndedBridge = 'true';
+            video.addEventListener('ended', notifyEnded, { once: true });
+          });
+        };
+
+        attachToVideos(document);
+
+        var observer = new MutationObserver(function() {
+          attachToVideos(document);
+        });
+
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+      })();
+    </script>`
+
     const beforePlyr = patched.replace(
       /(<script[^>]+\/plyr\.min\.js[^>]*><\/script>)/i,
       `$1${plyrPatch}`
     )
-    const final = beforePlyr.replace(
-      /(<script[^>]+hls(?:\.min)?\.js[^>]*><\/script>)/i,
-      `$1${hlsPatch}`
-    )
+    const final = beforePlyr
+      .replace(/(<script[^>]+hls(?:\.min)?\.js[^>]*><\/script>)/i, `$1${hlsPatch}`)
+      .replace(/<\/body>/i, `${endBridgePatch}</body>`)
 
     return final === html ? null : final
   }

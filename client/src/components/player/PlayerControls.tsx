@@ -11,7 +11,6 @@ import {
   FaExpand,
   FaCompress,
   FaCog,
-  FaListUl,
 } from 'react-icons/fa'
 import { MdReplay10, MdForward10 } from 'react-icons/md'
 import type { VideoSource, VideoLink, SkipInterval } from '../../types/player'
@@ -31,7 +30,6 @@ interface PlayerControlsProps {
   onSourceChange: (source: VideoSource, link: VideoLink) => void
   loadingVideo: boolean
   skipIntervals: SkipInterval[]
-  onToggleQueue: () => void
 }
 
 const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -40,15 +38,12 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   onAutoplayChange,
   showNextEpisodeButton,
   onNextEpisode,
-  onQueueAction,
-  queue,
   videoSources,
   selectedSource,
   selectedLink,
   onSourceChange,
   loadingVideo,
   skipIntervals,
-  onToggleQueue,
 }) => {
   const { state, refs, actions } = player
   const [showSettings, setShowSettings] = useState(false)
@@ -336,15 +331,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                   Next EP
                 </button>
               )}
-              {queue.length > 0 && (
-                <button
-                  className={styles.nextEpisodeBtn}
-                  onClick={onQueueAction}
-                  title={queue.length > 1 ? 'Go to next in queue' : 'Clear queue'}
-                >
-                  {queue.length > 1 ? 'Next in Queue' : 'Clear Queue'}
-                </button>
-              )}
               <button
                 className={styles.skipBtn}
                 onClick={() => actions.seek(-10)}
@@ -394,10 +380,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
               aria-label="Settings"
             >
               <FaCog />
-            </button>
-
-            <button className={styles.controlBtn} onClick={onToggleQueue} aria-label="Toggle queue">
-              <FaListUl />
             </button>
 
             <button className={styles.controlBtn} onClick={actions.toggleFullscreen}>

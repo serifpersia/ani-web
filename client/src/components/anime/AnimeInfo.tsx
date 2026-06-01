@@ -19,6 +19,7 @@ import { getSuggestedEpisode } from '../../lib/queue'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 import styles from './AnimeInfo.module.css'
 import AnimeMetaDetails from './AnimeMetaDetails'
+import SynopsisText from './SynopsisText'
 
 export default function AnimeInfo() {
   const { id: showId } = useParams<{ id: string }>()
@@ -158,11 +159,10 @@ export default function AnimeInfo() {
 
             <div className={styles.synopsisSection}>
               <h2 className={styles.sectionTitleSmall}>Synopsis</h2>
-              <p className={styles.description}>
-                {showMeta.description
-                  ? showMeta.description.replace(/<[^>]*>?/gm, '')
-                  : 'No description available.'}
-              </p>
+              <SynopsisText
+                text={showMeta.description ? showMeta.description.replace(/<[^>]*>?/gm, '') : ''}
+                emptyText="No description available."
+              />
             </div>
 
             <div className={styles.actions}>

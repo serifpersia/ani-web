@@ -1,5 +1,5 @@
 import React, { memo, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { FaMicrophone, FaClosedCaptioning, FaTimes, FaInfo } from 'react-icons/fa'
 import AnimePopup from './AnimePopup'
 import GenericModal from '../common/GenericModal'
@@ -93,6 +93,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     layout = 'vertical',
     rank,
   }) => {
+    const navigate = useNavigate()
     const isMobile = useIsMobile()
     const { titlePreference } = useTitlePreference()
     const { lowEndMode } = useLowEndMode()
@@ -102,18 +103,31 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
     const timeoutRef = React.useRef<NodeJS.Timeout | null>(null)
 
-    const handleInfoMouseEnter = (e: React.MouseEvent) => {
-      if (isMobile) return
+    const openPopup = (rect: DOMRect) => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
       setAnchorRect(rect)
       setIsPopupVisible(true)
     }
 
-    const handleInfoMouseLeave = () => {
+    const closePopup = () => {
+      setIsPopupVisible(false)
+      setAnchorRect(null)
+    }
+
+    const schedulePopupClose = () => {
       timeoutRef.current = setTimeout(() => {
-        setIsPopupVisible(false)
+        closePopup()
       }, 300)
+    }
+
+    const handleInfoMouseEnter = (e: React.MouseEvent) => {
+      if (isMobile) return
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      openPopup(rect)
+    }
+
+    const handleInfoMouseLeave = () => {
+      schedulePopupClose()
     }
 
     const handlePopupMouseEnter = () => {
@@ -121,7 +135,16 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     }
 
     const handlePopupMouseLeave = () => {
-      setIsPopupVisible(false)
+      closePopup()
+    }
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+      if (shouldBlur) return
+      if (isMobile) return
+
+      e.preventDefault()
+      e.stopPropagation()
+      openPopup((e.currentTarget as HTMLElement).getBoundingClientRect())
     }
 
     const mergedConfig = {
@@ -219,110 +242,209 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
       localStorage.getItem('agreedToViewMature') === 'true'
     )
     const [showModal, setShowModal] = React.useState(false)
+    const pendingMatureTargetRef = React.useRef<string | null>(null)
 
     const handleConfirmViewMature = () => {
       localStorage.setItem('agreedToViewMature', 'true')
       setIsAgreedToViewMature(true)
       setShowModal(false)
+      if (pendingMatureTargetRef.current) {
+        navigate(pendingMatureTargetRef.current)
+        pendingMatureTargetRef.current = null
+      }
     }
 
     const shouldBlur = adultContent && !isAgreedToViewMature
+    const handleCardClick = (e: React.MouseEvent) => {
+      if (shouldBlur) {
+        e.preventDefault()
+        e.stopPropagation()
+        pendingMatureTargetRef.current = linkTarget
+        setShowModal(true)
+        return
+      }
+
+      navigate(linkTarget)
+    }
 
     return (
       <div
         className={`${styles.cardWrapper} ${lowEndMode ? styles.lowEnd : ''}`}
         onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        onMouseLeave={() => {
+          setIsHovered(false)
+          if (isPopupVisible) schedulePopupClose()
+        }}
       >
-        <Link
-          to={linkTarget}
-          className={`${styles.card} ${styles[layout]}`}
-          onClick={(e) => {
-            if (shouldBlur) {
-              e.preventDefault()
-              setShowModal(true)
-            }
-          }}
-        >
-          <div className={styles.posterContainer}>
-            {shouldBlur && (
-              <div className={`${styles.matureOverlay} ${lowEndMode ? styles.flat : ''}`}></div>
-            )}
-            <img
-              src={fixThumbnailUrl(anime.thumbnail, lowEndMode ? 100 : 150, lowEndMode ? 150 : 200)}
-              alt={displayTitle}
-              width={lowEndMode ? '100' : '150'}
-              height={lowEndMode ? '150' : '200'}
-              className={`${styles.posterImg} ${isLoaded ? styles.loaded : ''} ${
-                shouldBlur && !lowEndMode ? styles.blurred : ''
-              }`}
-              loading="lazy"
-              decoding="async"
-              onLoad={() => setIsLoaded(true)}
-            />
-
-            {!isMobile && (
-              <>
-                {showTypeBadge && <div className={styles.typeBadge}>{anime.type || 'TV'}</div>}
-
-                {showEpBadge && progressString && (
-                  <div className={styles.epBadge}>{progressString}</div>
+        {shouldBlur ? (
+          <button
+            type="button"
+            className={`${styles.card} ${styles.cardButton} ${styles[layout]}`}
+            onClick={handleCardClick}
+          >
+            <div className={styles.posterContainer}>
+              <div className={`${styles.matureOverlay} ${lowEndMode ? styles.flat : ''}`} />
+              <img
+                src={fixThumbnailUrl(
+                  anime.thumbnail,
+                  lowEndMode ? 100 : 150,
+                  lowEndMode ? 150 : 200
                 )}
-              </>
-            )}
+                alt={displayTitle}
+                width={lowEndMode ? '100' : '150'}
+                height={lowEndMode ? '150' : '200'}
+                className={`${styles.posterImg} ${isLoaded ? styles.loaded : ''} ${
+                  !lowEndMode ? styles.blurred : ''
+                }`}
+                loading="lazy"
+                decoding="async"
+                onLoad={() => setIsLoaded(true)}
+              />
 
-            {showAdultBadge && adultContent && (
-              <div className={`${styles.adultBadge} ${shouldBlur ? styles.gated : ''}`}>18+</div>
-            )}
+              {!isMobile && (
+                <>
+                  {showTypeBadge && <div className={styles.typeBadge}>{anime.type || 'TV'}</div>}
+                  {showEpBadge && progressString && (
+                    <div className={styles.epBadge}>{progressString}</div>
+                  )}
+                </>
+              )}
 
-            {rank !== undefined && <div className={styles.rankBadge}>#{rank}</div>}
-          </div>
+              {showAdultBadge && adultContent && (
+                <div className={`${styles.adultBadge} ${styles.gated}`}>18+</div>
+              )}
 
-          <div className={styles.info}>
-            {infoEls?.title !== false && (
-              <div className={styles.title} title={displayTitle}>
-                {displayTitle}
-              </div>
-            )}
+              {rank !== undefined && <div className={styles.rankBadge}>#{rank}</div>}
+            </div>
 
-            {isMobile && showMobileBadges && (
-              <div className={styles.mobileBadges}>
-                <span className={styles.mobileType}>{anime.type || 'TV'}</span>
-                {progressString && <span className={styles.mobileEp}>{progressString}</span>}
-              </div>
-            )}
-
-            {showProgress && (continueWatching || lowEndMode) && hasProgress && (
-              <div>
-                <div className={styles.progressContainer}>
-                  <div className={styles.progressBar} style={{ width: `${progressPercent}%` }} />
+            <div className={styles.info}>
+              {infoEls?.title !== false && (
+                <div className={styles.title} title={displayTitle}>
+                  {displayTitle}
                 </div>
-                {!lowEndMode && (
-                  <div className={styles.timestamp}>
-                    {formatTime(anime.currentTime || 0)} / {formatTime(anime.duration || 0)}
-                  </div>
-                )}
-              </div>
-            )}
+              )}
 
-            {showMeta && (
-              <div className={styles.metaRow}>
-                {(anime.availableEpisodesDetail?.sub || anime.availableEpisodes?.sub) && (
-                  <div className={styles.metaItem}>
-                    <FaClosedCaptioning size={10} />
-                    {anime.availableEpisodesDetail?.sub?.length ?? anime.availableEpisodes?.sub}
+              {isMobile && showMobileBadges && (
+                <div className={styles.mobileBadges}>
+                  <span className={styles.mobileType}>{anime.type || 'TV'}</span>
+                  {progressString && <span className={styles.mobileEp}>{progressString}</span>}
+                </div>
+              )}
+
+              {showProgress && (continueWatching || lowEndMode) && hasProgress && (
+                <div>
+                  <div className={styles.progressContainer}>
+                    <div className={styles.progressBar} style={{ width: `${progressPercent}%` }} />
                   </div>
+                  {!lowEndMode && (
+                    <div className={styles.timestamp}>
+                      {formatTime(anime.currentTime || 0)} / {formatTime(anime.duration || 0)}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {showMeta && (
+                <div className={styles.metaRow}>
+                  {(anime.availableEpisodesDetail?.sub || anime.availableEpisodes?.sub) && (
+                    <div className={styles.metaItem}>
+                      <FaClosedCaptioning size={10} />
+                      {anime.availableEpisodesDetail?.sub?.length ?? anime.availableEpisodes?.sub}
+                    </div>
+                  )}
+                  {(anime.availableEpisodesDetail?.dub || anime.availableEpisodes?.dub) && (
+                    <div className={styles.metaItem}>
+                      <FaMicrophone size={10} />
+                      {anime.availableEpisodesDetail?.dub?.length ?? anime.availableEpisodes?.dub}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </button>
+        ) : (
+          <Link
+            to={linkTarget}
+            className={`${styles.card} ${styles[layout]}`}
+            onContextMenu={handleContextMenu}
+          >
+            <div className={styles.posterContainer}>
+              <img
+                src={fixThumbnailUrl(
+                  anime.thumbnail,
+                  lowEndMode ? 100 : 150,
+                  lowEndMode ? 150 : 200
                 )}
-                {(anime.availableEpisodesDetail?.dub || anime.availableEpisodes?.dub) && (
-                  <div className={styles.metaItem}>
-                    <FaMicrophone size={10} />
-                    {anime.availableEpisodesDetail?.dub?.length ?? anime.availableEpisodes?.dub}
+                alt={displayTitle}
+                width={lowEndMode ? '100' : '150'}
+                height={lowEndMode ? '150' : '200'}
+                className={`${styles.posterImg} ${isLoaded ? styles.loaded : ''}`}
+                loading="lazy"
+                decoding="async"
+                onLoad={() => setIsLoaded(true)}
+              />
+
+              {!isMobile && (
+                <>
+                  {showTypeBadge && <div className={styles.typeBadge}>{anime.type || 'TV'}</div>}
+                  {showEpBadge && progressString && (
+                    <div className={styles.epBadge}>{progressString}</div>
+                  )}
+                </>
+              )}
+
+              {showAdultBadge && adultContent && <div className={styles.adultBadge}>18+</div>}
+
+              {rank !== undefined && <div className={styles.rankBadge}>#{rank}</div>}
+            </div>
+
+            <div className={styles.info}>
+              {infoEls?.title !== false && (
+                <div className={styles.title} title={displayTitle}>
+                  {displayTitle}
+                </div>
+              )}
+
+              {isMobile && showMobileBadges && (
+                <div className={styles.mobileBadges}>
+                  <span className={styles.mobileType}>{anime.type || 'TV'}</span>
+                  {progressString && <span className={styles.mobileEp}>{progressString}</span>}
+                </div>
+              )}
+
+              {showProgress && (continueWatching || lowEndMode) && hasProgress && (
+                <div>
+                  <div className={styles.progressContainer}>
+                    <div className={styles.progressBar} style={{ width: `${progressPercent}%` }} />
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-        </Link>
+                  {!lowEndMode && (
+                    <div className={styles.timestamp}>
+                      {formatTime(anime.currentTime || 0)} / {formatTime(anime.duration || 0)}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {showMeta && (
+                <div className={styles.metaRow}>
+                  {(anime.availableEpisodesDetail?.sub || anime.availableEpisodes?.sub) && (
+                    <div className={styles.metaItem}>
+                      <FaClosedCaptioning size={10} />
+                      {anime.availableEpisodesDetail?.sub?.length ?? anime.availableEpisodes?.sub}
+                    </div>
+                  )}
+                  {(anime.availableEpisodesDetail?.dub || anime.availableEpisodes?.dub) && (
+                    <div className={styles.metaItem}>
+                      <FaMicrophone size={10} />
+                      {anime.availableEpisodesDetail?.dub?.length ?? anime.availableEpisodes?.dub}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </Link>
+        )}
+
         {showModal && (
           <GenericModal
             isOpen={showModal}
@@ -353,11 +475,13 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             </div>
           </GenericModal>
         )}
+
         {showRemoveBtn && (
           <button className={styles.removeBtn} onClick={handleRemoveClick} aria-label="Remove">
             <FaTimes size={10} />
           </button>
         )}
+
         {!continueWatching && !isMobile && !shouldBlur && (
           <button
             className={styles.infoBtn}
@@ -368,6 +492,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             <FaInfo size={11} />
           </button>
         )}
+
         {isPopupVisible && anchorRect && (
           <AnimePopup
             showId={anime._id}

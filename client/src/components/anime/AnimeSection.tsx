@@ -49,6 +49,7 @@ interface AnimeSectionProps {
   title: string
   animeList: Anime[]
   continueWatching?: boolean
+  titleLink?: string
   onRemove?: (id: string) => void
   loading?: boolean
   showSeeMore?: boolean
@@ -64,6 +65,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
   title,
   animeList,
   continueWatching,
+  titleLink,
   onRemove,
   loading,
   showSeeMore,
@@ -97,9 +99,17 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
     <section style={{ marginBottom: '2.5rem' }}>
       <div className={styles['section-header']}>
         <div className={styles['title-wrapper']}>
-          <div className="section-title" style={{ marginBottom: 0 }}>
-            {title}
-          </div>
+          {titleLink ? (
+            <Link to={titleLink} className={styles['title-link']}>
+              <div className="section-title" style={{ marginBottom: 0 }}>
+                {title}
+              </div>
+            </Link>
+          ) : (
+            <div className="section-title" style={{ marginBottom: 0 }}>
+              {title}
+            </div>
+          )}
           {carousel && animeList.length > 0 && (
             <div className={styles['nav-arrows']}>
               <button

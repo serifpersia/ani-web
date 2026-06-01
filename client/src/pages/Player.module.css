@@ -1,8 +1,9 @@
 .controls {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 1.25rem;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .titleContainer {
@@ -54,6 +55,9 @@
   align-items: center;
   gap: 0.6rem;
   font-size: 0.9rem;
+  flex: 1 1 180px;
+  min-width: 150px;
+  justify-content: center;
 }
 
 .watchlistBtn:hover {
@@ -73,6 +77,58 @@
   border-color: var(--color-success);
 }
 
+.queueBtn {
+  background: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.35);
+  color: #d8b4fe;
+}
+
+.queueBtn:hover {
+  background: rgba(139, 92, 246, 0.16);
+  border-color: rgba(167, 139, 250, 0.6);
+  color: #f3e8ff;
+}
+
+.queueActive {
+  background: rgba(139, 92, 246, 0.18);
+  border-color: rgba(167, 139, 250, 0.72);
+  color: #f5d0fe;
+}
+
+.modeToggleBtn {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  border-color: var(--glass-border);
+  flex: 1 1 180px;
+  min-width: 150px;
+}
+
+.modeToggleActive {
+  background: rgba(59, 130, 246, 0.14);
+  border-color: rgba(96, 165, 250, 0.65);
+  color: #dbeafe;
+}
+
+.nativeToggleBtn {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  border-color: var(--glass-border);
+  flex: 1 1 180px;
+  min-width: 150px;
+}
+
+.nativeToggleBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--text-secondary);
+  transform: translateY(-2px);
+}
+
+.nativeToggleActive {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.55);
+  color: #fde68a;
+}
+
 .watchlistBtn:disabled {
   opacity: 0.7;
   cursor: wait;
@@ -87,6 +143,9 @@
   background: rgba(59, 130, 246, 0.1);
   border-color: rgba(59, 130, 246, 0.35);
   color: #93c5fd;
+  flex: 1 1 180px;
+  min-width: 150px;
+  justify-content: center;
 }
 
 .markWatchedBtn:hover {
@@ -110,12 +169,103 @@
   background: rgba(16, 185, 129, 0.12);
   border-color: rgba(16, 185, 129, 0.38);
   color: #d1fae5;
+  flex: 1 1 200px;
+  min-width: 160px;
+  justify-content: center;
 }
 
 .completeSeriesBtn:hover {
   background: rgba(16, 185, 129, 0.18);
   border-color: rgba(52, 211, 153, 0.55);
   color: #ecfdf5;
+}
+
+.providerAndEpisodeRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.episodeActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.desktopEpisodeActions {
+  flex: 1 1 320px;
+  justify-content: flex-end;
+  align-self: flex-end;
+  margin: 0;
+}
+
+.mobileEpisodeActions {
+  margin: 0.5rem 0 0.25rem;
+}
+
+.episodeNavBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 0.7rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.episodeNavBtn:hover:not(:disabled) {
+  border-color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.episodeNavBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.episodeNavBtn.primary {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+  border-color: transparent;
+  color: white;
+}
+
+.episodeNavBtn.primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%);
+}
+
+.episodeNavBtn.secondary {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.episodePickerBtn {
+  display: none;
+}
+
+.queueCountdown {
+  position: absolute;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translateX(-50%);
+  z-index: 75;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: rgba(18, 18, 22, 0.92);
+  color: white;
+  font-weight: 700;
+  box-shadow: var(--glass-shadow);
 }
 
 .videoContainer {
@@ -665,18 +815,6 @@
   font-weight: 600;
 }
 
-.toggleContainer {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.toggleContainer span {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.8);
-}
-
 .sourceLoader {
   padding: 2rem;
   display: flex;
@@ -743,6 +881,57 @@
   }
   .skipText {
     font-size: 0.8rem;
+  }
+
+  .episodeActions {
+    margin-top: 0.25rem;
+  }
+
+  .controls {
+    gap: 0.65rem;
+  }
+
+  .watchBtn,
+  .watchlistBtn,
+  .queueBtn,
+  .markWatchedBtn,
+  .completeSeriesBtn,
+  .nativeToggleBtn,
+  .modeToggleBtn {
+    flex: 1 1 calc(50% - 0.35rem);
+    min-width: 0;
+  }
+
+  .watchBtn {
+    flex-basis: 100%;
+  }
+
+  .episodeNavBtn {
+    flex: 1 1 calc(50% - 0.4rem);
+    min-width: 0;
+  }
+
+  .episodePickerBtn {
+    display: inline-flex;
+    flex-basis: 100%;
+  }
+
+  .desktopEpisodeActions {
+    display: none;
+  }
+
+  .mobileEpisodeActions {
+    display: flex;
+  }
+
+  .providerAndEpisodeRow {
+    flex-direction: column;
+  }
+}
+
+@media (min-width: 769px) {
+  .mobileEpisodeActions {
+    display: none;
   }
 }
 

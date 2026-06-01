@@ -127,7 +127,7 @@ export class _123AnimeProvider implements Provider {
         if (!response.ok) return []
         const data = (await response.json()) as { success: boolean; data?: ApiAnime[] }
         if (!data.success || !data.data) return []
-        
+
         return data.data.filter((anime) => anime.title !== 'Dogge')
       }
 

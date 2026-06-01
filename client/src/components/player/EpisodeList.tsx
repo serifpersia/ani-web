@@ -6,9 +6,16 @@ interface EpisodeListProps {
   currentEpisode?: string
   watchedEpisodes: string[]
   onEpisodeClick: (ep: string) => void
+  variant?: 'sidebar' | 'drawer'
 }
 
-const EpisodeList = ({ episodes, currentEpisode, watchedEpisodes, onEpisodeClick }) => {
+const EpisodeList = ({
+  episodes,
+  currentEpisode,
+  watchedEpisodes,
+  onEpisodeClick,
+  variant = 'sidebar',
+}: EpisodeListProps) => {
   const [selectedRange, setSelectedRange] = useState(0)
 
   const episodeRanges = useMemo(() => {
@@ -32,8 +39,12 @@ const EpisodeList = ({ episodes, currentEpisode, watchedEpisodes, onEpisodeClick
   }, [episodes, episodeRanges, selectedRange])
 
   return (
-    <div className={styles.episodeListContainer}>
-      <div className={styles.episodeListHeader}>
+    <div
+      className={`${styles.episodeListContainer} ${variant === 'drawer' ? styles.drawerContainer : ''}`}
+    >
+      <div
+        className={`${styles.episodeListHeader} ${variant === 'drawer' ? styles.drawerHeader : ''}`}
+      >
         <h3 className={styles.episodeListTitle}>Episodes</h3>
         {episodeRanges.length > 0 && (
           <div className={styles.rangeSelector}>
@@ -49,7 +60,7 @@ const EpisodeList = ({ episodes, currentEpisode, watchedEpisodes, onEpisodeClick
           </div>
         )}
       </div>
-      <div className={styles.episodeList}>
+      <div className={`${styles.episodeList} ${variant === 'drawer' ? styles.drawerList : ''}`}>
         {filteredEpisodes.map((ep) => (
           <div
             key={ep}

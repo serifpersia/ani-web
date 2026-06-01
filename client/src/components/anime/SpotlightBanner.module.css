@@ -52,6 +52,9 @@
 .content {
   max-width: 600px;
   color: white;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .yearTag {
@@ -65,7 +68,8 @@
 
 .title {
   font-size: 2.5rem;
-  margin-bottom: 0.75rem;
+  margin: 0;
+  line-height: 1.05;
   transition: color var(--transition-base);
   cursor: pointer;
 }
@@ -78,7 +82,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin-bottom: 0.75rem;
 }
 
 .genreTag {
@@ -97,7 +100,7 @@
 .summary {
   font-size: 0.95rem;
   line-height: 1.6;
-  margin-bottom: 1.5rem;
+  margin: 0;
   opacity: 0.85;
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -128,25 +131,53 @@
 
 @media (max-width: 768px) {
   .posterWrapper {
-    height: 250px;
+    height: 280px;
   }
 
   .overlay {
-    padding: 0 1rem;
+    padding: 0 1rem 1rem;
     justify-content: flex-end;
-    padding-bottom: 3rem;
+    background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.88) 0%,
+      rgba(0, 0, 0, 0.38) 55%,
+      rgba(0, 0, 0, 0.05) 100%
+    );
   }
 
   .title {
-    font-size: 1.5rem;
-    margin-bottom: 0.5rem;
+    font-size: clamp(1.2rem, 5vw, 1.7rem);
   }
 
   .summary {
-    display: none;
+    -webkit-line-clamp: 2;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    max-width: 100%;
   }
 
   .content {
-    margin-bottom: 0.5rem;
+    gap: 0.5rem;
+    max-width: 100%;
+    padding-bottom: 2.5rem;
+  }
+
+  .genres {
+    gap: 0.3rem;
+  }
+
+  .genreTag {
+    font-size: 0.65rem;
+    padding: 0.18rem 0.5rem;
+    letter-spacing: 0.02em;
+  }
+
+  .carouselControls {
+    bottom: 0.75rem;
+  }
+
+  .carouselControls .dot {
+    width: 10px;
+    height: 10px;
   }
 }

@@ -6,11 +6,24 @@
   background: transparent;
 }
 
+.drawerContainer {
+  height: auto;
+  min-height: 100%;
+}
+
 .episodeListHeader {
   background: transparent;
   padding: 1.5rem;
   border-bottom: 1px solid var(--glass-border);
   z-index: 10;
+}
+
+.drawerHeader {
+  position: sticky;
+  top: 0;
+  background: rgba(12, 12, 15, 0.98);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .episodeListTitle {
@@ -67,6 +80,12 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   min-height: 0;
+  touch-action: pan-y;
+}
+
+.drawerList {
+  overflow: visible;
+  -webkit-overflow-scrolling: auto;
   touch-action: pan-y;
 }
 

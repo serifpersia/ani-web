@@ -1,15 +1,6 @@
 import React, { useEffect, useMemo, useCallback, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
-import {
-  FaBars,
-  FaChevronDown,
-  FaChevronLeft,
-  FaChevronRight,
-  FaChevronUp,
-  FaHistory,
-  FaTimes,
-} from 'react-icons/fa'
+import { FaChevronLeft, FaChevronRight, FaHistory } from 'react-icons/fa'
 import { Button } from '../components/common/Button'
 import AnimeSection from '../components/anime/AnimeSection'
 import TrendingList from '../components/anime/TrendingList'
@@ -18,89 +9,22 @@ import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
 import RemoveConfirmationModal from '../components/common/RemoveConfirmationModal'
 import SpotlightBanner from '../components/anime/SpotlightBanner'
+import QueueRail from '../components/player/QueueRail'
 import {
-  useLatestReleases,
   useInfiniteLatestReleases,
   usePaginatedCurrentSeason,
-  useContinueWatchingFast,
-  useContinueWatchingUpNext,
+  useAllContinueWatching,
   useRemoveFromWatchlist,
   usePopularAnime,
   useQueue,
   useRemoveFromQueue,
+  useClearQueue,
   useReorderQueue,
 } from '../hooks/useAnimeData'
-import type { QueueItem } from '../hooks/useAnimeData'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
-import { fixThumbnailUrl } from '../lib/utils'
 import styles from './Home.module.css'
 
 type ActiveTab = 'latest' | 'season' | 'popular'
-
-interface QuickQueueItemProps {
-  item: QueueItem
-  onRemove: (item: QueueItem) => void
-  onDragStart: (e: React.DragEvent) => void
-  onDragEnter: (e: React.DragEvent) => void
-  onDragEnd: (e: React.DragEvent) => void
-  isDragging: boolean
-}
-
-const QuickQueueItem = ({
-  item,
-  onRemove,
-  onDragStart,
-  onDragEnter,
-  onDragEnd,
-  isDragging,
-}: QuickQueueItemProps) => {
-  const navigate = useNavigate()
-  const { titlePreference } = useTitlePreference()
-
-  const displayTitle =
-    (item[titlePreference as keyof QueueItem] as string) || item.name || 'Unknown show'
-
-  return (
-    <div
-      className={`${styles.quickQueueItem} ${isDragging ? styles.dragging : ''}`}
-      draggable
-      onDragStart={onDragStart}
-      onDragEnter={onDragEnter}
-      onDragOver={(e) => e.preventDefault()}
-      onDragEnd={onDragEnd}
-    >
-      <button className={styles.quickQueueDrag} type="button" aria-label="Drag queue item">
-        <FaBars />
-      </button>
-      <img
-        className={styles.quickQueueThumb}
-        src={fixThumbnailUrl(item.thumbnail || '', 72, 96)}
-        alt={displayTitle}
-        onError={(event) => {
-          event.currentTarget.src = '/placeholder.svg'
-        }}
-      />
-      <div className={styles.quickQueueMeta}>
-        <button
-          className={styles.quickQueueName}
-          type="button"
-          onClick={() => navigate(`/watch/${item.showId}/${item.episodeNumber}`)}
-        >
-          {displayTitle}
-        </button>
-        <div className={styles.quickQueueEpisode}>Episode {item.episodeNumber}</div>
-      </div>
-      <button
-        className={styles.quickQueueRemove}
-        type="button"
-        onClick={() => onRemove(item)}
-        aria-label={`Remove ${displayTitle} episode ${item.episodeNumber} from queue`}
-      >
-        <FaTimes />
-      </button>
-    </div>
-  )
-}
 
 const Home: React.FC = () => {
   const queryClient = useQueryClient()
@@ -114,18 +38,12 @@ const Home: React.FC = () => {
 
   const { titlePreference } = useTitlePreference()
   const [itemToRemove, setItemToRemove] = React.useState<{ id: string; name: string } | null>(null)
-  const [isQueueOpen, setIsQueueOpen] = useState(true)
   const removeWatchlistMutation = useRemoveFromWatchlist()
   const { data: queueData = [] } = useQueue()
-  const [localQueue, setLocalQueue] = React.useState<QueueItem[]>([])
-  const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null)
 
   const removeQueue = useRemoveFromQueue()
+  const clearQueue = useClearQueue()
   const reorderQueue = useReorderQueue()
-
-  useEffect(() => {
-    setLocalQueue(queueData)
-  }, [queueData])
 
   useEffect(() => {
     document.title = 'Home - ani-web'
@@ -158,33 +76,35 @@ const Home: React.FC = () => {
     [hasMoreLatest, fetchingMoreLatest, loadingLatestInfinite, fetchMoreLatest]
   )
 
+  const {
+    data: continueWatchingInfinite,
+    isLoading: loadingContinueWatching,
+    fetchNextPage: fetchMoreContinueWatching,
+    hasNextPage: hasMoreContinueWatching,
+    isFetchingNextPage: fetchingMoreContinueWatching,
+  } = useAllContinueWatching()
+
+  const handleContinueWatchingScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      if (!hasMoreContinueWatching || fetchingMoreContinueWatching || loadingContinueWatching) {
+        return
+      }
+
+      const { scrollLeft, clientWidth, scrollWidth } = e.currentTarget
+      if (scrollLeft + clientWidth > scrollWidth * 0.7) {
+        fetchMoreContinueWatching()
+      }
+    },
+    [
+      hasMoreContinueWatching,
+      fetchingMoreContinueWatching,
+      loadingContinueWatching,
+      fetchMoreContinueWatching,
+    ]
+  )
+
   const { data: popularWeekly } = usePopularAnime('weekly')
-  const { data: cwFast, isLoading: loadingFast } = useContinueWatchingFast(14)
-  const { data: cwUpNext, isLoading: loadingUpNext } = useContinueWatchingUpNext()
-  const loadingCw = loadingFast || loadingUpNext
-
-  const cwList = useMemo(() => {
-    const combined: typeof cwFast = []
-    const seen = new Set<string>()
-
-    if (cwFast) {
-      for (const show of cwFast) {
-        combined.push(show)
-        seen.add(show.id)
-      }
-    }
-
-    if (cwUpNext) {
-      for (const show of cwUpNext) {
-        if (!seen.has(show.id)) {
-          combined.push(show)
-          seen.add(show.id)
-        }
-      }
-    }
-
-    return combined.length > 0 ? combined : cwFast || []
-  }, [cwFast, cwUpNext])
+  const cwList = useMemo(() => continueWatchingInfinite?.pages || [], [continueWatchingInfinite])
 
   const { data: currentSeason, isLoading: loadingSeason } = usePaginatedCurrentSeason(page)
   const seasonLimit = 14
@@ -201,8 +121,7 @@ const Home: React.FC = () => {
       })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
-      queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
+      queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
     },
   })
 
@@ -226,41 +145,6 @@ const Home: React.FC = () => {
     },
     [itemToRemove, removeCw, removeWatchlistMutation]
   )
-
-  const handleQueueRemove = useCallback(
-    (item: QueueItem) => {
-      removeQueue.mutate({ showId: item.showId, episodeNumber: item.episodeNumber })
-    },
-    [removeQueue]
-  )
-
-  const handleDragStart = (index: number) => {
-    setDraggedIndex(index)
-  }
-
-  const handleDragEnter = (index: number) => {
-    if (draggedIndex === null || draggedIndex === index) return
-
-    const newQueue = [...localQueue]
-    const draggedItem = newQueue[draggedIndex]
-    newQueue.splice(draggedIndex, 1)
-    newQueue.splice(index, 0, draggedItem)
-    setDraggedIndex(index)
-    setLocalQueue(newQueue)
-  }
-
-  const handleDragEnd = () => {
-    if (draggedIndex !== null) {
-      reorderQueue.mutate(
-        localQueue.map((item) => ({
-          id: item.id,
-          showId: item.showId,
-          episodeNumber: item.episodeNumber,
-        }))
-      )
-    }
-    setDraggedIndex(null)
-  }
 
   const tabs: { key: ActiveTab; label: string }[] = [
     { key: 'latest', label: 'Latest Releases' },
@@ -354,46 +238,35 @@ const Home: React.FC = () => {
   return (
     <div style={{ paddingBottom: '2rem' }}>
       <SpotlightBanner animeList={popularWeekly || []} />
-      {localQueue.length > 0 && (
-        <section className={styles.quickQueue}>
-          <button
-            type="button"
-            className={styles.quickQueueHeader}
-            onClick={() => setIsQueueOpen((open) => !open)}
-          >
-            <span className={styles.quickQueueTitle}>
-              Quick Queue
-              <span className={styles.queueBadge}>{localQueue.length}</span>
-            </span>
-            {isQueueOpen ? <FaChevronUp /> : <FaChevronDown />}
-          </button>
-
-          {isQueueOpen && (
-            <div className={styles.quickQueueList}>
-              {localQueue.map((item, index) => (
-                <QuickQueueItem
-                  key={item.id}
-                  item={item}
-                  onRemove={handleQueueRemove}
-                  onDragStart={() => handleDragStart(index)}
-                  onDragEnter={() => handleDragEnter(index)}
-                  onDragEnd={handleDragEnd}
-                  isDragging={draggedIndex === index}
-                />
-              ))}
-            </div>
-          )}
-        </section>
-      )}
+      <QueueRail
+        title="Queue"
+        items={queueData}
+        onRemove={(item) =>
+          removeQueue.mutate({ showId: item.showId, episodeNumber: item.episodeNumber })
+        }
+        showClearAll
+        onClear={() => clearQueue.mutate()}
+        onReorder={(items) =>
+          reorderQueue.mutate(
+            items.map((item) => ({
+              id: item.id,
+              showId: item.showId,
+              episodeNumber: item.episodeNumber,
+            }))
+          )
+        }
+      />
       {/* ── Continue Watching ── */}
       <AnimeSection
         title="Continue Watching"
-        animeList={cwList || []}
+        titleLink="/watchlist/Continue Watching"
+        animeList={cwList}
         continueWatching
         carousel
         onRemove={handleRemove}
-        showSeeMore={cwList !== undefined && cwList.length > 0}
-        loading={loadingFast}
+        loading={loadingContinueWatching}
+        onScroll={handleContinueWatchingScroll}
+        isFetchingNextPage={fetchingMoreContinueWatching}
         emptyState={
           <div
             style={{
