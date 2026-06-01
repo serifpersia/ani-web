@@ -23,6 +23,14 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
   const wasPlayingBeforeScrub = useRef(false)
   const debouncedUpdateTimer = useRef<NodeJS.Timeout | null>(null)
   const lastThrottledUpdateTime = useRef(0)
+  const normalPlaybackRateRef = useRef(1)
+  const speedBoostRef = useRef({
+    mouse: false,
+    keyboard: false,
+  })
+  const mouseHoldTimerRef = useRef<number | null>(null)
+  const spaceHoldTimerRef = useRef<number | null>(null)
+  const spaceKeyHeldRef = useRef(false)
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(() => {
@@ -63,6 +71,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
   const [activeSubtitleTrack, setActiveSubtitleTrack] = useState<string | null>(null)
   const [showSourceMenu, setShowSourceMenu] = useState(false)
   const [isBuffering, setIsBuffering] = useState(false)
+  const [isSpeedBoostActive, setIsSpeedBoostActive] = useState(false)
   const hasEnded = useRef(false)
   const lastReportedTime = useRef<number>(-1)
 
@@ -180,6 +189,34 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
     }
   }, [setShowControls])
 
+  const syncPlaybackRate = useCallback(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    const shouldBoost = speedBoostRef.current.mouse || speedBoostRef.current.keyboard
+    video.playbackRate = shouldBoost ? 2 : normalPlaybackRateRef.current
+  }, [])
+
+  const setMouseSpeedBoost = useCallback(
+    (enabled: boolean) => {
+      if (speedBoostRef.current.mouse === enabled) return
+      speedBoostRef.current.mouse = enabled
+      setIsSpeedBoostActive(enabled || speedBoostRef.current.keyboard)
+      syncPlaybackRate()
+    },
+    [syncPlaybackRate]
+  )
+
+  const setKeyboardSpeedBoost = useCallback(
+    (enabled: boolean) => {
+      if (speedBoostRef.current.keyboard === enabled) return
+      speedBoostRef.current.keyboard = enabled
+      setIsSpeedBoostActive(speedBoostRef.current.mouse || enabled)
+      syncPlaybackRate()
+    },
+    [syncPlaybackRate]
+  )
+
   const seek = useCallback(
     (seconds: number) => {
       if (videoRef.current) {
@@ -225,13 +262,33 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
+      if (
+        target.closest(
+          'input, textarea, button, select, a, [role="button"], [contenteditable="true"]'
+        )
+      )
+        return
+
+      if (e.code === 'Space') {
+        e.preventDefault()
+
+        if (spaceKeyHeldRef.current) return
+
+        spaceKeyHeldRef.current = true
+
+        if (spaceHoldTimerRef.current) {
+          clearTimeout(spaceHoldTimerRef.current)
+        }
+
+        spaceHoldTimerRef.current = window.setTimeout(() => {
+          spaceHoldTimerRef.current = null
+          if (!spaceKeyHeldRef.current) return
+          setKeyboardSpeedBoost(true)
+        }, 180)
+        return
+      }
 
       switch (e.key.toLowerCase()) {
-        case ' ':
-          e.preventDefault()
-          togglePlay()
-          break
         case 'f':
           toggleFullscreen()
           break
@@ -263,9 +320,97 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
       }
     }
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return
+
+      e.preventDefault()
+      spaceKeyHeldRef.current = false
+
+      if (speedBoostRef.current.keyboard) {
+        setKeyboardSpeedBoost(false)
+        return
+      }
+
+      if (spaceHoldTimerRef.current) {
+        clearTimeout(spaceHoldTimerRef.current)
+        spaceHoldTimerRef.current = null
+        togglePlay()
+      }
+    }
+
     document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [togglePlay, toggleFullscreen, toggleMute, seek])
+    document.addEventListener('keyup', handleKeyUp)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('keyup', handleKeyUp)
+      if (spaceHoldTimerRef.current) {
+        clearTimeout(spaceHoldTimerRef.current)
+        spaceHoldTimerRef.current = null
+      }
+      spaceKeyHeldRef.current = false
+      setKeyboardSpeedBoost(false)
+      setIsSpeedBoostActive(false)
+    }
+  }, [setKeyboardSpeedBoost, togglePlay, toggleFullscreen, toggleMute, seek])
+
+  useEffect(() => {
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return
+
+      const target = e.target as HTMLElement | null
+      if (!target) return
+
+      if (target.closest('[data-speed-boost-ignore="true"]')) return
+
+      const container = playerContainerRef.current
+      if (!container || !container.contains(target)) return
+
+      if (mouseHoldTimerRef.current) {
+        clearTimeout(mouseHoldTimerRef.current)
+      }
+
+      mouseHoldTimerRef.current = window.setTimeout(() => {
+        mouseHoldTimerRef.current = null
+        setMouseSpeedBoost(true)
+      }, 180)
+    }
+
+    const handleMouseUp = () => {
+      if (mouseHoldTimerRef.current) {
+        clearTimeout(mouseHoldTimerRef.current)
+        mouseHoldTimerRef.current = null
+      }
+      setMouseSpeedBoost(false)
+    }
+
+    const handleWindowBlur = () => {
+      if (mouseHoldTimerRef.current) {
+        clearTimeout(mouseHoldTimerRef.current)
+        mouseHoldTimerRef.current = null
+      }
+      spaceKeyHeldRef.current = false
+      if (spaceHoldTimerRef.current) {
+        clearTimeout(spaceHoldTimerRef.current)
+        spaceHoldTimerRef.current = null
+      }
+      setKeyboardSpeedBoost(false)
+      setMouseSpeedBoost(false)
+      setIsSpeedBoostActive(false)
+    }
+
+    document.addEventListener('mousedown', handleMouseDown)
+    document.addEventListener('mouseup', handleMouseUp)
+    window.addEventListener('blur', handleWindowBlur)
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown)
+      document.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('blur', handleWindowBlur)
+      if (mouseHoldTimerRef.current) {
+        clearTimeout(mouseHoldTimerRef.current)
+        mouseHoldTimerRef.current = null
+      }
+    }
+  }, [setKeyboardSpeedBoost, setMouseSpeedBoost])
 
   const onPlay = useCallback(() => {
     setIsPlaying(true)
@@ -281,7 +426,10 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
     setIsPlaying(false)
     setShowControls(true)
   }, [setShowControls])
-  const onLoadedMetadata = useCallback(() => setDuration(videoRef.current?.duration || 0), [])
+  const onLoadedMetadata = useCallback(() => {
+    setDuration(videoRef.current?.duration || 0)
+    syncPlaybackRate()
+  }, [syncPlaybackRate])
   const onVolumeChange = useCallback(() => {
     if (videoRef.current) {
       const newMuted = videoRef.current.muted
@@ -429,6 +577,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
       activeSubtitleTrack,
       showSourceMenu,
       isBuffering,
+      isSpeedBoostActive,
     },
     actions: actions,
   }

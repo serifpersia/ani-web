@@ -885,6 +885,13 @@ const Player: React.FC = () => {
             </div>
           )}
 
+          {player.state.isSpeedBoostActive && (
+            <div className={styles.speedBoostBadge} aria-hidden="true">
+              <span>2x</span>
+              <FaForward size={12} />
+            </div>
+          )}
+
           {isVideoLoading && (
             <div className={styles.loadingOverlay}>
               <div className={styles.loadingDots}>
@@ -925,7 +932,11 @@ const Player: React.FC = () => {
                   <p className={styles.errorSubtext}>
                     Please try selecting a different provider below.
                   </p>
-                  <button className={styles.retryButton} onClick={() => window.location.reload()}>
+                  <button
+                    className={styles.retryButton}
+                    onClick={() => window.location.reload()}
+                    data-speed-boost-ignore="true"
+                  >
                     Retry
                   </button>
                 </div>
