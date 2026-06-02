@@ -261,10 +261,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
         e.stopPropagation()
         pendingMatureTargetRef.current = linkTarget
         setShowModal(true)
-        return
       }
-
-      navigate(linkTarget)
     }
 
     return (
@@ -276,174 +273,88 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
           if (isPopupVisible) schedulePopupClose()
         }}
       >
-        {shouldBlur ? (
-          <button
-            type="button"
-            className={`${styles.card} ${styles.cardButton} ${styles[layout]}`}
-            onClick={handleCardClick}
-          >
-            <div className={styles.posterContainer}>
+        <Link
+          to={linkTarget}
+          className={`${styles.card} ${styles[layout]} ${shouldBlur ? styles.cardButton : ''}`}
+          onClick={handleCardClick}
+          onContextMenu={handleContextMenu}
+        >
+          <div className={styles.posterContainer}>
+            {shouldBlur && (
               <div className={`${styles.matureOverlay} ${lowEndMode ? styles.flat : ''}`} />
-              <img
-                src={fixThumbnailUrl(
-                  anime.thumbnail,
-                  lowEndMode ? 100 : 150,
-                  lowEndMode ? 150 : 200
+            )}
+            <img
+              src={fixThumbnailUrl(anime.thumbnail, lowEndMode ? 100 : 150, lowEndMode ? 150 : 200)}
+              alt={displayTitle}
+              className={`${styles.posterImg} ${isLoaded ? styles.loaded : ''} ${
+                shouldBlur && !lowEndMode ? styles.blurred : ''
+              }`}
+              loading="lazy"
+              decoding="async"
+              onLoad={() => setIsLoaded(true)}
+            />
+
+            {!isMobile && (
+              <>
+                {showTypeBadge && <div className={styles.typeBadge}>{anime.type || 'TV'}</div>}
+                {showEpBadge && progressString && (
+                  <div className={styles.epBadge}>{progressString}</div>
                 )}
-                alt={displayTitle}
-                width={lowEndMode ? '100' : '150'}
-                height={lowEndMode ? '150' : '200'}
-                className={`${styles.posterImg} ${isLoaded ? styles.loaded : ''} ${
-                  !lowEndMode ? styles.blurred : ''
-                }`}
-                loading="lazy"
-                decoding="async"
-                onLoad={() => setIsLoaded(true)}
-              />
+              </>
+            )}
 
-              {!isMobile && (
-                <>
-                  {showTypeBadge && <div className={styles.typeBadge}>{anime.type || 'TV'}</div>}
-                  {showEpBadge && progressString && (
-                    <div className={styles.epBadge}>{progressString}</div>
-                  )}
-                </>
-              )}
+            {showAdultBadge && adultContent && (
+              <div className={`${styles.adultBadge} ${shouldBlur ? styles.gated : ''}`}>18+</div>
+            )}
 
-              {showAdultBadge && adultContent && (
-                <div className={`${styles.adultBadge} ${styles.gated}`}>18+</div>
-              )}
+            {rank !== undefined && <div className={styles.rankBadge}>#{rank}</div>}
+          </div>
 
-              {rank !== undefined && <div className={styles.rankBadge}>#{rank}</div>}
-            </div>
+          <div className={styles.info}>
+            {infoEls?.title !== false && (
+              <div className={styles.title} title={displayTitle}>
+                {displayTitle}
+              </div>
+            )}
 
-            <div className={styles.info}>
-              {infoEls?.title !== false && (
-                <div className={styles.title} title={displayTitle}>
-                  {displayTitle}
+            {isMobile && showMobileBadges && (
+              <div className={styles.mobileBadges}>
+                <span className={styles.mobileType}>{anime.type || 'TV'}</span>
+                {progressString && <span className={styles.mobileEp}>{progressString}</span>}
+              </div>
+            )}
+
+            {showProgress && (continueWatching || lowEndMode) && hasProgress && (
+              <div>
+                <div className={styles.progressContainer}>
+                  <div className={styles.progressBar} style={{ width: `${progressPercent}%` }} />
                 </div>
-              )}
-
-              {isMobile && showMobileBadges && (
-                <div className={styles.mobileBadges}>
-                  <span className={styles.mobileType}>{anime.type || 'TV'}</span>
-                  {progressString && <span className={styles.mobileEp}>{progressString}</span>}
-                </div>
-              )}
-
-              {showProgress && (continueWatching || lowEndMode) && hasProgress && (
-                <div>
-                  <div className={styles.progressContainer}>
-                    <div className={styles.progressBar} style={{ width: `${progressPercent}%` }} />
+                {!lowEndMode && (
+                  <div className={styles.timestamp}>
+                    {formatTime(anime.currentTime || 0)} / {formatTime(anime.duration || 0)}
                   </div>
-                  {!lowEndMode && (
-                    <div className={styles.timestamp}>
-                      {formatTime(anime.currentTime || 0)} / {formatTime(anime.duration || 0)}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {showMeta && (
-                <div className={styles.metaRow}>
-                  {(anime.availableEpisodesDetail?.sub || anime.availableEpisodes?.sub) && (
-                    <div className={styles.metaItem}>
-                      <FaClosedCaptioning size={10} />
-                      {anime.availableEpisodesDetail?.sub?.length ?? anime.availableEpisodes?.sub}
-                    </div>
-                  )}
-                  {(anime.availableEpisodesDetail?.dub || anime.availableEpisodes?.dub) && (
-                    <div className={styles.metaItem}>
-                      <FaMicrophone size={10} />
-                      {anime.availableEpisodesDetail?.dub?.length ?? anime.availableEpisodes?.dub}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </button>
-        ) : (
-          <Link
-            to={linkTarget}
-            className={`${styles.card} ${styles[layout]}`}
-            onContextMenu={handleContextMenu}
-          >
-            <div className={styles.posterContainer}>
-              <img
-                src={fixThumbnailUrl(
-                  anime.thumbnail,
-                  lowEndMode ? 100 : 150,
-                  lowEndMode ? 150 : 200
                 )}
-                alt={displayTitle}
-                width={lowEndMode ? '100' : '150'}
-                height={lowEndMode ? '150' : '200'}
-                className={`${styles.posterImg} ${isLoaded ? styles.loaded : ''}`}
-                loading="lazy"
-                decoding="async"
-                onLoad={() => setIsLoaded(true)}
-              />
+              </div>
+            )}
 
-              {!isMobile && (
-                <>
-                  {showTypeBadge && <div className={styles.typeBadge}>{anime.type || 'TV'}</div>}
-                  {showEpBadge && progressString && (
-                    <div className={styles.epBadge}>{progressString}</div>
-                  )}
-                </>
-              )}
-
-              {showAdultBadge && adultContent && <div className={styles.adultBadge}>18+</div>}
-
-              {rank !== undefined && <div className={styles.rankBadge}>#{rank}</div>}
-            </div>
-
-            <div className={styles.info}>
-              {infoEls?.title !== false && (
-                <div className={styles.title} title={displayTitle}>
-                  {displayTitle}
-                </div>
-              )}
-
-              {isMobile && showMobileBadges && (
-                <div className={styles.mobileBadges}>
-                  <span className={styles.mobileType}>{anime.type || 'TV'}</span>
-                  {progressString && <span className={styles.mobileEp}>{progressString}</span>}
-                </div>
-              )}
-
-              {showProgress && (continueWatching || lowEndMode) && hasProgress && (
-                <div>
-                  <div className={styles.progressContainer}>
-                    <div className={styles.progressBar} style={{ width: `${progressPercent}%` }} />
+            {showMeta && (
+              <div className={styles.metaRow}>
+                {(anime.availableEpisodesDetail?.sub || anime.availableEpisodes?.sub) && (
+                  <div className={styles.metaItem}>
+                    <FaClosedCaptioning size={10} />
+                    {anime.availableEpisodesDetail?.sub?.length ?? anime.availableEpisodes?.sub}
                   </div>
-                  {!lowEndMode && (
-                    <div className={styles.timestamp}>
-                      {formatTime(anime.currentTime || 0)} / {formatTime(anime.duration || 0)}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {showMeta && (
-                <div className={styles.metaRow}>
-                  {(anime.availableEpisodesDetail?.sub || anime.availableEpisodes?.sub) && (
-                    <div className={styles.metaItem}>
-                      <FaClosedCaptioning size={10} />
-                      {anime.availableEpisodesDetail?.sub?.length ?? anime.availableEpisodes?.sub}
-                    </div>
-                  )}
-                  {(anime.availableEpisodesDetail?.dub || anime.availableEpisodes?.dub) && (
-                    <div className={styles.metaItem}>
-                      <FaMicrophone size={10} />
-                      {anime.availableEpisodesDetail?.dub?.length ?? anime.availableEpisodes?.dub}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </Link>
-        )}
+                )}
+                {(anime.availableEpisodesDetail?.dub || anime.availableEpisodes?.dub) && (
+                  <div className={styles.metaItem}>
+                    <FaMicrophone size={10} />
+                    {anime.availableEpisodesDetail?.dub?.length ?? anime.availableEpisodes?.dub}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </Link>
 
         {showModal && (
           <GenericModal

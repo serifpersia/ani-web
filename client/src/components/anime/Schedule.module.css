@@ -12,64 +12,119 @@
   row-gap: var(--space-3);
 }
 
-.dayBtn {
-  background-color: var(--bg-tertiary);
-  border: 1px solid var(--border-primary);
-  color: var(--text-secondary);
-  padding: var(--space-3) var(--space-2);
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-  transition: all var(--transition-base);
-  min-width: 80px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1.2;
-  min-height: 56px;
-  font-weight: var(--font-weight-medium);
-}
-
-.dayBtn:hover {
-  background-color: var(--bg-elevated);
-  border-color: var(--accent);
-  color: var(--accent-light);
-  transform: translateY(-2px);
-}
-
-.dayBtn.active {
-  background-color: var(--accent);
-  border-color: var(--accent);
-  color: white;
-  font-weight: var(--font-weight-bold);
-  box-shadow: 0 0 12px var(--accent-glow);
-}
-
-.dayName {
-  font-size: var(--font-size-sm);
-  color: var(--text-primary);
-}
-
-.dayBtn.active .dayName {
-  color: white;
-}
-
-.dayDate {
-  font-size: var(--font-size-xs);
-  color: var(--text-secondary);
-}
-
-.dayBtn.active .dayDate {
-  color: rgba(255, 255, 255, 0.85);
+/* ===== DAY SELECTOR ===== */
+.daySelectorContainer {
+  margin-bottom: var(--space-8);
+  width: 100%;
+  overflow: hidden;
+  position: relative;
 }
 
 .daySelector {
   display: flex;
-  justify-content: center;
   gap: var(--space-2);
-  flex-wrap: wrap;
-  margin-bottom: var(--space-6);
+  overflow-x: auto;
+  padding: var(--space-2) 0;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  justify-content: center;
+  width: 100%;
 }
 
+.daySelector::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .daySelector {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    overflow-x: hidden;
+    padding: var(--space-1) 0;
+  }
+
+  .dayBtn {
+    min-width: 0 !important;
+    padding: var(--space-1) 2px !important;
+    border-radius: var(--radius-md) !important;
+  }
+
+  .dayMonth {
+    font-size: 8px !important;
+  }
+
+  .dayNum {
+    font-size: 1rem !important;
+  }
+
+  .dayName {
+    font-size: 8px !important;
+  }
+
+  .dayBtn.active {
+    transform: translateY(-2px) !important;
+  }
+}
+
+.dayBtn {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  min-width: 70px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.dayBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-secondary);
+  transform: translateY(-2px);
+}
+
+.dayBtn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  box-shadow: 0 8px 20px var(--accent-glow);
+  transform: translateY(-4px);
+}
+
+.dayMonth {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+}
+
+.dayNum {
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.dayName {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.dayBtn.active .dayMonth,
+.dayBtn.active .dayName {
+  opacity: 1;
+}
+
+/* ===== NAV ARROWS ===== */
 .navArrows {
   display: flex;
   gap: 10px;
@@ -95,9 +150,11 @@
   border-color: var(--accent);
 }
 
+/* ===== CAROUSEL ===== */
 .carouselContainer {
   position: relative;
   width: 100%;
+  min-height: 280px;
 }
 
 .carousel {
@@ -107,6 +164,7 @@
   scroll-behavior: smooth;
   scrollbar-width: none;
   padding-bottom: 10px;
+  min-height: 260px;
 }
 
 .carousel::-webkit-scrollbar {
@@ -133,11 +191,29 @@
 @media (max-width: 768px) {
   .carouselCard {
     flex: 0 0 calc((100% - (2 * 15px)) / 3);
+    min-width: 0;
+  }
+
+  .daySelector {
+    justify-content: flex-start;
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+
+  .dayBtn {
+    min-width: 60px;
+    padding: var(--space-2) var(--space-3);
   }
 }
 
 @media (max-width: 480px) {
   .carouselCard {
-    flex: 0 0 calc((100% - (1 * 15px)) / 2);
+    flex: 0 0 calc((100% - (2 * 10px)) / 3);
+    min-width: 0;
+  }
+
+  .carousel {
+    gap: 10px;
+    align-items: flex-start;
   }
 }

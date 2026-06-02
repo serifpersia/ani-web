@@ -141,7 +141,13 @@
 
 @media (max-width: 480px) {
   .carouselItem {
-    flex: 0 0 calc((100% - (1 * 15px)) / 2);
+    flex: 0 0 calc((100% - (2 * 10px)) / 3);
+    min-width: 100px;
+  }
+
+  .carousel {
+    gap: 10px;
+    align-items: flex-start;
   }
 }
 

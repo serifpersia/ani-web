@@ -71,20 +71,23 @@ const Schedule: React.FC = () => {
     }
     return days.map((date) => {
       const dateString = date.toISOString().split('T')[0]
-      let dayLabel = dayNames[date.getDay()]
-      if (dateString === today.toISOString().split('T')[0]) {
-        dayLabel = 'Today'
-      } else {
-        const yesterday = new Date()
-        yesterday.setDate(today.getDate() - 1)
-        if (dateString === yesterday.toISOString().split('T')[0]) {
-          dayLabel = 'Yesterday'
-        }
-      }
-      const formattedDate = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-      return { dateString, dayLabel, formattedDate }
+      const isToday = dateString === today.toISOString().split('T')[0]
+      const isYesterday =
+        dateString === new Date(today.getTime() - 86400000).toISOString().split('T')[0]
+
+      const dayLabel = isToday ? 'Today' : isYesterday ? 'Yest' : dayNames[date.getDay()]
+      const dayNum = date.getDate()
+      const monthName = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(date)
+
+      return { dateString, dayLabel, dayNum, monthName }
     })
   }
+
+  useEffect(() => {
+    if (carouselRef.current) {
+      carouselRef.current.scrollLeft = 0
+    }
+  }, [selectedDate])
 
   return (
     <div className={styles.scheduleSection}>
@@ -114,21 +117,27 @@ const Schedule: React.FC = () => {
         </div>
       </div>
 
-      <div className={styles.daySelector}>
-        {getDayButtons().map((dayButton) => (
-          <button
-            key={dayButton.dateString}
-            className={`${styles.dayBtn} ${selectedDate === dayButton.dateString ? styles.active : ''}`}
-            onClick={() => setSelectedDate(dayButton.dateString)}
-          >
-            <span className={styles.dayName}>{dayButton.dayLabel}</span>
-            <span className={styles.dayDate}>{dayButton.formattedDate}</span>
-          </button>
-        ))}
+      <div className={styles.daySelectorContainer}>
+        <div className={styles.daySelector}>
+          {getDayButtons().map((dayButton) => (
+            <button
+              key={dayButton.dateString}
+              type="button"
+              className={`${styles.dayBtn} ${
+                selectedDate === dayButton.dateString ? styles.active : ''
+              }`}
+              onClick={() => setSelectedDate(dayButton.dateString)}
+            >
+              <span className={styles.dayMonth}>{dayButton.monthName}</span>
+              <span className={styles.dayNum}>{dayButton.dayNum}</span>
+              <span className={styles.dayName}>{dayButton.dayLabel}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className={styles.carouselContainer}>
-        <div className={styles.carousel} ref={carouselRef} key={selectedDate}>
+        <div className={styles.carousel} ref={carouselRef}>
           {loading ? (
             Array.from({ length: 7 }).map((_, i) => (
               <div key={i} className={styles.carouselCard}>

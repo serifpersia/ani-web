@@ -134,10 +134,8 @@ const Settings: React.FC = () => {
                 <TitlePreferenceToggle />
               </div>
               <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
-                <div
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                >
-                  <div>
+                <div className={styles.settingRow}>
+                  <div style={{ minWidth: 0 }}>
                     <h4 style={{ margin: 0, fontSize: '1rem' }}>Low End Mode</h4>
                     <p
                       style={{
@@ -159,10 +157,8 @@ const Settings: React.FC = () => {
               </div>
 
               <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
-                <div
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                >
-                  <div>
+                <div className={styles.settingRow}>
+                  <div style={{ minWidth: 0 }}>
                     <h4 style={{ margin: 0, fontSize: '1rem' }}>Virtual Keyboard</h4>
                     <p
                       style={{
@@ -183,10 +179,8 @@ const Settings: React.FC = () => {
               </div>
 
               <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
-                <div
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                >
-                  <div>
+                <div className={styles.settingRow}>
+                  <div style={{ minWidth: 0 }}>
                     <h4 style={{ margin: 0, fontSize: '1rem' }}>Telemetry Tracking</h4>
                     <p
                       style={{
@@ -243,14 +237,8 @@ const Settings: React.FC = () => {
 
               {localStorage.getItem('agreedToViewMature') === 'true' && (
                 <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <div>
+                  <div className={styles.settingRow}>
+                    <div style={{ minWidth: 0 }}>
                       <h4 style={{ margin: 0, fontSize: '1rem' }}>Mature Content</h4>
                       <p
                         style={{

@@ -176,8 +176,16 @@ export const useAddToQueue = () => {
       if (!response.ok) throw new Error('Failed to update queue')
       return response.json() as Promise<{ success: boolean; queued: boolean }>
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (data.queued) {
+        toast.success('Added to queue')
+      } else {
+        toast.success('Removed from queue')
+      }
       queryClient.invalidateQueries({ queryKey: ['queue'] })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update queue: ${error.message}`)
     },
   })
 }
@@ -194,7 +202,11 @@ export const useRemoveFromQueue = () => {
       if (!response.ok) throw new Error('Failed to remove queue item')
     },
     onSuccess: () => {
+      toast.success('Removed from queue')
       queryClient.invalidateQueries({ queryKey: ['queue'] })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to remove: ${error.message}`)
     },
   })
 }
@@ -207,7 +219,11 @@ export const useClearQueue = () => {
       if (!response.ok) throw new Error('Failed to clear queue')
     },
     onSuccess: () => {
+      toast.success('Queue cleared')
       queryClient.invalidateQueries({ queryKey: ['queue'] })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to clear queue: ${error.message}`)
     },
   })
 }

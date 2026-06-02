@@ -144,6 +144,27 @@ main {
   width: 100%;
 }
 
+@media (max-width: 1024px) {
+  .grid-container {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: var(--space-4);
+  }
+}
+
+@media (max-width: 768px) {
+  .grid-container {
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-2);
+  }
+}
+
+@media (max-width: 480px) {
+  .grid-container {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+}
+
 /* ===== FOOTER ===== */
 footer {
   text-align: center;

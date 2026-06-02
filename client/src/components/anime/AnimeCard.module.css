@@ -2,6 +2,7 @@
   position: relative;
   width: 100%;
   height: 100%;
+  min-width: 0;
   transition:
     transform var(--transition-base),
     z-index var(--transition-fast);
@@ -22,6 +23,7 @@
   border-radius: var(--radius-md);
   overflow: hidden;
   height: 100%;
+  min-width: 0;
   box-shadow: none;
   border: 1px solid var(--border-secondary);
   transition:
@@ -122,6 +124,8 @@
   overflow: hidden;
   margin-bottom: auto;
   transition: color var(--transition-base);
+  word-break: break-word;
+  min-width: 0;
 }
 
 .cardWrapper:hover .title {
@@ -196,6 +200,8 @@
   font-size: var(--font-size-xs);
   color: var(--text-secondary);
   margin-top: auto;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .metaItem {
@@ -316,6 +322,24 @@
 }
 
 @media (max-width: 768px) {
+  .cardWrapper,
+  .card {
+    height: auto !important;
+  }
+
+  .info {
+    flex-grow: 0 !important;
+    padding: var(--space-2) !important;
+  }
+
+  .title {
+    margin-bottom: 4px !important;
+    font-size: var(--font-size-xs) !important;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    text-align: center;
+  }
+
   .typeBadge {
     display: none;
   }
@@ -339,8 +363,9 @@
   }
 
   .card.horizontal .info {
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-2) var(--space-3) !important;
     justify-content: center;
+    flex-grow: 1 !important;
   }
 
   .card.vertical .posterContainer {
@@ -349,15 +374,7 @@
   }
 
   .card.vertical .info {
-    padding: var(--space-2);
     align-items: center;
-    text-align: center;
-  }
-
-  .card.vertical .title {
-    font-size: var(--font-size-xs);
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
     text-align: center;
   }
 
@@ -365,15 +382,9 @@
     justify-content: center;
   }
 
-  .title {
-    font-size: var(--font-size-sm);
-    margin-bottom: 2px;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-  }
-
   .metaRow {
-    margin-top: var(--space-1);
+    margin-top: 2px;
+    justify-content: center;
   }
 }
 

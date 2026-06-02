@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useQueries } from '@tanstack/react-query'
+import { FaChevronLeft, FaChevronRight, FaStar } from 'react-icons/fa'
 import { Button } from '../common/Button'
 import type { Anime } from '../../hooks/useAnimeData'
 import { fixThumbnailUrl } from '../../lib/utils'
@@ -21,6 +22,9 @@ interface ShowMeta {
   season?: { title?: string }
   score?: number
   status?: string
+  type?: string
+  episodeCount?: number
+  rating?: string
 }
 
 const fetchShowMeta = async (id: string): Promise<ShowMeta> => {
@@ -31,6 +35,7 @@ const fetchShowMeta = async (id: string): Promise<ShowMeta> => {
 
 const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [autoplayResetKey, setAutoplayResetKey] = useState(0)
   const [lastScrollTime, setLastScrollTime] = useState(0)
   const { lowEndMode } = useLowEndMode()
   const isMobile = useIsMobile()
@@ -49,6 +54,18 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
     }
   }
 
+  const resetAutoplay = useCallback(() => {
+    setAutoplayResetKey((k) => k + 1)
+  }, [])
+
+  const selectSlide = useCallback(
+    (index: number) => {
+      resetAutoplay()
+      setCurrentIndex(index)
+    },
+    [resetAutoplay]
+  )
+
   const nextSlide = useCallback(() => {
     setCurrentIndex((prev) => (prev + 1) % top6.length)
   }, [top6.length])
@@ -61,7 +78,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
     if (top6.length === 0) return
     const timer = setTimeout(nextSlide, 10000)
     return () => clearTimeout(timer)
-  }, [currentIndex, nextSlide, top6.length])
+  }, [currentIndex, nextSlide, top6.length, autoplayResetKey])
 
   const metaQueries = useQueries({
     queries: top6.map((anime) => ({
@@ -70,10 +87,6 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
       enabled: !!anime._id,
       staleTime: 1000 * 60 * 5,
       gcTime: 1000 * 60 * 10,
-      retry: 3,
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
-      refetchOnMount: true,
-      refetchOnWindowFocus: true,
     })),
   })
 
@@ -86,10 +99,9 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   const synopsis = rawDesc.replace(/<[^>]*>?/gm, '').trim()
   const genres: { name: string }[] = meta.genres ?? []
   const visibleGenres = genres.slice(0, isMobile ? 2 : 4)
-  const visibleSynopsis = isMobile ? synopsis.slice(0, 120) : synopsis
 
   const bannerSrc = meta.bannerImage
-    ? fixThumbnailUrl(meta.bannerImage)
+    ? fixThumbnailUrl(meta.bannerImage, 1920, 840)
     : fixThumbnailUrl(anime.thumbnail, 1280, 450)
 
   const handleWatch = () => {
@@ -103,32 +115,49 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
       const now = Date.now()
       if (now - lastScrollTime < 300) return
       setLastScrollTime(now)
+      resetAutoplay()
       if (e.deltaY > 0) nextSlide()
       else prevSlide()
     }
   }
 
+  const metadata = [
+    meta.type || 'Anime',
+    meta.status,
+    meta.episodeCount ? `${meta.episodeCount} Episodes` : undefined,
+    meta.rating,
+  ].filter(Boolean)
+
   return (
     <div className={styles.bannerContainer}>
-      <div
-        className={styles.posterWrapper}
-        style={{ boxShadow: !lowEndMode ? '0 10px 30px rgba(0,0,0,0.5)' : 'none' }}
-      >
+      <div className={styles.posterWrapper}>
         <img
-          key={currentIndex}
+          key={`${currentIndex}-${autoplayResetKey}`}
           src={bannerSrc}
           alt={getTitle(anime)}
           className={`${styles.posterImage} ${!lowEndMode ? styles.fadeIn : ''}`}
         />
+
         <div className={styles.overlay}>
           <div className={styles.content}>
-            <h2
-              className={styles.title}
-              onClick={() => navigate(`/anime/${anime._id}`)}
-              style={{ cursor: 'pointer' }}
-            >
+            <span className={styles.featureLabel}>Featured</span>
+
+            <div className={styles.metaRow}>
+              {metadata.map((item, idx) => (
+                <span key={idx}>{item}</span>
+              ))}
+              {meta.score && (
+                <span
+                  style={{ color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <FaStar size={14} /> {meta.score}
+                </span>
+              )}
+            </div>
+
+            <h1 className={styles.title} onClick={() => navigate(`/anime/${anime._id}`)}>
               {getTitle(anime)}
-            </h2>
+            </h1>
 
             {visibleGenres.length > 0 && (
               <div className={styles.genres}>
@@ -140,26 +169,27 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
               </div>
             )}
 
-            {visibleSynopsis && (
-              <p className={styles.summary}>
-                {visibleSynopsis.length < synopsis.length ? visibleSynopsis + '…' : visibleSynopsis}
-              </p>
-            )}
+            {synopsis && <p className={styles.summary}>{synopsis}</p>}
 
-            <Button variant="primary" size={isMobile ? 'md' : 'lg'} onClick={handleWatch}>
-              Watch Now
-            </Button>
+            <div className={styles.actions}>
+              <Button variant="primary" size="md" onClick={handleWatch}>
+                Watch Now
+              </Button>
+            </div>
           </div>
 
-          <div className={styles.carouselControls} onWheel={handleWheel}>
-            {top6.map((_, index) => (
-              <div
-                key={index}
-                className={`${styles.dot} ${index === currentIndex ? styles.activeDot : ''}`}
-                onClick={() => setCurrentIndex(index)}
-              />
-            ))}
-          </div>
+          {top6.length > 1 && (
+            <div className={styles.dotRow} onWheel={handleWheel}>
+              {top6.map((_, index) => (
+                <button
+                  key={index}
+                  className={index === currentIndex ? styles.activeDot : ''}
+                  onClick={() => selectSlide(index)}
+                  aria-label={`Go to slide ${index + 1}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
