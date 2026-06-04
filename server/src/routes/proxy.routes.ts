@@ -6,7 +6,6 @@ export function createProxyRouter(): Router {
   const controller = new ProxyController()
 
   router.get('/proxy', controller.handleProxy)
-  router.get('/embed-proxy', controller.handleEmbedProxy)
   router.get('/subtitle-proxy', controller.handleSubtitleProxy)
   router.get('/image-proxy', controller.handleImageProxy)
 
