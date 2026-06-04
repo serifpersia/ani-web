@@ -21,6 +21,7 @@ import useIsMobile from '../hooks/useIsMobile'
 import type Hls from 'hls.js'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import PlayerControls from '../components/player/PlayerControls'
+import PlayerStatusArea from '../components/player/PlayerStatusArea'
 import QueueRail from '../components/player/QueueRail'
 import EpisodeList from '../components/player/EpisodeList'
 import EpisodeDrawer from '../components/player/EpisodeDrawer'
@@ -108,12 +109,40 @@ const Player: React.FC = () => {
   } | null>(null)
   const clickCountRef = useRef(0)
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const lastInteractionTimeRef = useRef(0)
   const { data: queue = [] } = useQueue()
   const addQueue = useAddToQueue()
   const removeQueue = useRemoveFromQueue()
   const clearQueue = useClearQueue()
   const reorderQueue = useReorderQueue()
   const [queueConfirmed, setQueueConfirmed] = useState(false)
+  const [isTheaterMode, setIsTheaterMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('playerTheaterMode') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  useEffect(() => {
+    try {
+      if (isTheaterMode) {
+        document.body.classList.add('theater-mode')
+      } else {
+        document.body.classList.remove('theater-mode')
+      }
+    } catch (e) {
+      console.error(e)
+    }
+    return () => {
+      try {
+        document.body.classList.remove('theater-mode')
+      } catch (e) {
+        console.error(e)
+      }
+    }
+  }, [isTheaterMode])
+
   const { data: suggestedEpisode } = useQuery({
     queryKey: ['suggestedEpisode', showId],
     queryFn: () => getSuggestedEpisode(showId as string),
@@ -131,14 +160,12 @@ const Player: React.FC = () => {
 
   const handlePlayerClick = useCallback(
     (e: React.MouseEvent) => {
-      actions.setShowControls(true)
+      const isHiding = player.state.showControls
+      actions.setShowControls(!player.state.showControls)
 
-      const container = refs.playerContainerRef.current
-      if (!container) return
-
-      const { clientX } = e
-      const { left, width } = container.getBoundingClientRect()
-      const relativeX = clientX - left
+      if (isHiding) {
+        lastInteractionTimeRef.current = Date.now()
+      }
 
       clickCountRef.current += 1
 
@@ -146,24 +173,17 @@ const Player: React.FC = () => {
         clearTimeout(clickTimerRef.current)
       }
 
-      clickTimerRef.current = setTimeout(() => {
-        if (clickCountRef.current === 2) {
-          if (relativeX < width * 0.3) {
-            actions.seek(-15)
-            setSkipIndicator({ side: 'left', visible: true })
-            setTimeout(() => setSkipIndicator(null), 600)
-          } else if (relativeX > width * 0.7) {
-            actions.seek(15)
-            setSkipIndicator({ side: 'right', visible: true })
-            setTimeout(() => setSkipIndicator(null), 600)
-          } else {
-            actions.toggleFullscreen()
-          }
-        }
+      if (clickCountRef.current === 2) {
+        actions.toggleFullscreen()
         clickCountRef.current = 0
-      }, 300)
+        return
+      }
+
+      clickTimerRef.current = setTimeout(() => {
+        clickCountRef.current = 0
+      }, 250) // Short window for double click detection
     },
-    [actions, refs.playerContainerRef]
+    [actions, player.state.showControls]
   )
 
   useEffect(() => {
@@ -386,6 +406,29 @@ const Player: React.FC = () => {
     }
   }, [actions, navigate, queue, removeQueue, showId, state.currentEpisode])
 
+  const handleNextEpisode = useCallback(() => {
+    if (nextEpisode) {
+      navigate(`/watch/${showId}/${nextEpisode}`)
+    }
+    dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } })
+  }, [nextEpisode, navigate, showId, dispatch])
+
+  const handleNShortcut = useCallback(() => {
+    if (queue.length > 0) {
+      handleQueueTransition()
+    } else if (nextEpisode) {
+      handleNextEpisode()
+    } else {
+      toast.error('No next episode available')
+    }
+  }, [queue.length, handleQueueTransition, handleNextEpisode, nextEpisode])
+
+  const handlePreviousEpisode = () => {
+    if (previousEpisode) {
+      navigate(`/watch/${showId}/${previousEpisode}`)
+    }
+  }
+
   useEffect(() => {
     const videoElement = refs.videoRef.current
     if (!videoElement) return
@@ -469,48 +512,107 @@ const Player: React.FC = () => {
     }
   }, [displayTitle, state.currentEpisode])
 
-  const handleMouseMove = useCallback(() => {
-    const container = refs.playerContainerRef.current
-    if (!container) return
+  const handleUserActivity = useCallback(
+    (e: MouseEvent | TouchEvent) => {
+      const container = refs.playerContainerRef.current
+      if (!container) return
 
-    if (rafIdRef.current === null) {
-      rafIdRef.current = requestAnimationFrame(() => {
-        actions.setShowControls(true)
-        container.style.cursor = 'default'
+      if (Date.now() - lastInteractionTimeRef.current < 500) return
 
-        if (player.actions.inactivityTimer.current) {
-          clearTimeout(player.actions.inactivityTimer.current)
-        }
+      if (rafIdRef.current === null) {
+        rafIdRef.current = requestAnimationFrame(() => {
+          if (!player.state.showControls) {
+            actions.setShowControls(true)
+          }
+          container.style.cursor = 'default'
 
-        if (player.state.isPlaying) {
-          player.actions.inactivityTimer.current = window.setTimeout(() => {
-            actions.setShowControls(false)
-            if (player.state.isFullscreen) {
-              container.style.cursor = 'none'
-            }
-          }, 1000)
-        }
-        rafIdRef.current = null
-      })
+          if (player.actions.inactivityTimer.current) {
+            clearTimeout(player.actions.inactivityTimer.current)
+          }
+
+          const isInteracting =
+            player.state.isScrubbing ||
+            player.state.showSettings ||
+            player.state.showVolumeSlider ||
+            isEpisodeDrawerOpen
+
+          if (player.state.isPlaying && !isInteracting) {
+            player.actions.inactivityTimer.current = window.setTimeout(() => {
+              actions.setShowControls(false)
+              if (player.state.isFullscreen) {
+                container.style.cursor = 'none'
+              }
+            }, 2000) // 2 seconds auto hide
+          }
+          rafIdRef.current = null
+        })
+      }
+    },
+    [
+      player.state.isPlaying,
+      player.state.isFullscreen,
+      player.state.showControls,
+      player.state.isScrubbing,
+      player.state.showSettings,
+      player.state.showVolumeSlider,
+      isEpisodeDrawerOpen,
+      actions,
+      player.actions,
+      refs.playerContainerRef,
+    ]
+  )
+
+  useEffect(() => {
+    const isInteracting =
+      player.state.isScrubbing ||
+      player.state.showSettings ||
+      player.state.showVolumeSlider ||
+      isEpisodeDrawerOpen
+
+    if (isInteracting) {
+      actions.setShowControls(true)
+      if (player.actions.inactivityTimer.current) {
+        clearTimeout(player.actions.inactivityTimer.current)
+      }
     }
   }, [
-    player.state.isPlaying,
-    player.state.isFullscreen,
+    player.state.isScrubbing,
+    player.state.showSettings,
+    player.state.showVolumeSlider,
+    isEpisodeDrawerOpen,
     actions,
     player.actions,
-    refs.playerContainerRef,
   ])
 
   useEffect(() => {
     const container = refs.playerContainerRef.current
     if (container) {
-      container.addEventListener('mousemove', handleMouseMove)
-      return () => container.removeEventListener('mousemove', handleMouseMove)
+      container.addEventListener('mousemove', handleUserActivity)
+      container.addEventListener('touchstart', handleUserActivity, { passive: true })
+
+      const handleMouseLeave = () => {
+        actions.setShowControls(false)
+      }
+      container.addEventListener('mouseleave', handleMouseLeave)
+
+      return () => {
+        container.removeEventListener('mousemove', handleUserActivity)
+        container.removeEventListener('touchstart', handleUserActivity)
+        container.removeEventListener('mouseleave', handleMouseLeave)
+      }
     }
-  }, [handleMouseMove, refs.playerContainerRef])
+  }, [handleUserActivity, refs.playerContainerRef, actions])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      if (
+        target.closest(
+          'input, textarea, button, select, a, [role="button"], [contenteditable="true"]'
+        )
+      )
+        return
+
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(e.key.toLowerCase())) {
         actions.setShowControls(true)
         if (player.actions.inactivityTimer.current) {
@@ -520,12 +622,22 @@ const Player: React.FC = () => {
           actions.setShowControls(false)
         }, 1000)
       }
+
+      if (e.key.toLowerCase() === 'n') {
+        handleNShortcut()
+      }
+
+      if (e.key.toLowerCase() === 't') {
+        const newMode = !isTheaterMode
+        setIsTheaterMode(newMode)
+        localStorage.setItem('playerTheaterMode', newMode.toString())
+      }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [actions, player.actions.inactivityTimer])
+  }, [actions, player.actions.inactivityTimer, handleNShortcut, isTheaterMode])
 
   const { setIsFullscreen, setAvailableSubtitles, setActiveSubtitleTrack } = actions
 
@@ -663,19 +775,6 @@ const Player: React.FC = () => {
       refs.videoRef.current.play()
     }
     dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } })
-  }
-
-  const handleNextEpisode = () => {
-    if (nextEpisode) {
-      navigate(`/watch/${showId}/${nextEpisode}`)
-    }
-    dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } })
-  }
-
-  const handlePreviousEpisode = () => {
-    if (previousEpisode) {
-      navigate(`/watch/${showId}/${previousEpisode}`)
-    }
   }
 
   const episodeNavControls = (className: string, variant: 'desktop' | 'mobile') => (
@@ -834,10 +933,19 @@ const Player: React.FC = () => {
   if (!state.loadingShowData && !state.showMeta.name) return <p>Show not found.</p>
 
   const isVideoLoading = state.loadingShowData || state.loadingVideo
-  const showNativePlayer = state.forceNativePlayer || isMobile
+
+  const handleLayoutClick = (e: React.MouseEvent) => {
+    if (isTheaterMode && e.target === e.currentTarget) {
+      setIsTheaterMode(false)
+      localStorage.setItem('playerTheaterMode', 'false')
+    }
+  }
 
   return (
-    <div className={layoutStyles.playerPageLayout}>
+    <div
+      className={`${layoutStyles.playerPageLayout} ${isTheaterMode ? layoutStyles.theaterMode : ''}`}
+      onClick={handleLayoutClick}
+    >
       <ResumeModal
         show={state.showResumeModal}
         resumeTime={player.actions.formatTime(state.resumeTime)}
@@ -848,20 +956,22 @@ const Player: React.FC = () => {
         isCompleted={isCompleted}
       />
 
-      <aside className={layoutStyles.episodeSidebar}>
-        {state.loadingShowData ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-            Loading Episodes...
-          </div>
-        ) : (
-          <EpisodeList
-            episodes={state.episodes}
-            currentEpisode={state.currentEpisode}
-            watchedEpisodes={state.watchedEpisodes}
-            onEpisodeClick={(ep) => navigate(`/watch/${showId}/${ep}`)}
-          />
-        )}
-      </aside>
+      {!isTheaterMode && (
+        <aside className={layoutStyles.episodeSidebar}>
+          {state.loadingShowData ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              Loading Episodes...
+            </div>
+          ) : (
+            <EpisodeList
+              episodes={state.episodes}
+              currentEpisode={state.currentEpisode}
+              watchedEpisodes={state.watchedEpisodes}
+              onEpisodeClick={(ep) => navigate(`/watch/${showId}/${ep}`)}
+            />
+          )}
+        </aside>
+      )}
 
       <div className={layoutStyles.playerMain}>
         <div
@@ -941,7 +1051,7 @@ const Player: React.FC = () => {
                   </button>
                 </div>
               )}
-              {!isVideoLoading && state.videoSources.length > 0 && !showNativePlayer && (
+              {!isVideoLoading && state.videoSources.length > 0 && (
                 <PlayerControls
                   player={player}
                   isAutoplayEnabled={state.isAutoplayEnabled}
@@ -970,12 +1080,19 @@ const Player: React.FC = () => {
                   }}
                   loadingVideo={state.loadingVideo}
                   skipIntervals={state.skipIntervals}
+                  animeTitle={displayTitle}
+                  episodeNumber={state.currentEpisode}
+                  isTheaterMode={isTheaterMode}
+                  onTheaterModeToggle={() => {
+                    const newMode = !isTheaterMode
+                    setIsTheaterMode(newMode)
+                    localStorage.setItem('playerTheaterMode', newMode.toString())
+                  }}
                 />
               )}{' '}
               {!isVideoLoading && state.videoSources.length > 0 && (
                 <video
                   ref={refs.videoRef}
-                  controls={showNativePlayer}
                   onPlay={actions.onPlay}
                   onPause={actions.onPause}
                   onLoadedMetadata={actions.onLoadedMetadata}
@@ -1003,232 +1120,200 @@ const Player: React.FC = () => {
           )}
         </div>
 
-        <QueueRail
-          title="Queue"
-          items={queue}
-          currentShowId={showId}
-          currentEpisode={state.currentEpisode}
-          onNextQueue={handleQueueTransition}
-          onRemove={(item) =>
-            removeQueue.mutate({
-              showId: item.showId,
-              episodeNumber: item.episodeNumber,
-            })
-          }
-          onClear={() => clearQueue.mutate()}
-          showClearAll
-          onReorder={(items) =>
-            reorderQueue.mutate(
-              items.map((item) => ({
-                id: item.id,
-                showId: item.showId,
-                episodeNumber: item.episodeNumber,
-              }))
-            )
-          }
-        />
+        {!isTheaterMode && <PlayerStatusArea />}
 
-        <div className={styles.providerAndEpisodeRow}>
-          <ProviderSelector
-            selectedProvider={state.selectedProvider}
-            onProviderChange={(newProvider) => {
-              dispatch({
-                type: 'SET_STATE',
-                payload: {
-                  selectedProvider: newProvider,
-                  videoSources: [],
-                  selectedSource: null,
-                  selectedLink: null,
-                  loadingVideo: true,
-                },
-              })
-              localStorage.setItem('preferredProvider', newProvider)
-            }}
-          />
-          {episodeNavControls(
-            `${styles.episodeActions} ${styles.desktopEpisodeActions}`,
-            'desktop'
-          )}
-        </div>
-
-        {isVideoLoading ? (
-          <div className={styles.sourceLoader}>
-            <div className={styles.spinner}></div>
-          </div>
-        ) : (
+        {!isTheaterMode && (
           <>
-            <SourceSelector
-              videoSources={state.videoSources}
-              selectedSource={state.selectedSource}
-              onSourceChange={(source) => {
-                if (refs.videoRef.current && !isNaN(refs.videoRef.current.currentTime)) {
-                  seekToTimeRef.current = refs.videoRef.current.currentTime
-                }
-
-                const links = source.links || []
-                const bestLink =
-                  links.sort(
-                    (a: VideoLink, b: VideoLink) =>
-                      (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
-                  )[0] || null
-
-                setPreferredSource(source.sourceName)
-                dispatch({
-                  type: 'SET_STATE',
-                  payload: {
-                    selectedSource: source,
-                    selectedLink: bestLink,
-                    showResumeModal: state.showResumeModal && source.type !== 'iframe',
-                  },
+            <QueueRail
+              title="Queue"
+              items={queue}
+              currentShowId={showId}
+              currentEpisode={state.currentEpisode}
+              onNextQueue={handleQueueTransition}
+              onRemove={(item) =>
+                removeQueue.mutate({
+                  showId: item.showId,
+                  episodeNumber: item.episodeNumber,
                 })
-              }}
+              }
+              onClear={() => clearQueue.mutate()}
+              showClearAll
+              onReorder={(items) =>
+                reorderQueue.mutate(
+                  items.map((item) => ({
+                    id: item.id,
+                    showId: item.showId,
+                    episodeNumber: item.episodeNumber,
+                  }))
+                )
+              }
             />
-            {showNativePlayer && state.selectedSource && state.selectedSource.links.length > 1 && (
-              <div className={styles.sourceSelectionContainer} style={{ marginTop: '1rem' }}>
-                <h4>Resolution</h4>
-                <div className={styles.sourceButtons}>
-                  {state.selectedSource.links
-                    .sort(
-                      (a: VideoLink, b: VideoLink) =>
-                        (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
-                    )
-                    .map((link) => (
-                      <button
-                        key={link.resolutionStr}
-                        className={`${styles.sourceButton} ${state.selectedLink?.resolutionStr === link.resolutionStr ? styles.active : ''}`}
-                        onClick={() =>
-                          dispatch({ type: 'SET_STATE', payload: { selectedLink: link } })
-                        }
-                      >
-                        {link.resolutionStr}
-                      </button>
-                    ))}
-                </div>
-              </div>
-            )}
-          </>
-        )}
 
-        <div className={layoutStyles.playerInfoContainer}>
-          <div className={layoutStyles.playerInfoHeader}>
-            <div className={layoutStyles.playerAnimeCard}>
-              <img
-                src={fixThumbnailUrl(state.showMeta.thumbnail || '')}
-                alt={displayTitle}
-                onError={(e) => {
-                  ;(e.target as HTMLImageElement).src = '/placeholder.svg'
+            <div className={styles.providerAndEpisodeRow}>
+              <ProviderSelector
+                selectedProvider={state.selectedProvider}
+                onProviderChange={(newProvider) => {
+                  dispatch({
+                    type: 'SET_STATE',
+                    payload: {
+                      selectedProvider: newProvider,
+                      videoSources: [],
+                      selectedSource: null,
+                      selectedLink: null,
+                      loadingVideo: true,
+                    },
+                  })
+                  localStorage.setItem('preferredProvider', newProvider)
                 }}
               />
+              {episodeNavControls(
+                `${styles.episodeActions} ${styles.desktopEpisodeActions}`,
+                'desktop'
+              )}
             </div>
-            <div className={layoutStyles.videoTitleSection}>
-              <div className={styles.titleContainer}>
-                <h1>{displayTitle}</h1>
-                <div className={styles.scheduleInfo}>
-                  {state.showMeta.status && (
-                    <span className={styles.status}>{state.showMeta.status}</span>
-                  )}
-                  {state.showMeta.nextEpisodeAirDate && (
-                    <span className={styles.nextEpisode}>
-                      Next episode: {state.showMeta.nextEpisodeAirDate}
-                    </span>
-                  )}
+
+            {isVideoLoading ? (
+              <div className={styles.sourceLoader}>
+                <div className={styles.spinner}></div>
+              </div>
+            ) : (
+              <>
+                <SourceSelector
+                  videoSources={state.videoSources}
+                  selectedSource={state.selectedSource}
+                  onSourceChange={(source) => {
+                    if (refs.videoRef.current && !isNaN(refs.videoRef.current.currentTime)) {
+                      seekToTimeRef.current = refs.videoRef.current.currentTime
+                    }
+
+                    const links = source.links || []
+                    const bestLink =
+                      links.sort(
+                        (a: VideoLink, b: VideoLink) =>
+                          (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
+                      )[0] || null
+
+                    setPreferredSource(source.sourceName)
+                    dispatch({
+                      type: 'SET_STATE',
+                      payload: {
+                        selectedSource: source,
+                        selectedLink: bestLink,
+                        showResumeModal: state.showResumeModal && source.type !== 'iframe',
+                      },
+                    })
+                  }}
+                />
+              </>
+            )}
+
+            <div className={layoutStyles.playerInfoContainer}>
+              <div className={layoutStyles.playerInfoHeader}>
+                <div className={layoutStyles.playerAnimeCard}>
+                  <img
+                    src={fixThumbnailUrl(state.showMeta.thumbnail || '')}
+                    alt={displayTitle}
+                    onError={(e) => {
+                      ;(e.target as HTMLImageElement).src = '/placeholder.svg'
+                    }}
+                  />
+                </div>
+                <div className={layoutStyles.videoTitleSection}>
+                  <div className={styles.titleContainer}>
+                    <h1>{displayTitle}</h1>
+                    <div className={styles.scheduleInfo}>
+                      {state.showMeta.status && (
+                        <span className={styles.status}>{state.showMeta.status}</span>
+                      )}
+                      {state.showMeta.nextEpisodeAirDate && (
+                        <span className={styles.nextEpisode}>
+                          Next episode: {state.showMeta.nextEpisodeAirDate}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className={styles.controls}>
+                    <button
+                      className={`${styles.watchlistBtn} ${state.inWatchlist ? styles.inList : ''}`}
+                      onClick={toggleWatchlist}
+                    >
+                      {state.inWatchlist ? <FaCheck size={14} /> : <FaPlus size={14} />}
+                      {state.inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
+                    </button>
+                    <button
+                      className={`${styles.watchlistBtn} ${styles.queueBtn} ${queuedItem || queueConfirmed ? styles.queueActive : ''}`}
+                      onClick={handleQueueToggle}
+                    >
+                      {queuedItem || queueConfirmed ? <FaCheck size={14} /> : <FaPlus size={14} />}
+                      {queuedItem || queueConfirmed ? 'Queued' : 'Queue'}
+                    </button>
+                    {showManualWatchedButton && (
+                      <button
+                        className={`${styles.watchlistBtn} ${styles.markWatchedBtn} ${isCurrentEpisodeWatched ? styles.markWatchedDone : ''}`}
+                        onClick={handleMarkEpisodeWatched}
+                        disabled={isMarkingWatched || !state.currentEpisode}
+                      >
+                        <FaCheck size={14} />
+                        {isMarkingWatched
+                          ? 'Saving...'
+                          : isCurrentEpisodeWatched
+                            ? 'Watched'
+                            : 'Mark Watched'}
+                      </button>
+                    )}
+                    {canMoveToCompleted && (
+                      <button
+                        className={`${styles.watchlistBtn} ${styles.completeSeriesBtn}`}
+                        onClick={moveToCompleted}
+                        disabled={isUpdatingWatchlistStatus}
+                      >
+                        <FaCheck size={14} />
+                        {isUpdatingWatchlistStatus ? 'Saving...' : 'Move to Completed'}
+                      </button>
+                    )}
+                    <button
+                      className={`${styles.watchlistBtn} ${styles.modeToggleBtn} ${state.currentMode === 'dub' ? styles.modeToggleActive : ''}`}
+                      onClick={() => {
+                        const mode = state.currentMode === 'dub' ? 'sub' : 'dub'
+                        dispatch({ type: 'SET_MODE', payload: mode })
+                        localStorage.setItem('preferredMode', mode)
+                      }}
+                      type="button"
+                      aria-pressed={state.currentMode === 'dub'}
+                    >
+                      {state.currentMode === 'dub' ? 'DUB' : 'SUB'}
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div className={styles.controls}>
-                <button
-                  className={`${styles.watchlistBtn} ${state.inWatchlist ? styles.inList : ''}`}
-                  onClick={toggleWatchlist}
-                >
-                  {state.inWatchlist ? <FaCheck size={14} /> : <FaPlus size={14} />}
-                  {state.inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
-                </button>
-                <button
-                  className={`${styles.watchlistBtn} ${styles.queueBtn} ${queuedItem || queueConfirmed ? styles.queueActive : ''}`}
-                  onClick={handleQueueToggle}
-                >
-                  {queuedItem || queueConfirmed ? <FaCheck size={14} /> : <FaPlus size={14} />}
-                  {queuedItem || queueConfirmed ? 'Queued' : 'Queue'}
-                </button>
-                {showManualWatchedButton && (
-                  <button
-                    className={`${styles.watchlistBtn} ${styles.markWatchedBtn} ${isCurrentEpisodeWatched ? styles.markWatchedDone : ''}`}
-                    onClick={handleMarkEpisodeWatched}
-                    disabled={isMarkingWatched || !state.currentEpisode}
-                  >
-                    <FaCheck size={14} />
-                    {isMarkingWatched
-                      ? 'Saving...'
-                      : isCurrentEpisodeWatched
-                        ? 'Watched'
-                        : 'Mark Watched'}
-                  </button>
-                )}
-                {canMoveToCompleted && (
-                  <button
-                    className={`${styles.watchlistBtn} ${styles.completeSeriesBtn}`}
-                    onClick={moveToCompleted}
-                    disabled={isUpdatingWatchlistStatus}
-                  >
-                    <FaCheck size={14} />
-                    {isUpdatingWatchlistStatus ? 'Saving...' : 'Move to Completed'}
-                  </button>
-                )}
-                <button
-                  className={`${styles.watchlistBtn} ${styles.modeToggleBtn} ${state.currentMode === 'dub' ? styles.modeToggleActive : ''}`}
-                  onClick={() => {
-                    const mode = state.currentMode === 'dub' ? 'sub' : 'dub'
-                    dispatch({ type: 'SET_MODE', payload: mode })
-                    localStorage.setItem('preferredMode', mode)
-                  }}
-                  type="button"
-                  aria-pressed={state.currentMode === 'dub'}
-                >
-                  {state.currentMode === 'dub' ? 'DUB' : 'SUB'}
-                </button>
-                {window.innerWidth >= 768 && (
-                  <button
-                    className={`${styles.watchlistBtn} ${styles.nativeToggleBtn} ${state.forceNativePlayer ? styles.nativeToggleActive : ''}`}
-                    onClick={() => {
-                      const checked = !state.forceNativePlayer
-                      dispatch({
-                        type: 'SET_STATE',
-                        payload: { forceNativePlayer: checked },
-                      })
-                      localStorage.setItem('forceNativePlayer', checked.toString())
-                    }}
-                    type="button"
-                    aria-pressed={state.forceNativePlayer}
-                  >
-                    {state.forceNativePlayer ? 'Native On' : 'Native Off'}
-                  </button>
-                )}
+              {episodeNavControls(
+                `${styles.episodeActions} ${styles.mobileEpisodeActions}`,
+                'mobile'
+              )}
+
+              <div className={styles.descriptionSection}>
+                <h3>Synopsis</h3>
+                <SynopsisText
+                  text={
+                    state.showMeta.description
+                      ? state.showMeta.description.replace(/<[^>]*>?/gm, '')
+                      : ''
+                  }
+                  emptyText="No description available."
+                />
               </div>
+
+              <button className={styles.detailsToggleBtn} onClick={handleToggleDetails}>
+                {state.showCombinedDetails ? <FaChevronUp /> : <FaChevronDown />}
+                {state.showCombinedDetails ? 'Hide Details' : 'Show Details'}
+              </button>
+
+              {state.showCombinedDetails && (
+                <AnimeMetaDetails showMeta={state.showMeta} styles={styles} />
+              )}
             </div>
-          </div>
-
-          {episodeNavControls(`${styles.episodeActions} ${styles.mobileEpisodeActions}`, 'mobile')}
-
-          <div className={styles.descriptionSection}>
-            <h3>Synopsis</h3>
-            <SynopsisText
-              text={
-                state.showMeta.description
-                  ? state.showMeta.description.replace(/<[^>]*>?/gm, '')
-                  : ''
-              }
-              emptyText="No description available."
-            />
-          </div>
-
-          <button className={styles.detailsToggleBtn} onClick={handleToggleDetails}>
-            {state.showCombinedDetails ? <FaChevronUp /> : <FaChevronDown />}
-            {state.showCombinedDetails ? 'Hide Details' : 'Show Details'}
-          </button>
-
-          {state.showCombinedDetails && (
-            <AnimeMetaDetails showMeta={state.showMeta} styles={styles} />
-          )}
-        </div>
+          </>
+        )}
       </div>
 
       <EpisodeDrawer

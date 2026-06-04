@@ -69,7 +69,8 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
   )
   const [availableSubtitles, setAvailableSubtitles] = useState<SubtitleTrack[]>([])
   const [activeSubtitleTrack, setActiveSubtitleTrack] = useState<string | null>(null)
-  const [showSourceMenu, setShowSourceMenu] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false)
   const [isBuffering, setIsBuffering] = useState(false)
   const [isSpeedBoostActive, setIsSpeedBoostActive] = useState(false)
   const hasEnded = useRef(false)
@@ -530,7 +531,8 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
       setSubtitlePosition,
       setAvailableSubtitles,
       setActiveSubtitleTrack,
-      setShowSourceMenu,
+      setShowSettings,
+      setShowVolumeSlider,
       wasPlayingBeforeScrub,
       inactivityTimer,
       setIsFullscreen,
@@ -575,7 +577,8 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
       subtitlePosition,
       availableSubtitles,
       activeSubtitleTrack,
-      showSourceMenu,
+      showSettings,
+      showVolumeSlider,
       isBuffering,
       isSpeedBoostActive,
     },

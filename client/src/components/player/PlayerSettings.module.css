@@ -151,6 +151,60 @@
     right: 12px;
     bottom: 80px;
     width: calc(100vw - 24px);
-    max-width: 320px;
+    max-width: 220px;
+    border-radius: var(--radius-md);
+  }
+
+  .header {
+    height: 40px;
+    padding: 0.4rem 0.6rem;
+  }
+
+  .header h3 {
+    font-size: 0.65rem;
+  }
+
+  .backBtn {
+    left: 0.4rem;
+    padding: 3px;
+  }
+
+  .menuItem {
+    padding: 0.45rem 0.65rem;
+    font-size: 0.7rem;
+  }
+
+  .currentValue {
+    font-size: 0.65rem;
+  }
+
+  .contentWrapper {
+    max-height: 250px;
+  }
+
+  .sliderGroup {
+    padding: 0.5rem 0.65rem;
+    gap: 0.25rem;
+  }
+
+  .sliderGroup label {
+    font-size: 0.6rem;
+    letter-spacing: 0.02em;
+  }
+
+  .sliderGroup input[type='range'] {
+    height: 3px;
+  }
+}
+
+@media (max-width: 480px) {
+  .settingsPanel {
+    max-width: 180px;
+    right: 5px;
+    bottom: 55px;
+  }
+
+  .menuItem {
+    padding: 0.35rem 0.5rem;
   }
 }

@@ -1,6 +1,5 @@
 import React, { useEffect, useState, Suspense, lazy } from 'react'
 import styles from './PlayerControls.module.css'
-import ToggleSwitch from '../common/ToggleSwitch'
 import {
   FaPlay,
   FaPause,
@@ -11,8 +10,11 @@ import {
   FaExpand,
   FaCompress,
   FaCog,
+  FaTv,
+  FaChevronLeft,
+  FaForward,
 } from 'react-icons/fa'
-import { MdReplay10, MdForward10 } from 'react-icons/md'
+import { MdReplay10, MdForward10, MdFastForward, MdSkipNext } from 'react-icons/md'
 import type { VideoSource, VideoLink, SkipInterval } from '../../types/player'
 import type useVideoPlayer from '../../hooks/useVideoPlayer'
 
@@ -30,6 +32,10 @@ interface PlayerControlsProps {
   onSourceChange: (source: VideoSource, link: VideoLink) => void
   loadingVideo: boolean
   skipIntervals: SkipInterval[]
+  animeTitle: string
+  episodeNumber: string | undefined
+  isTheaterMode: boolean
+  onTheaterModeToggle: () => void
 }
 
 const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -44,11 +50,18 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   onSourceChange,
   loadingVideo,
   skipIntervals,
+  animeTitle,
+  episodeNumber,
+  isTheaterMode,
+  onTheaterModeToggle,
 }) => {
   const { state, refs, actions } = player
-  const [showSettings, setShowSettings] = useState(false)
+  const { showSettings, showVolumeSlider } = state
+  const { setShowSettings, setShowVolumeSlider } = actions
+
   const settingsRef = React.useRef<HTMLDivElement>(null)
   const settingsBtnRef = React.useRef<HTMLButtonElement>(null)
+  const volumeRef = React.useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -61,16 +74,24 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
       ) {
         setShowSettings(false)
       }
+
+      if (
+        volumeRef.current &&
+        !volumeRef.current.contains(event.target as Node) &&
+        showVolumeSlider
+      ) {
+        setShowVolumeSlider(false)
+      }
     }
 
-    if (showSettings) {
+    if (showSettings || showVolumeSlider) {
       document.addEventListener('mousedown', handleClickOutside)
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showSettings])
+  }, [showSettings, showVolumeSlider, setShowSettings, setShowVolumeSlider])
 
   const watchedBarRef = React.useRef<HTMLDivElement>(null)
   const thumbRef = React.useRef<HTMLDivElement>(null)
@@ -213,27 +234,60 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
 
   return (
     <div
-      className={`${styles.controlsOverlay} ${!state.showControls && !showSettings ? styles.hidden : ''} `}
+      className={`${styles.controlsOverlay} ${!state.showControls && !showSettings && !showVolumeSlider && !state.isScrubbing ? styles.hidden : ''} `}
       onDoubleClick={(e) => e.stopPropagation()}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          actions.setShowControls(true)
-        }
-      }}
     >
-      <button
-        className={styles.centerPlayPause}
-        data-speed-boost-ignore="true"
-        onClick={(e) => {
-          e.stopPropagation()
-          actions.togglePlay()
-        }}
-        aria-label={state.isPlaying ? 'Pause' : 'Play'}
-      >
-        {state.isPlaying ? <FaPause /> : <FaPlay className={styles.playIconOffset} />}
-      </button>
+      {/* Netflix Style Top Bar Overlay */}
+      <div className={styles.topControls} onClick={(e) => e.stopPropagation()}>
+        <button
+          className={styles.backBtn}
+          onClick={(e) => {
+            e.stopPropagation()
+            window.history.back()
+          }}
+          title="Back"
+          aria-label="Back"
+        >
+          <FaChevronLeft />
+        </button>
+        <div className={styles.videoTitleInfo}>
+          <span className={styles.animeTitle}>{animeTitle}</span>
+          {episodeNumber && <span className={styles.episodeNumber}>Episode {episodeNumber}</span>}
+        </div>
+      </div>
 
-      <div className={styles.bottomControls} data-speed-boost-ignore="true">
+      <div className={styles.centerControls} onClick={(e) => e.stopPropagation()}>
+        <button
+          className={styles.centerSkipBtn}
+          onClick={() => actions.seek(-10)}
+          title="Skip back 10s"
+          aria-label="Skip back 10 seconds"
+        >
+          <MdReplay10 />
+        </button>
+        <button
+          className={styles.centerPlayPause}
+          data-speed-boost-ignore="true"
+          onClick={actions.togglePlay}
+          aria-label={state.isPlaying ? 'Pause' : 'Play'}
+        >
+          {state.isPlaying ? <FaPause /> : <FaPlay className={styles.playIconOffset} />}
+        </button>
+        <button
+          className={styles.centerSkipBtn}
+          onClick={() => actions.seek(10)}
+          title="Skip forward 10s"
+          aria-label="Skip forward 10 seconds"
+        >
+          <MdForward10 />
+        </button>
+      </div>
+
+      <div
+        className={styles.bottomControls}
+        data-speed-boost-ignore="true"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div
           className={`${styles.progressBarContainer} ${state.isScrubbing ? styles.scrubbing : ''} `}
           ref={refs.progressBarRef}
@@ -282,8 +336,21 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
               {state.isPlaying ? <FaPause /> : <FaPlay />}
             </button>
 
-            <div className={styles.volumeContainer}>
-              <button className={styles.controlBtn} onClick={actions.toggleMute}>
+            <div
+              className={`${styles.volumeContainer} ${showVolumeSlider ? styles.visible : ''}`}
+              ref={volumeRef}
+            >
+              <button
+                className={styles.controlBtn}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (window.innerWidth <= 768) {
+                    setShowVolumeSlider(!showVolumeSlider)
+                  } else {
+                    actions.toggleMute()
+                  }
+                }}
+              >
                 {renderVolumeIcon()}
               </button>
               <input
@@ -332,47 +399,29 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                   Next EP
                 </button>
               )}
-              <button
-                className={styles.skipBtn}
-                onClick={() => actions.seek(-10)}
-                title="Skip back 10s"
-              >
-                <MdReplay10 />
-              </button>
-              <button
-                className={styles.skipBtn}
-                onClick={() => actions.seek(10)}
-                title="Skip forward 10s"
-              >
-                <MdForward10 />
-              </button>
             </div>
 
-            <div className={styles.toggleContainer}>
-              <label htmlFor="auto-skip-toggle" className={styles.toggleLabel}>
-                Auto Skip
-              </label>
-              <ToggleSwitch
-                id="auto-skip-toggle"
-                isChecked={state.isAutoSkipEnabled}
-                onChange={(e) => {
-                  const checked = e.target.checked
-                  actions.setIsAutoSkipEnabled(checked)
-                  localStorage.setItem('autoSkipEnabled', checked.toString())
-                }}
-              />
-            </div>
+            <button
+              className={`${styles.controlBtn} ${state.isAutoSkipEnabled ? styles.active : ''}`}
+              onClick={() => {
+                const newValue = !state.isAutoSkipEnabled
+                actions.setIsAutoSkipEnabled(newValue)
+                localStorage.setItem('autoSkipEnabled', newValue.toString())
+              }}
+              title={state.isAutoSkipEnabled ? 'Disable Auto Skip' : 'Enable Auto Skip'}
+              aria-label="Auto Skip"
+            >
+              <MdFastForward size={22} />
+            </button>
 
-            <div className={styles.toggleContainer}>
-              <label htmlFor="autoplay-toggle" className={styles.toggleLabel}>
-                Autoplay
-              </label>
-              <ToggleSwitch
-                id="autoplay-toggle"
-                isChecked={isAutoplayEnabled}
-                onChange={(e) => onAutoplayChange(e.target.checked)}
-              />
-            </div>
+            <button
+              className={`${styles.controlBtn} ${isAutoplayEnabled ? styles.active : ''}`}
+              onClick={() => onAutoplayChange(!isAutoplayEnabled)}
+              title={isAutoplayEnabled ? 'Disable Autoplay' : 'Enable Autoplay'}
+              aria-label="Autoplay"
+            >
+              <MdSkipNext size={24} />
+            </button>
 
             <button
               ref={settingsBtnRef}
@@ -381,6 +430,18 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
               aria-label="Settings"
             >
               <FaCog />
+            </button>
+
+            <button
+              className={`${styles.controlBtn} ${isTheaterMode ? styles.active : ''} `}
+              onClick={(e) => {
+                e.stopPropagation()
+                onTheaterModeToggle()
+              }}
+              title={isTheaterMode ? 'Exit Theater Mode' : 'Theater Mode'}
+              aria-label={isTheaterMode ? 'Exit Theater Mode' : 'Theater Mode'}
+            >
+              <FaTv />
             </button>
 
             <button className={styles.controlBtn} onClick={actions.toggleFullscreen}>

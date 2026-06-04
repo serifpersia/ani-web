@@ -1,0 +1,73 @@
+.statusArea {
+  display: flex;
+  align-items: center;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-lg);
+  margin-top: -1.25rem;
+  margin-bottom: 0;
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-lg);
+  width: fit-content;
+  max-width: 100%;
+  pointer-events: none;
+  user-select: none;
+  flex-wrap: wrap;
+}
+
+.shortcuts {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.shortcutGroup {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.shortcut {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+
+.key {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.15rem 0.4rem;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-weight: 800;
+  color: var(--text-primary);
+  font-size: 0.65rem;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  box-shadow: 0 1.5px 0 rgba(0, 0, 0, 0.3);
+}
+
+.key + .key {
+  margin-left: -0.15rem;
+}
+
+.label {
+  color: var(--text-tertiary);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+@media (max-width: 768px) {
+  .statusArea {
+    display: none;
+  }
+}

@@ -11,16 +11,7 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  background: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0.4) 0%,
-    rgba(0, 0, 0, 0.2) 15%,
-    transparent 40%,
-    transparent 60%,
-    rgba(0, 0, 0, 0.2) 85%,
-    rgba(0, 0, 0, 0.4) 100%
-  );
-  will-change: opacity;
+  background: radial-gradient(circle, transparent 20%, rgba(0, 0, 0, 0.4) 100%);
 }
 
 .controlsOverlay > * {
@@ -33,34 +24,140 @@
   cursor: none;
 }
 
-.centerPlayPause {
+.controlsOverlay.hidden .topControls {
+  transform: translateY(-20px);
+}
+
+.controlsOverlay.hidden .bottomControls {
+  transform: translateY(20px);
+}
+
+.controlsOverlay.hidden .centerControls {
+  transform: translate(-50%, -50%) scale(0.9);
+}
+
+.topControls {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.85) 0%,
+    rgba(0, 0, 0, 0.45) 60%,
+    transparent 100%
+  );
+  padding: 32px 40px;
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.backBtn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 1.6rem;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
+  transition: all var(--transition-fast);
+  padding: 8px;
+  border-radius: 50%;
+}
+
+.backBtn:hover {
+  background: var(--accent);
+  color: white;
+  transform: scale(1.12);
+  box-shadow: 0 0 25px var(--accent-glow);
+}
+
+.videoTitleInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.animeTitle {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: white;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.episodeNumber {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--accent-light);
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Netflix Style Center Controls */
+.centerControls {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(1);
+  display: flex;
+  align-items: center;
+  gap: 3rem;
+  z-index: 10;
+  pointer-events: auto;
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.centerSkipBtn {
+  background: rgba(15, 15, 17, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.85);
+  width: 56px;
+  height: 56px;
+  font-size: 1.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.centerSkipBtn:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+  transform: scale(1.12);
+  box-shadow: 0 0 35px var(--accent-glow);
+}
+
+.centerPlayPause {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 15, 17, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 50%;
   color: white;
-  width: 80px;
-  height: 80px;
+  width: 76px;
+  height: 76px;
   font-size: 2.2rem;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: var(--glass-shadow);
-  will-change: transform;
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 .centerPlayPause:hover {
   background: var(--accent);
-  transform: translate(-50%, -50%) scale(1.1);
   border-color: var(--accent);
-  box-shadow: 0 0 40px var(--accent-glow);
+  transform: scale(1.12);
+  box-shadow: 0 0 35px var(--accent-glow);
 }
 
 .playIconOffset {
@@ -69,22 +166,21 @@
 
 .bottomControls {
   position: absolute;
-  bottom: 24px;
-  left: 24px;
-  right: 24px;
+  bottom: 0;
+  left: 0;
+  right: 0;
   display: flex;
   flex-direction: column;
   gap: 0;
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xl);
-  padding: 16px 24px;
-  box-shadow: var(--glass-shadow);
-  transition:
-    transform 0.3s var(--ease-smooth),
-    opacity 0.3s var(--ease-smooth);
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.95) 0%,
+    rgba(0, 0, 0, 0.6) 50%,
+    rgba(0, 0, 0, 0.25) 80%,
+    transparent 100%
+  );
+  padding: 24px 32px 32px 32px;
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .progressBarContainer {
@@ -123,13 +219,13 @@
 .watchedBar {
   background: var(--accent);
   background: linear-gradient(90deg, var(--accent) 0%, var(--accent-light) 100%);
-  z-index: 2;
+  z-index: 12;
   box-shadow: 0 0 15px var(--accent-glow);
 }
 
 .bufferedBar {
   background-color: rgba(255, 255, 255, 0.2);
-  z-index: 1;
+  z-index: 11;
 }
 
 .thumb {
@@ -140,7 +236,7 @@
   height: 14px;
   background-color: white;
   border-radius: 50%;
-  z-index: 3;
+  z-index: 15;
   transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
 }
@@ -350,20 +446,6 @@
   box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
 }
 
-.toggleContainer {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.toggleLabel {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.5);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
 @media (max-width: 900px) and (orientation: landscape) {
   .playerPageLayout {
     padding: 0;
@@ -429,26 +511,130 @@
 }
 
 @media (max-width: 768px) {
-  .bottomControls {
+  .topControls {
     padding: 12px 16px;
-    bottom: 12px;
-    left: 12px;
-    right: 12px;
+    gap: 0.75rem;
+  }
+
+  .backBtn {
+    font-size: 1.2rem;
+    padding: 4px;
+  }
+
+  .animeTitle {
+    font-size: 1rem;
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .episodeNumber {
+    font-size: 0.75rem;
+  }
+
+  .centerControls {
+    gap: 1.25rem;
+  }
+
+  .centerSkipBtn {
+    width: 40px;
+    height: 40px;
+    font-size: 1.2rem;
+  }
+
+  .centerPlayPause {
+    width: 56px;
+    height: 56px;
+    font-size: 1.5rem;
+  }
+
+  .bottomControls {
+    padding: 12px 16px 16px 16px;
   }
 
   .leftControls,
   .rightControls {
-    gap: 0.75rem;
+    gap: 0.4rem;
   }
 
-  .volumeContainer,
-  .toggleContainer {
+  .controlBtn {
+    padding: 6px;
+    font-size: 1rem;
+  }
+
+  .timeDisplay {
+    font-size: 0.75rem;
+    margin-right: 2px;
+  }
+
+  .volumeContainer {
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: center;
+    position: relative;
+  }
+
+  .volumeSlider {
+    display: block !important;
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    width: 0;
+    height: 32px;
+    opacity: 0;
+    transform: translateX(-50%) rotate(-90deg) scaleX(0);
+    transform-origin: center;
+    transition: all 0.3s var(--ease-smooth);
+    margin: 0 0 20px 0;
+    background: rgba(15, 15, 17, 0.95);
+    border: 1px solid var(--glass-border);
+    padding: 4px 12px;
+    border-radius: 16px;
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  .volumeContainer.visible .volumeSlider,
+  .volumeContainer:hover .volumeSlider,
+  .volumeContainer:active .volumeSlider,
+  .volumeSlider:focus {
+    width: 100px;
+    opacity: 1;
+    transform: translateX(-50%) rotate(-90deg) scaleX(1);
+    pointer-events: auto;
+  }
+
+  .nextEpisodeBtn {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.75rem;
+  }
+}
+
+/* Extra small screens (portrait phones) */
+@media (max-width: 480px) {
+  .leftControls,
+  .rightControls {
+    gap: 0.2rem;
+  }
+
+  .shortcuts {
+    gap: 0.25rem;
+  }
+
+  .controlBtn {
+    padding: 4px;
+  }
+
+  .timeDisplay {
     display: none;
   }
 
-  .centerPlayPause {
-    width: 64px;
-    height: 64px;
-    font-size: 1.8rem;
+  .topControls {
+    padding: 8px 12px;
+  }
+
+  .centerControls {
+    gap: 1rem;
   }
 }
