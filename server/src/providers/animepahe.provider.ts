@@ -56,33 +56,45 @@ export class AnimePaheProvider implements Provider {
 
   private getRequestHeaders(isApi: boolean = false): Record<string, string> {
     const cookies = {
-      __ddg1_: '5H0114JE1p0wQHdJiV2O',
-      __ddg2_: 'FxnuwLkvPnXSQtPE',
-      __ddg8_: 'j55RhixQcxVPfvqt',
-      __ddg9_: '51.158.195.12',
-      __ddg10_: '1769167572',
-      __ddgid_: 'ExAWs3AJTzpAKb8m',
-      __ddgmark_: 'slbgrX6Jj2jTxuo2',
+      cf_clearance:
+        'Zs5bEtFKOizqftnXnmbGhQq7xNBGamfBNXrwBSNEoak-1780570525-1.2.1.1-wv0N0hIieBy_YRuiZWJ46tnHS445_Cazdo3W21XgEx3FVEaclWCmFkAy7_RRObj4uuSqAkg50uusNvz6QmyGiATnqCvRaLbB5tPI_bW4EG2G2ww1AC2._wxkk6yh4xpeKRD8GQGvXw5I2klTKicPVYwVc.bItn173EJw3CjHtvtRe7e51cp78l7WwQVmMlUGt.U2X2AI3yDag0RoJk8GOBrJFBHoqKnbujMO94OrQQEb3BLP17aV.kPaL.C5FviJNRST1y9B_OOvaTPi2ODJGNDLXpyK0GiXOVdEf25t.jYymysZsPcApMo45MlT7HiX7IGVTlCDnnUNocVk9XSbDujQR.BzqpJff5CWM6IYiznUbniNXv2cJHvZQ22RPnuuRGUuZrVu6PJvRVODMYQLKABhbq6zqj2XutSgWVbI42c',
+      'XSRF-TOKEN':
+        'eyJpdiI6IkNDVmU4WFdiaHhTY1VpSU94VGJSRXc9PSIsInZhbHVlIjoiWjRCK082MjBYU01OSnFhSEl3bEJNQWJIMys1RkxtYlYwZm96NEZBQW9IVzVYbVBZWDhDWjRvRTlrUXpyOUlVaDEvSmJYczNheHhYb2RxSVNrRjl3Z1lqeEs2SS9JT3BzcWlILytYNjRPdGZ6MFo5ZDZGWUZRcXpFcUFZMUV2N3ciLCJtYWMiOiI4NDgwMmNkZTdjZjU0YmQ3NTBhOGQ4MzJhZDU3MWUwODZhYzBjNTNjNzg1M2M4MjczNDdjODU4OWZmNTQ4ODA2IiwidGFnIjoiIn0%3D',
+      animepahe_session:
+        'eyJpdiI6ImFIeGFKNmhkQ0MyZlowTEdPcmdFNnc9PSIsInZhbHVlIjoia0pHSVFTb1NXNWZqMkpqd0YxNUZIZFkvSjJWREpNbDBtMkY2Zk9KTysrNzVRKzc3RGl0TVNDWFpMekxQdmxmYlFkTno2OVBMQURQY2NacmRXQVU0YUhvTlNxamdNSEZ2R01mNXg4VG5zL3NFYUlHT01CcllsREF4UzEydlJHa2siLCJtYWMiOiI0NDM5ZDIzOGM3YmUwZjJmNGFlYzkyNmM1NzM4ZGJkZTUwZjE3YTMwZGM2NzVkMWQ3OTRhMTUwMjJmZmJlYjBhIiwidGFnIjoiIn0%3D',
+      SERVERID: 'pong',
+      latest: '6745',
+      res: '1080',
+      aud: 'jpn',
+      av1: '0',
     }
 
     const cookieStr = Object.entries(cookies)
       .map(([k, v]) => `${k}=${v}`)
       .join('; ')
 
+    const userAgent =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0'
+
     const headers: Record<string, string> = {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
-      Accept:
-        'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'User-Agent': userAgent,
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       'Accept-Language': 'en-US,en;q=0.9',
       Referer: `${this.BASE_URL}/`,
       Origin: this.BASE_URL,
       Cookie: cookieStr,
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Upgrade-Insecure-Requests': '1',
     }
 
     if (isApi) {
       headers['X-Requested-With'] = 'XMLHttpRequest'
       headers['Accept'] = 'application/json, text/javascript, */*; q=0.01'
+      headers['Sec-Fetch-Dest'] = 'empty'
+      headers['Sec-Fetch-Mode'] = 'cors'
+      headers['Sec-Fetch-Site'] = 'same-origin'
     }
 
     return headers
