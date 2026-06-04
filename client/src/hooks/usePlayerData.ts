@@ -122,7 +122,7 @@ export const usePlayerData = (
       if (!showId || !uiState.currentEpisode) throw new Error('Missing params')
 
       let providerShowId = showId
-      if (['animepahe', '123anime', 'animeya', 'megaplay'].includes(uiState.selectedProvider)) {
+      if (['123anime', 'animeya', 'megaplay'].includes(uiState.selectedProvider)) {
         const names = showData?.showMeta?.names
         // AlAnime's `name` field is often the native Japanese script (e.g. "ブリーチ"
         // for Bleach), which gets mapped to names.romaji. Sending katakana/kanji to
