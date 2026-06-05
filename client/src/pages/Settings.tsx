@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Button } from '../components/common/Button'
 import TitlePreferenceToggle from '../components/common/TitlePreferenceToggle'
@@ -18,6 +18,7 @@ import {
   VIRTUAL_KEYBOARD_ENABLED_CHANGE_EVENT,
   VIRTUAL_KEYBOARD_ENABLED_KEY,
 } from '../hooks/useVirtualKeyboard'
+import { useSetting, useUpdateSetting } from '../hooks/useSettings'
 
 type SettingsTab = 'general' | 'sync' | 'watchlist' | 'database'
 
@@ -36,6 +37,23 @@ const Settings: React.FC = () => {
     localStorage.getItem('telemetry_enabled') !== 'false'
   )
   const [virtualKeyboardEnabled, setVirtualKeyboardEnabled] = useState(getVirtualKeyboardEnabled)
+
+  const [discordEnabled, setDiscordEnabled] = useState(true)
+  const { data: discordSetting } = useSetting('discordRPCEnabled')
+  const updateSetting = useUpdateSetting()
+
+  useEffect(() => {
+    if (discordSetting !== undefined) {
+      setDiscordEnabled(
+        discordSetting === 'true' || discordSetting === true || discordSetting === null
+      )
+    }
+  }, [discordSetting])
+
+  const toggleDiscord = (enabled: boolean) => {
+    setDiscordEnabled(enabled)
+    updateSetting.mutate({ key: 'discordRPCEnabled', value: String(enabled) })
+  }
 
   const toggleTelemetry = (enabled: boolean) => {
     setTelemetryEnabled(enabled)
@@ -174,6 +192,28 @@ const Settings: React.FC = () => {
                     isChecked={virtualKeyboardEnabled}
                     onChange={(e) => toggleVirtualKeyboard(e.target.checked)}
                     id="virtual-keyboard-enabled"
+                  />
+                </div>
+              </div>
+
+              <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
+                <div className={styles.settingRow}>
+                  <div style={{ minWidth: 0 }}>
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Discord Rich Presence</h4>
+                    <p
+                      style={{
+                        margin: '0.25rem 0 0',
+                        fontSize: '0.85rem',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      Show your current anime and watch progress on your Discord profile status.
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    isChecked={discordEnabled}
+                    onChange={(e) => toggleDiscord(e.target.checked)}
+                    id="discord-rpc-enabled"
                   />
                 </div>
               </div>

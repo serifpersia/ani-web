@@ -1,5 +1,5 @@
 import { useEffect, Suspense, lazy } from 'react'
-import { Routes, Route, Navigate, useParams } from 'react-router-dom'
+import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom'
 import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
 import Footer from './components/layout/Footer'
@@ -7,6 +7,30 @@ import ScrollToTopButton from './components/common/ScrollToTopButton'
 import { useTelemetry } from './hooks/useTelemetry'
 import VirtualKeyboard from './components/common/VirtualKeyboard'
 import { useVirtualKeyboard } from './hooks/useVirtualKeyboard'
+
+function useDiscordPageStatus() {
+  const location = useLocation()
+
+  useEffect(() => {
+    const path = location.pathname
+
+    if (path.startsWith('/watch/') || path.startsWith('/player/')) return
+
+    let page = 'home'
+    if (path.startsWith('/search')) page = 'search'
+    else if (path.startsWith('/watchlist')) page = 'watchlist'
+    else if (path.startsWith('/anime/')) page = 'anime'
+    else if (path.startsWith('/insights')) page = 'insights'
+    else if (path.startsWith('/settings')) page = 'settings'
+    else if (path.startsWith('/mal')) page = 'mal'
+
+    fetch('/api/discord/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page }),
+    }).catch(() => {})
+  }, [location.pathname])
+}
 
 const Home = lazy(() => import('./pages/Home'))
 const Watchlist = lazy(() => import('./pages/Watchlist'))
@@ -31,6 +55,7 @@ function App() {
   const { isOpen, setIsOpen } = useSidebar()
   const virtualKeyboard = useVirtualKeyboard()
   useTelemetry()
+  useDiscordPageStatus()
 
   useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {

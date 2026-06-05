@@ -24,6 +24,8 @@ import { createDataRouter } from './routes/data.routes'
 import { createProxyRouter } from './routes/proxy.routes'
 import { createSettingsRouter } from './routes/settings.routes'
 import { createInsightsRouter } from './routes/insights.routes'
+import { discordRPCService } from './discord-rpc'
+import { SettingsRepository } from './repositories/settings.repository'
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -86,9 +88,6 @@ app.use((req, res, next) => {
   req.db = db
   next()
 })
-
-// axiosRetry is applied only on the dedicated proxy axiosInstance (proxy.controller.ts)
-// to avoid amplifying retries on providers that already have their own fallback logic.
 
 app.use(
   compression({
@@ -173,6 +172,10 @@ async function main() {
   db = await initializeDatabase(dbPath)
   logger.info(`Database initialized at ${dbPath}`)
 
+  const rpcEnabledSetting = await SettingsRepository.getByKey(db, 'discordRPCEnabled')
+  const isRpcEnabled = rpcEnabledSetting ? rpcEnabledSetting.value === 'true' : true
+  discordRPCService.setEnabled(isRpcEnabled)
+
   await runSyncSequence(db)
 
   if (!fs.existsSync(CONFIG.LOCAL_MANIFEST_PATH)) {
@@ -198,8 +201,7 @@ async function main() {
     if (isShuttingDown) return
     isShuttingDown = true
     clearTimeout(debounceTimer)
-    // Close the watcher first to prevent a stale 'change' event from arming
-    // a new debounce timer that would call syncUp on an already-closed database.
+    discordRPCService.disconnect()
     await watcher.close()
 
     if (expressServer) {

@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { WatchlistController } from '../controllers/watchlist.controller'
 import { AllAnimeProvider } from '../providers/allanime.provider'
+import { discordRPCService } from '../discord-rpc'
 
 export function createWatchlistRouter(provider: AllAnimeProvider): Router {
   const router = Router()
@@ -28,6 +29,20 @@ export function createWatchlistRouter(provider: AllAnimeProvider): Router {
   router.get('/notifications', controller.getNotifications)
   router.post('/notifications/dismiss', controller.dismissNotification)
   router.post('/notifications/clear-all', controller.clearAllNotifications)
+
+  router.post('/discord/clear', (req, res) => {
+    const { sessionId } = req.body
+    discordRPCService.clearPresence(sessionId)
+    res.json({ success: true })
+  })
+
+  router.post('/discord/status', (req, res) => {
+    const { page } = req.body
+    if (typeof page === 'string') {
+      discordRPCService.setIdleStatus(page)
+    }
+    res.json({ success: true })
+  })
 
   return router
 }

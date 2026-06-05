@@ -60,7 +60,9 @@ const DATA_ROOT = resolveDataRoot()
 const ENV_PATH = path.join(DATA_ROOT, '.env')
 
 migrateLegacyData(SERVER_ROOT, DATA_ROOT)
-dotenv.config({ path: ENV_PATH })
+
+dotenv.config({ path: path.join(SERVER_ROOT, '.env') })
+dotenv.config({ path: ENV_PATH, override: true })
 
 const IS_DEV = process.argv.includes('--dev')
 const PORT = 3000
@@ -94,4 +96,5 @@ export const CONFIG = {
   GOOGLE_REDIRECT_URI: GOOGLE_REDIRECT_URI,
   RCLONE_REMOTE: process.env.RCLONE_REMOTE,
   SYNC_PROVIDER: process.env.SYNC_PROVIDER as 'github' | 'google' | 'rclone' | 'none' | undefined,
+  DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID,
 }

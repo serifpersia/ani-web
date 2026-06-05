@@ -79,6 +79,7 @@ const Player: React.FC = () => {
     skipIntervals: state.skipIntervals,
     showId,
     episodeNumber: state.currentEpisode?.toString(),
+    episodeCount: state.episodes.length || undefined,
     showMeta: memoizedShowMeta,
   })
   const { refs, actions } = player

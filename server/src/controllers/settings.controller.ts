@@ -10,6 +10,7 @@ import { DatabaseWrapper } from '../db'
 import { SettingsRepository } from '../repositories/settings.repository'
 import { asyncHandler } from '../utils/async-handler'
 import { getMachineId } from '../utils/machine-id'
+import { discordRPCService } from '../discord-rpc'
 
 interface MalAnimeItem {
   series_title: string[]
@@ -29,7 +30,11 @@ export class SettingsController {
   getSettings = async (req: Request, res: Response) => {
     try {
       const row = await SettingsRepository.getByKey(req.db, req.query.key as string)
-      res.json({ value: row ? row.value : null })
+      let value = row ? row.value : null
+      if (value === null && req.query.key === 'discordRPCEnabled') {
+        value = 'true'
+      }
+      res.json({ value: value })
     } catch {
       res.status(500).json({ error: 'DB error' })
     }
@@ -40,6 +45,9 @@ export class SettingsController {
       await performWriteTransaction(req.db, (tx) => {
         SettingsRepository.upsert(tx, req.body.key, String(req.body.value))
       })
+      if (req.body.key === 'discordRPCEnabled') {
+        discordRPCService.setEnabled(req.body.value === 'true' || req.body.value === true)
+      }
       res.json({ success: true })
     } catch {
       res.status(500).json({ error: 'DB error' })

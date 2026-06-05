@@ -156,6 +156,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     const rect = refs.progressBarRef.current.getBoundingClientRect()
     const percent = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
     refs.videoRef.current.currentTime = percent * state.duration
+    actions.sendProgressUpdate(false, true)
   }
 
   const handleProgressBarMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {

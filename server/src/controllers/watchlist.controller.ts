@@ -14,6 +14,8 @@ import { NotificationsRepository } from '../repositories/notifications.repositor
 import { QueueRepository } from '../repositories/queue.repository'
 import { SearchOptions } from '../providers/provider.interface'
 import { asyncHandler } from '../utils/async-handler'
+import { SettingsRepository } from '../repositories/settings.repository'
+import { discordRPCService } from '../discord-rpc'
 
 interface CombinedContinueWatchingShow {
   _id: string
@@ -382,12 +384,30 @@ export class WatchlistController {
       type,
       status,
       episodeCount,
+      isPlaying,
+      sessionId,
     } = req.body
 
-    const inWatchlist = await WatchlistRepository.exists(req.db, showId)
-    if (!inWatchlist) {
-      return res.json({ success: true })
+    const titlePreferenceRow = await SettingsRepository.getByKey(req.db, 'titlePreference')
+    const titlePreference = titlePreferenceRow ? titlePreferenceRow.value : 'englishName'
+
+    let displayName = showName
+    if (titlePreference === 'englishName' && englishName) {
+      displayName = englishName
+    } else if (titlePreference === 'nativeName' && nativeName) {
+      displayName = nativeName
     }
+
+    discordRPCService.updatePresence({
+      title: displayName,
+      episode: String(episodeNumber),
+      totalEpisodes: episodeCount ? String(episodeCount) : undefined,
+      currentTime: currentTime || 0,
+      duration: duration || 0,
+      thumbnail: this.provider.deobfuscateUrl(showThumbnail || ''),
+      isPlaying: isPlaying !== false,
+      sessionId,
+    })
 
     const genresStr = Array.isArray(genres) ? JSON.stringify(genres) : genres
 

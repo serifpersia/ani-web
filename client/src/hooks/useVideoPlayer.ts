@@ -5,6 +5,7 @@ interface VideoPlayerProps {
   skipIntervals: SkipInterval[]
   showId?: string
   episodeNumber?: string
+  episodeCount?: number
   showMeta?: {
     name?: string
     thumbnail?: string
@@ -15,7 +16,13 @@ interface VideoPlayerProps {
   }
 }
 
-const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: VideoPlayerProps) => {
+const useVideoPlayer = ({
+  skipIntervals,
+  showId,
+  episodeNumber,
+  episodeCount,
+  showMeta,
+}: VideoPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null)
   const playerContainerRef = useRef<HTMLDivElement>(null)
   const progressBarRef = useRef<HTMLDivElement>(null)
@@ -31,6 +38,8 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
   const mouseHoldTimerRef = useRef<number | null>(null)
   const spaceHoldTimerRef = useRef<number | null>(null)
   const spaceKeyHeldRef = useRef(false)
+
+  const sessionIdRef = useRef(Math.random().toString(36).substring(2))
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(() => {
@@ -83,6 +92,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
     return {
       showId,
       episodeNumber,
+      episodeCount,
       currentTime: video.currentTime,
       duration: video.duration,
       showName: showMeta.name,
@@ -92,11 +102,13 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
       genres: showMeta.genres?.map((g) => g.name),
       popularityScore: showMeta.score,
       type: showMeta.type,
+      isPlaying: !video.paused,
+      sessionId: sessionIdRef.current,
     }
-  }, [showId, episodeNumber, showMeta])
+  }, [showId, episodeNumber, episodeCount, showMeta])
 
   const sendProgressUpdate = useCallback(
-    (isFinalUpdate = false) => {
+    (isFinalUpdate = false, force = false) => {
       if (hasEnded.current) return false
 
       const payload = buildProgressPayload()
@@ -112,11 +124,13 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
         timeToReport = video.duration
       }
 
-      if (timeToReport === 0 && !isFinished) return false
+      if (!force) {
+        if (timeToReport === 0 && !isFinished) return false
 
-      const timeDiff = Math.abs(timeToReport - lastReportedTime.current)
-      if (!isFinalUpdate && timeToReport !== video.duration && timeDiff < 5) {
-        return false
+        const timeDiff = Math.abs(timeToReport - lastReportedTime.current)
+        if (!isFinalUpdate && timeToReport !== video.duration && timeDiff < 5) {
+          return false
+        }
       }
 
       payload.currentTime = timeToReport
@@ -224,7 +238,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
         videoRef.current.currentTime += seconds
         if (debouncedUpdateTimer.current) clearTimeout(debouncedUpdateTimer.current)
         debouncedUpdateTimer.current = setTimeout(() => {
-          sendProgressUpdate()
+          sendProgressUpdate(false, true)
         }, 1500)
         setShowControls(true)
       }
@@ -416,7 +430,8 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
   const onPlay = useCallback(() => {
     setIsPlaying(true)
     setIsBuffering(false)
-  }, [])
+    setTimeout(() => sendProgressUpdate(false, true), 50)
+  }, [sendProgressUpdate])
   const onPlaying = useCallback(() => {
     setIsBuffering(false)
   }, [])
@@ -426,7 +441,17 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
   const onPause = useCallback(() => {
     setIsPlaying(false)
     setShowControls(true)
-  }, [setShowControls])
+    setTimeout(() => sendProgressUpdate(false, true), 50)
+  }, [sendProgressUpdate])
+
+  useEffect(() => {
+    const sessionId = sessionIdRef.current
+    return () => {
+      const payload = JSON.stringify({ sessionId })
+      const blob = new Blob([payload], { type: 'application/json' })
+      navigator.sendBeacon('/api/discord/clear', blob)
+    }
+  }, [])
   const onLoadedMetadata = useCallback(() => {
     setDuration(videoRef.current?.duration || 0)
     syncPlaybackRate()
@@ -496,7 +521,7 @@ const useVideoPlayer = ({ skipIntervals, showId, episodeNumber, showMeta }: Vide
         if (wasPlayingBeforeScrub.current) {
           videoRef.current?.play()
         }
-        sendProgressUpdate()
+        sendProgressUpdate(false, true)
       }
     }
     if (isScrubbing) {

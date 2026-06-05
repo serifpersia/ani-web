@@ -63,6 +63,7 @@ jobs:
           cp -r server/dist release-package/server/
           cp client/package.json client/package-lock.json release-package/client/
           cp server/package.json release-package/server/
+          echo "DISCORD_CLIENT_ID=${{ secrets.DISCORD_CLIENT_ID }}" > release-package/server/.env
           cp package.json package-lock.json release-package/
           cp LICENSE README.md release-package/
           cp orchestrator.js release-package/
@@ -95,6 +96,7 @@ jobs:
 
       - name: Publish to NPM
         run: |
+          echo "DISCORD_CLIENT_ID=$DISCORD_CLIENT_ID" > server/.env
           PREV_VERSION=$(npm view ani-web version 2>/dev/null || echo "")
           npm publish --access public
           if [ -n "$PREV_VERSION" ]; then
@@ -103,3 +105,4 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           VITE_TELEMETRY_URL: ${{ secrets.TELEMETRY_URL }}
+          DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
