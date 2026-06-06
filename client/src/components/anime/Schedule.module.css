@@ -127,27 +127,34 @@
 /* ===== NAV ARROWS ===== */
 .navArrows {
   display: flex;
-  gap: 10px;
+  gap: 8px;
+  background: var(--bg-tertiary);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-primary);
 }
 
 .navButton {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-secondary);
-  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-base);
 }
 
 .navButton:hover {
-  background: var(--accent);
-  color: white;
-  border-color: var(--accent);
+  background: var(--bg-elevated);
+  color: var(--accent);
+}
+
+.navButton:active {
+  transform: scale(0.9);
 }
 
 /* ===== CAROUSEL ===== */

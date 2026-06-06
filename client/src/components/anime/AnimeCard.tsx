@@ -114,11 +114,19 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
       setAnchorRect(null)
     }
 
-    const schedulePopupClose = () => {
+    const schedulePopupClose = useCallback(() => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
       timeoutRef.current = setTimeout(() => {
         closePopup()
       }, 300)
-    }
+    }, [])
+
+    const clearPopupTimeout = useCallback(() => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
+    }, [])
 
     const handleInfoMouseEnter = (e: React.MouseEvent) => {
       if (isMobile) return
@@ -131,11 +139,11 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     }
 
     const handlePopupMouseEnter = () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      clearPopupTimeout()
     }
 
     const handlePopupMouseLeave = () => {
-      closePopup()
+      schedulePopupClose()
     }
 
     const handleContextMenu = (e: React.MouseEvent) => {
@@ -144,6 +152,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
 
       e.preventDefault()
       e.stopPropagation()
+      // Use the card's rect for context menu trigger to be consistent
       openPopup((e.currentTarget as HTMLElement).getBoundingClientRect())
     }
 
@@ -267,7 +276,10 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     return (
       <div
         className={`${styles.cardWrapper} ${lowEndMode ? styles.lowEnd : ''}`}
-        onMouseEnter={() => setIsHovered(true)}
+        onMouseEnter={() => {
+          setIsHovered(true)
+          if (isPopupVisible) clearPopupTimeout()
+        }}
         onMouseLeave={() => {
           setIsHovered(false)
           if (isPopupVisible) schedulePopupClose()

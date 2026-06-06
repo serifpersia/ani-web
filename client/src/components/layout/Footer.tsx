@@ -6,16 +6,40 @@ const Footer: React.FC = () => {
 
   return (
     <footer className={styles.footer}>
-      <p>
-        © {currentYear}{' '}
+      <div className={styles.footerLinks}>
         <a href="https://github.com/serifpersia/ani-web" target="_blank" rel="noopener noreferrer">
-          ani-web
+          GitHub
         </a>
-        {' | Created by '}
-        <a href="https://github.com/serifpersia" target="_blank" rel="noopener noreferrer">
-          serifpersia
+        <a
+          href="https://github.com/serifpersia/ani-web/issues"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Feedback
         </a>
-      </p>
+        <a
+          href="https://github.com/serifpersia/ani-web/releases"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Changelog
+        </a>
+      </div>
+
+      <div className={styles.footerContent}>
+        <p className={styles.copyright}>
+          © {currentYear}{' '}
+          <a href="/" className={styles.brand}>
+            ani-web
+          </a>
+        </p>
+        <p>
+          Crafted by{' '}
+          <a href="https://github.com/serifpersia" target="_blank" rel="noopener noreferrer">
+            serifpersia
+          </a>
+        </p>
+      </div>
     </footer>
   )
 }

@@ -109,20 +109,21 @@
   padding: var(--space-3);
   display: flex;
   flex-direction: column;
-  flex-grow: 1;
-  gap: var(--space-2);
+  height: 100px;
+  gap: var(--space-1);
 }
 
 .title {
   font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-sm);
-  line-height: var(--line-height-tight);
+  line-height: 1.3;
   color: var(--text-primary);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  margin-bottom: auto;
+  height: 2.6em;
+  margin-bottom: 0;
   transition: color var(--transition-base);
   word-break: break-word;
   min-width: 0;
@@ -201,7 +202,7 @@
   color: var(--text-secondary);
   margin-top: auto;
   min-width: 0;
-  flex-wrap: wrap;
+  height: 24px;
 }
 
 .metaItem {
@@ -328,16 +329,37 @@
   }
 
   .info {
-    flex-grow: 0 !important;
-    padding: var(--space-2) !important;
+    height: 95px !important;
+    padding: 6px 8px !important;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
   }
 
   .title {
-    margin-bottom: 4px !important;
-    font-size: var(--font-size-xs) !important;
+    height: 2.5em !important; /* Exactly 2 lines at 1.25 line-height */
+    margin-bottom: 2px !important;
+    font-size: 0.78rem !important;
+    line-height: 1.25;
+    display: -webkit-box;
     -webkit-line-clamp: 2;
-    line-clamp: 2;
+    -webkit-box-orient: vertical;
     text-align: center;
+    overflow: hidden;
+    word-break: break-word;
+    color: var(--text-primary);
+  }
+
+  .mobileBadges {
+    justify-content: center;
+    margin-bottom: 4px;
+    gap: 4px;
+  }
+
+  .metaRow {
+    margin-top: auto;
+    justify-content: center;
+    height: 20px;
   }
 
   .typeBadge {

@@ -1,17 +1,20 @@
 .header {
   height: var(--header-height);
-  background-color: var(--bg-secondary);
+  background-color: hsla(0, 0%, 2%, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border-primary);
   position: sticky;
   top: 0;
   z-index: 1000;
   display: flex;
   align-items: center;
-  padding: 0 var(--space-6);
+  padding: 0 var(--space-8);
   transition:
     transform var(--transition-slow),
+    background-color var(--transition-base),
     box-shadow var(--transition-base);
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
 }
 
 .header.hidden {
@@ -21,7 +24,7 @@
 .leftSection {
   display: flex;
   align-items: center;
-  gap: var(--space-6);
+  gap: var(--space-4);
   flex: 1;
 }
 
@@ -29,16 +32,16 @@
   background-color: transparent;
   border: 1px solid transparent;
   color: var(--text-primary);
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   padding: var(--space-2);
-  border-radius: 50%;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all var(--transition-base);
-  min-height: 48px;
-  min-width: 48px;
+  height: 40px;
+  width: 40px;
 }
 
 .hamburgerBtn:hover {
@@ -49,6 +52,14 @@
 
 .hamburgerBtn:active {
   transform: scale(0.95);
+}
+
+.logo {
+  transition: opacity var(--transition-base);
+}
+
+.logo:hover {
+  opacity: 0.8;
 }
 
 .rightSection {
@@ -67,13 +78,13 @@
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-primary);
   color: var(--text-primary);
-  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-4);
-  border-radius: var(--radius-full);
-  width: 250px;
-  font-size: var(--font-size-md);
+  padding: var(--space-2) var(--space-4) var(--space-2) 3rem;
+  border-radius: var(--radius-md);
+  width: 280px;
+  font-size: var(--font-size-sm);
   font-family: inherit;
   transition: all var(--transition-base);
-  min-height: 48px;
+  height: 40px;
 }
 
 .searchInput::placeholder {
@@ -87,15 +98,15 @@
 
 .searchInput:focus {
   border-color: var(--accent);
-  background-color: var(--bg-tertiary);
-  width: 310px;
+  background-color: var(--bg-main);
+  width: 340px;
   outline: none;
-  box-shadow: var(--shadow-input-focus);
+  box-shadow: 0 0 0 4px var(--accent-glow);
 }
 
 .searchButton {
   position: absolute;
-  right: var(--space-4);
+  left: var(--space-3);
   background: transparent;
   border: none;
   padding: 0;
@@ -103,41 +114,38 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all var(--transition-base);
+  pointer-events: none;
 }
 
 .searchIcon {
   color: var(--text-muted);
-  font-size: 1.1rem;
+  font-size: 0.9rem;
   transition: all var(--transition-base);
 }
 
-.searchButton:hover .searchIcon {
+.searchInput:focus + .searchButton .searchIcon {
   color: var(--accent);
-  transform: scale(1.1);
-}
-
-.searchButton:active .searchIcon {
-  transform: scale(0.9);
 }
 
 .profileBtn {
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   overflow: hidden;
-  border: 2px solid var(--border-primary);
+  border: 1px solid var(--border-primary);
   cursor: pointer;
   transition: all var(--transition-base);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  background-color: var(--bg-tertiary);
 }
 
 .profileBtn:hover {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(138, 79, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--accent-glow);
 }
 
 .profileBtn:active {
@@ -146,7 +154,7 @@
 
 .profileBtn svg {
   color: var(--text-primary);
-  font-size: 1.15rem;
+  font-size: 1rem;
 }
 
 .profileImg {
@@ -155,90 +163,53 @@
   object-fit: cover;
 }
 
-.signInBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--accent);
-  color: white;
-  border: none;
-  padding: var(--space-2) var(--space-6);
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  font-family: inherit;
-  transition: all var(--transition-base);
-  cursor: pointer;
-  min-height: 48px;
-}
-
-.signInBtn:hover {
-  background-color: var(--accent-dark);
-  box-shadow: var(--shadow-md);
-}
-
-.signInBtn:active {
-  transform: scale(0.98);
-}
-
-.signInBtn:focus {
-  outline: none;
-  box-shadow: var(--shadow-focus);
-}
-
 @media (max-width: 768px) {
   .header {
-    --header-height: 60px;
-    padding: 0 var(--space-3);
-    gap: var(--space-2);
-    flex-wrap: wrap;
-  }
-
-  .logo {
-    --logo-height: 45px;
+    height: 70px;
+    padding: 0 var(--space-4);
   }
 
   .leftSection {
     gap: var(--space-2);
   }
 
-  .hamburgerBtn {
-    min-height: 40px;
-    min-width: 40px;
-    font-size: 1.2rem;
-  }
-
-  .rightSection {
-    gap: var(--space-2);
-  }
-
   .searchInput {
     width: 120px;
-    min-height: 40px;
-    font-size: var(--font-size-sm);
+    height: 40px;
   }
 
   .searchInput:focus {
-    width: calc(100vw - 140px);
-  }
-
-  .profileBtn {
-    width: 36px;
-    height: 36px;
-  }
-
-  .signInBtn {
-    min-height: 36px;
-    padding: var(--space-2) var(--space-4);
-  }
-
-  .signInText {
-    display: none;
+    width: 180px;
   }
 }
 
 @media (max-width: 480px) {
-  .searchContainer {
+  .logo {
     display: none;
+  }
+
+  .searchContainer {
+    display: flex;
+    flex: 1;
+    margin: 0 var(--space-2);
+  }
+
+  .searchInput {
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+    padding-left: 2.5rem;
+  }
+
+  .searchInput:focus {
+    width: 100%;
+  }
+
+  .searchButton {
+    left: 10px;
+  }
+
+  .rightSection {
+    gap: var(--space-2);
   }
 }

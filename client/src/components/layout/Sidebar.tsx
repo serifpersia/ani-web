@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 import { useSidebar } from '../../hooks/useSidebar'
 import styles from './Sidebar.module.css'
 import { FaHome, FaSearch, FaClock, FaFileImport, FaCog, FaChartPie } from 'react-icons/fa'
@@ -13,6 +13,15 @@ const Sidebar: React.FC = () => {
     setIsOpen(false)
   }
 
+  const navItems = [
+    { to: '/', icon: <FaHome />, label: 'Home' },
+    { to: '/search', icon: <FaSearch />, label: 'Search' },
+    { to: '/watchlist', icon: <FaClock />, label: 'Watchlist' },
+    { to: '/insights', icon: <FaChartPie />, label: 'Insights' },
+    { to: '/mal', icon: <FaFileImport />, label: 'MAL Import' },
+    { to: '/settings', icon: <FaCog />, label: 'Settings' },
+  ]
+
   return (
     <>
       <aside className={`${styles.sidebar} ${isOpen ? styles.open : ''} sidebar`}>
@@ -21,38 +30,30 @@ const Sidebar: React.FC = () => {
             <Logo />
           </Link>
           <button
-            className={`${styles.closeBtn} closeBtn`}
+            className={styles.closeBtn}
             onClick={() => setIsOpen(false)}
             aria-label="Close menu"
           >
             &times;
           </button>
         </div>
-        <nav>
-          <Link to="/" className={`${styles.navLink} navLink`} onClick={handleNavLinkClick}>
-            <FaHome /> Home
-          </Link>
-          <Link to="/search" className={`${styles.navLink} navLink`} onClick={handleNavLinkClick}>
-            <FaSearch /> Search
-          </Link>
-          <Link
-            to="/watchlist"
-            className={`${styles.navLink} navLink`}
-            onClick={handleNavLinkClick}
-          >
-            <FaClock /> Watchlist
-          </Link>
-          <Link to="/insights" className={`${styles.navLink} navLink`} onClick={handleNavLinkClick}>
-            <FaChartPie /> Insights
-          </Link>
-          <Link to="/mal" className={`${styles.navLink} navLink`} onClick={handleNavLinkClick}>
-            <FaFileImport /> MAL Import
-          </Link>
-          <Link to="/settings" className={`${styles.navLink} navLink`} onClick={handleNavLinkClick}>
-            <FaCog /> Settings
-          </Link>
+
+        <nav className={styles.navSection}>
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
+              onClick={handleNavLinkClick}
+              end={item.to === '/'}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
         </nav>
-        <div className={styles.versionInfo}>v{packageJson.version}</div>
+
+        <div className={styles.versionInfo}>Version {packageJson.version}</div>
       </aside>
       {isOpen && (
         <div

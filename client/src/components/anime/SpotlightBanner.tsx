@@ -140,24 +140,28 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
 
         <div className={styles.overlay}>
           <div className={styles.content}>
-            <span className={styles.featureLabel}>Featured</span>
-
-            <div className={styles.metaRow}>
-              {metadata.map((item, idx) => (
-                <span key={idx}>{item}</span>
-              ))}
+            <div className={styles.badgeRow}>
+              <span className={styles.featureLabel}>Featured</span>
               {meta.score && (
-                <span
-                  style={{ color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '4px' }}
-                >
-                  <FaStar size={14} /> {meta.score}
-                </span>
+                <div className={styles.metaRow} style={{ color: '#fbbf24' }}>
+                  <FaStar size={14} />
+                  <span>{meta.score}</span>
+                </div>
               )}
             </div>
 
             <h1 className={styles.title} onClick={() => navigate(`/anime/${anime._id}`)}>
               {getTitle(anime)}
             </h1>
+
+            <div className={styles.metaRow}>
+              {metadata.map((item, idx) => (
+                <React.Fragment key={idx}>
+                  <span className={styles.metaItem}>{item}</span>
+                  {idx < metadata.length - 1 && <div className={styles.metaDivider} />}
+                </React.Fragment>
+              ))}
+            </div>
 
             {visibleGenres.length > 0 && (
               <div className={styles.genres}>

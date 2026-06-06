@@ -268,47 +268,22 @@ const Home: React.FC = () => {
         onScroll={handleContinueWatchingScroll}
         isFetchingNextPage={fetchingMoreContinueWatching}
         emptyState={
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '4rem 2rem',
-              backgroundColor: 'var(--bg-secondary)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border-secondary)',
-              textAlign: 'center',
-              gap: '1rem',
-              width: '100%',
-              minHeight: '280px',
-            }}
-          >
-            <FaHistory
-              size={40}
-              style={{ color: 'var(--accent)', opacity: 0.6, marginBottom: '0.5rem' }}
-            />
+          <div className={styles.emptyState}>
+            <FaHistory size={48} className={styles.emptyStateIcon} />
             <div>
-              <h3
-                style={{
-                  fontSize: '1.2rem',
-                  fontWeight: 'var(--font-weight-semibold)',
-                  marginBottom: '0.4rem',
-                  color: 'var(--text-primary)',
-                }}
-              >
-                Nothing is here...
-              </h3>
-              <p
-                style={{
-                  fontSize: '0.9rem',
-                  color: 'var(--text-secondary)',
-                  maxWidth: '300px',
-                }}
-              >
+              <h3 className={styles.emptyStateTitle}>Nothing is here...</h3>
+              <p className={styles.emptyStateText}>
                 You haven't watched anything yet. Start exploring and watch something first!
               </p>
             </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setActiveTab('popular')}
+              style={{ marginTop: '1rem' }}
+            >
+              Explore Trending
+            </Button>
           </div>
         }
       />

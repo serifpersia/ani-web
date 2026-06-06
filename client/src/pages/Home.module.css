@@ -2,52 +2,62 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-8);
 }
 
 .title-wrapper {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: var(--space-6);
 }
 
 .pagination-controls {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
-  background: var(--bg-secondary);
-  padding: 4px 8px;
-  border-radius: 20px;
-  border: 1px solid var(--border-secondary);
+  background: var(--bg-tertiary);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-primary);
 }
 
 .nav-button {
-  background: none;
+  background: transparent;
   border: none;
-  color: var(--text-primary);
-  cursor: pointer;
+  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
-  padding: 4px;
-  transition: opacity 0.2s;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.nav-button:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  color: var(--accent);
 }
 
 .nav-button:disabled {
+  opacity: 0.2;
   cursor: not-allowed;
 }
 
 .page-info {
-  font-size: 0.85rem;
-  font-weight: var(--font-weight-bold);
-  min-width: 20px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  min-width: 32px;
   text-align: center;
+  color: var(--text-primary);
 }
 
 @media (max-width: 600px) {
   .section-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: var(--space-3);
+    gap: var(--space-4);
   }
 
   .title-wrapper {
@@ -56,8 +66,8 @@
   }
 }
 
-/* ===== CURRENT SEASON RESPONSIVE GRID ===== */
 .seasonGrid {
+  display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: var(--space-4);
 }
@@ -88,32 +98,92 @@
   }
 }
 
-/* ===== TAB BAR ===== */
 .tabBar {
   display: flex;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
+  gap: var(--space-3);
+  margin-bottom: var(--space-8);
+  padding: 6px;
+  background: var(--bg-tertiary);
+  width: fit-content;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-primary);
+}
+
+.tabButton {
+  border-radius: var(--radius-md) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.02em;
+  transition: all var(--transition-base) !important;
+  border: none !important;
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+}
+
+.tabButton:hover {
+  color: var(--text-primary) !important;
+  background: var(--bg-elevated) !important;
 }
 
 @media (max-width: 600px) {
   .tabBar {
+    width: 100%;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 8px;
+    background: transparent;
+    border: none;
+    padding: 0;
   }
 
   .tabButton {
     width: 100%;
     justify-content: flex-start !important;
-    padding-left: var(--space-4) !important;
+    padding: 0 1.5rem !important;
+    height: 48px !important;
+    background: var(--bg-tertiary) !important;
+    border: 1px solid var(--border-primary) !important;
+  }
+
+  .tabActive {
+    background: var(--accent) !important;
+    border-color: var(--accent) !important;
+    color: #fff !important;
   }
 }
 
-.tabButton {
-  border-radius: 20px !important;
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-16) var(--space-8);
+  background: linear-gradient(to bottom, var(--bg-tertiary), var(--bg-main));
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-primary);
+  text-align: center;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: 320px;
 }
 
-.tabActive {
-  box-shadow: var(--shadow-md);
+.emptyStateIcon {
+  color: var(--accent);
+  opacity: 0.4;
+  margin-bottom: var(--space-2);
+  filter: drop-shadow(0 0 20px var(--accent-glow));
+}
+
+.emptyStateTitle {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.emptyStateText {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  max-width: 340px;
+  line-height: 1.6;
 }
 
 .quickQueue {

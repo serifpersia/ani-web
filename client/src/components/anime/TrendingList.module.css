@@ -2,60 +2,63 @@
 .section-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-6);
+  align-items: flex-end;
+  margin-bottom: var(--space-8);
   gap: var(--space-4);
 }
 
 .title-wrapper {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: var(--space-6);
+  flex: 1;
 }
 
 @media (max-width: 600px) {
   .section-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: var(--space-3);
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
   }
 
   .title-wrapper {
     width: 100%;
     justify-content: space-between;
   }
-
-  .header-actions {
-    width: 100%;
-    display: flex;
-    justify-content: flex-end;
-  }
 }
 
 /* ===== NAV ARROWS ===== */
 .nav-arrows {
   display: flex;
-  gap: 10px;
+  gap: 8px;
+  background: var(--bg-tertiary);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-primary);
 }
 
 .nav-button {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-secondary);
-  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-base);
 }
 
 .nav-button:hover {
-  background: var(--accent);
-  color: white;
-  border-color: var(--accent);
+  background: var(--bg-elevated);
+  color: var(--accent);
+}
+
+.nav-button:active {
+  transform: scale(0.9);
 }
 
 /* ===== TIMEFRAME SELECT ===== */
@@ -64,24 +67,24 @@
   height: 34px;
   padding: 0 var(--space-3);
   padding-right: 2rem;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-secondary);
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: var(--font-size-sm);
-  font-weight: 500;
+  font-weight: 700;
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23a1a1aa' stroke-width='2' viewBox='0 0 12 12'%3E%3Cpolyline points='3 5 6 8 9 5'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.5rem center;
-  transition: border-color 0.15s ease;
+  transition: all var(--transition-base);
 }
 
 .timeSelect:hover {
-  border-color: var(--border-primary);
-  background-color: var(--bg-tertiary);
+  border-color: var(--border-secondary);
+  background-color: var(--bg-elevated);
 }
 
 .timeSelect:focus {
