@@ -222,6 +222,7 @@
 
   .title {
     font-size: 2.25rem;
+    text-shadow: none;
   }
 
   .summary {
@@ -229,5 +230,6 @@
     font-size: 0.95rem;
     line-height: 1.5;
     max-width: 100%;
+    text-shadow: none;
   }
 }

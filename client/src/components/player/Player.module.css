@@ -84,7 +84,6 @@
   padding: 2rem;
   border-radius: var(--radius-xl);
   width: 100%;
-  box-shadow: var(--glass-shadow);
 }
 
 .providerSelectContainer {
@@ -124,7 +123,6 @@
 .sourceSelect:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 4px var(--accent-glow);
 }
 
 .providerSelect option,
@@ -172,7 +170,6 @@
   background: var(--accent);
   border-color: var(--accent);
   color: white;
-  box-shadow: 0 8px 20px var(--accent-glow);
 }
 
 .detailsBox {
@@ -185,7 +182,6 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  box-shadow: var(--glass-shadow);
 }
 
 .detailsToggle {

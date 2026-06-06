@@ -69,7 +69,6 @@
   background: var(--accent);
   color: white;
   border-color: var(--accent);
-  box-shadow: 0 4px 12px var(--accent-glow);
 }
 
 .episodeList {
@@ -137,7 +136,6 @@
   background: rgba(139, 92, 246, 0.1);
   color: var(--accent-light);
   border: 1px solid rgba(139, 92, 246, 0.3);
-  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.1);
 }
 
 .episodeItem.active:hover {

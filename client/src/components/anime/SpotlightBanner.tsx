@@ -128,6 +128,8 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
     meta.rating,
   ].filter(Boolean)
 
+  if (isMobile) return null
+
   return (
     <div className={styles.bannerContainer}>
       <div className={styles.posterWrapper}>
