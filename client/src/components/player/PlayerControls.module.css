@@ -70,11 +70,24 @@
   border-radius: 50%;
 }
 
+.backBtn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 1.6rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  padding: 8px;
+  border-radius: 50%;
+}
+
 .backBtn:hover {
-  background: var(--accent);
+  background: rgba(15, 15, 17, 0.6);
   color: white;
-  transform: scale(1.12);
-  box-shadow: 0 0 25px var(--accent-glow);
+  transform: scale(1.1);
 }
 
 .videoTitleInfo {
@@ -114,8 +127,8 @@
 }
 
 .centerSkipBtn {
-  background: rgba(15, 15, 17, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 50%;
   color: rgba(255, 255, 255, 0.85);
   width: 56px;
@@ -126,23 +139,22 @@
   justify-content: center;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .centerSkipBtn:hover {
-  background: var(--accent);
+  background: rgba(15, 15, 17, 0.7);
   color: white;
-  border-color: var(--accent);
-  transform: scale(1.12);
-  box-shadow: 0 0 35px var(--accent-glow);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .centerPlayPause {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 15, 17, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 50%;
   color: white;
   width: 76px;
@@ -150,14 +162,13 @@
   font-size: 2.2rem;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 .centerPlayPause:hover {
-  background: var(--accent);
-  border-color: var(--accent);
-  transform: scale(1.12);
-  box-shadow: 0 0 35px var(--accent-glow);
+  background: rgba(15, 15, 17, 0.75);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: scale(1.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 .playIconOffset {
@@ -179,13 +190,13 @@
     rgba(0, 0, 0, 0.25) 80%,
     transparent 100%
   );
-  padding: 24px 32px 32px 32px;
+  padding: 0 32px 24px 32px;
   transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .progressBarContainer {
   width: 100%;
-  padding: 12px 0;
+  padding: 10px 0 6px 0;
   cursor: pointer;
   position: relative;
   touch-action: none;
@@ -294,7 +305,7 @@
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  margin-top: 4px;
+  margin-top: 0;
 }
 
 .leftControls,
@@ -477,7 +488,7 @@
 }
 
 :global(body.low-end) .centerPlayPause:hover {
-  background: var(--accent) !important;
+  background: #000 !important;
 }
 
 :global(body.low-end) .controlBtn.active {
@@ -550,7 +561,7 @@
   }
 
   .bottomControls {
-    padding: 12px 16px 16px 16px;
+    padding: 0 16px 16px 16px;
   }
 
   .leftControls,
