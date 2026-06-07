@@ -82,6 +82,13 @@ const useVideoPlayer = ({
   const [showVolumeSlider, setShowVolumeSlider] = useState(false)
   const [isBuffering, setIsBuffering] = useState(false)
   const [isSpeedBoostActive, setIsSpeedBoostActive] = useState(false)
+  const [useNativeControls, setUseNativeControls] = useState(() => {
+    try {
+      return localStorage.getItem('playerUseNativeControls') === 'true'
+    } catch {
+      return false
+    }
+  })
   const hasEnded = useRef(false)
   const lastReportedTime = useRef<number>(-1)
 
@@ -564,6 +571,7 @@ const useVideoPlayer = ({
       onWaiting,
       onPlaying,
       sendProgressUpdate,
+      setUseNativeControls,
     }),
     [
       togglePlay,
@@ -581,6 +589,7 @@ const useVideoPlayer = ({
       onWaiting,
       onPlaying,
       sendProgressUpdate,
+      setUseNativeControls,
     ]
   )
 
@@ -606,6 +615,7 @@ const useVideoPlayer = ({
       showVolumeSlider,
       isBuffering,
       isSpeedBoostActive,
+      useNativeControls,
     },
     actions: actions,
   }

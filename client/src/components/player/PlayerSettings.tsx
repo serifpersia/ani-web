@@ -18,6 +18,8 @@ interface PlayerSettingsProps {
     position: number
   }
   onSubtitleSettingsChange: (key: 'fontSize' | 'position', value: number) => void
+  useNativeControls: boolean
+  onNativeControlsToggle: (value: boolean) => void
 }
 
 type SettingsView = 'main' | 'quality' | 'subtitles' | 'subtitle-style'
@@ -35,6 +37,8 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
     onSubtitleChange,
     subtitleSettings,
     onSubtitleSettingsChange,
+    useNativeControls,
+    onNativeControlsToggle,
   } = props
   const [view, setView] = useState<SettingsView>('main')
 
@@ -57,6 +61,17 @@ const PlayerSettings = (props: PlayerSettingsProps, ref: React.ForwardedRef<HTML
       </button>
       <button className={styles.menuItem} onClick={() => setView('subtitle-style')}>
         <span>Subtitle Style</span>
+      </button>
+      <button
+        className={`${styles.menuItem} ${useNativeControls ? styles.selected : ''}`}
+        onClick={() => {
+          const newValue = !useNativeControls
+          onNativeControlsToggle(newValue)
+          localStorage.setItem('playerUseNativeControls', newValue.toString())
+        }}
+      >
+        <span>Native Controls</span>
+        {useNativeControls && <FaCheck size={12} />}
       </button>
     </div>
   )

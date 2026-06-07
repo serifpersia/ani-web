@@ -182,7 +182,7 @@ const Player: React.FC = () => {
 
       clickTimerRef.current = setTimeout(() => {
         clickCountRef.current = 0
-      }, 250) // Short window for double click detection
+      }, 250)
     },
     [actions, player.state.showControls]
   )
@@ -314,13 +314,11 @@ const Player: React.FC = () => {
     }
   }, [state.selectedSource, state.selectedLink, refs.videoRef, actions, state.loadingVideo])
 
-  // Sync URL if provider reports a different actual episode number (e.g. 0 -> 1 fallback)
   useEffect(() => {
     if (state.loadingVideo) return
     const actualEp = state.selectedSource?.actualEpisodeNumber
     const fetchedEp = state.fetchedEpisodeNumber
 
-    // Only sync if the data we are looking at actually belongs to the episode in the URL
     if (actualEp && episodeNumber && fetchedEp === episodeNumber && actualEp !== episodeNumber) {
       console.log(`[Sync] Redirecting from episode ${episodeNumber} to ${actualEp}`)
       navigate(`/watch/${showId}/${actualEp}`, { replace: true })
@@ -518,11 +516,12 @@ const Player: React.FC = () => {
       const container = refs.playerContainerRef.current
       if (!container) return
 
-      if (Date.now() - lastInteractionTimeRef.current < 500) return
+      const interactionDelay = e.type === 'touchstart' ? 800 : 500
+      if (Date.now() - lastInteractionTimeRef.current < interactionDelay) return
 
       if (rafIdRef.current === null) {
         rafIdRef.current = requestAnimationFrame(() => {
-          if (!player.state.showControls) {
+          if (!player.state.showControls && !player.state.useNativeControls) {
             actions.setShowControls(true)
           }
           container.style.cursor = 'default'
@@ -539,11 +538,13 @@ const Player: React.FC = () => {
 
           if (player.state.isPlaying && !isInteracting) {
             player.actions.inactivityTimer.current = window.setTimeout(() => {
-              actions.setShowControls(false)
+              if (!player.state.useNativeControls) {
+                actions.setShowControls(false)
+              }
               if (player.state.isFullscreen) {
                 container.style.cursor = 'none'
               }
-            }, 2000) // 2 seconds auto hide
+            }, 3000)
           }
           rafIdRef.current = null
         })
@@ -556,6 +557,7 @@ const Player: React.FC = () => {
       player.state.isScrubbing,
       player.state.showSettings,
       player.state.showVolumeSlider,
+      player.state.useNativeControls,
       isEpisodeDrawerOpen,
       actions,
       player.actions,
@@ -589,7 +591,11 @@ const Player: React.FC = () => {
     const container = refs.playerContainerRef.current
     if (container) {
       container.addEventListener('mousemove', handleUserActivity)
-      container.addEventListener('touchstart', handleUserActivity, { passive: true })
+
+      const handleTouch = (e: TouchEvent) => {
+        handleUserActivity(e)
+      }
+      container.addEventListener('touchstart', handleTouch, { passive: true })
 
       const handleMouseLeave = () => {
         actions.setShowControls(false)
@@ -598,7 +604,7 @@ const Player: React.FC = () => {
 
       return () => {
         container.removeEventListener('mousemove', handleUserActivity)
-        container.removeEventListener('touchstart', handleUserActivity)
+        container.removeEventListener('touchstart', handleTouch)
         container.removeEventListener('mouseleave', handleMouseLeave)
       }
     }
@@ -1052,48 +1058,51 @@ const Player: React.FC = () => {
                   </button>
                 </div>
               )}
-              {!isVideoLoading && state.videoSources.length > 0 && (
-                <PlayerControls
-                  player={player}
-                  isAutoplayEnabled={state.isAutoplayEnabled}
-                  onAutoplayChange={handleAutoplayChange}
-                  showNextEpisodeButton={
-                    !state.showResumeModal && showNextEpisodePrompt && queue.length === 0
-                  }
-                  onNextEpisode={handleNextEpisode}
-                  videoSources={state.videoSources}
-                  selectedSource={state.selectedSource}
-                  selectedLink={state.selectedLink}
-                  onSourceChange={(source, link) => {
-                    if (refs.videoRef.current && !isNaN(refs.videoRef.current.currentTime)) {
-                      seekToTimeRef.current = refs.videoRef.current.currentTime
+              {!isVideoLoading &&
+                state.videoSources.length > 0 &&
+                !player.state.useNativeControls && (
+                  <PlayerControls
+                    player={player}
+                    isAutoplayEnabled={state.isAutoplayEnabled}
+                    onAutoplayChange={handleAutoplayChange}
+                    showNextEpisodeButton={
+                      !state.showResumeModal && showNextEpisodePrompt && queue.length === 0
                     }
+                    onNextEpisode={handleNextEpisode}
+                    videoSources={state.videoSources}
+                    selectedSource={state.selectedSource}
+                    selectedLink={state.selectedLink}
+                    onSourceChange={(source, link) => {
+                      if (refs.videoRef.current && !isNaN(refs.videoRef.current.currentTime)) {
+                        seekToTimeRef.current = refs.videoRef.current.currentTime
+                      }
 
-                    setPreferredSource(source.sourceName)
-                    dispatch({
-                      type: 'SET_STATE',
-                      payload: {
-                        selectedSource: source,
-                        selectedLink: link,
-                        showResumeModal: state.showResumeModal && source.type !== 'iframe',
-                      },
-                    })
-                  }}
-                  loadingVideo={state.loadingVideo}
-                  skipIntervals={state.skipIntervals}
-                  animeTitle={displayTitle}
-                  episodeNumber={state.currentEpisode}
-                  isTheaterMode={isTheaterMode}
-                  onTheaterModeToggle={() => {
-                    const newMode = !isTheaterMode
-                    setIsTheaterMode(newMode)
-                    localStorage.setItem('playerTheaterMode', newMode.toString())
-                  }}
-                />
-              )}{' '}
+                      setPreferredSource(source.sourceName)
+                      dispatch({
+                        type: 'SET_STATE',
+                        payload: {
+                          selectedSource: source,
+                          selectedLink: link,
+                          showResumeModal: state.showResumeModal && source.type !== 'iframe',
+                        },
+                      })
+                    }}
+                    loadingVideo={state.loadingVideo}
+                    skipIntervals={state.skipIntervals}
+                    animeTitle={displayTitle}
+                    episodeNumber={state.currentEpisode}
+                    isTheaterMode={isTheaterMode}
+                    onTheaterModeToggle={() => {
+                      const newMode = !isTheaterMode
+                      setIsTheaterMode(newMode)
+                      localStorage.setItem('playerTheaterMode', newMode.toString())
+                    }}
+                  />
+                )}{' '}
               {!isVideoLoading && state.videoSources.length > 0 && (
                 <video
                   ref={refs.videoRef}
+                  controls={player.state.useNativeControls}
                   onPlay={actions.onPlay}
                   onPause={actions.onPause}
                   onLoadedMetadata={actions.onLoadedMetadata}
@@ -1283,6 +1292,17 @@ const Player: React.FC = () => {
                       aria-pressed={state.currentMode === 'dub'}
                     >
                       {state.currentMode === 'dub' ? 'DUB' : 'SUB'}
+                    </button>
+                    <button
+                      className={`${styles.watchlistBtn} ${styles.modeToggleBtn} ${player.state.useNativeControls ? styles.modeToggleActive : ''}`}
+                      onClick={() => {
+                        const newValue = !player.state.useNativeControls
+                        player.actions.setUseNativeControls(newValue)
+                        localStorage.setItem('playerUseNativeControls', newValue.toString())
+                      }}
+                      type="button"
+                    >
+                      {player.state.useNativeControls ? 'NATIVE: ON' : 'NATIVE: OFF'}
                     </button>
                   </div>
                 </div>

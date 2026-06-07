@@ -477,6 +477,8 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
               localStorage.setItem('subtitlePosition', value.toString())
             }
           }}
+          useNativeControls={state.useNativeControls}
+          onNativeControlsToggle={actions.setUseNativeControls}
         />
       </Suspense>
     </div>
