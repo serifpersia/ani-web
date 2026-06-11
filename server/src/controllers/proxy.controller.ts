@@ -26,6 +26,7 @@ axiosRetry(axiosInstance, { retries: 3, retryDelay: axiosRetry.exponentialDelay 
 
 export class ProxyController {
   private static readonly KWIK_DOMAINS = new Set(['kwik.cx', 'kwik.si', 'kwik.pro'])
+  private static readonly ANIMEPAHE_URL = 'https://animepahe.pw/'
 
   private abortWhenClientLeaves(res: Response, abortController: AbortController) {
     res.on('close', () => {
@@ -157,6 +158,117 @@ export class ProxyController {
       if (axios.isCancel(e)) return
       if (!res.headersSent) res.status(500).send('Proxy error')
     }
+  }
+
+  handleEmbedProxy = async (req: Request, res: Response) => {
+    const kwikUrl = this.validateKwikUrl(req.query.url)
+    if (!kwikUrl) return res.status(400).send('Invalid or unsupported gateway URL')
+
+    const abortController = new AbortController()
+    this.abortWhenClientLeaves(res, abortController)
+
+    try {
+      const { data: originalHtml } = await axiosInstance.get<string>(kwikUrl.href, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
+          Referer: ProxyController.ANIMEPAHE_URL,
+          Origin: 'https://animepahe.pw',
+        },
+        responseType: 'text',
+        signal: abortController.signal,
+      })
+
+      const patched = this.applyKwikPatches(originalHtml, kwikUrl)
+      if (!patched) return res.status(502).send('Failed to patch video gateway')
+
+      return res
+        .status(200)
+        .set('Content-Type', 'text/html; charset=utf-8')
+        .set('Cache-Control', 'private, max-age=120')
+        .send(patched)
+    } catch (e) {
+      if (axios.isCancel(e)) return
+      if (!res.headersSent) res.status(502).send('Gateway proxy error')
+    }
+  }
+
+  private applyKwikPatches(html: string, kwikUrl: URL): string | null {
+    const safeReferer = JSON.stringify(kwikUrl.href).replace(/</g, '\\u003c')
+
+    const patched = html.replace(
+      /\b(src|href|url)\s*[=:]\s*(["']?)(\/\/[^"'>)]+|\/(?!\/)[^"'>)]*)\2/gi,
+      (match, attr, quote, path) => {
+        const full = path.startsWith('//') ? `https:${path}` : `${kwikUrl.origin}${path}`
+        const prefix = match.startsWith('url') ? `url(` : `${attr}=`
+        const suffix = match.startsWith('url') ? `)` : ''
+        return `${prefix}${quote}${full}${quote}${suffix}`
+      }
+    )
+
+    const iconProxy = `/api/proxy?url=${encodeURIComponent(`${kwikUrl.origin}/app/js/vendor/plyr.svg`)}&referer=${encodeURIComponent(kwikUrl.href)}`
+    const plyrPatch = `<script>if(window.Plyr) Plyr.defaults.iconUrl=${JSON.stringify(iconProxy).replace(/</g, '\\u003c')};</script>`
+
+    const hlsPatch = `<script>
+      (function() {
+        var hook = function() {
+          if (!window.Hls) return;
+          var original = Hls.prototype.loadSource;
+          Hls.prototype.loadSource = function(src) {
+            if (typeof src === 'string' && src.includes('.m3u8')) {
+              src = window.location.origin + '/api/proxy?url=' + encodeURIComponent(src) + '&referer=' + encodeURIComponent(${safeReferer});
+            }
+            return original.call(this, src);
+          };
+        };
+        if (window.Hls) hook();
+        else {
+          var observer = new MutationObserver(function() {
+            if (window.Hls) { hook(); observer.disconnect(); }
+          });
+          observer.observe(document.documentElement, { childList: true, subtree: true });
+        }
+      })();
+    </script>`
+
+    const endBridgePatch = `<script>
+      (function() {
+        var notified = false;
+        var notifyEnded = function() {
+          if (notified) return;
+          notified = true;
+          window.parent.postMessage({ type: 'ANI_WEB_MEDIA_ENDED' }, window.location.origin);
+        };
+
+        var attachToVideos = function(root) {
+          var scope = root || document;
+          var videos = scope.querySelectorAll ? scope.querySelectorAll('video') : [];
+          Array.prototype.forEach.call(videos, function(video) {
+            if (video.dataset && video.dataset.aniWebEndedBridge === 'true') return;
+            if (video.dataset) video.dataset.aniWebEndedBridge = 'true';
+            video.addEventListener('ended', notifyEnded, { once: true });
+          });
+        };
+
+        attachToVideos(document);
+
+        var observer = new MutationObserver(function() {
+          attachToVideos(document);
+        });
+
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+      })();
+    </script>`
+
+    const beforePlyr = patched.replace(
+      /(<script[^>]+\/plyr\.min\.js[^>]*><\/script>)/i,
+      `$1${plyrPatch}`
+    )
+    const final = beforePlyr
+      .replace(/(<script[^>]+hls(?:\.min)?\.js[^>]*><\/script>)/i, `$1${hlsPatch}`)
+      .replace(/<\/body>/i, `${endBridgePatch}</body>`)
+
+    return final === html ? null : final
   }
 
   handleSubtitleProxy = async (req: Request, res: Response) => {

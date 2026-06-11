@@ -34,8 +34,25 @@ interface RawSkipInterval {
 }
 
 const fetchApi = async (url: string) => {
-  const response = await fetch(url)
-  if (!response.ok) throw new Error(`Failed to fetch ${url}`)
+  const headers: Record<string, string> = {}
+  const animepaheUa = localStorage.getItem('animepahe_ua')
+  const animepaheCookie = localStorage.getItem('animepahe_cookie')
+
+  if (animepaheUa) headers['x-animepahe-ua'] = animepaheUa
+  if (animepaheCookie) headers['x-animepahe-cookie'] = animepaheCookie
+
+  const response = await fetch(url, { headers })
+  if (!response.ok) {
+    if (response.status === 403) {
+      const data = await response.json().catch(() => ({}))
+      if (data.error === 'AUTH_REQUIRED') {
+        const err = new Error('AUTH_REQUIRED') as Error & { provider?: string }
+        err.provider = data.provider
+        throw err
+      }
+    }
+    throw new Error(`Failed to fetch ${url}`)
+  }
   return response.json()
 }
 
@@ -64,31 +81,42 @@ export const usePlayerData = (
     queryKey: ['show-data', showId, uiState.currentMode],
     queryFn: async () => {
       if (!showId) throw new Error('No showId')
-      const [meta, episodeData, watchlistStatus, watchedEpisodes] = await Promise.all([
-        fetchApi(`/api/show-meta/${showId}`),
-        fetchApi(`/api/episodes?showId=${showId}&mode=${uiState.currentMode}`).catch(() => null),
-        fetchApi(`/api/watchlist/check/${showId}`).catch(() => ({ inWatchlist: false })),
-        fetchApi(`/api/watched-episodes/${showId}`).catch(() => []),
-      ])
+      try {
+        const [meta, episodeData, watchlistStatus, watchedEpisodes] = await Promise.all([
+          fetchApi(`/api/show-meta/${showId}`),
+          fetchApi(`/api/episodes?showId=${showId}&mode=${uiState.currentMode}`).catch(() => null),
+          fetchApi(`/api/watchlist/check/${showId}`).catch(() => ({ inWatchlist: false })),
+          fetchApi(`/api/watched-episodes/${showId}`).catch(() => []),
+        ])
 
-      const episodes = episodeData?.episodes
-        ? episodeData.episodes.sort((a: string, b: string) => parseFloat(a) - parseFloat(b))
-        : []
+        const episodes = episodeData?.episodes
+          ? episodeData.episodes.sort((a: string, b: string) => parseFloat(a) - parseFloat(b))
+          : []
 
-      return {
-        showMeta: {
-          ...meta,
-          description: episodeData?.description || meta?.description,
-          names: meta?.names || {
-            romaji: meta?.name,
-            english: meta?.englishName,
-            native: meta?.nativeName,
+        return {
+          showMeta: {
+            ...meta,
+            description: episodeData?.description || meta?.description,
+            names: meta?.names || {
+              romaji: meta?.name,
+              english: meta?.englishName,
+              native: meta?.nativeName,
+            },
           },
-        },
-        episodes,
-        inWatchlist: watchlistStatus.inWatchlist,
-        watchlistStatus: watchlistStatus.status ?? null,
-        watchedEpisodes,
+          episodes,
+          inWatchlist: watchlistStatus.inWatchlist,
+          watchlistStatus: watchlistStatus.status ?? null,
+          watchedEpisodes,
+        }
+      } catch (e) {
+        const error = e as Error & { provider?: string }
+        if (error.message === 'AUTH_REQUIRED') {
+          dispatch({
+            type: 'SET_STATE',
+            payload: { showCookieModal: true, cookieProvider: error.provider },
+          })
+        }
+        throw e
       }
     },
     enabled: !!showId,
@@ -121,150 +149,161 @@ export const usePlayerData = (
     queryFn: async () => {
       if (!showId || !uiState.currentEpisode) throw new Error('Missing params')
 
-      let providerShowId = showId
-      if (['123anime', 'animeya', 'megaplay'].includes(uiState.selectedProvider)) {
-        const names = showData?.showMeta?.names
-        // AlAnime's `name` field is often the native Japanese script (e.g. "ブリーチ"
-        // for Bleach), which gets mapped to names.romaji. Sending katakana/kanji to
-        // other providers causes them to search for the transliteration ("Burichi")
-        // and return no results. Guard against this by only using romaji when it is
-        // pure ASCII, otherwise fall back to the English name.
-        const isAscii = (s: string) => {
-          for (let i = 0; i < s.length; i++) {
-            if (s.charCodeAt(i) > 127) return false
-          }
-          return true
-        }
-        const romajiName = names?.romaji && isAscii(names.romaji) ? names.romaji : null
-        const englishName =
-          names?.english || showData?.showMeta?.englishName || showData?.showMeta?.name
-        const searchQuery =
-          uiState.currentMode === 'dub' ? englishName || romajiName : romajiName || englishName
-
-        if (searchQuery) {
-          const searchResults = await fetchApi(
-            `/api/search?query=${encodeURIComponent(searchQuery)}&provider=${uiState.selectedProvider}`
-          )
-          if (searchResults && searchResults.length > 0) {
-            interface SearchResult {
-              id: string
-              session?: string
-              name?: string
-              title?: string
+      try {
+        let providerShowId = showId
+        if (['animepahe', '123anime', 'animeya', 'megaplay'].includes(uiState.selectedProvider)) {
+          const names = showData?.showMeta?.names
+          // AlAnime's `name` field is often the native Japanese script (e.g. "ブリーチ"
+          // for Bleach), which gets mapped to names.romaji. Sending katakana/kanji to
+          // other providers causes them to search for the transliteration ("Burichi")
+          // and return no results. Guard against this by only using romaji when it is
+          // pure ASCII, otherwise fall back to the English name.
+          const isAscii = (s: string) => {
+            for (let i = 0; i < s.length; i++) {
+              if (s.charCodeAt(i) > 127) return false
             }
-            // Score each result by title closeness to the search query AND
-            // whether it matches the current sub/dub mode.
-            // Scoring:
-            //   +4  exact title match (case-insensitive)
-            //   +2  title starts with query
-            //   +1  title contains query
-            //   +0  id starts with normalised query slug
-            //   -10 wrong mode (dub result when sub wanted, or vice versa)
-            const qLower = (searchQuery as string).toLowerCase().trim()
-            const toSlug = (s: string) =>
-              s
-                .toLowerCase()
-                .replace(/[^a-z0-9]+/g, '-')
-                .replace(/^-+|-+$/g, '')
-            const qSlug = toSlug(qLower)
+            return true
+          }
+          const romajiName = names?.romaji && isAscii(names.romaji) ? names.romaji : null
+          const englishName =
+            names?.english || showData?.showMeta?.englishName || showData?.showMeta?.name
+          const searchQuery =
+            uiState.currentMode === 'dub' ? englishName || romajiName : romajiName || englishName
 
-            let bestMatch: SearchResult = searchResults[0]
-            let bestScore = -Infinity
-
-            for (const s of searchResults as SearchResult[]) {
-              const title = (s.name || s.title || '').toLowerCase().trim()
-              const sid = (s.id || '').toLowerCase()
-              const isDubResult =
-                title.includes('(dub)') || title.endsWith(' dub') || sid.endsWith('-dub')
-              const wantDub = uiState.currentMode === 'dub'
-
-              let score = 0
-              if (title === qLower) score += 4
-              else if (title.startsWith(qLower)) score += 2
-              else if (title.includes(qLower)) score += 1
-              else if (sid.startsWith(qSlug)) score += 0
-
-              // Heavy penalty for wrong mode so a correct-mode partial match
-              // beats an exact wrong-mode match
-              if (isDubResult !== wantDub) score -= 10
-
-              if (score > bestScore) {
-                bestScore = score
-                bestMatch = s
+          if (searchQuery) {
+            const searchResults = await fetchApi(
+              `/api/search?query=${encodeURIComponent(searchQuery)}&provider=${uiState.selectedProvider}`
+            )
+            if (searchResults && searchResults.length > 0) {
+              interface SearchResult {
+                id: string
+                session?: string
+                name?: string
+                title?: string
               }
-            }
+              // Score each result by title closeness to the search query AND
+              // whether it matches the current sub/dub mode.
+              // Scoring:
+              //   +4  exact title match (case-insensitive)
+              //   +2  title starts with query
+              //   +1  title contains query
+              //   +0  id starts with normalised query slug
+              //   -10 wrong mode (dub result when sub wanted, or vice versa)
+              const qLower = (searchQuery as string).toLowerCase().trim()
+              const toSlug = (s: string) =>
+                s
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, '-')
+                  .replace(/^-+|-+$/g, '')
+              const qSlug = toSlug(qLower)
 
-            providerShowId = bestMatch.session || bestMatch.id
+              let bestMatch: SearchResult = searchResults[0]
+              let bestScore = -Infinity
+
+              for (const s of searchResults as SearchResult[]) {
+                const title = (s.name || s.title || '').toLowerCase().trim()
+                const sid = (s.id || '').toLowerCase()
+                const isDubResult =
+                  title.includes('(dub)') || title.endsWith(' dub') || sid.endsWith('-dub')
+                const wantDub = uiState.currentMode === 'dub'
+
+                let score = 0
+                if (title === qLower) score += 4
+                else if (title.startsWith(qLower)) score += 2
+                else if (title.includes(qLower)) score += 1
+                else if (sid.startsWith(qSlug)) score += 0
+
+                // Heavy penalty for wrong mode so a correct-mode partial match
+                // beats an exact wrong-mode match
+                if (isDubResult !== wantDub) score -= 10
+
+                if (score > bestScore) {
+                  bestScore = score
+                  bestMatch = s
+                }
+              }
+
+              providerShowId = bestMatch.session || bestMatch.id
+            }
           }
         }
-      }
 
-      const [sources, progress, preferredSourceData, skipTimesData] = await Promise.all([
-        fetchApi(
-          `/api/video?showId=${providerShowId}&episodeNumber=${uiState.currentEpisode}&mode=${uiState.currentMode}&provider=${uiState.selectedProvider}`
-        ),
-        fetchApi(`/api/episode-progress/${showId}/${uiState.currentEpisode}`).catch(() => null),
-        fetchApi(`/api/settings?key=preferredSource`).catch(() => null),
-        fetchApi(`/api/skip-times/${showId}/${uiState.currentEpisode}`).catch(() => []),
-      ])
+        const [sources, progress, preferredSourceData, skipTimesData] = await Promise.all([
+          fetchApi(
+            `/api/video?showId=${providerShowId}&episodeNumber=${uiState.currentEpisode}&mode=${uiState.currentMode}&provider=${uiState.selectedProvider}`
+          ),
+          fetchApi(`/api/episode-progress/${showId}/${uiState.currentEpisode}`).catch(() => null),
+          fetchApi(`/api/settings?key=preferredSource`).catch(() => null),
+          fetchApi(`/api/skip-times/${showId}/${uiState.currentEpisode}`).catch(() => []),
+        ])
 
-      const preferredSourceName = preferredSourceData?.value
+        const preferredSourceName = preferredSourceData?.value
 
-      const modeMatchedSources = (sources as VideoSource[]).filter((s) => {
-        const name = s.sourceName.toLowerCase()
-        if (uiState.currentMode === 'dub') {
-          return name.includes('eng') || name.includes('dub')
-        } else {
-          return (
-            name.includes('jpn') ||
-            name.includes('sub') ||
-            (!name.includes('eng') && !name.includes('dub'))
-          )
+        const modeMatchedSources = (sources as VideoSource[]).filter((s) => {
+          const name = s.sourceName.toLowerCase()
+          if (uiState.currentMode === 'dub') {
+            return name.includes('eng') || name.includes('dub')
+          } else {
+            return (
+              name.includes('jpn') ||
+              name.includes('sub') ||
+              (!name.includes('eng') && !name.includes('dub'))
+            )
+          }
+        })
+
+        const pool = modeMatchedSources.length > 0 ? modeMatchedSources : (sources as VideoSource[])
+        let sourceToSelect: VideoSource | null = pool.length > 0 ? pool[0] : null
+
+        if (preferredSourceName) {
+          const found = pool.find((s: VideoSource) => s.sourceName === preferredSourceName)
+          if (found) sourceToSelect = found
         }
-      })
 
-      const pool = modeMatchedSources.length > 0 ? modeMatchedSources : (sources as VideoSource[])
-      let sourceToSelect: VideoSource | null = pool.length > 0 ? pool[0] : null
+        const selectedLink =
+          sourceToSelect && sourceToSelect.links.length > 0
+            ? sourceToSelect.links.sort(
+                (a: VideoLink, b: VideoLink) =>
+                  (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
+              )[0]
+            : null
 
-      if (preferredSourceName) {
-        const found = pool.find((s: VideoSource) => s.sourceName === preferredSourceName)
-        if (found) sourceToSelect = found
-      }
+        const resumeTime = progress?.currentTime || 0
+        const resumeDuration = progress?.duration || 0
+        const rawSkips = Array.isArray(skipTimesData) ? skipTimesData : skipTimesData.results || []
 
-      const selectedLink =
-        sourceToSelect && sourceToSelect.links.length > 0
-          ? sourceToSelect.links.sort(
-              (a: VideoLink, b: VideoLink) =>
-                (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
-            )[0]
-          : null
+        const skipIntervals: SkipInterval[] = rawSkips
+          .map((item: RawSkipInterval) => ({
+            skip_id: item.skip_id || '',
+            skip_type: item.skip_type || '',
+            start_time: item.interval?.start_time ?? item.start_time ?? 0,
+            end_time: item.interval?.end_time ?? item.end_time ?? 0,
+          }))
+          .filter((i: SkipInterval) => i.end_time > 0)
 
-      const resumeTime = progress?.currentTime || 0
-      const resumeDuration = progress?.duration || 0
-      const rawSkips = Array.isArray(skipTimesData) ? skipTimesData : skipTimesData.results || []
+        if (sources.length === 0) {
+          toast.error(`No video sources found for ${uiState.selectedProvider}`)
+        }
 
-      const skipIntervals: SkipInterval[] = rawSkips
-        .map((item: RawSkipInterval) => ({
-          skip_id: item.skip_id || '',
-          skip_type: item.skip_type || '',
-          start_time: item.interval?.start_time ?? item.start_time ?? 0,
-          end_time: item.interval?.end_time ?? item.end_time ?? 0,
-        }))
-        .filter((i: SkipInterval) => i.end_time > 0)
-
-      if (sources.length === 0) {
-        toast.error(`No video sources found for ${uiState.selectedProvider}`)
-      }
-
-      return {
-        videoSources: sources as VideoSource[],
-        selectedSource: sourceToSelect,
-        selectedLink,
-        resumeTime,
-        resumeDuration,
-        showResumeModal: resumeTime > 5 && sourceToSelect?.type !== 'iframe',
-        skipIntervals,
-        fetchedEpisodeNumber: uiState.currentEpisode,
+        return {
+          videoSources: sources as VideoSource[],
+          selectedSource: sourceToSelect,
+          selectedLink,
+          resumeTime,
+          resumeDuration,
+          showResumeModal: resumeTime > 5 && sourceToSelect?.type !== 'iframe',
+          skipIntervals,
+          fetchedEpisodeNumber: uiState.currentEpisode,
+        }
+      } catch (e) {
+        const error = e as Error & { provider?: string }
+        if (error.message === 'AUTH_REQUIRED') {
+          dispatch({
+            type: 'SET_STATE',
+            payload: { showCookieModal: true, cookieProvider: error.provider },
+          })
+        }
+        throw e
       }
     },
     enabled: !!showId && !!uiState.currentEpisode && !!showData?.showMeta?.name,
@@ -414,6 +453,9 @@ export const usePlayerData = (
   // DERIVED STATE
   const state = useMemo(() => {
     const error = showDataError || videoError
+    const errorMessage = error ? (error as Error).message : null
+    const finalError = errorMessage === 'AUTH_REQUIRED' ? null : errorMessage
+
     return {
       ...uiState,
       showMeta: {
@@ -434,7 +476,7 @@ export const usePlayerData = (
       loadingShowData,
       loadingVideo,
       loadingDetails,
-      error: error ? (error as Error).message : null,
+      error: finalError,
       fetchedEpisodeNumber: videoData?.fetchedEpisodeNumber,
     }
   }, [

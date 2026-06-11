@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import styles from './Player.module.css'
 import layoutStyles from './PlayerPageLayout.module.css'
 import {
@@ -41,10 +41,12 @@ import type { VideoLink, SubtitleTrack } from '../types/player'
 import AnimeMetaDetails from '../components/anime/AnimeMetaDetails'
 import SynopsisText from '../components/anime/SynopsisText'
 import { getSuggestedEpisode } from '../lib/queue'
+import AnimePaheCookieModal from '../components/anime/AnimePaheCookieModal'
 
 const Player: React.FC = () => {
   const { id: showId, episodeNumber } = useParams<{ id: string; episodeNumber?: string }>()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
   const {
     state,
@@ -937,7 +939,8 @@ const Player: React.FC = () => {
   ])
 
   if (state.error) return <p className="error-message">Error: {state.error}</p>
-  if (!state.loadingShowData && !state.showMeta.name) return <p>Show not found.</p>
+  if (!state.loadingShowData && !state.showMeta.name && !state.showCookieModal)
+    return <p>Show not found.</p>
 
   const isVideoLoading = state.loadingShowData || state.loadingVideo
 
@@ -961,6 +964,22 @@ const Player: React.FC = () => {
         onNextEpisode={handleNextEpisode}
         hasNextEpisode={hasNextEpisode}
         isCompleted={isCompleted}
+      />
+
+      <AnimePaheCookieModal
+        isOpen={!!state.showCookieModal}
+        onClose={() => dispatch({ type: 'SET_STATE', payload: { showCookieModal: false } })}
+        onSuccess={() => {
+          queryClient.invalidateQueries({
+            queryKey: [
+              'video-sources',
+              showId,
+              state.currentEpisode,
+              state.selectedProvider,
+              state.currentMode,
+            ],
+          })
+        }}
       />
 
       {!isTheaterMode && (

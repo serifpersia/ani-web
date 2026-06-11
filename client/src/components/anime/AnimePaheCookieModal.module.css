@@ -1,0 +1,74 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  color: var(--text-color, #fff);
+  max-width: 400px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.field label {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.textarea {
+  background: var(--bg-secondary, #2a2a2a);
+  border: 1px solid var(--border-color, #444);
+  color: #fff;
+  padding: 0.5rem;
+  border-radius: 4px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.input {
+  background: var(--bg-secondary, #2a2a2a);
+  border: 1px solid var(--border-color, #444);
+  color: #fff;
+  padding: 0.6rem;
+  border-radius: 4px;
+}
+
+.button {
+  background: var(--accent-color, #007bff);
+  color: #fff;
+  border: none;
+  padding: 0.7rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: opacity 0.2s;
+}
+
+.button:hover {
+  opacity: 0.9;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.secondaryButton {
+  background: transparent;
+  border: 1px solid var(--border-color, #444);
+  color: #fff;
+  padding: 0.7rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.actions .button {
+  flex: 1;
+}

@@ -15,6 +15,7 @@ import { AllAnimeProvider } from './providers/allanime.provider'
 import { _123AnimeProvider as Anime123Provider } from './providers/123anime.provider'
 import { AnimeyaProvider } from './providers/animeya.provider'
 import { MegaPlayProvider } from './providers/megaplay.provider'
+import { AnimePaheProvider } from './providers/animepahe.provider'
 import { googleDriveService } from './google'
 import { CONFIG } from './config'
 import { initializeDatabase, syncDownOnBoot, syncUp, initSyncProvider, waitForSync } from './sync'
@@ -26,6 +27,7 @@ import { createSettingsRouter } from './routes/settings.routes'
 import { createInsightsRouter } from './routes/insights.routes'
 import { discordRPCService } from './discord-rpc'
 import { SettingsRepository } from './repositories/settings.repository'
+import { requestContext } from './utils/request-context'
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -34,18 +36,32 @@ declare module 'express-serve-static-core' {
 }
 
 const app = express()
+
+app.use((req, res, next) => {
+  const store = new Map<string, string>()
+  if (req.headers['x-animepahe-ua']) {
+    store.set('ua', req.headers['x-animepahe-ua'] as string)
+  }
+  if (req.headers['x-animepahe-cookie']) {
+    store.set('cookie', req.headers['x-animepahe-cookie'] as string)
+  }
+  requestContext.run(store, next)
+})
+
 const apiCache = new NodeCache({ stdTTL: 3600 })
 
 const allAnimeProvider = new AllAnimeProvider(apiCache)
 const _123AnimeProvider = new Anime123Provider(apiCache)
 const animeyaProvider = new AnimeyaProvider(apiCache)
 const megaPlayProvider = new MegaPlayProvider(apiCache)
+const animepaheProvider = new AnimePaheProvider(apiCache)
 
 const providers = {
   allanime: allAnimeProvider,
   '123anime': _123AnimeProvider,
   animeya: animeyaProvider,
   megaplay: megaPlayProvider,
+  animepahe: animepaheProvider,
 }
 
 let db: DatabaseWrapper

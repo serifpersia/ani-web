@@ -20,15 +20,29 @@ export class DataController {
       | 'all'
     const page = parseInt(req.query.page as string) || 1
     const size = parseInt(req.query.size as string) || 10
-    const data = await this.getProvider(req).getPopular(timeframe, page, size)
-    res.set('Cache-Control', 'public, max-age=300').json(data)
+    try {
+      const data = await this.getProvider(req).getPopular(timeframe, page, size)
+      res.set('Cache-Control', 'public, max-age=300').json(data)
+    } catch (e) {
+      if ((e as Error).message === 'AUTH_REQUIRED') {
+        return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'animepahe' })
+      }
+      throw e
+    }
   })
 
   getSchedule = asyncHandler(async (req: Request, res: Response) => {
-    const data = await this.getProvider(req).getSchedule(
-      new Date(req.params.date + 'T00:00:00.000Z')
-    )
-    res.set('Cache-Control', 'public, max-age=300').json(data)
+    try {
+      const data = await this.getProvider(req).getSchedule(
+        new Date(req.params.date + 'T00:00:00.000Z')
+      )
+      res.set('Cache-Control', 'public, max-age=300').json(data)
+    } catch (e) {
+      if ((e as Error).message === 'AUTH_REQUIRED') {
+        return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'animepahe' })
+      }
+      throw e
+    }
   })
 
   getSkipTimes = asyncHandler(async (req: Request, res: Response) => {
@@ -52,6 +66,9 @@ export class DataController {
       )
       res.json(urls || [])
     } catch (e) {
+      if ((e as Error).message === 'AUTH_REQUIRED') {
+        return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'animepahe' })
+      }
       // Return empty array instead of 500 so frontend can stay functional
       // and allow provider switching.
       logger.error({ err: e, provider: req.query.provider }, 'Provider video fetch failed')
@@ -60,32 +77,69 @@ export class DataController {
   })
 
   getEpisodes = asyncHandler(async (req: Request, res: Response) => {
-    res.json(
-      await this.getProvider(req).getEpisodes(
+    try {
+      const data = await this.getProvider(req).getEpisodes(
         req.query.showId as string,
         req.query.mode as 'sub' | 'dub'
       )
-    )
+      res.json(data)
+    } catch (e) {
+      if ((e as Error).message === 'AUTH_REQUIRED') {
+        return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'animepahe' })
+      }
+      throw e
+    }
   })
 
   search = asyncHandler(async (req: Request, res: Response) => {
-    res.json(await this.getProvider(req).search(req.query))
+    try {
+      const data = await this.getProvider(req).search(req.query)
+      res.json(data)
+    } catch (e) {
+      if ((e as Error).message === 'AUTH_REQUIRED') {
+        return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'animepahe' })
+      }
+      throw e
+    }
   })
 
   getSeasonal = asyncHandler(async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1
-    res.json(await this.getProvider(req).getSeasonal(page))
+    try {
+      const data = await this.getProvider(req).getSeasonal(page)
+      res.json(data)
+    } catch (e) {
+      if ((e as Error).message === 'AUTH_REQUIRED') {
+        return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'animepahe' })
+      }
+      throw e
+    }
   })
 
   getLatestReleases = asyncHandler(async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1
     const size = parseInt(req.query.size as string) || 14
-    res.json(await this.getProvider(req).getLatestReleases(page, size))
+    try {
+      const data = await this.getProvider(req).getLatestReleases(page, size)
+      res.json(data)
+    } catch (e) {
+      if ((e as Error).message === 'AUTH_REQUIRED') {
+        return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'animepahe' })
+      }
+      throw e
+    }
   })
 
   getShowMeta = asyncHandler(async (req: Request, res: Response) => {
-    const meta = await this.getProvider(req).getShowMeta(req.params.id as string)
-    res.json(meta || {})
+    try {
+      const meta = await this.getProvider(req).getShowMeta(req.params.id as string)
+      res.json(meta || {})
+    } catch (e) {
+      if ((e as Error).message === 'AUTH_REQUIRED') {
+        return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'animepahe' })
+      }
+      throw e
+    }
   })
 
   getGenresAndTags = (_req: Request, res: Response) => {

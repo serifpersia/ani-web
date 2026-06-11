@@ -119,11 +119,13 @@ export interface PlayerState {
   resumeTime: number
   resumeDuration: number
   skipIntervals: SkipInterval[]
-  selectedProvider: 'allanime' | '123anime' | 'animeya' | 'megaplay'
+  selectedProvider: 'allanime' | 'animepahe' | '123anime' | 'animeya' | 'megaplay'
   loadingShowData: boolean
   loadingVideo: boolean
   loadingDetails: boolean
   error: string | null
   detailsError: string | null
   fetchedEpisodeNumber?: string
+  showCookieModal?: boolean
+  cookieProvider?: 'animepahe' | null
 }
