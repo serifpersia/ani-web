@@ -15,6 +15,36 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Generate Release Notes
+        run: |
+          # Fetch all remote tags to ensure the local index knows about them
+          git fetch --tags origin || true
+
+          # Find previous SHA of refs/tags/latest
+          PREV_SHA=$(git rev-parse refs/tags/latest 2>/dev/null || echo "")
+          echo "Previous release SHA: $PREV_SHA"
+
+          CURRENT_SHA=$(git rev-parse HEAD)
+          echo "Current build SHA: $CURRENT_SHA"
+
+          # Write header
+          echo "Automatically built from the latest commit." > release_notes.md
+          echo "" >> release_notes.md
+          echo "### What's Changed" >> release_notes.md
+
+          if [ -n "$PREV_SHA" ] && [ "$PREV_SHA" != "$CURRENT_SHA" ]; then
+            git log "$PREV_SHA..HEAD" --pretty=format:"* %s ([%h](https://github.com/${{ github.repository }}/commit/%H))" --no-merges >> release_notes.md
+          else
+            echo "* Initial release or no new commits since last build." >> release_notes.md
+          fi
+
+          echo "" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Manual Setup" >> release_notes.md
+          echo "1. Download and extract 'ani-web.zip'" >> release_notes.md
+          echo "2. Run 'npm install --omit=dev' inside the folder" >> release_notes.md
+          echo "3. Launch using 'run.bat' (Windows) or 'run.sh' (Linux/Mac)" >> release_notes.md
+
       - name: Inject Version Date
         run: |
           node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); pkg.versionDate = new Date().toISOString(); fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
@@ -81,15 +111,11 @@ jobs:
 
       - name: Create New Latest Release
         run: |
+          VERSION=$(node -p "require('./package.json').version")
           gh release create "latest" \
             "ani-web.zip" \
-            --title "latest" \
-            --notes "Automatically built from the latest commit. 
-
-          ### Manual Setup:
-          1. Download and extract 'ani-web.zip'
-          2. Run 'npm install --omit=dev' inside the folder
-          3. Launch using 'run.bat' (Windows) or 'run.sh' (Linux/Mac)" \
+            --title "latest (v$VERSION)" \
+            --notes-file release_notes.md \
             --target ${{ github.sha }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
