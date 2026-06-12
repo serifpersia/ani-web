@@ -88,9 +88,17 @@ async function runSyncSequence(
     })
   })
 
+  let currentDb = database
   if (didDownload) {
     db = await initializeDatabase(dbPath)
+    currentDb = db
     logger.info('Database re-initialized after sync.')
+  }
+
+  try {
+    await syncUp(currentDb, dbPath, remoteFolder)
+  } catch (err) {
+    logger.error({ err }, 'Sync up on boot failed')
   }
 }
 
@@ -198,25 +206,38 @@ async function main() {
     fs.writeFileSync(CONFIG.LOCAL_MANIFEST_PATH, JSON.stringify({ version: 0 }))
   }
 
+  let hasUnsyncedChanges = false
+
   const watcher = chokidar.watch(CONFIG.LOCAL_MANIFEST_PATH, {
     persistent: true,
     ignoreInitial: true,
   })
-  let debounceTimer: NodeJS.Timeout
 
   const expressServer = app.listen(CONFIG.PORT, () => {
     logger.info(`Server running on http://localhost:${CONFIG.PORT}`)
   })
 
   watcher.on('change', () => {
-    clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => syncUp(db, dbPath, remoteFolder), 60000)
+    hasUnsyncedChanges = true
   })
+
+  const syncInterval = setInterval(async () => {
+    if (hasUnsyncedChanges) {
+      logger.info('Uploading accumulated database changes...')
+      hasUnsyncedChanges = false
+      try {
+        await syncUp(db, dbPath, remoteFolder)
+      } catch (err) {
+        logger.error({ err }, 'Failed to upload database changes')
+        hasUnsyncedChanges = true
+      }
+    }
+  }, 300000)
 
   const shutdown = async (signal?: string) => {
     if (isShuttingDown) return
     isShuttingDown = true
-    clearTimeout(debounceTimer)
+    clearInterval(syncInterval)
     discordRPCService.disconnect()
     await watcher.close()
 
@@ -224,10 +245,14 @@ async function main() {
       expressServer.close()
     }
 
-    try {
-      await syncUp(db, dbPath, remoteFolder)
-    } catch (e) {
-      console.error('Sync failed:', e)
+    if (hasUnsyncedChanges) {
+      logger.info('Sync on shutdown: uploading final database changes...')
+      hasUnsyncedChanges = false
+      try {
+        await syncUp(db, dbPath, remoteFolder)
+      } catch (e) {
+        console.error('Final sync on shutdown failed:', e)
+      }
     }
 
     await waitForSync()

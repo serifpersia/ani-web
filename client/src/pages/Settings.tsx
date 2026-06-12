@@ -36,6 +36,23 @@ const Settings: React.FC = () => {
   const [telemetryEnabled, setTelemetryEnabled] = useState(
     localStorage.getItem('telemetry_enabled') !== 'false'
   )
+  const [installationId, setInstallationId] = useState<string>(
+    localStorage.getItem('installation_id') || ''
+  )
+
+  useEffect(() => {
+    fetch('/api/installation-id')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.id) {
+          setInstallationId(data.id)
+          localStorage.setItem('installation_id', data.id)
+        }
+      })
+      .catch(() => {
+        // fallback: keep whatever is in localStorage
+      })
+  }, [])
   const [virtualKeyboardEnabled, setVirtualKeyboardEnabled] = useState(getVirtualKeyboardEnabled)
 
   const [discordEnabled, setDiscordEnabled] = useState(true)
@@ -262,7 +279,7 @@ const Settings: React.FC = () => {
                       }}
                     >
                       <p style={{ margin: '0' }}>
-                        <strong>ID:</strong> {localStorage.getItem('installation_id')}
+                        <strong>ID:</strong> {installationId || 'Loading...'}
                       </p>
                       <p style={{ margin: '0' }}>
                         <strong>Version:</strong> {packageJson.version}

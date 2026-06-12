@@ -452,13 +452,26 @@ const useVideoPlayer = ({
   }, [sendProgressUpdate])
 
   useEffect(() => {
+    hasEnded.current = false
+    lastReportedTime.current = -1
+    lastThrottledUpdateTime.current = 0
+    sessionIdRef.current = Math.random().toString(36).substring(2)
+  }, [showId, episodeNumber])
+
+  useEffect(() => {
     const sessionId = sessionIdRef.current
     return () => {
       const payload = JSON.stringify({ sessionId })
       const blob = new Blob([payload], { type: 'application/json' })
       navigator.sendBeacon('/api/discord/clear', blob)
     }
-  }, [])
+  }, [showId, episodeNumber])
+
+  useEffect(() => {
+    if (showMeta?.name && videoRef.current) {
+      sendProgressUpdate(false, true)
+    }
+  }, [showMeta?.name, episodeNumber, showId, sendProgressUpdate])
   const onLoadedMetadata = useCallback(() => {
     setDuration(videoRef.current?.duration || 0)
     syncPlaybackRate()
