@@ -490,7 +490,7 @@ export class AllAnimeProvider implements Provider {
     return this._fetchShows(variables)
   }
 
-  async getShowMeta(showId: string): Promise<Partial<Show> | null> {
+  async getShowMeta(showId: string, _ua?: string, _cookie?: string): Promise<Partial<Show> | null> {
     const { data: axiosResponse } = await axios.post(
       API_ENDPOINT,
       {
@@ -549,7 +549,12 @@ export class AllAnimeProvider implements Provider {
     return null
   }
 
-  async getEpisodes(showId: string, mode: 'sub' | 'dub'): Promise<EpisodeDetails | null> {
+  async getEpisodes(
+    showId: string,
+    mode: 'sub' | 'dub',
+    _ua?: string,
+    _cookie?: string
+  ): Promise<EpisodeDetails | null> {
     const cacheKey = `episodes-${showId}-${mode}`
     const cachedData = this.cache.get<EpisodeDetails>(cacheKey)
     if (cachedData) return cachedData

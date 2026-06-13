@@ -1,6 +1,7 @@
 export interface Show {
   _id: string
   id?: string
+  session?: string
   name: string
   names?: {
     romaji?: string
@@ -66,9 +67,15 @@ export interface VideoSource {
   actualEpisodeNumber?: string
 }
 
+export interface EpisodeDetail {
+  number: string
+  title?: string
+}
+
 export interface EpisodeDetails {
   episodes: string[]
   description: string
+  availableEpisodesDetail?: EpisodeDetail[]
 }
 
 export interface SkipInterval {
@@ -114,8 +121,13 @@ export interface Provider {
   getSchedule(date: Date): Promise<Show[]>
   getSeasonal(page: number): Promise<Show[]>
   getLatestReleases(page?: number, size?: number): Promise<Show[]>
-  getShowMeta(showId: string): Promise<Partial<Show> | null>
-  getEpisodes(showId: string, mode?: 'sub' | 'dub'): Promise<EpisodeDetails | null>
+  getShowMeta(showId: string, ua?: string, cookie?: string): Promise<Partial<Show> | null>
+  getEpisodes(
+    showId: string,
+    mode?: 'sub' | 'dub',
+    ua?: string,
+    cookie?: string
+  ): Promise<EpisodeDetails | null>
   getStreamUrls(
     showId: string,
     episodeNumber: string,

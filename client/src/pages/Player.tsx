@@ -82,6 +82,7 @@ const Player: React.FC = () => {
     showId,
     episodeNumber: state.currentEpisode?.toString(),
     episodeCount: state.episodes.length || undefined,
+    sourceType: state.selectedSource?.type,
     showMeta: memoizedShowMeta,
   })
   const { refs, actions } = player

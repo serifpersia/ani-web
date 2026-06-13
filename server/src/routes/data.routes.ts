@@ -80,7 +80,7 @@ export function createDataRouter(
     '/show-meta/:id',
     makeCacheMiddleware(
       apiCache,
-      (req) => `meta-${req.params.id}`,
+      (req) => `meta-${req.params.id}-${req.query.provider || 'allanime'}`,
       3600,
       (d) =>
         !!d &&

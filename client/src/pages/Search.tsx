@@ -56,6 +56,7 @@ export default function Search() {
   const [year, setYear] = useState(searchParams.get('year') || 'ALL')
   const [country, setCountry] = useState(searchParams.get('country') || 'ALL')
   const [studio, setStudio] = useState(searchParams.get('studios') || 'ALL')
+  const [provider, setProvider] = useState(searchParams.get('provider') || 'allanime')
   const [showFilters, setShowFilters] = useState(false)
   const { lowEndMode } = useLowEndMode()
   const resultsRef = useRef<HTMLDivElement>(null)
@@ -108,6 +109,7 @@ export default function Search() {
     setYear(searchParams.get('year') || 'ALL')
     setCountry(searchParams.get('country') || 'ALL')
     setStudio(searchParams.get('studios') || 'ALL')
+    setProvider(searchParams.get('provider') || 'allanime')
     setPage(parseInt(searchParams.get('page') || '1'))
 
     const states: { [key: string]: 'include' | 'exclude' } = {}
@@ -129,6 +131,7 @@ export default function Search() {
     if (year !== 'ALL') params.set('year', year)
     if (country !== 'ALL') params.set('country', country)
     if (studio !== 'ALL') params.set('studios', studio)
+    if (provider !== 'allanime') params.set('provider', provider)
 
     const genres = Object.entries(genreStates)
       .filter(([, s]) => s === 'include')
@@ -209,127 +212,140 @@ export default function Search() {
             />
           </div>
           <div className={styles.searchActions}>
+            <div className={styles.filterItem} style={{ marginRight: '10px' }}>
+              <select
+                value={provider}
+                onChange={(e) => setProvider(e.currentTarget.value)}
+                className={styles.providerSelect}
+              >
+                <option value="allanime">AllAnime</option>
+                <option value="animepahe">AnimePahe</option>
+              </select>
+            </div>
             <Button onClick={() => handleSearch()} className={styles.searchBtn}>
               Search
             </Button>
-            <button
-              className={`${styles.filterToggleBtn} ${showFilters ? styles.active : ''}`}
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              <FaFilter size={14} />
-              <span>Filters</span>
-              {showFilters ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
-            </button>
+            {provider === 'allanime' && (
+              <button
+                className={`${styles.filterToggleBtn} ${showFilters ? styles.active : ''}`}
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <FaFilter size={14} />
+                <span>Filters</span>
+                {showFilters ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
+              </button>
+            )}
           </div>
         </div>
 
-        <div className={`${styles.advancedFilters} ${showFilters ? styles.show : ''}`}>
-          <div className={styles.filterDivider} />
-
-          <div className={styles.filterGrid}>
-            <div className={styles.filterItem}>
-              <label>Type</label>
-              <select value={type} onChange={(e) => setType(e.currentTarget.value)}>
-                {typeOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className={styles.filterItem}>
-              <label>Season</label>
-              <select value={season} onChange={(e) => setSeason(e.currentTarget.value)}>
-                {seasonOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className={styles.filterItem}>
-              <label>Year</label>
-              <select value={year} onChange={(e) => setYear(e.currentTarget.value)}>
-                {yearOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className={styles.filterItem}>
-              <label>Country</label>
-              <select value={country} onChange={(e) => setCountry(e.currentTarget.value)}>
-                {countryOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {studioOptions.length > 1 && (
+        {provider === 'allanime' && (
+          <div className={`${styles.advancedFilters} ${showFilters ? styles.show : ''}`}>
+            <div className={styles.filterDivider} />
+            <div className={styles.filterGrid}>
               <div className={styles.filterItem}>
-                <label>Studio</label>
-                <SearchableSelect
-                  options={studioOptions}
-                  value={studio}
-                  onChange={setStudio}
-                  placeholder="All Studios"
-                />
+                <label>Type</label>
+                <select value={type} onChange={(e) => setType(e.currentTarget.value)}>
+                  {typeOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className={styles.filterItem}>
+                <label>Season</label>
+                <select value={season} onChange={(e) => setSeason(e.currentTarget.value)}>
+                  {seasonOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className={styles.filterItem}>
+                <label>Year</label>
+                <select value={year} onChange={(e) => setYear(e.currentTarget.value)}>
+                  {yearOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className={styles.filterItem}>
+                <label>Country</label>
+                <select value={country} onChange={(e) => setCountry(e.currentTarget.value)}>
+                  {countryOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {studioOptions.length > 1 && (
+                <div className={styles.filterItem}>
+                  <label>Studio</label>
+                  <SearchableSelect
+                    options={studioOptions}
+                    value={studio}
+                    onChange={setStudio}
+                    placeholder="All Studios"
+                  />
+                </div>
+              )}
+              <div className={styles.filterItem}>
+                <label>Content</label>
+                <div style={{ display: 'flex', alignItems: 'center', height: '40px', gap: '8px' }}>
+                  <ToggleSwitch
+                    isChecked={showMature}
+                    onChange={(e) => setShowMature(e.target.checked)}
+                    id="search-mature-toggle"
+                  />
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    Show mature content
+                  </span>{' '}
+                </div>
+              </div>
+            </div>
+
+            {availableGenres.length > 0 && (
+              <div className={styles.genreSection}>
+                <label className={styles.genreLabel}>Genres</label>
+                <div className={styles.genreContainer}>
+                  {availableGenres.map((g) => (
+                    <button
+                      key={g}
+                      className={`${styles.genreButton} ${styles[genreStates[g] || '']}`}
+                      onClick={() => toggleGenre(g)}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
-            <div className={styles.filterItem}>
-              <label>Content</label>
-              <div style={{ display: 'flex', alignItems: 'center', height: '40px', gap: '8px' }}>
-                <ToggleSwitch
-                  isChecked={showMature}
-                  onChange={(e) => setShowMature(e.target.checked)}
-                  id="search-mature-toggle"
-                />
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  Show mature content
-                </span>{' '}
-              </div>
+
+            <div className={styles.filterActions}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setGenreStates({})
+                  setType('ALL')
+                  setSeason('ALL')
+                  setYear('ALL')
+                  setCountry('ALL')
+                  setStudio('ALL')
+                  setShowMature(false)
+                }}
+              >
+                Reset All
+              </Button>
+              <Button onClick={() => handleSearch()} className={styles.applyBtn}>
+                Apply Filters
+              </Button>
             </div>
           </div>
-
-          {availableGenres.length > 0 && (
-            <div className={styles.genreSection}>
-              <label className={styles.genreLabel}>Genres</label>
-              <div className={styles.genreContainer}>
-                {availableGenres.map((g) => (
-                  <button
-                    key={g}
-                    className={`${styles.genreButton} ${styles[genreStates[g] || '']}`}
-                    onClick={() => toggleGenre(g)}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className={styles.filterActions}>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setGenreStates({})
-                setType('ALL')
-                setSeason('ALL')
-                setYear('ALL')
-                setCountry('ALL')
-                setStudio('ALL')
-                setShowMature(false)
-              }}
-            >
-              Reset All
-            </Button>
-            <Button onClick={() => handleSearch()} className={styles.applyBtn}>
-              Apply Filters
-            </Button>
-          </div>
-        </div>
+        )}
       </div>
 
       {isError && <ErrorMessage message={error?.message || 'Error'} />}

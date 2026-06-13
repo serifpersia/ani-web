@@ -1,11 +1,15 @@
 import { Router } from 'express'
 import { WatchlistController } from '../controllers/watchlist.controller'
 import { AllAnimeProvider } from '../providers/allanime.provider'
+import { AnimePaheProvider } from '../providers/animepahe.provider'
 import { discordRPCService } from '../discord-rpc'
 
-export function createWatchlistRouter(provider: AllAnimeProvider): Router {
+export function createWatchlistRouter(
+  allAnime: AllAnimeProvider,
+  animePahe?: AnimePaheProvider
+): Router {
   const router = Router()
-  const controller = new WatchlistController(provider)
+  const controller = new WatchlistController({ allAnime, animePahe })
 
   router.get('/continue-watching', controller.getContinueWatching)
   router.get('/continue-watching/fast', controller.getContinueWatchingFast)

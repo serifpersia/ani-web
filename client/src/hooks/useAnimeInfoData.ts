@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import type { DetailedShowMeta } from '../types/player'
+import { fetchApi } from '../lib/fetchApi'
 
 interface UseAnimeInfoDataReturn {
   showMeta: DetailedShowMeta | undefined
@@ -9,12 +10,6 @@ interface UseAnimeInfoDataReturn {
   loadingMeta: boolean
   error: string | null
   toggleWatchlist: () => Promise<void>
-}
-
-const fetchApi = async (url: string) => {
-  const response = await fetch(url)
-  if (!response.ok) throw new Error(`Failed to fetch ${url}`)
-  return response.json()
 }
 
 export function useAnimeInfoData(showId: string | undefined): UseAnimeInfoDataReturn {
@@ -28,18 +23,15 @@ export function useAnimeInfoData(showId: string | undefined): UseAnimeInfoDataRe
     queryKey: ['show-data-info', showId],
     queryFn: async () => {
       if (!showId) throw new Error('No showId')
-      const [meta, watchlistStatus, episodesResponse] = await Promise.all([
+      const [meta, watchlistStatus, episodeData] = await Promise.all([
         fetchApi(`/api/show-meta/${showId}`),
         fetchApi(`/api/watchlist/check/${showId}`).catch(() => ({ inWatchlist: false })),
-        fetch(`/api/episodes?showId=${showId}&mode=sub`),
+        fetchApi(`/api/episodes?showId=${showId}&mode=sub`).catch(() => null),
       ])
 
       let description = meta?.description
-      if (episodesResponse.ok) {
-        const episodeData = await episodesResponse.json()
-        if (episodeData?.description) {
-          description = episodeData.description
-        }
+      if (episodeData?.description) {
+        description = episodeData.description
       }
 
       return {

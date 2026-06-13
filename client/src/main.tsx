@@ -6,6 +6,7 @@ import './styles/base.css'
 import { SidebarProvider } from './contexts/SidebarProvider'
 import { TitlePreferenceProvider } from './contexts/TitlePreferenceContext'
 import { LowEndModeProvider } from './contexts/LowEndModeContext'
+import { AnimePaheCookieProvider } from './contexts/AnimePaheCookieProvider'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 const queryClient = new QueryClient({
@@ -22,13 +23,15 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
-        <SidebarProvider>
-          <TitlePreferenceProvider>
-            <LowEndModeProvider>
-              <App />
-            </LowEndModeProvider>
-          </TitlePreferenceProvider>
-        </SidebarProvider>
+        <AnimePaheCookieProvider>
+          <SidebarProvider>
+            <TitlePreferenceProvider>
+              <LowEndModeProvider>
+                <App />
+              </LowEndModeProvider>
+            </TitlePreferenceProvider>
+          </SidebarProvider>
+        </AnimePaheCookieProvider>
       </QueryClientProvider>
     </BrowserRouter>
   </React.StrictMode>

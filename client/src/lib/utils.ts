@@ -62,22 +62,29 @@ export const fixThumbnailUrl = (
   let proxiedUrl: string
   if (finalUrl.startsWith('https://s4.anilist.co')) {
     proxiedUrl = finalUrl // No proxy for anilist
+  } else if (finalUrl.includes('animepahe.pw')) {
+    proxiedUrl = `/api/image-proxy?url=${encodeURIComponent(finalUrl)}`
+    const cookie = localStorage.getItem('animepahe_cookie')
+    const ua = localStorage.getItem('animepahe_ua')
+    if (cookie) proxiedUrl += `&cookie=${encodeURIComponent(cookie)}`
+    if (ua) proxiedUrl += `&ua=${encodeURIComponent(ua)}`
   } else if (finalUrl.startsWith('http')) {
     proxiedUrl = `/api/image-proxy?url=${encodeURIComponent(finalUrl)}`
+
     if (width) proxiedUrl += `&w=${width}`
     if (height) proxiedUrl += `&h=${height}`
-    else proxiedUrl += '&w=300'
+    else if (!width) proxiedUrl += '&w=300'
   } else {
-    // Relative paths from AllAnime
     const host =
       finalUrl.startsWith('mcovers') || finalUrl.startsWith('images2')
         ? 'https://aln.youtube-anime.com'
         : 'https://aln.youtube-anime.com/images'
     const fullUrl = `${host}/${finalUrl}`
     proxiedUrl = `/api/image-proxy?url=${encodeURIComponent(fullUrl)}`
+
     if (width) proxiedUrl += `&w=${width}`
     if (height) proxiedUrl += `&h=${height}`
-    else proxiedUrl += '&w=300'
+    else if (!width) proxiedUrl += '&w=300'
   }
 
   if (thumbnailCache.size > MAX_CACHE_SIZE) {

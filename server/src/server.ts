@@ -134,7 +134,7 @@ app.use(
   createAuthRouter((database) => runSyncSequence(database))
 )
 
-app.use('/api', createWatchlistRouter(allAnimeProvider))
+app.use('/api', createWatchlistRouter(allAnimeProvider, animepaheProvider))
 app.use('/api', createDataRouter(apiCache, providers))
 app.use('/api', createProxyRouter())
 app.use('/api', createInsightsRouter(allAnimeProvider))
@@ -188,7 +188,6 @@ app.use(
 )
 
 async function main() {
-  logger.info('DEBUG: main() started')
   const dbName = CONFIG.IS_DEV ? CONFIG.DB_NAME_DEV : CONFIG.DB_NAME_PROD
   const dbPath = path.join(CONFIG.ROOT, dbName)
   const remoteFolder = CONFIG.IS_DEV ? CONFIG.REMOTE_FOLDER_DEV : CONFIG.REMOTE_FOLDER_PROD

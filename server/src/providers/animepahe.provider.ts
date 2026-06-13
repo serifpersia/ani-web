@@ -6,6 +6,7 @@ import {
   Show,
   VideoSource,
   EpisodeDetails,
+  EpisodeDetail,
   SkipIntervals,
   SearchOptions,
 } from './provider.interface'
@@ -27,6 +28,7 @@ interface AnimePaheEpisode {
   number?: number
   session?: string
   release_session?: string
+  title?: string
 }
 
 interface AnimePaheVideoSource {
@@ -55,10 +57,14 @@ export class AnimePaheProvider implements Provider {
     this.cache = cache
   }
 
-  private async getRequestHeaders(isApi: boolean = false): Promise<Record<string, string>> {
+  private async getRequestHeaders(
+    isApi: boolean = false,
+    customUaOverride?: string,
+    customCookieOverride?: string
+  ): Promise<Record<string, string>> {
     const store = requestContext.getStore()
-    const customUa = store?.get('ua')
-    const customCookie = store?.get('cookie')
+    const customUa = customUaOverride || store?.get('ua')
+    const customCookie = customCookieOverride || store?.get('cookie')
 
     const userAgent =
       customUa ||
@@ -96,9 +102,14 @@ export class AnimePaheProvider implements Provider {
     return headers
   }
 
-  private async fetchText(url: string, isApi: boolean = false): Promise<string> {
+  private async fetchText(
+    url: string,
+    isApi: boolean = false,
+    ua?: string,
+    cookie?: string
+  ): Promise<string> {
     try {
-      const headers = await this.getRequestHeaders(isApi)
+      const headers = await this.getRequestHeaders(isApi, ua, cookie)
       const response = await fetch(url, {
         method: 'GET',
         headers,
@@ -123,8 +134,8 @@ export class AnimePaheProvider implements Provider {
     }
   }
 
-  private async fetchJson<T>(url: string): Promise<T | null> {
-    const data = await this.fetchText(url, true)
+  private async fetchJson<T>(url: string, ua?: string, cookie?: string): Promise<T | null> {
+    const data = await this.fetchText(url, true, ua, cookie)
     try {
       return JSON.parse(data) as T
     } catch {
@@ -157,11 +168,19 @@ export class AnimePaheProvider implements Provider {
     }
   }
 
-  async getEpisodes(showId: string, _mode: 'sub' | 'dub'): Promise<EpisodeDetails | null> {
+  async getEpisodes(
+    showId: string,
+    _mode: 'sub' | 'dub',
+    ua?: string,
+    cookie?: string
+  ): Promise<EpisodeDetails | null> {
     try {
       const firstPageUrl = `${this.API_URL}?m=release&id=${showId}&sort=episode_asc&page=1`
-      const firstPageData =
-        await this.fetchJson<AnimePaheApiResponse<AnimePaheEpisode>>(firstPageUrl)
+      const firstPageData = await this.fetchJson<AnimePaheApiResponse<AnimePaheEpisode>>(
+        firstPageUrl,
+        ua,
+        cookie
+      )
       if (!firstPageData) return null
 
       let episodes = (firstPageData.data || firstPageData.results || []) as AnimePaheEpisode[]
@@ -169,7 +188,11 @@ export class AnimePaheProvider implements Provider {
 
       for (let p = 2; p <= lastPage; p++) {
         const pageUrl = `${this.API_URL}?m=release&id=${showId}&sort=episode_asc&page=${p}`
-        const pageData = await this.fetchJson<AnimePaheApiResponse<AnimePaheEpisode>>(pageUrl)
+        const pageData = await this.fetchJson<AnimePaheApiResponse<AnimePaheEpisode>>(
+          pageUrl,
+          ua,
+          cookie
+        )
         if (pageData) {
           episodes = episodes.concat(
             (pageData.data || pageData.results || []) as AnimePaheEpisode[]
@@ -178,22 +201,25 @@ export class AnimePaheProvider implements Provider {
       }
 
       const episodeMap: Record<string, string> = {}
-      const episodeNumbers: string[] = []
+      const epDetails: EpisodeDetail[] = []
 
       episodes.forEach((ep) => {
         const epNum = (ep.episode ?? ep.number ?? '').toString()
         if (epNum) {
           episodeMap[epNum] = ep.session || ep.release_session || ''
-          episodeNumbers.push(epNum)
+          epDetails.push({ number: epNum, title: ep.title })
         }
       })
 
       this.cache.set(`animepahe_epmap_${showId}`, episodeMap, 86400)
 
       return {
-        episodes: episodeNumbers.sort((a, b) => Number(a) - Number(b)),
+        episodes: epDetails
+          .sort((a, b) => Number(a.number) - Number(b.number))
+          .map((e) => e.number),
+        availableEpisodesDetail: epDetails,
         description: '',
-      }
+      } satisfies EpisodeDetails
     } catch (e) {
       if ((e as Error).message === 'AUTH_REQUIRED') throw e
       return null
@@ -219,7 +245,6 @@ export class AnimePaheProvider implements Provider {
       if (parseFloat(key) === target) return cachedMap[key]
     }
 
-    // Fallback search
     const sorted = keys.sort((a, b) => Number(a) - Number(b))
     const first = Number(sorted[0])
 
@@ -317,8 +342,184 @@ export class AnimePaheProvider implements Provider {
     return { m3u8: '', referer: '' }
   }
 
-  async getShowMeta(_showId: string): Promise<Partial<Show> | null> {
-    return null
+  async getShowMeta(showId: string, ua?: string, cookie?: string): Promise<Partial<Show> | null> {
+    try {
+      const url = `${this.BASE_URL}/anime/${showId}`
+      const html = await this.fetchText(url, false, ua, cookie)
+
+      const $ = cheerio.load(html)
+      const metadata: Partial<Show> = {
+        _id: showId,
+        id: showId,
+        names: {},
+      }
+
+      const cleanText = (text?: string): string | null => {
+        if (!text) return null
+        return text.replace(/\s+/g, ' ').trim()
+      }
+
+      const titleText =
+        cleanText($('.anime-header h1 > span').text()) ||
+        cleanText($('.anime-header h1').text()) ||
+        ''
+      metadata.name = titleText
+      metadata.englishName = titleText
+      metadata.names!.english = titleText
+
+      const romaji = cleanText($('.anime-header h2.japanese').text())
+      if (romaji) {
+        metadata.names!.romaji = romaji
+      }
+
+      const posterDiv = $('.anime-poster')
+      if (posterDiv.length) {
+        const img = posterDiv.find('img')
+        if (img.length) {
+          metadata.thumbnail = img.attr('data-src') || img.attr('src')
+        }
+      }
+
+      const synopsisDiv = $('.anime-synopsis')
+      if (synopsisDiv.length) {
+        metadata.description = cleanText(synopsisDiv.text()) || undefined
+      }
+
+      const infoBox: Record<string, string | { name: string; url?: string }[]> = {}
+      const infoDiv = $('.anime-info')
+      if (infoDiv.length) {
+        infoDiv.find('p').each((_, el) => {
+          const p = $(el)
+          const fullText = cleanText(p.text())
+          if (!fullText) return
+
+          const colonIdx = fullText.indexOf(':')
+          if (colonIdx === -1) return
+
+          const label = fullText.substring(0, colonIdx).trim()
+
+          if (label === 'External Links' || label === 'Themes' || label === 'Demographic') {
+            const items: { name: string; url?: string }[] = []
+            p.find('a').each((_, aEl) => {
+              items.push({
+                name: cleanText($(aEl).text()) || '',
+                url: $(aEl).attr('href'),
+              })
+            })
+            infoBox[label] = items
+          } else {
+            const value = fullText.substring(colonIdx + 1).trim()
+            infoBox[label] = value
+          }
+        })
+      }
+
+      if (typeof infoBox['Japanese'] === 'string') {
+        metadata.nativeName = infoBox['Japanese']
+        metadata.names!.native = infoBox['Japanese']
+      }
+
+      if (typeof infoBox['Synonyms'] === 'string') {
+        metadata.names!.synonyms = infoBox['Synonyms'].split(',').map((s: string) => s.trim())
+      }
+
+      if (typeof infoBox['Type'] === 'string') {
+        metadata.type = infoBox['Type']
+      }
+
+      const epsStr =
+        typeof infoBox['Episodes'] === 'string'
+          ? infoBox['Episodes']
+          : typeof infoBox['Episode'] === 'string'
+            ? infoBox['Episode']
+            : undefined
+      if (epsStr && epsStr !== '?') {
+        const parsedEps = parseInt(epsStr, 10)
+        if (!isNaN(parsedEps)) {
+          metadata.episodeCount = parsedEps
+        }
+      }
+
+      if (typeof infoBox['Duration'] === 'string') {
+        metadata.episodeDuration = infoBox['Duration']
+      }
+      if (typeof infoBox['Status'] === 'string') {
+        metadata.status = infoBox['Status']
+      }
+
+      const parseDateStr = (dateStr?: string) => {
+        if (!dateStr) return null
+        const parsed = Date.parse(dateStr)
+        if (isNaN(parsed)) return null
+        const dateObj = new Date(parsed)
+        return {
+          year: dateObj.getFullYear(),
+          month: dateObj.getMonth(),
+          date: dateObj.getDate(),
+        }
+      }
+
+      const airedStr = typeof infoBox['Aired'] === 'string' ? infoBox['Aired'] : undefined
+      if (airedStr) {
+        const dates = airedStr.split(/\s+to\s+/)
+        const start = parseDateStr(dates[0])
+        if (start) {
+          metadata.airedStart = start
+        }
+        if (dates[1] && dates[1] !== '?') {
+          const end = parseDateStr(dates[1])
+          if (end) {
+            metadata.airedEnd = end
+          }
+        }
+      }
+
+      const seasonStr = typeof infoBox['Season'] === 'string' ? infoBox['Season'] : undefined
+      if (seasonStr) {
+        const parts = seasonStr.split(' ')
+        const seasonName = parts[0]
+        const yearMatch = seasonStr.match(/\d{4}/)
+        const yearVal = yearMatch ? parseInt(yearMatch[0], 10) : undefined
+        if (yearVal) {
+          metadata.year = yearVal
+        }
+        metadata.season = {
+          season: seasonName,
+          year: yearVal,
+        }
+      } else if (typeof infoBox['Aired'] === 'string') {
+        const yearMatch = infoBox['Aired'].match(/\d{4}/)
+        if (yearMatch) {
+          metadata.year = parseInt(yearMatch[0], 10)
+        }
+      }
+
+      if (typeof infoBox['Studios'] === 'string') {
+        metadata.studios = infoBox['Studios'].split(',').map((s: string) => ({ name: s.trim() }))
+      }
+
+      const themes = (infoBox['Themes'] as { name: string; url?: string }[] | undefined) ?? []
+      const demographic =
+        (infoBox['Demographic'] as { name: string; url?: string }[] | undefined) ?? []
+      metadata.tags = [
+        ...themes.map((t) => ({ name: t.name })),
+        ...demographic.map((d) => ({ name: d.name })),
+      ]
+
+      const genreDiv = $('.anime-genre')
+      if (genreDiv.length) {
+        metadata.genres = genreDiv
+          .find('a')
+          .map((_, el) => ({ name: cleanText($(el).text()) || '' }))
+          .get()
+      }
+
+      return metadata
+    } catch (e) {
+      if ((e as Error).message === 'AUTH_REQUIRED') throw e
+      logger.error({ showId, error: (e as Error).message }, 'Failed to fetch AnimePahe metadata')
+      return null
+    }
   }
   async getPopular(
     _timeframe: 'daily' | 'weekly' | 'monthly' | 'all',

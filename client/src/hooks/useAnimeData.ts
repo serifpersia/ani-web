@@ -1,5 +1,6 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { fetchApi } from '../lib/fetchApi'
 
 export interface Anime {
   _id: string
@@ -35,14 +36,6 @@ export interface QueueItem {
   englishName?: string
   thumbnail?: string
   type?: string
-}
-
-const fetchApi = async (url: string) => {
-  const response = await fetch(url)
-  if (!response.ok) {
-    throw new Error(`Failed to fetch from ${url}`)
-  }
-  return response.json()
 }
 
 export const usePopularAnime = (timeframe: string) => {

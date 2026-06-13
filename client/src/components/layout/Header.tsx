@@ -112,7 +112,12 @@ const Header: React.FC = () => {
             onFocus={() => setIsSearchFocused(true)}
             onBlur={() => setIsSearchFocused(false)}
           />
-          <button type="submit" className={styles.searchButton} aria-label="Search">
+          <button
+            type="submit"
+            className={styles.searchButton}
+            aria-label="Search"
+            onMouseDown={(e) => e.preventDefault()}
+          >
             <FaSearch className={styles.searchIcon} />
           </button>
         </form>

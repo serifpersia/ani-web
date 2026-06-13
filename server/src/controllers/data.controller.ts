@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { Provider } from '../providers/provider.interface'
+import { Provider, Show } from '../providers/provider.interface'
 import { genres, tags, studios } from '../constants.json'
 import logger from '../logger'
 import { asyncHandler } from '../utils/async-handler'
@@ -78,10 +78,40 @@ export class DataController {
 
   getEpisodes = asyncHandler(async (req: Request, res: Response) => {
     try {
-      const data = await this.getProvider(req).getEpisodes(
-        req.query.showId as string,
-        req.query.mode as 'sub' | 'dub'
-      )
+      let showId = req.query.showId as string
+      const provider = this.getProvider(req)
+      const providerName = ((req.query.provider as string) || 'allanime').toLowerCase()
+
+      if (providerName === 'animepahe') {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          showId
+        )
+        if (!isUuid) {
+          let animeName = ''
+          try {
+            const allAnimeProvider = this.providers['allanime']
+            if (allAnimeProvider) {
+              const meta = await allAnimeProvider.getShowMeta(showId)
+              if (meta) {
+                animeName = meta.name || meta.englishName || ''
+              }
+            }
+          } catch (e) {
+            logger.warn(
+              { showId, error: (e as Error).message },
+              'Failed to resolve AllAnime metadata for AnimePahe name resolution'
+            )
+          }
+
+          const searchFor = animeName || showId
+          const results = await provider.search({ query: searchFor })
+          if (results.length > 0) {
+            showId = results[0].session || results[0].id || results[0]._id
+          }
+        }
+      }
+
+      const data = await provider.getEpisodes(showId, req.query.mode as 'sub' | 'dub')
       res.json(data)
     } catch (e) {
       if ((e as Error).message === 'AUTH_REQUIRED') {
@@ -132,7 +162,88 @@ export class DataController {
 
   getShowMeta = asyncHandler(async (req: Request, res: Response) => {
     try {
-      const meta = await this.getProvider(req).getShowMeta(req.params.id as string)
+      const id = req.params.id as string
+      const providerQuery = req.query.provider as string
+
+      if (providerQuery) {
+        let meta: Partial<Show> | null = null
+        const provider = this.getProvider(req)
+
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+        if (isUuid) {
+          meta = await provider.getShowMeta(id)
+        } else {
+          if (providerQuery.toLowerCase() === 'allanime') {
+            meta = await provider.getShowMeta(id)
+          } else {
+            let animeName = ''
+            try {
+              const allAnimeProvider = this.providers['allanime']
+              if (allAnimeProvider) {
+                const localMeta = await allAnimeProvider.getShowMeta(id)
+                if (localMeta) {
+                  animeName = localMeta.name || localMeta.englishName || ''
+                }
+              }
+            } catch (e) {
+              logger.warn(
+                { id, error: (e as Error).message },
+                'Failed to resolve AllAnime name in getShowMeta'
+              )
+            }
+
+            const searchFor = animeName || id
+            const results = await provider.search({ query: searchFor })
+            if (results.length > 0) {
+              const targetId = results[0].session || results[0].id || results[0]._id
+              meta = await provider.getShowMeta(targetId)
+            }
+          }
+        }
+        return res.json(meta || {})
+      }
+
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+      let meta: Partial<Show> | null = null
+
+      if (isUuid) {
+        try {
+          if (this.providers['animepahe']) {
+            meta = await this.providers['animepahe'].getShowMeta(id)
+          }
+        } catch (e) {
+          if ((e as Error).message === 'AUTH_REQUIRED') {
+            return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'animepahe' })
+          }
+          logger.warn({ id, error: (e as Error).message }, 'AnimePahe getShowMeta failed for UUID')
+        }
+      } else {
+        try {
+          meta = await this.providers['allanime'].getShowMeta(id)
+        } catch (e) {
+          logger.warn(
+            { id, error: (e as Error).message },
+            'AllAnime getShowMeta failed, trying fallback'
+          )
+        }
+
+        if (!meta || !meta.name) {
+          try {
+            if (this.providers['animepahe']) {
+              meta = await this.providers['animepahe'].getShowMeta(id)
+            }
+          } catch (e) {
+            if ((e as Error).message === 'AUTH_REQUIRED') {
+              return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'animepahe' })
+            }
+            logger.warn(
+              { id, error: (e as Error).message },
+              'AnimePahe fallback getShowMeta failed'
+            )
+          }
+        }
+      }
+
       res.json(meta || {})
     } catch (e) {
       if ((e as Error).message === 'AUTH_REQUIRED') {

@@ -7,6 +7,7 @@ import https from 'https'
 import NodeCache from 'node-cache'
 import { CONFIG } from '../config'
 import fs from 'fs'
+import logger from '../logger'
 
 const proxyCache = new NodeCache({ stdTTL: 30, checkperiod: 60 })
 
@@ -298,17 +299,30 @@ export class ProxyController {
   }
 
   handleImageProxy = async (req: Request, res: Response) => {
-    const { url } = req.query
+    const { url, cookie, ua } = req.query
     if (!url) return res.status(400).send('URL required')
 
+    const targetUrl = url as string
     const abortController = new AbortController()
     this.abortWhenClientLeaves(res, abortController)
 
-    try {
-      const targetUrl = url as string
-      let refererValue = 'https://allanime.day'
+    let refererValue = 'https://allanime.day'
+    const headers: Record<string, string> = {
+      'User-Agent':
+        (ua as string) ||
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    }
 
-      if (targetUrl.includes('anilist.co')) {
+    try {
+      if (targetUrl.includes('animepahe.pw')) {
+        refererValue = 'https://animepahe.pw/'
+        const rawCookie = (cookie as string) || ''
+        let formattedCookie = rawCookie.replace(/"/g, '')
+        if (formattedCookie.includes('cf_clearance:')) {
+          formattedCookie = formattedCookie.replace('cf_clearance:', 'cf_clearance=')
+        }
+        headers['Cookie'] = formattedCookie
+      } else if (targetUrl.includes('anilist.co')) {
         refererValue = 'https://anilist.co/'
       } else if (targetUrl.includes('gogocdn.net')) {
         refererValue = 'https://gogoanime.lu/'
@@ -318,37 +332,23 @@ export class ProxyController {
         refererValue = 'https://animeya.cc/'
       }
 
+      headers['Referer'] = refererValue
       const imageResponse = await axiosInstance({
         method: 'get',
         url: targetUrl,
         responseType: 'stream',
-        headers: {
-          Referer: refererValue,
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
+        headers,
         timeout: 30000,
         signal: abortController.signal,
       })
 
       if (imageResponse.status === 200) {
         res.set('Cache-Control', 'public, max-age=604800, immutable')
+        res.set('Content-Type', String(imageResponse.headers['content-type'] ?? 'image/webp'))
+        imageResponse.data.pipe(res)
+      } else {
+        this.sendPlaceholder(res)
       }
-      res.set('Content-Type', String(imageResponse.headers['content-type'] ?? ''))
-
-      imageResponse.data.on('error', () => {
-        if (!res.headersSent) {
-          this.sendPlaceholder(res)
-        }
-      })
-
-      res.on('close', () => {
-        if (!imageResponse.data.destroyed) {
-          imageResponse.data.destroy()
-        }
-      })
-
-      imageResponse.data.pipe(res)
     } catch (e) {
       if (axios.isCancel(e)) {
         return

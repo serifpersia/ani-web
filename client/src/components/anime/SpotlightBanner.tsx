@@ -10,6 +10,8 @@ import { useLowEndMode } from '../../contexts/LowEndModeContext'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 import useIsMobile from '../../hooks/useIsMobile'
 
+import { fetchApi } from '../../lib/fetchApi'
+
 interface SpotlightBannerProps {
   animeList: Anime[]
 }
@@ -28,9 +30,11 @@ interface ShowMeta {
 }
 
 const fetchShowMeta = async (id: string): Promise<ShowMeta> => {
-  const res = await fetch(`/api/show-meta/${id}`)
-  if (!res.ok) return {}
-  return res.json()
+  try {
+    return await fetchApi(`/api/show-meta/${id}`)
+  } catch {
+    return {}
+  }
 }
 
 const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {

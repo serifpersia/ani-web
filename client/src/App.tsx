@@ -1,4 +1,4 @@
-import { useEffect, Suspense, lazy } from 'react'
+import { useEffect, Suspense, lazy, useState } from 'react'
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom'
 import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
@@ -7,6 +7,8 @@ import ScrollToTopButton from './components/common/ScrollToTopButton'
 import { useTelemetry } from './hooks/useTelemetry'
 import VirtualKeyboard from './components/common/VirtualKeyboard'
 import { useVirtualKeyboard } from './hooks/useVirtualKeyboard'
+import { useAnimePaheCookie } from './hooks/useAnimePaheCookie'
+import AnimePaheCookieModal from './components/anime/AnimePaheCookieModal'
 
 function useDiscordPageStatus() {
   const location = useLocation()
@@ -52,19 +54,26 @@ const PlayerRedirect = () => {
 }
 
 function App() {
-  const { isOpen, setIsOpen } = useSidebar()
+  const { isOpen, openModal, closeModal, onSuccess } = useAnimePaheCookie()
+  const { isOpen: sidebarOpen, setIsOpen } = useSidebar()
   const virtualKeyboard = useVirtualKeyboard()
   useTelemetry()
   useDiscordPageStatus()
 
   useEffect(() => {
+    const handleAuthRequired = () => openModal()
+    window.addEventListener('ANIMEPAHE_AUTH_REQUIRED', handleAuthRequired)
+    return () => window.removeEventListener('ANIMEPAHE_AUTH_REQUIRED', handleAuthRequired)
+  }, [openModal])
+
+  useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {
-      if (isOpen && event.key === 'Escape') {
+      if (sidebarOpen && event.key === 'Escape') {
         setIsOpen(false)
       }
     }
 
-    if (isOpen) {
+    if (sidebarOpen) {
       document.body.classList.add('sidebar-open')
     } else {
       document.body.classList.remove('sidebar-open')
@@ -76,10 +85,11 @@ function App() {
       window.removeEventListener('keydown', handleKeydown)
       document.body.classList.remove('sidebar-open')
     }
-  }, [isOpen, setIsOpen])
+  }, [sidebarOpen, setIsOpen])
 
   return (
     <div className="app-container">
+      <AnimePaheCookieModal isOpen={isOpen} onClose={closeModal} onSuccess={onSuccess} />
       <Toaster
         position="top-center"
         toastOptions={{

@@ -6,6 +6,7 @@ interface VideoPlayerProps {
   showId?: string
   episodeNumber?: string
   episodeCount?: number
+  sourceType?: string
   showMeta?: {
     name?: string
     thumbnail?: string
@@ -21,6 +22,7 @@ const useVideoPlayer = ({
   showId,
   episodeNumber,
   episodeCount,
+  sourceType,
   showMeta,
 }: VideoPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -94,14 +96,14 @@ const useVideoPlayer = ({
 
   const buildProgressPayload = useCallback(() => {
     const video = videoRef.current
-    if (!video || !showId || !episodeNumber || !showMeta?.name) return null
+    if (!showId || !episodeNumber || !showMeta?.name) return null
 
     return {
       showId,
       episodeNumber,
       episodeCount,
-      currentTime: video.currentTime,
-      duration: video.duration,
+      currentTime: video ? video.currentTime : 0,
+      duration: video ? video.duration : 0,
       showName: showMeta.name,
       showThumbnail: showMeta.thumbnail,
       nativeName: showMeta.names?.native,
@@ -109,7 +111,7 @@ const useVideoPlayer = ({
       genres: showMeta.genres?.map((g) => g.name),
       popularityScore: showMeta.score,
       type: showMeta.type,
-      isPlaying: !video.paused,
+      isPlaying: video ? !video.paused : true,
       sessionId: sessionIdRef.current,
     }
   }, [showId, episodeNumber, episodeCount, showMeta])
@@ -122,20 +124,20 @@ const useVideoPlayer = ({
       if (!payload) return false
 
       const video = videoRef.current
-      if (!video) return false
+      if (!video && sourceType !== 'iframe') return false
 
-      const isFinished = video.currentTime >= video.duration * 0.8
-      let timeToReport = video.currentTime
+      const isFinished = video ? video.currentTime >= video.duration * 0.8 : false
+      let timeToReport = video ? video.currentTime : 0
 
       if (isFinalUpdate && isFinished) {
-        timeToReport = video.duration
+        timeToReport = video ? video.duration : 0
       }
 
       if (!force) {
         if (timeToReport === 0 && !isFinished) return false
 
-        const timeDiff = Math.abs(timeToReport - lastReportedTime.current)
-        if (!isFinalUpdate && timeToReport !== video.duration && timeDiff < 5) {
+        const timeDiff = video ? Math.abs(timeToReport - lastReportedTime.current) : 0
+        if (!isFinalUpdate && video && timeToReport !== video.duration && timeDiff < 5) {
           return false
         }
       }
@@ -143,16 +145,25 @@ const useVideoPlayer = ({
       payload.currentTime = timeToReport
       lastReportedTime.current = timeToReport
 
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+      const animepaheUa = localStorage.getItem('animepahe_ua')
+      const animepaheCookie = localStorage.getItem('animepahe_cookie')
+
+      if (animepaheUa) headers['x-animepahe-ua'] = animepaheUa
+      if (animepaheCookie) headers['x-animepahe-cookie'] = animepaheCookie
+
       fetch('/api/update-progress', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
         keepalive: true,
       }).catch((err) => console.error('Failed to update progress:', err))
 
       return true
     },
-    [buildProgressPayload]
+    [buildProgressPayload, sourceType]
   )
 
   useEffect(() => {
@@ -468,10 +479,19 @@ const useVideoPlayer = ({
   }, [showId, episodeNumber])
 
   useEffect(() => {
-    if (showMeta?.name && videoRef.current) {
+    if (sourceType !== 'iframe') return
+
+    // Immediate update at start
+    sendProgressUpdate(false, true)
+
+    // Periodic update every 60 seconds
+    const heartbeatInterval = setInterval(() => {
       sendProgressUpdate(false, true)
-    }
-  }, [showMeta?.name, episodeNumber, showId, sendProgressUpdate])
+    }, 60000)
+
+    return () => clearInterval(heartbeatInterval)
+  }, [sourceType, sendProgressUpdate])
+
   const onLoadedMetadata = useCallback(() => {
     setDuration(videoRef.current?.duration || 0)
     syncPlaybackRate()
@@ -520,9 +540,18 @@ const useVideoPlayer = ({
 
     payload.currentTime = payload.duration
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+    const animepaheUa = localStorage.getItem('animepahe_ua')
+    const animepaheCookie = localStorage.getItem('animepahe_cookie')
+
+    if (animepaheUa) headers['x-animepahe-ua'] = animepaheUa
+    if (animepaheCookie) headers['x-animepahe-cookie'] = animepaheCookie
+
     fetch('/api/update-progress', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload),
       keepalive: true,
     }).catch((err) => console.error('Failed to send final progress:', err))

@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useReducer, useMemo } from 'react'
+import { useEffect, useCallback, useReducer, useMemo, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import type {
@@ -9,6 +9,7 @@ import type {
   PlayerState,
 } from '../types/player'
 import { playerReducer, createInitialState, type Action } from '../reducers/playerReducer'
+import { fetchApi } from '../lib/fetchApi'
 
 interface UsePlayerDataReturn {
   state: PlayerState
@@ -33,35 +34,26 @@ interface RawSkipInterval {
   end_time?: number
 }
 
-const fetchApi = async (url: string) => {
-  const headers: Record<string, string> = {}
-  const animepaheUa = localStorage.getItem('animepahe_ua')
-  const animepaheCookie = localStorage.getItem('animepahe_cookie')
-
-  if (animepaheUa) headers['x-animepahe-ua'] = animepaheUa
-  if (animepaheCookie) headers['x-animepahe-cookie'] = animepaheCookie
-
-  const response = await fetch(url, { headers })
-  if (!response.ok) {
-    if (response.status === 403) {
-      const data = await response.json().catch(() => ({}))
-      if (data.error === 'AUTH_REQUIRED') {
-        const err = new Error('AUTH_REQUIRED') as Error & { provider?: string }
-        err.provider = data.provider
-        throw err
-      }
-    }
-    throw new Error(`Failed to fetch ${url}`)
-  }
-  return response.json()
-}
-
 export const usePlayerData = (
   showId: string | undefined,
   episodeNumber: string | undefined
 ): UsePlayerDataReturn => {
   const [uiState, dispatch] = useReducer(playerReducer, undefined, createInitialState)
   const queryClient = useQueryClient()
+  const hasForcedProvider = useRef<string | null>(null)
+
+  useEffect(() => {
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (
+      showId &&
+      UUID_RE.test(showId) &&
+      uiState.selectedProvider !== 'animepahe' &&
+      hasForcedProvider.current !== showId
+    ) {
+      hasForcedProvider.current = showId
+      dispatch({ type: 'SET_PROVIDER', payload: 'animepahe' })
+    }
+  }, [showId, uiState.selectedProvider])
 
   useEffect(() => {
     if (episodeNumber && episodeNumber !== uiState.currentEpisode) {
@@ -81,10 +73,18 @@ export const usePlayerData = (
     queryKey: ['show-data', showId, uiState.currentMode],
     queryFn: async () => {
       if (!showId) throw new Error('No showId')
+
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      const isUuid = UUID_RE.test(showId)
+      const metaProvider = isUuid ? 'animepahe' : 'allanime'
+      const episodeProvider = metaProvider
+
       try {
         const [meta, episodeData, watchlistStatus, watchedEpisodes] = await Promise.all([
-          fetchApi(`/api/show-meta/${showId}`),
-          fetchApi(`/api/episodes?showId=${showId}&mode=${uiState.currentMode}`).catch(() => null),
+          fetchApi(`/api/show-meta/${showId}?provider=${metaProvider}`),
+          fetchApi(
+            `/api/episodes?showId=${showId}&mode=${uiState.currentMode}&provider=${episodeProvider}`
+          ).catch(() => null),
           fetchApi(`/api/watchlist/check/${showId}`).catch(() => ({ inWatchlist: false })),
           fetchApi(`/api/watched-episodes/${showId}`).catch(() => []),
         ])
@@ -151,7 +151,7 @@ export const usePlayerData = (
 
       try {
         let providerShowId = showId
-        if (['animepahe', '123anime', 'animeya', 'megaplay'].includes(uiState.selectedProvider)) {
+        if (['123anime', 'animeya', 'megaplay'].includes(uiState.selectedProvider)) {
           const names = showData?.showMeta?.names
           // AlAnime's `name` field is often the native Japanese script (e.g. "ブリーチ"
           // for Bleach), which gets mapped to names.romaji. Sending katakana/kanji to
@@ -226,6 +226,18 @@ export const usePlayerData = (
               providerShowId = bestMatch.session || bestMatch.id
             }
           }
+        } else if (uiState.selectedProvider === 'animepahe') {
+          const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+          if (!UUID_RE.test(showId)) {
+            const searchResults = await fetchApi(
+              `/api/search?query=${encodeURIComponent(showData?.showMeta?.name || showId)}&provider=animepahe`
+            )
+            if (searchResults && searchResults.length > 0) {
+              providerShowId = searchResults[0].session || searchResults[0].id
+            }
+          } else {
+            providerShowId = showId
+          }
         }
 
         const [sources, progress, preferredSourceData, skipTimesData] = await Promise.all([
@@ -234,7 +246,9 @@ export const usePlayerData = (
           ),
           fetchApi(`/api/episode-progress/${showId}/${uiState.currentEpisode}`).catch(() => null),
           fetchApi(`/api/settings?key=preferredSource`).catch(() => null),
-          fetchApi(`/api/skip-times/${showId}/${uiState.currentEpisode}`).catch(() => []),
+          fetchApi(
+            `/api/skip-times/${showId}/${uiState.currentEpisode}?provider=${uiState.selectedProvider}`
+          ).catch(() => []),
         ])
 
         const preferredSourceName = preferredSourceData?.value

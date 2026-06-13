@@ -79,6 +79,30 @@
   gap: var(--space-3);
 }
 
+.providerSelect {
+  height: 52px;
+  padding: 0 var(--space-4);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  cursor: pointer;
+  appearance: none;
+  transition: all var(--transition-fast);
+}
+
+.providerSelect:hover {
+  border-color: var(--border-secondary);
+  background-color: var(--bg-elevated);
+}
+
+.providerSelect:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 .searchBtn {
   height: 52px;
   padding: 0 var(--space-8) !important;

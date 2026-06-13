@@ -12,6 +12,7 @@ interface DiscordActivityData {
   duration: number
   thumbnail: string
   isPlaying: boolean
+  providerName: string
   sessionId?: string
 }
 
@@ -165,6 +166,7 @@ class DiscordRPCService {
     duration: number
     thumbnail: string
     isPlaying: boolean
+    providerName: string
     sessionId?: string
   }) {
     this.lastActivity = data
@@ -173,13 +175,15 @@ class DiscordRPCService {
     }
     if (!this.isEnabled || !this.client || !this.client.user) return
 
+    const imageKey = data.providerName === 'AnimePahe' ? 'logo' : data.thumbnail
+
     try {
       if (!data.isPlaying) {
         await this.client.user.clearActivity()
         await this.client.user.setActivity({
           details: data.title,
           state: `Episode ${data.episode}${data.totalEpisodes ? `/${data.totalEpisodes}` : ''} (Paused)`,
-          largeImageKey: data.thumbnail,
+          largeImageKey: imageKey,
           largeImageText: data.title,
           smallImageKey: 'logo',
           smallImageText: 'ani-web',
@@ -195,24 +199,22 @@ class DiscordRPCService {
       }
 
       const nowSeconds = Math.round(Date.now() / 1000)
-      const startTimestamp = Math.round(nowSeconds - data.currentTime)
 
       const activity: {
         details: string
         state: string
-        startTimestamp: number
+        startTimestamp?: number
+        endTimestamp?: number
         largeImageKey: string
         largeImageText: string
         smallImageKey: string
         smallImageText: string
         type: number
         buttons: { label: string; url: string }[]
-        endTimestamp?: number
       } = {
         details: data.title,
         state: `Episode ${data.episode}${data.totalEpisodes ? `/${data.totalEpisodes}` : ''}`,
-        startTimestamp: startTimestamp,
-        largeImageKey: data.thumbnail,
+        largeImageKey: imageKey,
         largeImageText: data.title,
         smallImageKey: 'logo',
         smallImageText: 'ani-web',
@@ -225,9 +227,12 @@ class DiscordRPCService {
         ],
       }
 
-      if (data.duration && data.duration > 0 && data.duration > data.currentTime) {
-        const endTimestamp = Math.round(nowSeconds + (data.duration - data.currentTime))
-        activity.endTimestamp = endTimestamp
+      if (data.currentTime && data.currentTime > 0) {
+        activity.startTimestamp = Math.round(nowSeconds - data.currentTime)
+      }
+
+      if (data.duration && data.duration > data.currentTime) {
+        activity.endTimestamp = Math.round(nowSeconds + (data.duration - data.currentTime))
       }
 
       await this.client.user.setActivity(activity)
@@ -252,6 +257,10 @@ class DiscordRPCService {
     const label = pageLabels[page] ?? { details: 'Browsing Anime', state: 'Idle' }
 
     try {
+      if (!this.client || !this.client.user) {
+        log.warn('Discord client not connected, skipping idle status update')
+        return
+      }
       await this.client.user.setActivity({
         details: label.details,
         state: label.state,
@@ -266,13 +275,16 @@ class DiscordRPCService {
         ],
       })
     } catch (err) {
-      log.error({ err }, 'Failed to set Discord idle status')
+      if ((err as Error).message === 'Closed by Discord') {
+        log.warn('Discord connection ended, skipping idle status update')
+      } else {
+        log.error({ err }, 'Failed to set Discord idle status')
+      }
     }
   }
 
   public async clearPresence(sessionId?: string) {
     if (sessionId && this.currentSessionId && sessionId !== this.currentSessionId) {
-      log.debug(`Ignoring clear request for inactive session: ${sessionId}`)
       return
     }
 
