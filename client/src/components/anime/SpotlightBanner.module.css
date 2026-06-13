@@ -104,7 +104,7 @@
 
 .title {
   font-size: 3rem;
-  transition: color var(--transition-base);
+  line-height: 1.1;
   cursor: pointer;
   max-width: 800px;
   text-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
