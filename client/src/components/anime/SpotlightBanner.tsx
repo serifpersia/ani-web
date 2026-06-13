@@ -31,7 +31,9 @@ interface ShowMeta {
 
 const fetchShowMeta = async (id: string): Promise<ShowMeta> => {
   try {
-    return await fetchApi(`/api/show-meta/${id}`)
+    const response = await fetch(`/api/show-meta/${id}`)
+    if (!response.ok) return {}
+    return await response.json()
   } catch {
     return {}
   }
@@ -41,6 +43,9 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [autoplayResetKey, setAutoplayResetKey] = useState(0)
   const [lastScrollTime, setLastScrollTime] = useState(0)
+  const [isAtTop, setIsAtTop] = useState(
+    () => typeof window !== 'undefined' && window.scrollY === 0
+  )
   const { lowEndMode } = useLowEndMode()
   const isMobile = useIsMobile()
   const { titlePreference } = useTitlePreference()
@@ -83,6 +88,16 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
     const timer = setTimeout(nextSlide, 10000)
     return () => clearTimeout(timer)
   }, [currentIndex, nextSlide, top6.length, autoplayResetKey])
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsAtTop(window.scrollY === 0)
+    }
+
+    handleScroll()
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   const metaQueries = useQueries({
     queries: top6.map((anime) => ({
@@ -135,7 +150,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   if (isMobile) return null
 
   return (
-    <div className={styles.bannerContainer}>
+    <div className={`${styles.bannerContainer} ${isAtTop ? styles.bannerAtTop : ''}`}>
       <div className={styles.posterWrapper}>
         <img
           key={`${currentIndex}-${autoplayResetKey}`}

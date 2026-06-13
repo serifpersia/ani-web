@@ -1,8 +1,6 @@
 .header {
   height: var(--header-height);
-  background-color: hsla(0, 0%, 2%, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background-color: var(--bg-main);
   border-bottom: 1px solid var(--border-primary);
   position: sticky;
   top: 0;
