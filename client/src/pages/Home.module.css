@@ -124,6 +124,12 @@
   background: var(--bg-elevated) !important;
 }
 
+.tabActive {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff !important;
+}
+
 @media (max-width: 600px) {
   .tabBar {
     width: 100%;

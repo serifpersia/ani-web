@@ -61,7 +61,13 @@ export const fixThumbnailUrl = (
 
   let proxiedUrl: string
   if (finalUrl.startsWith('https://s4.anilist.co')) {
-    proxiedUrl = finalUrl // No proxy for anilist
+    proxiedUrl = finalUrl
+    if (width) {
+      proxiedUrl += `${proxiedUrl.includes('?') ? '&' : '?'}w=${width}`
+    }
+    if (height) {
+      proxiedUrl += `${proxiedUrl.includes('?') ? '&' : '?'}h=${height}`
+    }
   } else if (finalUrl.includes('animepahe.pw')) {
     proxiedUrl = `/api/image-proxy?url=${encodeURIComponent(finalUrl)}`
     const cookie = localStorage.getItem('animepahe_cookie')

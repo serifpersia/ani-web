@@ -263,6 +263,8 @@ const Home: React.FC = () => {
         animeList={cwList}
         continueWatching
         carousel
+        collapsible
+        defaultExpanded={cwList.length > 0}
         onRemove={handleRemove}
         loading={loadingContinueWatching}
         onScroll={handleContinueWatchingScroll}

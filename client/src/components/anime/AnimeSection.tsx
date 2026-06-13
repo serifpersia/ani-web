@@ -1,6 +1,6 @@
 import React, { useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { FaChevronLeft, FaChevronRight } from 'react-icons/fa'
+import { FaChevronDown, FaChevronLeft, FaChevronRight, FaChevronUp } from 'react-icons/fa'
 import AnimeCard from './AnimeCard'
 import AnimeCardSkeleton from './AnimeCardSkeleton'
 import SkeletonGrid from '../common/SkeletonGrid'
@@ -59,6 +59,8 @@ interface AnimeSectionProps {
   layout?: 'vertical' | 'horizontal'
   onScroll?: (e: React.UIEvent<HTMLDivElement>) => void
   isFetchingNextPage?: boolean
+  collapsible?: boolean
+  defaultExpanded?: boolean
 }
 
 const AnimeSection: React.FC<AnimeSectionProps> = ({
@@ -75,9 +77,19 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
   layout,
   onScroll,
   isFetchingNextPage,
+  collapsible,
+  defaultExpanded = true,
 }) => {
   const { lowEndMode } = useLowEndMode()
   const carouselRef = useRef<HTMLDivElement>(null)
+  const [isExpanded, setIsExpanded] = React.useState(defaultExpanded)
+
+  React.useEffect(() => {
+    setIsExpanded(defaultExpanded)
+  }, [defaultExpanded])
+
+  const shouldRenderSection = !(!loading && animeList.length === 0 && !emptyState && !collapsible)
+  if (!shouldRenderSection) return null
 
   const isActuallyCarousel = carousel
   const defaultLayout = 'vertical'
@@ -110,7 +122,7 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
               {title}
             </div>
           )}
-          {carousel && animeList.length > 0 && (
+          {carousel && animeList.length > 0 && isExpanded && (
             <div className={styles['nav-arrows']}>
               <button
                 className={styles['nav-button']}
@@ -135,72 +147,86 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
             </div>
           )}
         </div>
-        {showSeeMore && (
-          <div className={styles['header-actions']}>
-            <Link
-              to="/watchlist/Continue Watching"
-              className="btn-secondary"
-              style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}
+        <div className={styles['header-controls']}>
+          {showSeeMore && (
+            <div className={styles['header-actions']}>
+              <Link
+                to="/watchlist/Continue Watching"
+                className="btn-secondary"
+                style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}
+              >
+                View All
+              </Link>
+            </div>
+          )}
+          {collapsible && (
+            <button
+              className={styles['collapse-button']}
+              type="button"
+              onClick={() => setIsExpanded((open) => !open)}
+              aria-expanded={isExpanded}
+              aria-label={isExpanded ? `Collapse ${title}` : `Expand ${title}`}
             >
-              View All
-            </Link>
-          </div>
-        )}
+              {isExpanded ? <FaChevronUp /> : <FaChevronDown />}
+            </button>
+          )}
+        </div>
       </div>
 
-      {isActuallyCarousel ? (
-        !loading && animeList.length === 0 && emptyState ? (
-          <div>{emptyState}</div>
-        ) : (
-          <div className={styles['carousel-container']}>
-            <div className={styles.carousel} ref={carouselRef} onScroll={onScroll}>
-              {loading && animeList.length === 0
-                ? Array.from({ length: 7 }).map((_, i) => (
-                    <div key={i} className={styles['carousel-card']}>
-                      <AnimeCardSkeleton layout={currentLayout} />
-                    </div>
-                  ))
-                : animeList.map((anime, index) => (
-                    <div key={anime._id} className={styles['carousel-card']}>
-                      <AnimeCard
-                        anime={anime}
-                        continueWatching={continueWatching}
-                        onRemove={onRemove}
-                        isLCP={index < 4 && title === 'Latest Releases'}
-                        config={cardConfig}
-                        layout={currentLayout}
-                      />
-                    </div>
-                  ))}
-              {isFetchingNextPage && (
-                <div className={styles['carousel-card']}>
-                  <AnimeCardSkeleton layout={currentLayout} />
-                </div>
-              )}
+      {isExpanded &&
+        (isActuallyCarousel ? (
+          !loading && animeList.length === 0 && emptyState ? (
+            <div>{emptyState}</div>
+          ) : (
+            <div className={styles['carousel-container']}>
+              <div className={styles.carousel} ref={carouselRef} onScroll={onScroll}>
+                {loading && animeList.length === 0
+                  ? Array.from({ length: 7 }).map((_, i) => (
+                      <div key={i} className={styles['carousel-card']}>
+                        <AnimeCardSkeleton layout={currentLayout} />
+                      </div>
+                    ))
+                  : animeList.map((anime, index) => (
+                      <div key={anime._id} className={styles['carousel-card']}>
+                        <AnimeCard
+                          anime={anime}
+                          continueWatching={continueWatching}
+                          onRemove={onRemove}
+                          isLCP={index < 4 && title === 'Latest Releases'}
+                          config={cardConfig}
+                          layout={currentLayout}
+                        />
+                      </div>
+                    ))}
+                {isFetchingNextPage && (
+                  <div className={styles['carousel-card']}>
+                    <AnimeCardSkeleton layout={currentLayout} />
+                  </div>
+                )}
+              </div>
             </div>
+          )
+        ) : (
+          <div className="grid-container">
+            {loading && animeList.length === 0 ? (
+              <SkeletonGrid count={6} layout={currentLayout} />
+            ) : animeList.length > 0 ? (
+              animeList.map((anime, index) => (
+                <AnimeCard
+                  key={anime._id}
+                  anime={anime}
+                  continueWatching={continueWatching}
+                  onRemove={onRemove}
+                  isLCP={index < 4 && title === 'Latest Releases'}
+                  config={cardConfig}
+                  layout={currentLayout}
+                />
+              ))
+            ) : !loading ? (
+              <div style={{ gridColumn: '1 / -1' }}>{emptyState}</div>
+            ) : null}
           </div>
-        )
-      ) : (
-        <div className="grid-container">
-          {loading && animeList.length === 0 ? (
-            <SkeletonGrid count={6} layout={currentLayout} />
-          ) : animeList.length > 0 ? (
-            animeList.map((anime, index) => (
-              <AnimeCard
-                key={anime._id}
-                anime={anime}
-                continueWatching={continueWatching}
-                onRemove={onRemove}
-                isLCP={index < 4 && title === 'Latest Releases'}
-                config={cardConfig}
-                layout={currentLayout}
-              />
-            ))
-          ) : !loading ? (
-            <div style={{ gridColumn: '1 / -1' }}>{emptyState}</div>
-          ) : null}
-        </div>
-      )}
+        ))}
     </section>
   )
 }

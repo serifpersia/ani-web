@@ -69,9 +69,14 @@ const AnimePaheCookieModal: React.FC<AnimePaheCookieModalProps> = ({
                 className={styles.textarea}
               />
             </div>
-            <button className={styles.button} onClick={handleStartVerification}>
-              Start Verification (Opens AnimePahe)
-            </button>
+            <div className={styles.actions}>
+              <button className={styles.secondaryButton} onClick={onClose}>
+                Cancel
+              </button>
+              <button className={styles.button} onClick={handleStartVerification}>
+                Start Verification (Opens AnimePahe)
+              </button>
+            </div>
           </>
         ) : (
           <>
@@ -97,6 +102,9 @@ const AnimePaheCookieModal: React.FC<AnimePaheCookieModalProps> = ({
               />
             </div>
             <div className={styles.actions}>
+              <button className={styles.secondaryButton} onClick={onClose}>
+                Cancel
+              </button>
               <button className={styles.secondaryButton} onClick={() => setStep(1)}>
                 Back
               </button>
