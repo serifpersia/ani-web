@@ -255,7 +255,8 @@ export class WatchlistController {
 
       let relativeEpisodeNumber = show.episodeNumber
       if (epList) {
-        const idx = epList.indexOf(String(show.episodeNumber))
+        const sortedEpList = [...epList].sort((a, b) => Number(a) - Number(b))
+        const idx = sortedEpList.indexOf(String(show.episodeNumber))
         if (idx !== -1) {
           relativeEpisodeNumber = (idx + 1).toString()
         }

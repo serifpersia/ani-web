@@ -171,9 +171,14 @@ export const usePlayerData = (
             uiState.currentMode === 'dub' ? englishName || romajiName : romajiName || englishName
 
           if (searchQuery) {
-            const searchResults = await fetchApi(
-              `/api/search?query=${encodeURIComponent(searchQuery)}&provider=${uiState.selectedProvider}`
-            )
+            let searchResults
+            try {
+              searchResults = await fetchApi(
+                `/api/search?query=${encodeURIComponent(searchQuery)}&provider=${uiState.selectedProvider}`
+              )
+            } catch {
+              searchResults = []
+            }
             if (searchResults && searchResults.length > 0) {
               interface SearchResult {
                 id: string
@@ -229,9 +234,14 @@ export const usePlayerData = (
         } else if (uiState.selectedProvider === 'animepahe') {
           const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
           if (!UUID_RE.test(showId)) {
-            const searchResults = await fetchApi(
-              `/api/search?query=${encodeURIComponent(showData?.showMeta?.name || showId)}&provider=animepahe`
-            )
+            let searchResults
+            try {
+              searchResults = await fetchApi(
+                `/api/search?query=${encodeURIComponent(showData?.showMeta?.name || showId)}&provider=animepahe`
+              )
+            } catch {
+              searchResults = []
+            }
             if (searchResults && searchResults.length > 0) {
               providerShowId = searchResults[0].session || searchResults[0].id
             }
@@ -243,7 +253,7 @@ export const usePlayerData = (
         const [sources, progress, preferredSourceData, skipTimesData] = await Promise.all([
           fetchApi(
             `/api/video?showId=${providerShowId}&episodeNumber=${uiState.currentEpisode}&mode=${uiState.currentMode}&provider=${uiState.selectedProvider}`
-          ),
+          ).catch(() => null),
           fetchApi(`/api/episode-progress/${showId}/${uiState.currentEpisode}`).catch(() => null),
           fetchApi(`/api/settings?key=preferredSource`).catch(() => null),
           fetchApi(
@@ -253,20 +263,24 @@ export const usePlayerData = (
 
         const preferredSourceName = preferredSourceData?.value
 
-        const modeMatchedSources = (sources as VideoSource[]).filter((s) => {
-          const name = s.sourceName.toLowerCase()
-          if (uiState.currentMode === 'dub') {
-            return name.includes('eng') || name.includes('dub')
-          } else {
-            return (
-              name.includes('jpn') ||
-              name.includes('sub') ||
-              (!name.includes('eng') && !name.includes('dub'))
-            )
-          }
-        })
+        const modeMatchedSources =
+          (sources as VideoSource[] | null)?.filter((s) => {
+            const name = s.sourceName.toLowerCase()
+            if (uiState.currentMode === 'dub') {
+              return name.includes('eng') || name.includes('dub')
+            } else {
+              return (
+                name.includes('jpn') ||
+                name.includes('sub') ||
+                (!name.includes('eng') && !name.includes('dub'))
+              )
+            }
+          }) ?? []
 
-        const pool = modeMatchedSources.length > 0 ? modeMatchedSources : (sources as VideoSource[])
+        const pool =
+          modeMatchedSources.length > 0
+            ? modeMatchedSources
+            : ((sources as VideoSource[] | null) ?? [])
         let sourceToSelect: VideoSource | null = pool.length > 0 ? pool[0] : null
 
         if (preferredSourceName) {
@@ -284,7 +298,7 @@ export const usePlayerData = (
 
         const resumeTime = progress?.currentTime || 0
         const resumeDuration = progress?.duration || 0
-        const rawSkips = Array.isArray(skipTimesData) ? skipTimesData : skipTimesData.results || []
+        const rawSkips = Array.isArray(skipTimesData) ? skipTimesData : skipTimesData?.results || []
 
         const skipIntervals: SkipInterval[] = rawSkips
           .map((item: RawSkipInterval) => ({
@@ -295,7 +309,7 @@ export const usePlayerData = (
           }))
           .filter((i: SkipInterval) => i.end_time > 0)
 
-        if (sources.length === 0) {
+        if (!sources || sources.length === 0) {
           toast.error(`No video sources found for ${uiState.selectedProvider}`)
         }
 
@@ -316,6 +330,16 @@ export const usePlayerData = (
             type: 'SET_STATE',
             payload: { showCookieModal: true, cookieProvider: error.provider },
           })
+          return {
+            videoSources: [],
+            selectedSource: null,
+            selectedLink: null,
+            resumeTime: 0,
+            resumeDuration: 0,
+            showResumeModal: false,
+            skipIntervals: [],
+            fetchedEpisodeNumber: uiState.currentEpisode,
+          }
         }
         throw e
       }
