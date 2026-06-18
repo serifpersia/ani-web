@@ -1,6 +1,6 @@
 {
   "name": "ani-web",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "A web application for watching anime.",
   "main": "orchestrator.js",
   "bin": {
@@ -17,7 +17,6 @@
     "client": "npm start --prefix client",
     "server": "npm run start --prefix server",
     "preview": "node orchestrator.js prod",
-    "lighthouse": "npm run lighthouse --prefix client",
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "npm run lint --prefix client && npm run lint --prefix server",
     "format": "prettier --write .",
