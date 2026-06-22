@@ -74,8 +74,8 @@ class DiscordRPCService {
         this.scheduleReconnect()
       })
 
-      this.client.on('error', (err) => {
-        const errMsg = err?.message || String(err)
+      this.client.on('ERROR', (err: unknown) => {
+        const errMsg = err instanceof Error ? err.message : String(err)
         if (errMsg.includes('ENOENT') || errMsg.includes('ECONNREFUSED')) {
           log.debug('Discord client not running or connection refused.')
         } else {
