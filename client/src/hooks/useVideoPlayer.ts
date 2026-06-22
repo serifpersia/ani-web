@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { SkipInterval, SubtitleTrack } from '../types/player'
 
 interface VideoPlayerProps {
@@ -25,6 +26,7 @@ const useVideoPlayer = ({
   sourceType,
   showMeta,
 }: VideoPlayerProps) => {
+  const queryClient = useQueryClient()
   const videoRef = useRef<HTMLVideoElement>(null)
   const playerContainerRef = useRef<HTMLDivElement>(null)
   const progressBarRef = useRef<HTMLDivElement>(null)
@@ -145,25 +147,46 @@ const useVideoPlayer = ({
       payload.currentTime = timeToReport
       lastReportedTime.current = timeToReport
 
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      }
       const animepaheUa = localStorage.getItem('animepahe_ua')
       const animepaheCookie = localStorage.getItem('animepahe_cookie')
 
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
       if (animepaheUa) headers['x-animepahe-ua'] = animepaheUa
       if (animepaheCookie) headers['x-animepahe-cookie'] = animepaheCookie
 
-      fetch('/api/update-progress', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-        keepalive: true,
-      }).catch((err) => console.error('Failed to update progress:', err))
+      const saveProgress = async () => {
+        try {
+          await fetch('/api/update-progress', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload),
+          })
+          queryClient.invalidateQueries({ queryKey: ['video-sources', showId, episodeNumber] })
+          queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
+          queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
+          queryClient.invalidateQueries({ queryKey: ['continueWatching'] })
+          queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+        } catch (err) {
+          console.error('Failed to update progress:', err)
+        }
+      }
+
+      if (isFinalUpdate) {
+        saveProgress()
+      } else {
+        fetch('/api/update-progress', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+          keepalive: true,
+        }).catch((err) => console.error('Failed to update progress:', err))
+      }
 
       return true
     },
-    [buildProgressPayload, sourceType]
+    [buildProgressPayload, sourceType, queryClient, showId, episodeNumber]
   )
 
   useEffect(() => {
@@ -553,9 +576,16 @@ const useVideoPlayer = ({
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
-      keepalive: true,
-    }).catch((err) => console.error('Failed to send final progress:', err))
-  }, [buildProgressPayload])
+    })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['video-sources', showId, episodeNumber] })
+        queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
+        queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
+        queryClient.invalidateQueries({ queryKey: ['continueWatching'] })
+        queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+      })
+      .catch((err) => console.error('Failed to send final progress:', err))
+  }, [buildProgressPayload, queryClient, showId, episodeNumber])
 
   const onEnded = useCallback(() => {
     hasEnded.current = true

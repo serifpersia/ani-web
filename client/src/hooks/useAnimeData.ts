@@ -197,6 +197,10 @@ export const useRemoveFromQueue = () => {
     onSuccess: () => {
       toast.success('Removed from queue')
       queryClient.invalidateQueries({ queryKey: ['queue'] })
+      queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
+      queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
+      queryClient.invalidateQueries({ queryKey: ['continueWatching'] })
+      queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
     },
     onError: (error: Error) => {
       toast.error(`Failed to remove: ${error.message}`)
@@ -214,6 +218,10 @@ export const useClearQueue = () => {
     onSuccess: () => {
       toast.success('Queue cleared')
       queryClient.invalidateQueries({ queryKey: ['queue'] })
+      queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
+      queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
+      queryClient.invalidateQueries({ queryKey: ['continueWatching'] })
+      queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
     },
     onError: (error: Error) => {
       toast.error(`Failed to clear queue: ${error.message}`)

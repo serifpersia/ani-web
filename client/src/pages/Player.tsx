@@ -344,6 +344,10 @@ const Player: React.FC = () => {
       const currentIndex = state.episodes.findIndex((ep) => ep === state.currentEpisode)
       if (currentIndex > -1 && currentIndex < state.episodes.length - 1) {
         const nextEpisode = state.episodes[currentIndex + 1]
+        queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
+        queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
+        queryClient.invalidateQueries({ queryKey: ['continueWatching'] })
+        queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
         navigate(`/watch/${showId}/${nextEpisode}`)
       }
     }
@@ -356,6 +360,7 @@ const Player: React.FC = () => {
     state.currentEpisode,
     state.episodes,
     state.isAutoplayEnabled,
+    queryClient,
   ])
 
   const handleQueueTransition = useCallback(() => {
@@ -390,10 +395,14 @@ const Player: React.FC = () => {
 
   const handleNextEpisode = useCallback(() => {
     if (nextEpisode) {
+      queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
+      queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
+      queryClient.invalidateQueries({ queryKey: ['continueWatching'] })
+      queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
       navigate(`/watch/${showId}/${nextEpisode}`)
     }
     dispatch({ type: 'SET_STATE', payload: { showResumeModal: false } })
-  }, [nextEpisode, navigate, showId, dispatch])
+  }, [nextEpisode, navigate, showId, dispatch, queryClient])
 
   const handleNShortcut = useCallback(() => {
     if (queue.length > 0) {
