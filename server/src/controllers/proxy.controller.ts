@@ -314,14 +314,14 @@ export class ProxyController {
     }
 
     try {
-      if (targetUrl.includes('animepahe.pw')) {
+      if (targetUrl.includes('animepahe')) {
         refererValue = 'https://animepahe.pw/'
         const rawCookie = (cookie as string) || ''
-        let formattedCookie = rawCookie.replace(/"/g, '')
-        if (formattedCookie.includes('cf_clearance:')) {
-          formattedCookie = formattedCookie.replace('cf_clearance:', 'cf_clearance=')
-        }
-        headers['Cookie'] = formattedCookie
+        let sanitized = rawCookie.trim()
+        sanitized = sanitized.replace(/^cf_clearance/i, '')
+        sanitized = sanitized.replace(/^[:=]\s*/, '')
+        sanitized = sanitized.replace(/["']/g, '').trim()
+        headers['Cookie'] = `cf_clearance=${sanitized}`
       } else if (targetUrl.includes('anilist.co')) {
         refererValue = 'https://anilist.co/'
       } else if (targetUrl.includes('gogocdn.net')) {

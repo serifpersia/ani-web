@@ -68,7 +68,7 @@ export const fixThumbnailUrl = (
     if (height) {
       proxiedUrl += `${proxiedUrl.includes('?') ? '&' : '?'}h=${height}`
     }
-  } else if (finalUrl.includes('animepahe.pw')) {
+  } else if (finalUrl.includes('animepahe')) {
     proxiedUrl = `/api/image-proxy?url=${encodeURIComponent(finalUrl)}`
     const cookie = localStorage.getItem('animepahe_cookie')
     const ua = localStorage.getItem('animepahe_ua')

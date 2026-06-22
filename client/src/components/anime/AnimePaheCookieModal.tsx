@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 interface AnimePaheCookieModalProps {
   isOpen: boolean
   onClose: () => void
-  onSuccess: () => void
+  onSuccess?: () => void
 }
 
 const AnimePaheCookieModal: React.FC<AnimePaheCookieModalProps> = ({
@@ -43,7 +43,7 @@ const AnimePaheCookieModal: React.FC<AnimePaheCookieModalProps> = ({
     try {
       localStorage.setItem('animepahe_cookie', cookie.trim())
       toast.success('Cookie updated successfully!')
-      onSuccess()
+      onSuccess?.()
       onClose()
     } catch (e) {
       toast.error('Failed to save cookie')
