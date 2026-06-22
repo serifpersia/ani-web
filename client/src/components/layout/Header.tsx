@@ -16,30 +16,42 @@ interface UserProfile {
 }
 
 const fetchSyncProfile = async (): Promise<UserProfile | null> => {
-  const githubRes = await fetch('/api/auth/github/status')
-  if (githubRes.ok) {
-    const github = await githubRes.json()
-    if (github.authenticated && github.user) {
-      return {
-        name: github.user.name || github.user.login,
-        picture: github.user.avatarUrl,
-        provider: 'github',
+  const settingsRes = await fetch('/api/auth/settings/sync')
+  if (!settingsRes.ok) return null
+
+  const settings = await settingsRes.json()
+  const activeProvider = settings.actualActiveProvider as 'github' | 'google' | 'rclone' | 'none'
+
+  if (activeProvider === 'github') {
+    const githubRes = await fetch('/api/auth/github/status')
+    if (githubRes.ok) {
+      const github = await githubRes.json()
+      if (github.authenticated && github.user) {
+        return {
+          name: github.user.name || github.user.login,
+          picture: github.user.avatarUrl,
+          provider: 'github',
+        }
       }
     }
   }
 
-  const googleRes = await fetch('/api/auth/user')
-  if (!googleRes.ok) return null
-
-  const google = await googleRes.json()
-  if (!google) return null
-
-  return {
-    name: google.name,
-    picture: google.picture,
-    email: google.email,
-    provider: 'google',
+  if (activeProvider === 'google') {
+    const googleRes = await fetch('/api/auth/user')
+    if (googleRes.ok) {
+      const google = await googleRes.json()
+      if (google) {
+        return {
+          name: google.name,
+          picture: google.picture,
+          email: google.email,
+          provider: 'google',
+        }
+      }
+    }
   }
+
+  return null
 }
 
 const Header: React.FC = () => {
