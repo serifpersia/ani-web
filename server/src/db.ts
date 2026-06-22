@@ -81,121 +81,46 @@ export class DatabaseWrapper {
     return stmt
   }
 
-  private executeAndFinalize(
-    query: string,
-    params: BindableValue[] | undefined,
-    operation: 'run' | 'get' | 'all'
-  ): unknown {
+  public run(query: string, params: BindableValue[] = []): void {
+    if (this.isClosed) {
+      throw new Error('Database is closed')
+    }
     const stmt = this.getPreparedStatement(query)
-    let result: unknown
-    if (operation === 'run') {
-      if (params && params.length > 0) {
-        stmt.run(...params)
-      } else {
-        stmt.run()
-      }
-      result = null
-    } else if (operation === 'get') {
-      if (params && params.length > 0) {
-        result = stmt.get(...params)
-      } else {
-        result = stmt.get()
-      }
+    if (params.length > 0) {
+      stmt.run(...params)
     } else {
-      if (params && params.length > 0) {
-        result = stmt.all(...params)
-      } else {
-        result = stmt.all()
-      }
-    }
-    return result
-  }
-
-  public run(
-    query: string,
-    params?: unknown[] | ((err: Error | null) => void),
-    cb?: (err: Error | null) => void,
-    _options?: { skipSave?: boolean }
-  ) {
-    if (this.isClosed) {
-      if (cb) cb(new Error('Database is closed'))
-      return
-    }
-    if (typeof params === 'function') {
-      cb = params as (err: Error | null) => void
-      params = []
-    }
-    try {
-      const bindableParams =
-        params && Array.isArray(params) && params.length > 0
-          ? (params as BindableValue[])
-          : undefined
-      this.executeAndFinalize(query, bindableParams, 'run')
-      if (cb) cb(null)
-    } catch (e) {
-      logger.error({ err: e, query, params }, 'SQL Execution Error (run)')
-      if (cb) cb(e as Error)
+      stmt.run()
     }
   }
 
-  public get<T = unknown>(
-    query: string,
-    params?: unknown[] | ((err: Error | null, row: T) => void),
-    cb?: (err: Error | null, row: T) => void
-  ) {
+  public get<T = unknown>(query: string, params: BindableValue[] = []): T | undefined {
     if (this.isClosed) {
-      if (cb) cb(new Error('Database is closed'), null as unknown as T)
-      return
+      throw new Error('Database is closed')
     }
-    if (typeof params === 'function') {
-      cb = params as (err: Error | null, row: T) => void
-      params = []
+    const stmt = this.getPreparedStatement(query)
+    if (params.length > 0) {
+      return stmt.get(...params) as T | undefined
     }
-    try {
-      const bindableParams =
-        params && Array.isArray(params) && params.length > 0
-          ? (params as BindableValue[])
-          : undefined
-      const res = this.executeAndFinalize(query, bindableParams, 'get')
-      if (cb) cb(null, res as unknown as T)
-    } catch (e) {
-      logger.error({ err: e, query, params }, 'SQL Execution Error (get)')
-      if (cb) cb(e as Error, null as unknown as T)
-    }
+    return stmt.get() as T | undefined
   }
 
-  public all<T = unknown>(
-    query: string,
-    params?: unknown[] | ((err: Error | null, rows: T[]) => void),
-    cb?: (err: Error | null, rows: T[]) => void
-  ) {
+  public all<T = unknown>(query: string, params: BindableValue[] = []): T[] {
     if (this.isClosed) {
-      if (cb) cb(new Error('Database is closed'), [])
-      return
+      throw new Error('Database is closed')
     }
-    if (typeof params === 'function') {
-      cb = params as (err: Error | null, rows: T[]) => void
-      params = []
+    const stmt = this.getPreparedStatement(query)
+    if (params.length > 0) {
+      return stmt.all(...params) as T[]
     }
-    try {
-      const bindableParams =
-        params && Array.isArray(params) && params.length > 0
-          ? (params as BindableValue[])
-          : undefined
-      const res = this.executeAndFinalize(query, bindableParams, 'all') as T[]
-      if (cb) cb(null, res)
-    } catch (e) {
-      logger.error({ err: e, query, params }, 'SQL Execution Error (all)')
-      if (cb) cb(e as Error, [])
-    }
+    return stmt.all() as T[]
   }
 
   public prepare(query: string) {
     const stmt = this.getPreparedStatement(query)
 
     return {
-      run: (...args: unknown[]) => {
-        stmt.run(...(args as BindableValue[]))
+      run: (...args: BindableValue[]) => {
+        stmt.run(...args)
       },
       all: <T = unknown>(): T[] => {
         return stmt.all() as T[]
@@ -204,14 +129,6 @@ export class DatabaseWrapper {
         return stmt.get() as T | undefined
       },
       finalize: () => {},
-      runAsync: (cb: (err: Error | null) => void) => {
-        try {
-          stmt.run()
-          cb(null)
-        } catch (e) {
-          cb(e as Error)
-        }
-      },
     }
   }
 

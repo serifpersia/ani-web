@@ -16,8 +16,8 @@ export const WatchlistRepository = {
   getById: (db: DatabaseWrapper, id: string) =>
     dbGet<WatchlistRow>(db, 'SELECT * FROM watchlist WHERE id = ?', [id]),
 
-  exists: async (db: DatabaseWrapper, id: string) => {
-    const row = await dbGet<{ inWatchlist: number }>(
+  exists: (db: DatabaseWrapper, id: string) => {
+    const row = dbGet<{ inWatchlist: number }>(
       db,
       'SELECT EXISTS(SELECT 1 FROM watchlist WHERE id = ?) as inWatchlist',
       [id]
@@ -44,7 +44,7 @@ export const WatchlistRepository = {
     return dbAll<WatchlistRow>(db, query, params)
   },
 
-  getCount: async (db: DatabaseWrapper, status?: string) => {
+  getCount: (db: DatabaseWrapper, status?: string) => {
     let query = 'SELECT COUNT(*) as total FROM watchlist'
     const params: string[] = []
 
@@ -53,7 +53,7 @@ export const WatchlistRepository = {
       params.push(status)
     }
 
-    const row = await dbGet<{ total: number }>(db, query, params)
+    const row = dbGet<{ total: number }>(db, query, params)
     return row?.total || 0
   },
 

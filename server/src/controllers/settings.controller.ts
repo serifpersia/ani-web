@@ -8,7 +8,6 @@ import fs from 'fs'
 import { CONFIG } from '../config'
 import { DatabaseWrapper } from '../db'
 import { SettingsRepository } from '../repositories/settings.repository'
-import { asyncHandler } from '../utils/async-handler'
 import { getMachineId } from '../utils/machine-id'
 import { discordRPCService } from '../discord-rpc'
 
@@ -121,7 +120,7 @@ export class SettingsController {
     })
   }
 
-  importMalXml = asyncHandler(async (req: Request, res: Response) => {
+  importMalXml = async (req: Request, res: Response) => {
     if (!req.file) return res.status(400).json({ error: 'No file' })
     const { erase } = req.body
 
@@ -163,7 +162,7 @@ export class SettingsController {
       SettingsRepository.upsertWatchlistBatch(tx, showsToInsert)
     })
     res.json({ imported: showsToInsert.length, skipped: skippedCount })
-  })
+  }
 
   getInstallationId = (_req: Request, res: Response) => {
     try {

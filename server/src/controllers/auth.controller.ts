@@ -7,7 +7,6 @@ import { initializeDatabase, syncDownOnBoot, initSyncProvider } from '../sync'
 import { CONFIG } from '../config'
 import { rcloneService } from '../rclone'
 import path from 'path'
-import { asyncHandler } from '../utils/async-handler'
 
 export class AuthController {
   private runSyncSequence: (
@@ -36,7 +35,7 @@ export class AuthController {
     })
   }
 
-  updateGoogleAuthSettings = asyncHandler(async (req: Request, res: Response) => {
+  updateGoogleAuthSettings = async (req: Request, res: Response) => {
     const { clientId, clientSecret } = req.body
     const { updateEnvFile } = await import('../utils/env.utils')
 
@@ -52,18 +51,18 @@ export class AuthController {
 
     await updateEnvFile(updates)
     res.json({ success: true })
-  })
+  }
 
-  getRcloneSettings = asyncHandler(async (_req: Request, res: Response) => {
+  getRcloneSettings = async (_req: Request, res: Response) => {
     const remotes = await rcloneService.listRemotes()
     res.json({
       remote: CONFIG.RCLONE_REMOTE || '',
       availableRemotes: remotes,
       activeRemote: rcloneService.isActive() ? rcloneService.getRemoteName() : null,
     })
-  })
+  }
 
-  getSyncSettings = asyncHandler(async (_req: Request, res: Response) => {
+  getSyncSettings = async (_req: Request, res: Response) => {
     const { getActiveProvider } = await import('../sync')
     res.json({
       activeProvider: process.env.SYNC_PROVIDER || 'default',
@@ -74,9 +73,9 @@ export class AuthController {
         rclone: rcloneService.isActive(),
       },
     })
-  })
+  }
 
-  updateSyncProvider = asyncHandler(async (req: Request, res: Response) => {
+  updateSyncProvider = async (req: Request, res: Response) => {
     const { provider } = req.body
     const { updateEnvFile } = await import('../utils/env.utils')
 
@@ -84,9 +83,9 @@ export class AuthController {
     await updateEnvFile({ SYNC_PROVIDER: value })
     await initSyncProvider()
     res.json({ success: true, activeProvider: process.env.SYNC_PROVIDER || 'default' })
-  })
+  }
 
-  getGitHubAuthStatus = asyncHandler(async (_req: Request, res: Response) => {
+  getGitHubAuthStatus = async (_req: Request, res: Response) => {
     try {
       const user = await githubSyncService.getUserProfile()
       res.json({
@@ -106,26 +105,26 @@ export class AuthController {
         usingDefaultClientId: !process.env.GITHUB_CLIENT_ID,
       })
     }
-  })
+  }
 
-  startGitHubDeviceAuth = asyncHandler(async (req: Request, res: Response) => {
+  startGitHubDeviceAuth = async (req: Request, res: Response) => {
     const state = await githubSyncService.startDeviceAuth(req.db, this.runSyncSequence)
     res.json(state)
-  })
+  }
 
   pollGitHubDeviceAuth = (_req: Request, res: Response) => {
     res.json(githubSyncService.getDeviceState())
   }
 
-  logoutGitHub = asyncHandler(async (_req: Request, res: Response) => {
+  logoutGitHub = async (_req: Request, res: Response) => {
     await githubSyncService.logout()
     const { updateEnvFile } = await import('../utils/env.utils')
     await updateEnvFile({ SYNC_PROVIDER: '' })
     await initSyncProvider()
     res.json({ success: true })
-  })
+  }
 
-  updateRcloneSettings = asyncHandler(async (req: Request, res: Response) => {
+  updateRcloneSettings = async (req: Request, res: Response) => {
     const { remote } = req.body
     const { updateEnvFile } = await import('../utils/env.utils')
 
@@ -135,14 +134,14 @@ export class AuthController {
     })
     await this.runSyncSequence(req.db, 'rclone')
     res.json({ success: true })
-  })
+  }
 
-  getAuthUrl = asyncHandler(async (_req: Request, res: Response) => {
+  getAuthUrl = async (_req: Request, res: Response) => {
     const url = googleDriveService.getAuthUrl()
     res.json({ url })
-  })
+  }
 
-  loginGoogle = asyncHandler(async (req: Request, res: Response) => {
+  loginGoogle = async (req: Request, res: Response) => {
     if (googleDriveService.isAuthenticated()) {
       const user = await googleDriveService.getUserProfile()
       if (user) {
@@ -157,9 +156,9 @@ export class AuthController {
     }
     const url = googleDriveService.getAuthUrl()
     res.json({ url, authenticated: false })
-  })
+  }
 
-  handleCallback = asyncHandler(async (req: Request, res: Response) => {
+  handleCallback = async (req: Request, res: Response) => {
     const code = req.query.code as string
     if (!code) {
       return res.status(400).send('No code provided')
@@ -195,18 +194,18 @@ export class AuthController {
             </html>
             `
     res.send(responseHtml)
-  })
+  }
 
-  getUserProfile = asyncHandler(async (_req: Request, res: Response) => {
+  getUserProfile = async (_req: Request, res: Response) => {
     const user = await googleDriveService.getUserProfile()
     res.json(user)
-  })
+  }
 
-  logout = asyncHandler(async (_req: Request, res: Response) => {
+  logout = async (_req: Request, res: Response) => {
     await googleDriveService.logout()
     const { updateEnvFile } = await import('../utils/env.utils')
     await updateEnvFile({ SYNC_PROVIDER: '' })
     await initSyncProvider()
     res.json({ success: true })
-  })
+  }
 }

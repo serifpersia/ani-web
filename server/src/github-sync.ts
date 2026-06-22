@@ -119,7 +119,7 @@ function quoteIdentifier(identifier: string) {
   return `"${identifier.replace(/"/g, '""')}"`
 }
 
-function getRowsFromAll<T = unknown>(db: DatabaseWrapper, sql: string): Promise<T[]> {
+function getRowsFromAll<T = unknown>(db: DatabaseWrapper, sql: string): T[] {
   return dbAll<T>(db, sql)
 }
 

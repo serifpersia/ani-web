@@ -82,7 +82,6 @@ export async function initSyncProvider(
     return
   }
 
-  // Fallback to priority if no preferred provider is authenticated
   if (githubSyncService.isAuthenticated()) {
     activeProvider = 'github'
     log.info('Sync Provider: GitHub (Fallback)')
@@ -171,7 +170,7 @@ export async function syncDownOnBoot(
   let localVersion = await getLocalManifestVersion()
 
   if (localVersion === 0 && db) {
-    const row = await dbGet<{ value: number }>(
+    const row = dbGet<{ value: number }>(
       db,
       "SELECT value FROM sync_metadata WHERE key = 'db_version'"
     )
@@ -267,13 +266,11 @@ export async function syncDownOnBoot(
             log.info('Backup restored successfully after failed sync down.')
           } catch (restoreErr) {
             log.error({ err: restoreErr }, 'Critical: restore from backup also failed.')
-            // The DB may be corrupt – propagate so the caller can exit cleanly.
             throw new Error('Sync down and restore both failed. Database may be corrupt.', {
               cause: restoreErr,
             })
           }
         }
-        // DB was already closed before the attempt; re-open is required regardless.
         return true
       }
     } else {
@@ -373,22 +370,17 @@ export async function performWriteTransaction(
   db: DatabaseWrapper,
   runnable: (tx: DatabaseWrapper) => void
 ): Promise<void> {
-  // node:sqlite is fully synchronous — serialize/run/get all complete before returning,
-  // so we can avoid the nested Promise/callback pattern that could hang forever if
-  // setLocalManifestVersion threw after resolve/reject was no longer reachable.
   db.serialize(() => {
     runnable(db)
     db.run("UPDATE sync_metadata SET value = value + 1 WHERE key = 'db_version'")
   })
 
-  // Capture version synchronously; the callback fires immediately with node:sqlite.
-  const row = await dbGet<{ value: number }>(
+  const row = dbGet<{ value: number }>(
     db,
     "SELECT value FROM sync_metadata WHERE key = 'db_version'"
   )
   const newVersion = row?.value ?? 1
 
-  // Only the manifest write is truly async (disk I\O); errors here propagate normally.
   await setLocalManifestVersion(newVersion)
 }
 
@@ -399,104 +391,56 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
 
     db.run('PRAGMA journal_mode = WAL;')
     db.run('PRAGMA synchronous = NORMAL;')
-
     db.run('PRAGMA cache_size = -20000;')
     db.run('PRAGMA temp_store = MEMORY;')
     db.run('PRAGMA mmap_size = 268435456;')
     db.run('PRAGMA foreign_keys = ON;')
 
-    const initOpts = { skipSave: true } as const
-
     db.run(
-      `CREATE TABLE IF NOT EXISTS watchlist (id TEXT NOT NULL, name TEXT, thumbnail TEXT, status TEXT, nativeName TEXT, englishName TEXT, type TEXT, PRIMARY KEY (id))`,
-      undefined,
-      undefined,
-      initOpts
+      `CREATE TABLE IF NOT EXISTS watchlist (id TEXT NOT NULL, name TEXT, thumbnail TEXT, status TEXT, nativeName TEXT, englishName TEXT, type TEXT, PRIMARY KEY (id))`
     )
     db.run(
-      `CREATE TABLE IF NOT EXISTS watched_episodes (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, watchedAt DATETIME DEFAULT CURRENT_TIMESTAMP, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, PRIMARY KEY (showId, episodeNumber))`,
-      undefined,
-      undefined,
-      initOpts
+      `CREATE TABLE IF NOT EXISTS watched_episodes (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, watchedAt DATETIME DEFAULT CURRENT_TIMESTAMP, currentTime REAL DEFAULT 0, duration REAL DEFAULT 0, PRIMARY KEY (showId, episodeNumber))`
     )
     db.run(
-      `CREATE TABLE IF NOT EXISTS queue (id INTEGER PRIMARY KEY, showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, queue_order INTEGER NOT NULL)`,
-      undefined,
-      undefined,
-      initOpts
+      `CREATE TABLE IF NOT EXISTS queue (id INTEGER PRIMARY KEY, showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, queue_order INTEGER NOT NULL)`
     )
     db.run(
-      `CREATE TABLE IF NOT EXISTS settings (key TEXT NOT NULL, value TEXT, PRIMARY KEY (key))`,
-      undefined,
-      undefined,
-      initOpts
+      `CREATE TABLE IF NOT EXISTS settings (key TEXT NOT NULL, value TEXT, PRIMARY KEY (key))`
     )
     db.run(
-      `CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT, nativeName TEXT, englishName TEXT, episodeCount INTEGER, status TEXT, genres TEXT, popularityScore INTEGER, type TEXT)`,
-      undefined,
-      undefined,
-      initOpts
+      `CREATE TABLE IF NOT EXISTS shows_meta (id TEXT PRIMARY KEY, name TEXT, thumbnail TEXT, nativeName TEXT, englishName TEXT, episodeCount INTEGER, status TEXT, genres TEXT, popularityScore INTEGER, type TEXT)`
     )
     db.run(
-      `CREATE TABLE IF NOT EXISTS dismissed_notifications (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, dismissedAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (showId, episodeNumber))`,
-      undefined,
-      undefined,
-      initOpts
+      `CREATE TABLE IF NOT EXISTS dismissed_notifications (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, dismissedAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (showId, episodeNumber))`
     )
     db.run(
-      `CREATE TABLE IF NOT EXISTS discovered_notifications (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, discoveredAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (showId, episodeNumber))`,
-      undefined,
-      undefined,
-      initOpts
+      `CREATE TABLE IF NOT EXISTS discovered_notifications (showId TEXT NOT NULL, episodeNumber TEXT NOT NULL, discoveredAt DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (showId, episodeNumber))`
     )
     db.run(
-      `CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`,
-      undefined,
-      undefined,
-      initOpts
+      `CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`
     )
     db.run(
-      `INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`,
-      undefined,
-      undefined,
-      initOpts
+      `INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`
     )
 
     db.run(
-      `CREATE INDEX IF NOT EXISTS idx_watched_episodes_showId ON watched_episodes(showId)`,
-      undefined,
-      undefined,
-      initOpts
+      `CREATE INDEX IF NOT EXISTS idx_watched_episodes_showId ON watched_episodes(showId)`
     )
     db.run(
-      `CREATE INDEX IF NOT EXISTS idx_watched_episodes_showId_episodeNumber ON watched_episodes(showId, episodeNumber)`,
-      undefined,
-      undefined,
-      initOpts
+      `CREATE INDEX IF NOT EXISTS idx_watched_episodes_showId_episodeNumber ON watched_episodes(showId, episodeNumber)`
     )
     db.run(
-      `CREATE INDEX IF NOT EXISTS idx_watched_episodes_watchedAt ON watched_episodes(watchedAt)`,
-      undefined,
-      undefined,
-      initOpts
+      `CREATE INDEX IF NOT EXISTS idx_watched_episodes_watchedAt ON watched_episodes(watchedAt)`
     )
     db.run(
-      `CREATE INDEX IF NOT EXISTS idx_watchlist_status ON watchlist(status)`,
-      undefined,
-      undefined,
-      initOpts
+      `CREATE INDEX IF NOT EXISTS idx_watchlist_status ON watchlist(status)`
     )
     db.run(
-      `CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_show_episode ON queue(showId, episodeNumber)`,
-      undefined,
-      undefined,
-      initOpts
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_show_episode ON queue(showId, episodeNumber)`
     )
     db.run(
-      `CREATE INDEX IF NOT EXISTS idx_queue_order ON queue(queue_order)`,
-      undefined,
-      undefined,
-      initOpts
+      `CREATE INDEX IF NOT EXISTS idx_queue_order ON queue(queue_order)`
     )
 
     db.run('DELETE FROM watched_episodes WHERE showId NOT IN (SELECT id FROM watchlist)')
@@ -514,11 +458,9 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     )
 
     const addCol = (tbl: string, col: string, type: string) => {
-      db.all(`PRAGMA table_info(${tbl})`, (e: Error | null, r: unknown) => {
-        const columns = r as { name: string }[]
-        if (!columns.some((c) => c.name === col))
-          db.run(`ALTER TABLE ${tbl} ADD COLUMN ${col} ${type}`, undefined, undefined, initOpts)
-      })
+      const columns = db.all<{ name: string }>(`PRAGMA table_info(${tbl})`)
+      if (!columns.some((c) => c.name === col))
+        db.run(`ALTER TABLE ${tbl} ADD COLUMN ${col} ${type}`)
     }
 
     addCol('watchlist', 'nativeName', 'TEXT')

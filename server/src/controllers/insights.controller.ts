@@ -2,7 +2,6 @@ import { Request, Response } from 'express'
 import { AllAnimeProvider } from '../providers/allanime.provider'
 import logger from '../logger'
 import { InsightsRepository } from '../repositories/insights.repository'
-import { asyncHandler } from '../utils/async-handler'
 
 interface CoreStats {
   totalSeconds?: number
@@ -45,7 +44,7 @@ interface CompletionVelocity {
 export class InsightsController {
   constructor(private provider: AllAnimeProvider) {}
 
-  getWatchInsights = asyncHandler(async (req: Request, res: Response) => {
+  getWatchInsights = async (req: Request, res: Response) => {
     const db = req.db
 
     const [
@@ -179,5 +178,5 @@ export class InsightsController {
         }) || [],
       droppedShows: (droppedWarning || []).slice(0, 5),
     })
-  })
+  }
 }

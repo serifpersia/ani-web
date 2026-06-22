@@ -14,7 +14,6 @@ import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
 import { NotificationsRepository } from '../repositories/notifications.repository'
 import { QueueRepository } from '../repositories/queue.repository'
 import { SearchOptions } from '../providers/provider.interface'
-import { asyncHandler } from '../utils/async-handler'
 import { SettingsRepository } from '../repositories/settings.repository'
 import { discordRPCService } from '../discord-rpc'
 import { requestContext } from '../utils/request-context'
@@ -241,9 +240,11 @@ export class WatchlistController {
             const epCount = epList.length
             episodeFetchResults.set(show.id, epCount)
             episodeMappingResults.set(show.id, epList)
-            ShowsMetaRepository.updateEpisodeCount(req.db, show.id, epCount).catch((e) => {
+            try {
+              ShowsMetaRepository.updateEpisodeCount(req.db, show.id, epCount)
+            } catch (e) {
               logger.error({ err: e, showId: show.id }, 'Failed to update episode count in DB')
-            })
+            }
           }
         })
       }
@@ -381,24 +382,24 @@ export class WatchlistController {
     return upNextShows
   }
 
-  getContinueWatchingFast = asyncHandler(async (req: Request, res: Response) => {
+  getContinueWatchingFast = async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 10
     const data = await this.getContinueWatchingData(req, limit)
     res.json(data)
-  })
+  }
 
-  getContinueWatchingUpNext = asyncHandler(async (req: Request, res: Response) => {
+  getContinueWatchingUpNext = async (req: Request, res: Response) => {
     const data = await this.getUpNextShowsData(req)
     res.json(data)
-  })
+  }
 
-  getContinueWatching = asyncHandler(async (req: Request, res: Response) => {
+  getContinueWatching = async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 10
     const data = await this.getContinueWatchingData(req)
     res.json(data.slice(0, limit))
-  })
+  }
 
-  getAllContinueWatching = asyncHandler(async (req: Request, res: Response) => {
+  getAllContinueWatching = async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1
     const limit = parseInt(req.query.limit as string) || 10
     const offset = (page - 1) * limit
@@ -411,9 +412,9 @@ export class WatchlistController {
       page,
       limit,
     })
-  })
+  }
 
-  updateProgress = asyncHandler(async (req: Request, res: Response) => {
+  updateProgress = async (req: Request, res: Response) => {
     const {
       showId,
       episodeNumber,
@@ -499,18 +500,18 @@ export class WatchlistController {
 
     req.db.scheduleSave()
     res.json({ success: true })
-  })
+  }
 
-  removeContinueWatching = asyncHandler(async (req: Request, res: Response) => {
+  removeContinueWatching = async (req: Request, res: Response) => {
     const { showId } = req.body
     await performWriteTransaction(req.db, (tx) => {
       WatchedEpisodesRepository.deleteByShow(tx, showId)
       NotificationsRepository.deleteByShow(tx, showId)
     })
     res.json({ success: true })
-  })
+  }
 
-  getWatchlist = asyncHandler(async (req: Request, res: Response) => {
+  getWatchlist = async (req: Request, res: Response) => {
     const { status, page: pageStr, limit: limitStr } = req.query
     const page = parseInt(pageStr as string) || 1
     const limit = parseInt(limitStr as string) || 10
@@ -582,14 +583,14 @@ export class WatchlistController {
         }
       }
     })
-  })
+  }
 
-  checkWatchlist = asyncHandler(async (req: Request, res: Response) => {
+  checkWatchlist = async (req: Request, res: Response) => {
     const item = await WatchlistRepository.getById(req.db, req.params.showId as string)
     res.json({ inWatchlist: !!item, status: item?.status ?? null })
-  })
+  }
 
-  getQueue = asyncHandler(async (req: Request, res: Response) => {
+  getQueue = async (req: Request, res: Response) => {
     const rows = await QueueRepository.getAll(req.db)
     res.json(
       rows.map((row) => ({
@@ -599,9 +600,9 @@ export class WatchlistController {
         thumbnail: this.deobfuscateUrl(row.thumbnail || '', row.showId),
       }))
     )
-  })
+  }
 
-  addToQueue = asyncHandler(async (req: Request, res: Response) => {
+  addToQueue = async (req: Request, res: Response) => {
     const { showId, episodeNumber, showName, showThumbnail, nativeName, englishName, type } =
       req.body
 
@@ -632,24 +633,24 @@ export class WatchlistController {
 
     req.db.scheduleSave()
     res.json({ success: true, queued: !existing })
-  })
+  }
 
-  removeFromQueue = asyncHandler(async (req: Request, res: Response) => {
+  removeFromQueue = async (req: Request, res: Response) => {
     const { showId, episodeNumber } = req.body
     await performWriteTransaction(req.db, (tx) => {
       QueueRepository.removeEpisode(tx, showId, String(episodeNumber))
     })
     res.json({ success: true })
-  })
+  }
 
-  clearQueue = asyncHandler(async (req: Request, res: Response) => {
+  clearQueue = async (req: Request, res: Response) => {
     await performWriteTransaction(req.db, (tx) => {
       QueueRepository.clear(tx)
     })
     res.json({ success: true })
-  })
+  }
 
-  reorderQueue = asyncHandler(async (req: Request, res: Response) => {
+  reorderQueue = async (req: Request, res: Response) => {
     const { items } = req.body
     if (!Array.isArray(items)) {
       return res.status(400).json({ error: 'items must be an array' })
@@ -659,9 +660,9 @@ export class WatchlistController {
       QueueRepository.reorder(tx, items)
     })
     res.json({ success: true })
-  })
+  }
 
-  getSuggestedQueueEpisode = asyncHandler(async (req: Request, res: Response) => {
+  getSuggestedQueueEpisode = async (req: Request, res: Response) => {
     const showId = req.params.showId as string
     const resumeProgress = await WatchedEpisodesRepository.getLatestResumeProgress(req.db, showId)
 
@@ -703,26 +704,26 @@ export class WatchlistController {
       '1'
 
     res.json({ showId, episodeNumber, resumeTime: 0 })
-  })
+  }
 
-  getEpisodeProgress = asyncHandler(async (req: Request, res: Response) => {
+  getEpisodeProgress = async (req: Request, res: Response) => {
     const progress = await WatchedEpisodesRepository.getByShowAndEpisode(
       req.db,
       req.params.showId as string,
       req.params.episodeNumber as string
     )
     res.json(progress || { currentTime: 0, duration: 0 })
-  })
+  }
 
-  getWatchedEpisodes = asyncHandler(async (req: Request, res: Response) => {
+  getWatchedEpisodes = async (req: Request, res: Response) => {
     const episodes = await WatchedEpisodesRepository.getWatchedEpisodeNumbers(
       req.db,
       req.params.showId as string
     )
     res.json(episodes)
-  })
+  }
 
-  addToWatchlist = asyncHandler(async (req: Request, res: Response) => {
+  addToWatchlist = async (req: Request, res: Response) => {
     const { id, status, nativeName, englishName } = req.body
     let { name, thumbnail, type } = req.body
 
@@ -757,9 +758,9 @@ export class WatchlistController {
 
     await req.db.saveNow()
     res.json({ success: true })
-  })
+  }
 
-  removeFromWatchlist = asyncHandler(async (req: Request, res: Response) => {
+  removeFromWatchlist = async (req: Request, res: Response) => {
     const { id } = req.body
     await performWriteTransaction(req.db, (tx) => {
       WatchlistRepository.delete(tx, id)
@@ -767,17 +768,17 @@ export class WatchlistController {
       NotificationsRepository.deleteByShow(tx, id)
     })
     res.json({ success: true })
-  })
+  }
 
-  updateWatchlistStatus = asyncHandler(async (req: Request, res: Response) => {
+  updateWatchlistStatus = async (req: Request, res: Response) => {
     const { id, status } = req.body
     await performWriteTransaction(req.db, (tx) => {
       WatchlistRepository.updateStatus(tx, id, status)
     })
     res.json({ success: true })
-  })
+  }
 
-  getNotifications = asyncHandler(async (req: Request, res: Response) => {
+  getNotifications = async (req: Request, res: Response) => {
     const db = req.db
     const watchingShows = await WatchlistRepository.getWatchingShows(db)
 
@@ -851,21 +852,21 @@ export class WatchlistController {
     res.json(
       notifications.sort((a, b) => parseFloat(b.episodeNumber) - parseFloat(a.episodeNumber))
     )
-  })
+  }
 
-  dismissNotification = asyncHandler(async (req: Request, res: Response) => {
+  dismissNotification = async (req: Request, res: Response) => {
     const { showId, episodeNumber } = req.body
     await performWriteTransaction(req.db, (tx) => {
       NotificationsRepository.addDismissed(tx, showId, episodeNumber)
     })
     res.json({ success: true })
-  })
+  }
 
-  clearAllNotifications = asyncHandler(async (req: Request, res: Response) => {
+  clearAllNotifications = async (req: Request, res: Response) => {
     const { showId } = req.body
     await performWriteTransaction(req.db, (tx) => {
       NotificationsRepository.dismissFromDiscovered(tx, showId)
     })
     res.json({ success: true })
-  })
+  }
 }

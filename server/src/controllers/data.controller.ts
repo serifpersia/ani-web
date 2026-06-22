@@ -2,7 +2,6 @@ import { Request, Response } from 'express'
 import { Provider, Show } from '../providers/provider.interface'
 import { genres, tags, studios } from '../constants.json'
 import logger from '../logger'
-import { asyncHandler } from '../utils/async-handler'
 
 export class DataController {
   constructor(private providers: { [key: string]: Provider }) {}
@@ -12,7 +11,7 @@ export class DataController {
     return this.providers[providerName.toLowerCase()] || this.providers['allanime']
   }
 
-  getPopular = asyncHandler(async (req: Request, res: Response) => {
+  getPopular = async (req: Request, res: Response) => {
     const timeframe = (req.params.timeframe as string).toLowerCase() as
       | 'daily'
       | 'weekly'
@@ -29,9 +28,9 @@ export class DataController {
       }
       throw e
     }
-  })
+  }
 
-  getSchedule = asyncHandler(async (req: Request, res: Response) => {
+  getSchedule = async (req: Request, res: Response) => {
     try {
       const data = await this.getProvider(req).getSchedule(
         new Date(req.params.date + 'T00:00:00.000Z')
@@ -43,9 +42,9 @@ export class DataController {
       }
       throw e
     }
-  })
+  }
 
-  getSkipTimes = asyncHandler(async (req: Request, res: Response) => {
+  getSkipTimes = async (req: Request, res: Response) => {
     try {
       const data = await this.getProvider(req).getSkipTimes(
         req.params.showId as string,
@@ -55,9 +54,9 @@ export class DataController {
     } catch {
       res.json({ found: false, results: [] })
     }
-  })
+  }
 
-  getVideo = asyncHandler(async (req: Request, res: Response) => {
+  getVideo = async (req: Request, res: Response) => {
     try {
       const urls = await this.getProvider(req).getStreamUrls(
         req.query.showId as string,
@@ -69,14 +68,12 @@ export class DataController {
       if ((e as Error).message === 'AUTH_REQUIRED') {
         return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'animepahe' })
       }
-      // Return empty array instead of 500 so frontend can stay functional
-      // and allow provider switching.
       logger.error({ err: e, provider: req.query.provider }, 'Provider video fetch failed')
       res.json([])
     }
-  })
+  }
 
-  getEpisodes = asyncHandler(async (req: Request, res: Response) => {
+  getEpisodes = async (req: Request, res: Response) => {
     try {
       let showId = req.query.showId as string
       const provider = this.getProvider(req)
@@ -119,9 +116,9 @@ export class DataController {
       }
       throw e
     }
-  })
+  }
 
-  search = asyncHandler(async (req: Request, res: Response) => {
+  search = async (req: Request, res: Response) => {
     try {
       const data = await this.getProvider(req).search(req.query)
       res.json(data)
@@ -131,9 +128,9 @@ export class DataController {
       }
       throw e
     }
-  })
+  }
 
-  getSeasonal = asyncHandler(async (req: Request, res: Response) => {
+  getSeasonal = async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1
     try {
       const data = await this.getProvider(req).getSeasonal(page)
@@ -144,9 +141,9 @@ export class DataController {
       }
       throw e
     }
-  })
+  }
 
-  getLatestReleases = asyncHandler(async (req: Request, res: Response) => {
+  getLatestReleases = async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1
     const size = parseInt(req.query.size as string) || 14
     try {
@@ -158,9 +155,9 @@ export class DataController {
       }
       throw e
     }
-  })
+  }
 
-  getShowMeta = asyncHandler(async (req: Request, res: Response) => {
+  getShowMeta = async (req: Request, res: Response) => {
     try {
       const id = req.params.id as string
       const providerQuery = req.query.provider as string
@@ -251,7 +248,7 @@ export class DataController {
       }
       throw e
     }
-  })
+  }
 
   getGenresAndTags = (_req: Request, res: Response) => {
     res.json({ genres, tags, studios })
