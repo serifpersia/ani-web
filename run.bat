@@ -70,7 +70,7 @@ if exist "server\dist\server.js" if exist "client\dist" (
 echo.
 echo --^> Ensuring Production Dependencies for server...
 cd server
-call npm install --omit=dev --workspace=server
+call npm install --omit=dev
 cd ..
 
 echo.
