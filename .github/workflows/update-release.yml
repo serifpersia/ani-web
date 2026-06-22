@@ -78,7 +78,6 @@ jobs:
       - name: Install Dependencies
         run: |
           npm install
-          npm run install:client
 
       - name: Build Application
         run: npm run build

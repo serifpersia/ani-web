@@ -14,6 +14,8 @@
   },
   "overrides": {
     "encoding-sniffer": "^1.0.2",
-    "glob": "^13.0.0"
+    "glob": "^13.0.0",
+    "esbuild": "^0.28.1",
+    "undici": "^8.5.0"
   }
 }

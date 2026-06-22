@@ -9,16 +9,19 @@
   "engines": {
     "node": ">=22.5.0"
   },
+  "workspaces": [
+    "client",
+    "server"
+  ],
   "scripts": {
-    "install:client": "npm install --prefix client",
-    "build": "npm run build --prefix client && npm run build --prefix server",
+    "build": "npm run build --workspaces",
     "start": "node orchestrator.js prod",
     "dev": "node orchestrator.js dev",
-    "client": "npm start --prefix client",
-    "server": "npm run start --prefix server",
+    "client": "npm start --workspace=client",
+    "server": "npm run start --workspace=server",
     "preview": "node orchestrator.js prod",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "lint": "npm run lint --prefix client && npm run lint --prefix server",
+    "lint": "npm run lint --workspaces",
     "format": "prettier --write .",
     "prepublishOnly": "npm run build",
     "update-version": "node update-version.js"
@@ -46,7 +49,7 @@
   "dependencies": {
     "@octokit/auth-oauth-device": "^8.0.3",
     "@octokit/rest": "^22.0.1",
-    "@xhayper/discord-rpc": "^1.1.8",
+    "@xhayper/discord-rpc": "^1.3.4",
     "axios": "^1.15.1",
     "axios-retry": "^4.5.0",
     "cheerio": "^1.2.0",
@@ -63,7 +66,9 @@
     "xml2js": "^0.6.2"
   },
   "overrides": {
-    "encoding-sniffer": "^1.0.2"
+    "encoding-sniffer": "^1.0.2",
+    "esbuild": "^0.28.1",
+    "undici": "^8.5.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
