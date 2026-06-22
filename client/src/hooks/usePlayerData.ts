@@ -57,7 +57,11 @@ export const usePlayerData = (
     }
   }, [showId, uiState.selectedProvider])
 
-  const { data: showData, isLoading: loadingShowData, error: showDataError } = useQuery({
+  const {
+    data: showData,
+    isLoading: loadingShowData,
+    error: showDataError,
+  } = useQuery({
     queryKey: ['show-data', showId, uiState.currentMode],
     queryFn: async () => {
       if (!showId) throw new Error('No showId')
@@ -111,12 +115,7 @@ export const usePlayerData = (
   })
 
   useEffect(() => {
-    if (
-      !episodeNumber &&
-      showData?.episodes &&
-      showData.episodes.length > 0 &&
-      !episodeNumber
-    ) {
+    if (!episodeNumber && showData?.episodes && showData.episodes.length > 0 && !episodeNumber) {
       dispatch({ type: 'SET_STATE', payload: { initialEpisode: showData.episodes[0] } })
     }
   }, [showData, episodeNumber])

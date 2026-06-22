@@ -15,12 +15,11 @@ export const SettingsRepository = {
     shows: { id: string; name: string; thumbnail?: string; status: string }[]
   ) => {
     for (const show of shows) {
-      dbRun(db, 'INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status) VALUES (?, ?, ?, ?)', [
-        show.id,
-        show.name,
-        show.thumbnail ?? null,
-        show.status,
-      ])
+      dbRun(
+        db,
+        'INSERT OR REPLACE INTO watchlist (id, name, thumbnail, status) VALUES (?, ?, ?, ?)',
+        [show.id, show.name, show.thumbnail ?? null, show.status]
+      )
     }
   },
 }
