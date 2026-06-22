@@ -106,7 +106,6 @@ export interface PlayerState {
   episodes: string[]
   watchedEpisodes: string[]
   watchlistStatus: string | null
-  currentEpisode?: string
   showCombinedDetails: boolean
   currentMode: 'sub' | 'dub'
   inWatchlist: boolean
@@ -128,4 +127,5 @@ export interface PlayerState {
   fetchedEpisodeNumber?: string
   showCookieModal?: boolean
   cookieProvider?: 'animepahe' | null
+  initialEpisode?: string
 }

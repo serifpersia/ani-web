@@ -2,7 +2,6 @@ import type { PlayerState, VideoSource, VideoLink } from '../types/player'
 
 export type Action =
   | { type: 'SET_STATE'; payload: Partial<PlayerState> }
-  | { type: 'SET_CURRENT_EPISODE'; payload: string | undefined }
   | { type: 'SET_MODE'; payload: 'sub' | 'dub' }
   | {
       type: 'SET_PROVIDER'
@@ -28,7 +27,6 @@ export const createInitialState = (): PlayerState => ({
   episodes: [],
   watchedEpisodes: [],
   watchlistStatus: null,
-  currentEpisode: undefined,
   showCombinedDetails: false,
   currentMode: getPreferredMode(),
   inWatchlist: false,
@@ -57,8 +55,6 @@ export function playerReducer(state: PlayerState, action: Action): PlayerState {
   switch (action.type) {
     case 'SET_STATE':
       return { ...state, ...action.payload }
-    case 'SET_CURRENT_EPISODE':
-      return { ...state, currentEpisode: action.payload }
     case 'SET_MODE':
       return {
         ...state,

@@ -317,26 +317,6 @@ const Player: React.FC = () => {
     }
   }, [state.selectedSource, state.selectedLink, refs.videoRef, actions, state.loadingVideo])
 
-  useEffect(() => {
-    if (state.loadingVideo) return
-    const actualEp = state.selectedSource?.actualEpisodeNumber
-    const fetchedEp = state.fetchedEpisodeNumber
-
-    if (actualEp && episodeNumber && fetchedEp === episodeNumber && actualEp !== episodeNumber) {
-      console.log(`[Sync] Redirecting from episode ${episodeNumber} to ${actualEp}`)
-      navigate(`/watch/${showId}/${actualEp}`, { replace: true })
-      dispatch({ type: 'SET_CURRENT_EPISODE', payload: actualEp })
-    }
-  }, [
-    state.selectedSource?.actualEpisodeNumber,
-    state.fetchedEpisodeNumber,
-    episodeNumber,
-    showId,
-    navigate,
-    dispatch,
-    state.loadingVideo,
-  ])
-
   const handlePlaybackFinished = useCallback(() => {
     actions.onEnded()
 

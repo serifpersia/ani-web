@@ -42,6 +42,8 @@ export const usePlayerData = (
   const queryClient = useQueryClient()
   const hasForcedProvider = useRef<string | null>(null)
 
+  const currentEpisode = episodeNumber || uiState.initialEpisode
+
   useEffect(() => {
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     if (
@@ -55,21 +57,7 @@ export const usePlayerData = (
     }
   }, [showId, uiState.selectedProvider])
 
-  useEffect(() => {
-    if (episodeNumber && episodeNumber !== uiState.currentEpisode) {
-      dispatch({ type: 'SET_CURRENT_EPISODE', payload: episodeNumber })
-      dispatch({
-        type: 'SET_STATE',
-        payload: { selectedSource: null, selectedLink: null, showResumeModal: true },
-      })
-    }
-  }, [episodeNumber, uiState.currentEpisode])
-
-  const {
-    data: showData,
-    isLoading: loadingShowData,
-    error: showDataError,
-  } = useQuery({
+  const { data: showData, isLoading: loadingShowData, error: showDataError } = useQuery({
     queryKey: ['show-data', showId, uiState.currentMode],
     queryFn: async () => {
       if (!showId) throw new Error('No showId')
@@ -127,11 +115,11 @@ export const usePlayerData = (
       !episodeNumber &&
       showData?.episodes &&
       showData.episodes.length > 0 &&
-      !uiState.currentEpisode
+      !episodeNumber
     ) {
-      dispatch({ type: 'SET_CURRENT_EPISODE', payload: showData.episodes[0] })
+      dispatch({ type: 'SET_STATE', payload: { initialEpisode: showData.episodes[0] } })
     }
-  }, [showData, episodeNumber, uiState.currentEpisode])
+  }, [showData, episodeNumber])
 
   const {
     data: videoData,
@@ -141,13 +129,13 @@ export const usePlayerData = (
     queryKey: [
       'video-sources',
       showId,
-      uiState.currentEpisode,
+      currentEpisode,
       uiState.selectedProvider,
       uiState.currentMode,
       showData?.showMeta?.name,
     ],
     queryFn: async () => {
-      if (!showId || !uiState.currentEpisode) throw new Error('Missing params')
+      if (!showId || !currentEpisode) throw new Error('Missing params')
 
       try {
         let providerShowId = showId
@@ -252,12 +240,12 @@ export const usePlayerData = (
 
         const [sources, progress, preferredSourceData, skipTimesData] = await Promise.all([
           fetchApi(
-            `/api/video?showId=${providerShowId}&episodeNumber=${uiState.currentEpisode}&mode=${uiState.currentMode}&provider=${uiState.selectedProvider}`
+            `/api/video?showId=${providerShowId}&episodeNumber=${currentEpisode}&mode=${uiState.currentMode}&provider=${uiState.selectedProvider}`
           ).catch(() => null),
-          fetchApi(`/api/episode-progress/${showId}/${uiState.currentEpisode}`).catch(() => null),
+          fetchApi(`/api/episode-progress/${showId}/${currentEpisode}`).catch(() => null),
           fetchApi(`/api/settings?key=preferredSource`).catch(() => null),
           fetchApi(
-            `/api/skip-times/${showId}/${uiState.currentEpisode}?provider=${uiState.selectedProvider}`
+            `/api/skip-times/${showId}/${currentEpisode}?provider=${uiState.selectedProvider}`
           ).catch(() => []),
         ])
 
@@ -321,7 +309,7 @@ export const usePlayerData = (
           resumeDuration,
           showResumeModal: resumeTime > 5 && sourceToSelect?.type !== 'iframe',
           skipIntervals,
-          fetchedEpisodeNumber: uiState.currentEpisode,
+          fetchedEpisodeNumber: currentEpisode,
         }
       } catch (e) {
         const error = e as Error & { provider?: string }
@@ -338,16 +326,15 @@ export const usePlayerData = (
             resumeDuration: 0,
             showResumeModal: false,
             skipIntervals: [],
-            fetchedEpisodeNumber: uiState.currentEpisode,
+            fetchedEpisodeNumber: currentEpisode,
           }
         }
         throw e
       }
     },
-    enabled: !!showId && !!uiState.currentEpisode && !!showData?.showMeta?.name,
+    enabled: !!showId && !!currentEpisode && !!showData?.showMeta?.name,
   })
 
-  // 3. Additional Details Query
   const loadingDetails = false
 
   const { mutateAsync: toggleWatchlistMutation } = useMutation({
@@ -496,9 +483,10 @@ export const usePlayerData = (
 
     return {
       ...uiState,
+      currentEpisode,
       showMeta: {
         ...(showData?.showMeta || {}),
-        name: showData?.showMeta?.name, // Preserve original name
+        name: showData?.showMeta?.name,
       },
       episodes: showData?.episodes || [],
       watchedEpisodes: showData?.watchedEpisodes || [],
@@ -526,6 +514,7 @@ export const usePlayerData = (
     loadingDetails,
     showDataError,
     videoError,
+    currentEpisode,
   ])
 
   return {
