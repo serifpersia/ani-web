@@ -1,6 +1,6 @@
 {
   "name": "ani-web",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "A web application for watching anime.",
   "main": "orchestrator.js",
   "bin": {
@@ -46,7 +46,7 @@
   "dependencies": {
     "@octokit/auth-oauth-device": "^8.0.3",
     "@octokit/rest": "^22.0.1",
-    "@xhayper/discord-rpc": "^1.3.4",
+    "@xhayper/discord-rpc": "^1.1.8",
     "axios": "^1.15.1",
     "axios-retry": "^4.5.0",
     "cheerio": "^1.2.0",
