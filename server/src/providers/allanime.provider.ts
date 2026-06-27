@@ -517,6 +517,7 @@ export class AllAnimeProvider implements Provider {
         _id: show._id,
         name: show.name,
         thumbnail: this.deobfuscateUrl(show.thumbnail || ''),
+        thumbnails: Array.isArray(show.thumbnails) ? show.thumbnails : undefined,
         bannerImage: show.banner,
         description: show.description,
         genres: show.genres ? show.genres.map((g: string) => ({ name: g })) : [],

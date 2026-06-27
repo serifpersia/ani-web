@@ -14,6 +14,7 @@ interface DiscordActivityData {
   isPlaying: boolean
   providerName: string
   sessionId?: string
+  thumbnails?: string[]
 }
 
 class DiscordRPCService {
@@ -158,24 +159,52 @@ class DiscordRPCService {
     return `${mm}:${ss}`
   }
 
-  public async updatePresence(data: {
-    title: string
-    episode: string
-    totalEpisodes?: string
-    currentTime: number
-    duration: number
-    thumbnail: string
-    isPlaying: boolean
-    providerName: string
-    sessionId?: string
-  }) {
+  public async updatePresence(data: DiscordActivityData) {
     this.lastActivity = data
     if (data.sessionId) {
       this.currentSessionId = data.sessionId
     }
     if (!this.isEnabled || !this.client || !this.client.user) return
 
-    const imageKey = data.providerName === 'AnimePahe' ? 'logo' : data.thumbnail
+    const isSafeUrl = (url: string): boolean => {
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        return false
+      }
+      if (url.includes('localhost') || url.includes('127.0.0.1')) {
+        return false
+      }
+      if (url.includes('s4.anilist.co') || url.includes('anilistcdn')) {
+        return true
+      }
+      const blockedDomains = [
+        'youtube-anime.com',
+        'allanime.day',
+        'animepahe',
+        'animeya.cc',
+        'gogocdn.net',
+      ]
+      return !blockedDomains.some((domain) => url.includes(domain))
+    }
+
+    let imageKey = 'logo'
+    if (data.thumbnail && data.providerName !== 'AnimePahe') {
+      let thumbUrl = data.thumbnail
+      if (thumbUrl.includes('/api/image-proxy')) {
+        const match = thumbUrl.match(/url=([^&]+)/)
+        if (match) {
+          thumbUrl = decodeURIComponent(match[1])
+        }
+      }
+
+      if (isSafeUrl(thumbUrl)) {
+        imageKey = thumbUrl
+      } else if (data.thumbnails) {
+        const safeThumb = data.thumbnails.find(
+          (t) => t && (t.includes('s4.anilist.co') || t.includes('anilistcdn'))
+        )
+        if (safeThumb) imageKey = safeThumb
+      }
+    }
 
     try {
       if (!data.isPlaying) {

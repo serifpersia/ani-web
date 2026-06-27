@@ -12,6 +12,7 @@ export interface Show {
   nativeName?: string
   englishName?: string
   thumbnail?: string
+  thumbnails?: string[]
   bannerImage?: string
   description?: string
   type?: string

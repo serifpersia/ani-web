@@ -460,6 +460,14 @@ export class WatchlistController {
       }
     }
 
+    let discordThumbnails: string[] | undefined
+    try {
+      const meta = await this.getProviderForId(showId).getShowMeta(showId)
+      if (meta?.thumbnails) discordThumbnails = meta.thumbnails
+    } catch {
+      // Non-critical, Discord will fall back to logo
+    }
+
     discordRPCService.updatePresence({
       title: displayName,
       episode: String(actualEpisodeNumber),
@@ -470,6 +478,7 @@ export class WatchlistController {
       isPlaying: isPlaying !== false,
       providerName: this.getProviderForId(showId).name,
       sessionId,
+      thumbnails: discordThumbnails,
     })
 
     const genresStr = Array.isArray(genres) ? JSON.stringify(genres) : genres
