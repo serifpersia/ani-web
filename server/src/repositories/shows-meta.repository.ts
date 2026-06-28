@@ -61,6 +61,9 @@ export const ShowsMetaRepository = {
   updateType: (db: DatabaseWrapper, id: string, type: string) =>
     dbRun(db, 'UPDATE shows_meta SET type = ? WHERE id = ?', [type, id]),
 
+  updateStatus: (db: DatabaseWrapper, id: string, status: string) =>
+    dbRun(db, 'UPDATE shows_meta SET status = ? WHERE id = ?', [status, id]),
+
   updateThumbnail: (db: DatabaseWrapper, id: string, thumbnail: string) =>
     dbRun(db, 'UPDATE shows_meta SET thumbnail = ? WHERE id = ?', [thumbnail, id]),
 

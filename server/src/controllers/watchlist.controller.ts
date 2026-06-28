@@ -878,4 +878,94 @@ export class WatchlistController {
     })
     res.json({ success: true })
   }
+
+  getThisWeekSchedule = async (req: Request, res: Response) => {
+    const db = req.db
+    let rows = await WatchlistRepository.getShowsWithNewEpisodes(db)
+
+    if (rows.length === 0) {
+      return res.json([])
+    }
+
+    const showsNeedingStatus = rows.filter((r) => !r.smStatus)
+    if (showsNeedingStatus.length > 0) {
+      const BATCH_SIZE = 5
+      for (let i = 0; i < showsNeedingStatus.length; i += BATCH_SIZE) {
+        const batch = showsNeedingStatus.slice(i, i + BATCH_SIZE)
+        await Promise.allSettled(
+          batch.map((show) =>
+            this.getProviderForId(show.id)
+              .getShowMeta(show.id)
+              .then((meta) => {
+                if (meta?.status) {
+                  return ShowsMetaRepository.upsert(db, { id: show.id, status: meta.status })
+                }
+              })
+              .catch(() => {})
+          )
+        )
+      }
+      await db.saveNow()
+    }
+
+    rows = await WatchlistRepository.getShowsWithNewEpisodes(db)
+
+    const filteredRows = rows.filter(
+      (r) =>
+        r.smStatus === 'Ongoing' || r.smStatus === 'Releasing' || r.smStatus === 'Currently Airing'
+    )
+
+    if (filteredRows.length === 0) {
+      return res.json([])
+    }
+
+    const BATCH_SIZE = 5
+    const episodeFetchResults = new Map<string, string[]>()
+
+    for (let i = 0; i < filteredRows.length; i += BATCH_SIZE) {
+      const batch = filteredRows.slice(i, i + BATCH_SIZE)
+      const batchResults = await Promise.allSettled(
+        batch.map((show) => this.getProviderForId(show.id).getEpisodes(show.id, 'sub'))
+      )
+
+      batch.forEach((show, index) => {
+        const result = batchResults[index]
+        if (result.status === 'fulfilled' && result.value?.episodes) {
+          episodeFetchResults.set(show.id, result.value.episodes)
+        }
+      })
+    }
+
+    const enrichedRows = filteredRows.map((show) => {
+      const epList = episodeFetchResults.get(show.id)
+      let relativeEpisodeNumber = show.latestDiscoveredEpisode
+
+      if (epList) {
+        const sortedEpList = [...epList].sort((a, b) => Number(a) - Number(b))
+        const idx = sortedEpList.indexOf(show.latestDiscoveredEpisode)
+        if (idx !== -1) {
+          relativeEpisodeNumber = String(idx + 1)
+        }
+      }
+
+      return {
+        _id: show.id,
+        id: show.id,
+        name: show.name,
+        thumbnail: this.deobfuscateUrl(show.thumbnail ?? '', show.id),
+        nativeName: show.nativeName,
+        englishName: show.englishName,
+        episodeNumber: show.latestDiscoveredEpisode,
+        relativeEpisodeNumber: show.latestDiscoveredEpisode,
+        currentTime: 0,
+        duration: 0,
+        episodeCount: show.episodeCount,
+        nextEpisodeToWatch: show.latestDiscoveredEpisode,
+        newEpisodesCount: 1,
+        type: show.type || show.smType,
+      }
+    })
+
+    res.json(enrichedRows)
+  }
 }

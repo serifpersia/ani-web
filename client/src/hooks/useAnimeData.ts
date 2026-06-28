@@ -437,6 +437,14 @@ export const useClearAllNotifications = () => {
     },
   })
 }
+
+export const useThisWeekSchedule = () => {
+  return useQuery<Anime[]>({
+    queryKey: ['thisWeekSchedule'],
+    queryFn: () => fetchApi('/api/continue-watching/this-week'),
+  })
+}
+
 export const useGenresAndStudios = () => {
   return useQuery<{ genres: string[]; tags: string[]; studios: string[] }>({
     queryKey: ['genresAndStudios'],

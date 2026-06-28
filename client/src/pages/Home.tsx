@@ -20,18 +20,19 @@ import {
   useRemoveFromQueue,
   useClearQueue,
   useReorderQueue,
+  useThisWeekSchedule,
 } from '../hooks/useAnimeData'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import styles from './Home.module.css'
 
-type ActiveTab = 'latest' | 'season' | 'popular'
+type ActiveTab = 'latest' | 'season' | 'popular' | 'week'
 
 const Home: React.FC = () => {
   const queryClient = useQueryClient()
   const [page, setPage] = React.useState(1)
-  const [activeTab, setActiveTab] = useState(
-    () => (localStorage.getItem('home_activeTab') as ActiveTab) || 'latest'
-  )
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
+    return (localStorage.getItem('home_activeTab') as ActiveTab) || 'latest'
+  })
   const seasonalRef = useRef<HTMLDivElement>(null)
 
   const { data: nextPageData } = usePaginatedCurrentSeason(page + 1)
@@ -49,9 +50,17 @@ const Home: React.FC = () => {
     document.title = 'Home - ani-web'
   }, [])
 
+  const { data: thisWeekList, isLoading: loadingThisWeek } = useThisWeekSchedule()
+
   useEffect(() => {
     localStorage.setItem('home_activeTab', activeTab)
   }, [activeTab])
+
+  useEffect(() => {
+    if (thisWeekList !== undefined && thisWeekList.length === 0 && activeTab === 'week') {
+      setActiveTab('latest')
+    }
+  }, [thisWeekList, activeTab])
 
   const {
     data: latestInfinite,
@@ -152,8 +161,15 @@ const Home: React.FC = () => {
     { key: 'popular', label: 'Trending' },
   ]
 
+  const hasThisWeek = thisWeekList !== undefined && thisWeekList.length > 0
+  const tabsWithWeek = hasThisWeek
+    ? [{ key: 'week' as ActiveTab, label: 'This Week' }, ...tabs]
+    : tabs
+
+  const displayTab = activeTab === 'week' && !hasThisWeek ? 'latest' : activeTab
+
   const renderTabContent = () => {
-    switch (activeTab) {
+    switch (displayTab) {
       case 'latest':
         return (
           <AnimeSection
@@ -230,6 +246,17 @@ const Home: React.FC = () => {
         )
       case 'popular':
         return <TrendingList title="Trending" />
+      case 'week':
+        return (
+          <AnimeSection
+            title="This Week"
+            animeList={thisWeekList || []}
+            continueWatching={false}
+            carousel
+            onScroll={() => {}}
+            loading={loadingThisWeek}
+          />
+        )
       default:
         return null
     }
@@ -292,12 +319,12 @@ const Home: React.FC = () => {
 
       {/* ── Tab Selector ── */}
       <div className={styles.tabBar}>
-        {tabs.map((tab) => (
+        {tabsWithWeek.map((tab) => (
           <Button
             key={tab.key}
-            variant={activeTab === tab.key ? 'primary' : 'secondary'}
+            variant={displayTab === tab.key ? 'primary' : 'secondary'}
             size="sm"
-            className={`${styles.tabButton} ${activeTab === tab.key ? styles.tabActive : ''}`}
+            className={`${styles.tabButton} ${displayTab === tab.key ? styles.tabActive : ''}`}
             onClick={() => setActiveTab(tab.key)}
           >
             {tab.label}

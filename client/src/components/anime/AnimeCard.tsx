@@ -312,8 +312,10 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             {!isMobile && (
               <>
                 {showTypeBadge && <div className={styles.typeBadge}>{anime.type || 'TV'}</div>}
-                {showEpBadge && progressString && (
-                  <div className={styles.epBadge}>{progressString}</div>
+                {showEpBadge && (progressString || anime.episodeNumber) && (
+                  <div className={styles.epBadge}>
+                    {progressString ? progressString : `EP ${anime.episodeNumber}`}
+                  </div>
                 )}
               </>
             )}
@@ -335,7 +337,11 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             {isMobile && showMobileBadges && (
               <div className={styles.mobileBadges}>
                 <span className={styles.mobileType}>{anime.type || 'TV'}</span>
-                {progressString && <span className={styles.mobileEp}>{progressString}</span>}
+                {(progressString || anime.episodeNumber) && (
+                  <span className={styles.mobileEp}>
+                    {progressString ? progressString : `EP ${anime.episodeNumber}`}
+                  </span>
+                )}
               </div>
             )}
 

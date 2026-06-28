@@ -15,6 +15,7 @@ export function createWatchlistRouter(
   router.get('/continue-watching/fast', controller.getContinueWatchingFast)
   router.get('/continue-watching/up-next', controller.getContinueWatchingUpNext)
   router.get('/continue-watching/all', controller.getAllContinueWatching)
+  router.get('/continue-watching/this-week', controller.getThisWeekSchedule)
   router.post('/continue-watching/remove', controller.removeContinueWatching)
   router.post('/update-progress', controller.updateProgress)
   router.get('/watchlist', controller.getWatchlist)
