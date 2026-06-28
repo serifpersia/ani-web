@@ -8,6 +8,7 @@ export const InsightsRepository = {
       `SELECT
         (SELECT SUM(currentTime) FROM watched_episodes) as totalSeconds,
         (SELECT COUNT(*) FROM watched_episodes) as totalEpisodes,
+        (SELECT COUNT(DISTINCT showId) FROM watched_episodes) as totalAnime,
         (SELECT COUNT(*) FROM watchlist WHERE status = 'Completed') as completedCount,
         (SELECT COUNT(*) FROM watchlist) as totalWatchlist`
     ),

@@ -6,6 +6,7 @@ import { InsightsRepository } from '../repositories/insights.repository'
 interface CoreStats {
   totalSeconds?: number
   totalEpisodes?: number
+  totalAnime: number
   completedCount: number
   totalWatchlist: number
 }
@@ -176,6 +177,7 @@ export class InsightsController {
     res.json({
       totalHours: Math.round((core?.totalSeconds || 0) / 3600),
       totalEpisodes: core?.totalEpisodes || 0,
+      totalAnime: core?.totalAnime || 0,
       completedAnime: core?.completedCount || 0,
       completionRate:
         core?.totalWatchlist > 0

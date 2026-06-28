@@ -8,6 +8,7 @@ import {
   FaUserAstronaut,
   FaHistory,
   FaExclamationTriangle,
+  FaBookmark,
 } from 'react-icons/fa'
 import { useGenreCards, type GenreCard, type TopShow } from '../hooks/useAnimeData'
 import { fixThumbnailUrl } from '../lib/utils'
@@ -43,6 +44,7 @@ interface DroppedShow {
 interface InsightData {
   totalHours: number
   totalEpisodes: number
+  totalAnime: number
   completedAnime: number
   completionRate: number
   persona: string
@@ -163,6 +165,32 @@ const Insights: React.FC = () => {
           <div className={styles.statInfo}>
             <span className={styles.statValue}>{data.totalHours}h</span>
             <span className={styles.statLabel}>Watch Time</span>
+          </div>
+        </div>
+
+        <div className={styles.statCard}>
+          <div
+            className={styles.statIcon}
+            style={{ background: 'rgba(167, 139, 250, 0.2)', color: '#a78bfa' }}
+          >
+            <FaBookmark />
+          </div>
+          <div className={styles.statInfo}>
+            <span className={styles.statValue}>{data.totalAnime}</span>
+            <span className={styles.statLabel}>Total Anime</span>
+          </div>
+        </div>
+
+        <div className={styles.statCard}>
+          <div
+            className={styles.statIcon}
+            style={{ background: 'rgba(34, 197, 94, 0.2)', color: '#22c55e' }}
+          >
+            <FaCheckCircle />
+          </div>
+          <div className={styles.statInfo}>
+            <span className={styles.statValue}>{data.totalEpisodes}</span>
+            <span className={styles.statLabel}>Episodes Watched</span>
           </div>
         </div>
 
