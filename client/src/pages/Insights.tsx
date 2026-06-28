@@ -9,6 +9,9 @@ import {
   FaHistory,
   FaExclamationTriangle,
 } from 'react-icons/fa'
+import { useGenreCards, type GenreCard, type TopShow } from '../hooks/useAnimeData'
+import { fixThumbnailUrl } from '../lib/utils'
+import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import styles from './Insights.module.css'
 
 interface GenreStat {
@@ -64,6 +67,20 @@ const Insights: React.FC = () => {
     },
   })
 
+  const { data: genreCardsData, isLoading: isLoadingGenreCards } = useGenreCards()
+  const { titlePreference } = useTitlePreference()
+
+  const getShowTitle = (show: TopShow) => {
+    switch (titlePreference) {
+      case 'nativeName':
+        return show.nativeName || show.name
+      case 'englishName':
+        return show.englishName || show.name
+      default:
+        return show.name
+    }
+  }
+
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
 
   const availableYears = useMemo(() => {
@@ -116,7 +133,8 @@ const Insights: React.FC = () => {
     return Math.max(...data.hourlyDist.map((h) => h.count), 1)
   }, [data])
 
-  if (isLoading) return <div className={styles.loading}>Analyzing your anime lifestyle...</div>
+  if (isLoading || isLoadingGenreCards)
+    return <div className={styles.loading}>Analyzing your anime lifestyle...</div>
   if (isError)
     return <div className={styles.error}>Could not load insights. Data might be syncing.</div>
   if (!data) return null
@@ -230,7 +248,6 @@ const Insights: React.FC = () => {
                 heatmapData.forEach((d, i) => {
                   if (d.month !== lastMonth && !d.isOutOfRange) {
                     const weekIdx = Math.floor(i / 7) + 1
-                    // Only add label if it's at least 2 weeks after the previous label to avoid overlap
                     if (
                       weekIdx >
                       (labels.length > 0
@@ -367,29 +384,44 @@ const Insights: React.FC = () => {
             ))}
           </div>
         </div>
-        <div className={styles.chartWrapper}>
-          <h3>Genre Dominance</h3>
-          <div className={styles.genreList}>
-            {data.genreSplit?.map((g, i) => (
-              <div key={i} className={styles.genreRow}>
-                <div className={styles.genreInfo}>
-                  <span className={styles.genreName}>{g.name}</span>
-                  <span className={styles.genreCount}>{g.count} titles</span>
+      </div>
+
+      <div className={styles.genreGrid}>
+        {isLoadingGenreCards
+          ? Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className={styles.genreCardSkeleton}>
+                <div className={styles.skeletonRank} />
+                <div className={styles.skeletonTitle} />
+                <div className={styles.skeletonStats} />
+                <div className={styles.skeletonPosters} />
+              </div>
+            ))
+          : genreCardsData?.map((card: GenreCard) => (
+              <div key={card.name} className={styles.genreCard}>
+                <div className={styles.rankBadge}>
+                  <span className={styles.rankNumber}>{card.rank}</span>
                 </div>
-                <div className={styles.genreBarBg}>
-                  <div
-                    className={styles.genreBar}
-                    style={{
-                      width: `${(g.count / (data.genreSplit[0]?.count || 1)) * 100}%`,
-                      backgroundColor: `hsl(${265 - i * 15}, 70%, 65%)`,
-                    }}
-                  />
+                <h3 className={styles.genreTitle}>{card.name}</h3>
+                <div className={styles.genreStats}>
+                  <span>{card.count} episodes</span>
+                  <span>{card.meanScore.toFixed(1)} avg score</span>
+                  <span>{card.timeWatched}</span>
+                </div>
+                <div className={styles.posterRow}>
+                  {card.topShows.map((show: TopShow) => (
+                    <img
+                      key={show.id}
+                      src={fixThumbnailUrl(show.thumbnail)}
+                      alt={getShowTitle(show)}
+                      className={styles.miniPoster}
+                      title={getShowTitle(show)}
+                    />
+                  ))}
                 </div>
               </div>
             ))}
-          </div>
-        </div>
       </div>
+
       {data.droppedShows?.length > 0 && (
         <div className={styles.warningSection}>
           <div className={styles.warningHeader}>

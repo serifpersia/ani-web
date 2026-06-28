@@ -41,6 +41,35 @@ interface CompletionVelocity {
   daysToFinish: number
 }
 
+interface TopShow {
+  id: string
+  name: string
+  nativeName?: string
+  englishName?: string
+  thumbnail: string
+}
+
+interface GenreCard {
+  rank: number
+  name: string
+  count: number
+  meanScore: number
+  timeWatched: string
+  topShows: TopShow[]
+}
+
+interface WatchedEpisodeWithMeta {
+  showId: string
+  currentTime: number
+  duration: number
+  genres: string
+  popularityScore: number
+  name: string
+  nativeName?: string
+  englishName?: string
+  thumbnail: string
+}
+
 export class InsightsController {
   constructor(private provider: AllAnimeProvider) {}
 
@@ -178,5 +207,106 @@ export class InsightsController {
         }) || [],
       droppedShows: (droppedWarning || []).slice(0, 5),
     })
+  }
+
+  private formatTime(seconds: number): string {
+    const days = Math.floor(seconds / 86400)
+    const hours = Math.floor((seconds % 86400) / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+
+    if (days > 0) {
+      return `${days} days ${hours > 0 ? `${hours} hours` : ''}`
+    }
+    if (hours > 0) {
+      return `${hours} hours${minutes > 0 ? ` ${minutes} mins` : ''}`
+    }
+    return `${minutes} mins`
+  }
+
+  getGenreCards = async (req: Request, res: Response) => {
+    const db = req.db
+    const rows: WatchedEpisodeWithMeta[] = await InsightsRepository.getWatchedEpisodesWithMeta(db)
+
+    const genreData: Record<
+      string,
+      {
+        count: number
+        totalTime: number
+        scores: number[]
+        showWatches: Record<string, number>
+        showMeta: Record<
+          string,
+          { name: string; nativeName?: string; englishName?: string; thumbnail: string }
+        >
+      }
+    > = {}
+
+    for (const row of rows) {
+      let genres: string[] = []
+      if (row.genres) {
+        try {
+          if (row.genres.startsWith('[')) {
+            genres = JSON.parse(row.genres)
+          } else {
+            genres = row.genres.split(',').map((g: string) => g.trim())
+          }
+        } catch (e) {
+          logger.warn({ err: e, showId: row.showId }, 'Failed to parse genres for genre cards')
+        }
+      }
+
+      const timeWatched = (row.currentTime || 0) + (row.duration || 0)
+      let score = row.popularityScore || 0
+      if (score > 10) score = score / 10
+
+      for (const genre of genres) {
+        if (!genreData[genre]) {
+          genreData[genre] = { count: 0, totalTime: 0, scores: [], showWatches: {}, showMeta: {} }
+        }
+        genreData[genre].count++
+        genreData[genre].totalTime += timeWatched
+        if (score > 0) genreData[genre].scores.push(score)
+        genreData[genre].showWatches[row.showId] =
+          (genreData[genre].showWatches[row.showId] || 0) + 1
+        if (row.name && row.thumbnail) {
+          genreData[genre].showMeta[row.showId] = {
+            name: row.name,
+            nativeName: row.nativeName,
+            englishName: row.englishName,
+            thumbnail: row.thumbnail,
+          }
+        }
+      }
+    }
+
+    const genreCards: GenreCard[] = Object.entries(genreData).map(([name, data]) => {
+      const topShows = Object.entries(data.showWatches)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4)
+        .map(([showId]) => ({
+          id: showId,
+          name: data.showMeta[showId]?.name || '',
+          nativeName: data.showMeta[showId]?.nativeName,
+          englishName: data.showMeta[showId]?.englishName,
+          thumbnail: data.showMeta[showId]?.thumbnail || '',
+        }))
+
+      return {
+        rank: 0,
+        name,
+        count: data.count,
+        meanScore:
+          data.scores.length > 0 ? data.scores.reduce((a, b) => a + b, 0) / data.scores.length : 0,
+        timeWatched: this.formatTime(data.totalTime),
+        topShows,
+      }
+    })
+
+    genreCards.sort((a, b) => b.count - a.count)
+    genreCards.forEach((card, i) => {
+      card.rank = i + 1
+    })
+
+    res.json(genreCards)
   }
 }

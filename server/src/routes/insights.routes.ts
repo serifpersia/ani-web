@@ -7,6 +7,7 @@ export function createInsightsRouter(provider: AllAnimeProvider): Router {
   const controller = new InsightsController(provider)
 
   router.get('/insights', controller.getWatchInsights)
+  router.get('/insights/genre-cards', controller.getGenreCards)
 
   return router
 }

@@ -452,3 +452,27 @@ export const useGenresAndStudios = () => {
     staleTime: 1000 * 60 * 60,
   })
 }
+
+export interface GenreCard {
+  rank: number
+  name: string
+  count: number
+  meanScore: number
+  timeWatched: string
+  topShows: TopShow[]
+}
+
+export interface TopShow {
+  id: string
+  name: string
+  nativeName?: string
+  englishName?: string
+  thumbnail: string
+}
+
+export const useGenreCards = () => {
+  return useQuery<GenreCard[]>({
+    queryKey: ['genreCards'],
+    queryFn: () => fetchApi('/api/insights/genre-cards'),
+  })
+}

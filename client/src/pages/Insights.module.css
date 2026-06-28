@@ -596,4 +596,159 @@
   .heatmapLayout {
     flex-direction: column-reverse;
   }
+  .genreGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.genreGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: var(--space-10);
+}
+
+.genreCard {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  padding: 1.5rem;
+  position: relative;
+  box-shadow: var(--glass-shadow);
+}
+
+.rankBadge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.4);
+}
+
+.rankNumber {
+  color: white;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.genreTitle {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.01em;
+}
+
+.genreStats {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.posterRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.miniPoster {
+  aspect-ratio: 2/3;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: transform var(--transition-fast);
+}
+
+.miniPoster:hover {
+  transform: scale(1.05);
+  border-color: var(--accent);
+  box-shadow: 0 4px 15px rgba(138, 79, 255, 0.3);
+}
+
+.genreCardSkeleton {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  padding: 1.5rem;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeletonRank {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.1) 25%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.1) 75%
+  );
+  border-radius: 50%;
+  margin-bottom: 0.5rem;
+}
+
+.skeletonTitle {
+  height: 1.25rem;
+  width: 60%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.1) 25%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.1) 75%
+  );
+  border-radius: 4px;
+  margin-bottom: 0.75rem;
+}
+
+.skeletonStats {
+  height: 1rem;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.1) 25%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.1) 75%
+  );
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.skeletonPosters {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.skeletonPosters::before {
+  content: '';
+  display: block;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.1) 25%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.1) 75%
+  );
+  border-radius: 4px;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
 }

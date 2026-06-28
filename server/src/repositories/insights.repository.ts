@@ -65,4 +65,31 @@ export const InsightsRepository = {
         WHERE w.status = 'Completed'
         GROUP BY w.id`
     ),
+
+  getWatchedEpisodesWithMeta: (db: DatabaseWrapper) =>
+    dbAll<{
+      showId: string
+      currentTime: number
+      duration: number
+      genres: string
+      popularityScore: number
+      name: string
+      nativeName?: string
+      englishName?: string
+      thumbnail: string
+    }>(
+      db,
+      `SELECT 
+        we.showId,
+        we.currentTime,
+        we.duration,
+        sm.genres,
+        sm.popularityScore,
+        sm.name,
+        sm.nativeName,
+        sm.englishName,
+        sm.thumbnail
+      FROM watched_episodes we
+      JOIN shows_meta sm ON we.showId = sm.id`
+    ),
 }
