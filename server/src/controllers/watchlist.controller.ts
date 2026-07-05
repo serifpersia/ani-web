@@ -810,7 +810,10 @@ export class WatchlistController {
 
             if (!epDetails || !epDetails.episodes || epDetails.episodes.length === 0) return
 
-            if (showStatus && !['Ongoing', 'Releasing', 'Currently Airing'].includes(showStatus)) {
+            if (
+              showStatus &&
+              !['Ongoing', 'Releasing', 'Currently Airing', 'Not Yet Released'].includes(showStatus)
+            ) {
               return
             }
 
@@ -912,7 +915,10 @@ export class WatchlistController {
 
     const filteredRows = rows.filter(
       (r) =>
-        r.smStatus === 'Ongoing' || r.smStatus === 'Releasing' || r.smStatus === 'Currently Airing'
+        r.smStatus === 'Ongoing' ||
+        r.smStatus === 'Releasing' ||
+        r.smStatus === 'Currently Airing' ||
+        r.smStatus === 'Not Yet Released'
     )
 
     if (filteredRows.length === 0) {
