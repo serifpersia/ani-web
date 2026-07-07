@@ -19,6 +19,14 @@ const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0'
 const REFERER = 'https://youtu-chan.com'
 
+// AllAnime anti-bot crypto constants (aaReq envelope + tobeparsed decryption)
+const AA_EPOCH = '4128'
+const AA_BUILD_ID = '9'
+const AA_KEY_PART_A_HEX = 'b1a9a4d051988f1b1b12dbb747439d9bd64b09ea17835600a7eaa4de87c1ad87'
+const AA_KEY_PART_B_B64 = 'k7DLdv5SGiuEyGUtcncl5wQOR7r4aenLfDV3AOBKlAU='
+// Window used to derive the IV timestamp (5 minutes, in milliseconds)
+const AA_TS_WINDOW_MS = 300_000
+
 const DEOBFUSCATION_MAP: { [key: string]: string } = {
   '79': 'A',
   '7a': 'B',
@@ -127,26 +135,38 @@ interface RawClockData {
 export class AllAnimeProvider implements Provider {
   name = 'AllAnime'
   private cache: NodeCache
+  private aaAesKey: Buffer
 
   constructor(cache: NodeCache) {
     this.cache = cache
+    this.aaAesKey = AllAnimeProvider.computeAesKey()
+  }
+
+  private static computeAesKey(): Buffer {
+    const partA = Buffer.from(AA_KEY_PART_A_HEX, 'hex')
+    const partB = Buffer.from(AA_KEY_PART_B_B64, 'base64')
+    const key = Buffer.alloc(partA.length)
+    for (let i = 0; i < partA.length; i++) {
+      key[i] = partA[i] ^ partB[i]
+    }
+    return key
   }
 
   private decryptTobeparsed(encryptedBase64: string): unknown {
     try {
-      const secret = 'Xot36i3lK3:v1'
-      const key = crypto.createHash('sha256').update(secret).digest()
       const encryptedBuffer = Buffer.from(encryptedBase64, 'base64')
 
       if (encryptedBuffer.length < 30) {
         throw new Error('Encrypted data too short')
       }
 
-      const ivPart = encryptedBuffer.subarray(1, 13)
-      const iv = Buffer.concat([ivPart, Buffer.from('00000002', 'hex')])
+      // Envelope: byte 0 = version (0x01), bytes 1..13 = IV, last 16 = auth tag, middle = ciphertext
+      const iv = encryptedBuffer.subarray(1, 13)
+      const tag = encryptedBuffer.subarray(encryptedBuffer.length - 16)
       const ciphertext = encryptedBuffer.subarray(13, encryptedBuffer.length - 16)
 
-      const decipher = crypto.createDecipheriv('aes-256-ctr', key, iv)
+      const decipher = crypto.createDecipheriv('aes-256-gcm', this.aaAesKey, iv)
+      decipher.setAuthTag(tag)
       let decrypted = decipher.update(ciphertext)
       decrypted = Buffer.concat([decrypted, decipher.final()])
 
@@ -159,6 +179,24 @@ export class AllAnimeProvider implements Provider {
       e.cause = error
       throw e
     }
+  }
+
+  private makeAaReq(queryHash: string): string {
+    const ts = Math.floor(Date.now() / AA_TS_WINDOW_MS) * AA_TS_WINDOW_MS
+    const payload = JSON.stringify({
+      v: 1,
+      ts,
+      epoch: parseInt(AA_EPOCH, 10),
+      buildId: AA_BUILD_ID,
+      qh: queryHash,
+    })
+    const k = `${AA_EPOCH}:${AA_BUILD_ID}:${queryHash}:${ts}`
+    const iv = crypto.createHash('sha256').update(k).digest().subarray(0, 12)
+    const cipher = crypto.createCipheriv('aes-256-gcm', this.aaAesKey, iv)
+    const encrypted = Buffer.concat([cipher.update(payload, 'utf8'), cipher.final()])
+    const tag = cipher.getAuthTag()
+    const envelope = Buffer.concat([Buffer.from([0x01]), iv, encrypted, tag])
+    return envelope.toString('base64')
   }
 
   private _hexDecode(obfuscatedBody: string): string {
@@ -623,6 +661,9 @@ export class AllAnimeProvider implements Provider {
     episodeNumber: string,
     mode: 'sub' | 'dub'
   ): Promise<VideoSource[] | null> {
+    const aaReqToken = this.makeAaReq(
+      'd405d0edd690624b66baba3068e0edc3ac90f1597d898a1ec8db4e5c43c00fec'
+    )
     const { data: axiosResponse } = await axios.post(
       API_ENDPOINT,
       {
@@ -632,6 +673,7 @@ export class AllAnimeProvider implements Provider {
             version: 1,
             sha256Hash: 'd405d0edd690624b66baba3068e0edc3ac90f1597d898a1ec8db4e5c43c00fec',
           },
+          aaReq: aaReqToken,
         },
       },
       {
