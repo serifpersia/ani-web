@@ -10,6 +10,8 @@ _A local-first anime media client focused on performance, privacy, and personal 
 
 ![Users](https://ani-web-users-badge-v3.ramiserifpersia.workers.dev)
 
+![Provider Status](https://ani-web-users-badge-v3.ramiserifpersia.workers.dev/?view=all)
+
 </div>
 
 ---
