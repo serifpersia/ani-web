@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import axios from 'axios'
 import axiosRetry from 'axios-retry'
+import { gotScraping } from 'got-scraping'
 import path from 'path'
 import http from 'http'
 import https from 'https'
@@ -66,7 +67,7 @@ export class ProxyController {
     try {
       const headers: Record<string, string> = {
         'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
       }
       if (referer) headers['Referer'] = refererStr
       if (req.headers.range) headers['Range'] = req.headers.range
@@ -80,18 +81,26 @@ export class ProxyController {
             .send(cached)
         }
 
-        const resp = await axiosInstance.get(urlStr, {
+        const resp = await gotScraping({
+          url: urlStr,
+          method: 'GET',
           headers,
           responseType: 'text',
-          signal: abortController.signal,
+          timeout: { request: 30000 },
+          followRedirect: true,
+          throwHttpErrors: false,
         })
+
+        if (resp.statusCode !== 200) {
+          return res.status(resp.statusCode ?? 502).send('Upstream error')
+        }
 
         const baseUrl = new URL(urlStr)
         const proxiedMediaUrl = (targetUrl: string) =>
           `/api/proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererStr)}`
         const needsProxy = Boolean(refererStr)
 
-        const rewritten = resp.data
+        const rewritten = resp.body
           .split('\n')
           .map((line: string) => {
             const trimmed = line.trim()
@@ -115,45 +124,32 @@ export class ProxyController {
           .set('Access-Control-Allow-Origin', '*')
           .send(rewritten)
       } else {
-        const resp = await axiosInstance({
-          method: 'get',
+        const resp = await gotScraping({
           url: urlStr,
-          responseType: 'stream',
+          method: 'GET',
           headers,
-          signal: abortController.signal,
+          responseType: 'buffer',
+          timeout: { request: 30000 },
+          followRedirect: true,
+          throwHttpErrors: false,
         })
-        res.status(resp.status)
 
-        const forwardHeaders = [
-          'content-type',
-          'content-length',
-          'content-range',
-          'accept-ranges',
-          'cache-control',
-          'last-modified',
-          'etag',
-        ]
+        res.status(resp.statusCode ?? 200)
 
-        Object.keys(resp.headers).forEach((k) => {
-          if (forwardHeaders.includes(k.toLowerCase())) {
-            res.set(k, resp.headers[k] as string)
-          }
-        })
+        const ct = resp.headers['content-type']
+        if (ct) res.set('Content-Type', ct as string)
+
+        const cl = resp.headers['content-length']
+        if (cl) res.set('Content-Length', cl as string)
+
+        const cr = resp.headers['content-range']
+        if (cr) res.set('Content-Range', cr as string)
+
+        const ar = resp.headers['accept-ranges']
+        if (ar) res.set('Accept-Ranges', ar as string)
+
         res.set('Access-Control-Allow-Origin', '*')
-
-        resp.data.on('error', () => {
-          abortController.abort()
-          if (!res.headersSent) res.status(502).send('Upstream error')
-          else res.destroy()
-        })
-
-        res.on('close', () => {
-          if (!resp.data.destroyed) {
-            resp.data.destroy()
-          }
-        })
-
-        resp.data.pipe(res)
+        res.send(resp.rawBody)
       }
     } catch (e) {
       if (axios.isCancel(e)) return
@@ -169,7 +165,9 @@ export class ProxyController {
     this.abortWhenClientLeaves(res, abortController)
 
     try {
-      const { data: originalHtml } = await axiosInstance.get<string>(kwikUrl.href, {
+      const response = await gotScraping({
+        url: kwikUrl.href,
+        method: 'GET',
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
@@ -177,9 +175,12 @@ export class ProxyController {
           Origin: 'https://animepahe.pw',
         },
         responseType: 'text',
-        signal: abortController.signal,
+        timeout: { request: 30000 },
+        followRedirect: true,
+        throwHttpErrors: false,
       })
 
+      const originalHtml = response.body as string
       const patched = this.applyKwikPatches(originalHtml, kwikUrl)
       if (!patched) return res.status(502).send('Failed to patch video gateway')
 
@@ -190,6 +191,7 @@ export class ProxyController {
         .send(patched)
     } catch (e) {
       if (axios.isCancel(e)) return
+      if (abortController.signal.aborted) return
       if (!res.headersSent) res.status(502).send('Gateway proxy error')
     }
   }

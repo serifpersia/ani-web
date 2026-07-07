@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio'
 import NodeCache from 'node-cache'
+import { gotScraping } from 'got-scraping'
 
 import {
   Provider,
@@ -110,20 +111,21 @@ export class AnimePaheProvider implements Provider {
   ): Promise<string> {
     try {
       const headers = await this.getRequestHeaders(isApi, ua, cookie)
-      const response = await fetch(url, {
+      const response = await gotScraping(url, {
         method: 'GET',
         headers,
+        responseType: 'text',
       })
 
-      const text = await response.text()
+      const text = response.body
 
-      if (!response.ok) {
-        if (response.status === 403 || text.includes('Cloudflare')) {
+      if (response.statusCode !== 200) {
+        if (response.statusCode === 403 || text.includes('Cloudflare')) {
           const error = new Error(`AUTH_REQUIRED`) as Error & { status?: number }
           error.status = 403
           throw error
         }
-        throw new Error(`HTTP ${response.status}`)
+        throw new Error(`HTTP ${response.statusCode}`)
       }
 
       return text
