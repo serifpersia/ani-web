@@ -9,40 +9,115 @@ import {
 } from './provider.interface'
 import logger from '../logger'
 
-interface JikanAnime {
-  mal_id: number
-  title: string
-  title_english?: string
-  images?: {
-    jpg?: {
-      image_url?: string
-    }
-  }
-  type?: string
-  year?: number
-  episodes?: number
-  synopsis?: string
+interface AniListTitle {
+  romaji?: string
+  english?: string
+  native?: string
+}
+
+interface AniListMedia {
+  id: number
+  idMal?: number | null
+  title?: AniListTitle
+  coverImage?: { large?: string }
+  format?: string
+  seasonYear?: number | null
+  episodes?: number | null
+  description?: string | null
   status?: string
-  genres?: { name: string }[]
-  score?: number
+  genres?: string[]
+  averageScore?: number | null
 }
 
-interface JikanResponse {
-  data: JikanAnime[]
+interface AniListPage {
+  media?: AniListMedia[]
+  airingSchedule?: { media?: AniListMedia }[]
 }
 
-interface JikanSingleResponse {
-  data: JikanAnime
+interface AniListResponse {
+  data?: {
+    Page?: AniListPage
+    Media?: AniListMedia
+  }
+  errors?: { message: string }[]
 }
 
 export class MegaPlayProvider implements Provider {
   name = 'MegaPlay'
-  private jikanBase = 'https://api.jikan.moe/v4'
+  private anilistBase = 'https://graphql.anilist.co'
   private megaPlayBase = 'https://megaplay.buzz/stream/mal'
   private cache: NodeCache
 
   constructor(cache: NodeCache) {
     this.cache = cache
+  }
+
+  private async anilistRequest(
+    query: string,
+    variables: Record<string, unknown>
+  ): Promise<AniListResponse['data'] | null> {
+    try {
+      const response = await fetch(this.anilistBase, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ query, variables }),
+      })
+
+      if (!response.ok) return null
+
+      const json = (await response.json()) as AniListResponse
+      if (json.errors && json.errors.length > 0) {
+        return null
+      }
+
+      return json.data ?? null
+    } catch (error) {
+      logger.error({ error }, '[MegaPlay] AniList request failed')
+      return null
+    }
+  }
+
+  private stripHtml(input?: string | null): string {
+    if (!input) return ''
+    return input
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#0?39;|&apos;/g, "'")
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .trim()
+  }
+
+  private toShow(media: AniListMedia): Show {
+    const id = (media.idMal ?? media.id).toString()
+    const title = media.title
+    const name = title?.romaji || title?.english || title?.native || 'Unknown'
+
+    return {
+      _id: id,
+      id,
+      name,
+      englishName: title?.english,
+      nativeName: title?.native,
+      names: {
+        romaji: title?.romaji,
+        english: title?.english,
+        native: title?.native,
+      },
+      thumbnail: media.coverImage?.large,
+      type: media.format,
+      year: media.seasonYear ?? null,
+      episodeCount: media.episodes ?? null,
+      description: this.stripHtml(media.description),
+      status: media.status,
+      genres: media.genres?.map((g) => ({ name: g })),
+      score: media.averageScore ?? null,
+    }
   }
 
   private normalizeTitle(title: string): string {
@@ -53,21 +128,22 @@ export class MegaPlayProvider implements Provider {
       .trim()
   }
 
-  private bestMatch(results: JikanAnime[], query: string): JikanAnime {
+  private bestMatch(results: AniListMedia[], query: string): AniListMedia {
     const q = this.normalizeTitle(query)
     let best = results[0]
     let bestScore = -1
 
     for (const anime of results) {
-      const title = this.normalizeTitle(anime.title)
-      const englishTitle = anime.title_english ? this.normalizeTitle(anime.title_english) : ''
+      const title = anime.title ? this.normalizeTitle(anime.title.romaji || '') : ''
+      const englishTitle = anime.title?.english ? this.normalizeTitle(anime.title.english) : ''
+      const nativeTitle = anime.title?.native ? this.normalizeTitle(anime.title.native) : ''
       let score = -1
 
-      if (title === q || englishTitle === q) {
+      if (title === q || englishTitle === q || nativeTitle === q) {
         score = 3
-      } else if (title.startsWith(q) || englishTitle.startsWith(q)) {
+      } else if (title.startsWith(q) || englishTitle.startsWith(q) || nativeTitle.startsWith(q)) {
         score = 2
-      } else if (title.includes(q) || englishTitle.includes(q)) {
+      } else if (title.includes(q) || englishTitle.includes(q) || nativeTitle.includes(q)) {
         score = 1
       }
 
@@ -81,31 +157,43 @@ export class MegaPlayProvider implements Provider {
     return best
   }
 
+  private mediaFields = `
+    id
+    idMal
+    title { romaji english native }
+    coverImage { large }
+    format
+    seasonYear
+    episodes
+    description
+    status
+    genres
+    averageScore
+  `
+
   async search(options: SearchOptions): Promise<Show[]> {
     try {
       const rawQuery = options.query || ''
       const query = rawQuery.replace(/[""]/g, '').replace(/[']/g, '').replace(/\s+/g, ' ').trim()
-      const url = `${this.jikanBase}/anime?q=${encodeURIComponent(query)}`
+      if (!query) return []
 
-      const response = await fetch(url)
-      const data = (await response.json()) as JikanResponse
+      const gql = `query ($q: String, $page: Int, $perPage: Int) {
+        Page (page: $page, perPage: $perPage) {
+          media (search: $q, type: ANIME) {
+            ${this.mediaFields}
+          }
+        }
+      }`
 
-      if (!data.data || data.data.length === 0) return []
+      const data = await this.anilistRequest(gql, { q: query, page: 1, perPage: 20 })
+      const media = data?.Page?.media
+      if (!media || media.length === 0) return []
 
-      const results = data.data.map((anime) => ({
-        _id: anime.mal_id.toString(),
-        id: anime.mal_id.toString(),
-        name: anime.title,
-        englishName: anime.title_english || anime.title,
-        thumbnail: anime.images?.jpg?.image_url,
-        type: anime.type,
-        year: anime.year,
-        episodeCount: anime.episodes,
-      }))
+      const results = media.map((m) => this.toShow(m))
 
-      if (query && results.length > 0) {
-        const best = this.bestMatch(data.data, query)
-        const bestIndex = data.data.findIndex((a) => a.mal_id === best.mal_id)
+      if (results.length > 0) {
+        const best = this.bestMatch(media, query)
+        const bestIndex = media.findIndex((m) => (m.idMal ?? m.id) === (best.idMal ?? best.id))
         if (bestIndex > 0) {
           const [bestItem] = results.splice(bestIndex, 1)
           results.unshift(bestItem)
@@ -114,7 +202,7 @@ export class MegaPlayProvider implements Provider {
 
       return results
     } catch (error) {
-      logger.error({ error }, 'MegaPlay (Jikan) search failed')
+      logger.error({ error }, 'MegaPlay (AniList) search failed')
       return []
     }
   }
@@ -127,19 +215,21 @@ export class MegaPlayProvider implements Provider {
       const cached = this.cache.get<EpisodeDetails>(cacheKey)
       if (cached) return cached
 
-      const url = `${this.jikanBase}/anime/${showId}`
-      const response = await fetch(url)
+      const gql = `query ($idMal: Int) {
+        Media (idMal: $idMal, type: ANIME) {
+          episodes
+          status
+        }
+      }`
 
-      if (!response.ok) return null
+      const data = await this.anilistRequest(gql, { idMal: Number(showId) })
+      const media = data?.Media
+      if (!media) return null
 
-      const data = (await response.json()) as JikanSingleResponse
-
-      if (!data.data) return null
-
-      const episodeCount = data.data.episodes || 0
+      const episodeCount = media.episodes || 0
       let count = episodeCount
       if (count === 0) {
-        if (data.data.status === 'Currently Airing' || data.data.status === 'Finished Airing') {
+        if (media.status === 'RELEASING' || media.status === 'FINISHED') {
           count = 12
         }
       }
@@ -148,7 +238,7 @@ export class MegaPlayProvider implements Provider {
 
       const result: EpisodeDetails = {
         episodes,
-        description: data.data.synopsis || '',
+        description: '',
       }
 
       this.cache.set(cacheKey, result, 86400)
@@ -193,26 +283,17 @@ export class MegaPlayProvider implements Provider {
     try {
       if (!/^\d+$/.test(showId)) return null
 
-      const url = `${this.jikanBase}/anime/${showId}`
-      const response = await fetch(url)
-      const data = (await response.json()) as JikanSingleResponse
+      const gql = `query ($idMal: Int) {
+        Media (idMal: $idMal, type: ANIME) {
+          ${this.mediaFields}
+        }
+      }`
 
-      if (!data.data) return null
+      const data = await this.anilistRequest(gql, { idMal: Number(showId) })
+      const media = data?.Media
+      if (!media) return null
 
-      const anime = data.data
-      return {
-        _id: anime.mal_id.toString(),
-        name: anime.title,
-        englishName: anime.title_english,
-        thumbnail: anime.images?.jpg?.image_url,
-        description: anime.synopsis,
-        type: anime.type,
-        year: anime.year,
-        episodeCount: anime.episodes,
-        status: anime.status,
-        genres: anime.genres?.map((g) => ({ name: g.name })),
-        score: anime.score,
-      }
+      return this.toShow(media)
     } catch (error) {
       logger.error({ error, showId }, 'MegaPlay getShowMeta failed')
       return null
@@ -225,22 +306,19 @@ export class MegaPlayProvider implements Provider {
     size?: number
   ): Promise<Show[]> {
     try {
-      const url = `${this.jikanBase}/top/anime?page=${page || 1}&limit=${size || 10}`
-      const response = await fetch(url)
-      const data = (await response.json()) as JikanResponse
+      const gql = `query ($page: Int, $perPage: Int) {
+        Page (page: $page, perPage: $perPage) {
+          media (sort: POPULARITY_DESC, type: ANIME) {
+            ${this.mediaFields}
+          }
+        }
+      }`
 
-      if (!data.data) return []
+      const data = await this.anilistRequest(gql, { page: page || 1, perPage: size || 10 })
+      const media = data?.Page?.media
+      if (!media) return []
 
-      return data.data.map((anime) => ({
-        _id: anime.mal_id.toString(),
-        id: anime.mal_id.toString(),
-        name: anime.title,
-        englishName: anime.title_english || anime.title,
-        thumbnail: anime.images?.jpg?.image_url,
-        type: anime.type,
-        year: anime.year,
-        episodeCount: anime.episodes,
-      }))
+      return media.map((m) => this.toShow(m))
     } catch {
       return []
     }
@@ -248,24 +326,35 @@ export class MegaPlayProvider implements Provider {
 
   async getSchedule(date: Date): Promise<Show[]> {
     try {
-      const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-      const day = days[date.getDay()]
-      const url = `${this.jikanBase}/schedules?filter=${day}`
-      const response = await fetch(url)
-      const data = (await response.json()) as JikanResponse
+      const dayStart = Math.floor(date.getTime() / 1000)
+      const dayEnd = dayStart + 86400
 
-      if (!data.data) return []
+      const gql = `query ($dayStart: Int, $dayEnd: Int) {
+        Page (perPage: 50) {
+          airingSchedule (airingAt_greater: $dayStart, airingAt_lesser: $dayEnd) {
+            media {
+              ${this.mediaFields}
+            }
+          }
+        }
+      }`
 
-      return data.data.map((anime) => ({
-        _id: anime.mal_id.toString(),
-        id: anime.mal_id.toString(),
-        name: anime.title,
-        englishName: anime.title_english || anime.title,
-        thumbnail: anime.images?.jpg?.image_url,
-        type: anime.type,
-        year: anime.year,
-        episodeCount: anime.episodes,
-      }))
+      const data = await this.anilistRequest(gql, { dayStart, dayEnd })
+      const schedule = data?.Page?.airingSchedule
+      if (!schedule) return []
+
+      const seen = new Set<number>()
+      const results: Show[] = []
+      for (const entry of schedule) {
+        const media = entry.media
+        if (!media) continue
+        const key = media.idMal ?? media.id
+        if (seen.has(key)) continue
+        seen.add(key)
+        results.push(this.toShow(media))
+      }
+
+      return results
     } catch {
       return []
     }
@@ -273,22 +362,39 @@ export class MegaPlayProvider implements Provider {
 
   async getSeasonal(page: number): Promise<Show[]> {
     try {
-      const url = `${this.jikanBase}/seasons/now?page=${page}`
-      const response = await fetch(url)
-      const data = (await response.json()) as JikanResponse
+      const now = new Date()
+      const month = now.getMonth() + 1
+      let season: 'WINTER' | 'SPRING' | 'SUMMER' | 'FALL'
+      let year = now.getFullYear()
+      if (month === 12 || month <= 2) {
+        season = 'WINTER'
+        if (month === 12) year += 1
+      } else if (month <= 5) {
+        season = 'SPRING'
+      } else if (month <= 8) {
+        season = 'SUMMER'
+      } else {
+        season = 'FALL'
+      }
 
-      if (!data.data) return []
+      const gql = `query ($page: Int, $perPage: Int, $season: MediaSeason, $year: Int) {
+        Page (page: $page, perPage: $perPage) {
+          media (season: $season, seasonYear: $year, type: ANIME, sort: POPULARITY_DESC) {
+            ${this.mediaFields}
+          }
+        }
+      }`
 
-      return data.data.map((anime) => ({
-        _id: anime.mal_id.toString(),
-        id: anime.mal_id.toString(),
-        name: anime.title,
-        englishName: anime.title_english || anime.title,
-        thumbnail: anime.images?.jpg?.image_url,
-        type: anime.type,
-        year: anime.year,
-        episodeCount: anime.episodes,
-      }))
+      const data = await this.anilistRequest(gql, {
+        page,
+        perPage: 20,
+        season,
+        year,
+      })
+      const media = data?.Page?.media
+      if (!media) return []
+
+      return media.map((m) => this.toShow(m))
     } catch {
       return []
     }
@@ -296,22 +402,19 @@ export class MegaPlayProvider implements Provider {
 
   async getLatestReleases(page?: number, size?: number): Promise<Show[]> {
     try {
-      const url = `${this.jikanBase}/top/anime?filter=airing&page=${page || 1}&limit=${size || 10}`
-      const response = await fetch(url)
-      const data = (await response.json()) as JikanResponse
+      const gql = `query ($page: Int, $perPage: Int) {
+        Page (page: $page, perPage: $perPage) {
+          media (status: RELEASING, sort: POPULARITY_DESC, type: ANIME) {
+            ${this.mediaFields}
+          }
+        }
+      }`
 
-      if (!data.data) return []
+      const data = await this.anilistRequest(gql, { page: page || 1, perPage: size || 10 })
+      const media = data?.Page?.media
+      if (!media) return []
 
-      return data.data.map((anime) => ({
-        _id: anime.mal_id.toString(),
-        id: anime.mal_id.toString(),
-        name: anime.title,
-        englishName: anime.title_english || anime.title,
-        thumbnail: anime.images?.jpg?.image_url,
-        type: anime.type,
-        year: anime.year,
-        episodeCount: anime.episodes,
-      }))
+      return media.map((m) => this.toShow(m))
     } catch {
       return []
     }
