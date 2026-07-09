@@ -107,6 +107,10 @@ const Player: React.FC = () => {
   const [hasReachedEpisodeEnd, setHasReachedEpisodeEnd] = useState(false)
   const [isEpisodeDrawerOpen, setIsEpisodeDrawerOpen] = useState(false)
   const [queueCountdown, setQueueCountdown] = useState<number | null>(null)
+  const hasAutoFallbackRef = useRef(false)
+  const videoSourcesRef = useRef(state.videoSources)
+  videoSourcesRef.current = state.videoSources
+  const handleVideoSourceErrorRef = useRef<() => void>(() => {})
   const [pendingQueueTransition, setPendingQueueTransition] = useState<{
     nextItem: QueueItem | null
     playedItem: QueueItem | null
@@ -280,6 +284,11 @@ const Player: React.FC = () => {
               enableWorker: true,
             })
             hlsInstance.current = hls
+            hls.on('hlsError', (_event, data) => {
+              if (data.fatal && !hasAutoFallbackRef.current) {
+                handleVideoSourceErrorRef.current()
+              }
+            })
             hls.loadSource(proxiedUrl)
             hls.attachMedia(videoElement)
           } else {
@@ -316,6 +325,23 @@ const Player: React.FC = () => {
       }
     }
   }, [state.selectedSource, state.selectedLink, refs.videoRef, actions, state.loadingVideo])
+
+  const handleVideoSourceError = useCallback(() => {
+    if (hasAutoFallbackRef.current) return
+    const sources = videoSourcesRef.current
+    if (state.selectedSource?.type !== 'player') return
+    const fallbackSource = sources.find((s) => s.type === 'iframe')
+    if (!fallbackSource?.links?.length) return
+
+    hasAutoFallbackRef.current = true
+    const bestLink = fallbackSource.links[0]
+    setPreferredSource(fallbackSource.sourceName)
+    dispatch({
+      type: 'SET_STATE',
+      payload: { selectedSource: fallbackSource, selectedLink: bestLink },
+    })
+  }, [state.selectedSource, dispatch, setPreferredSource])
+  handleVideoSourceErrorRef.current = handleVideoSourceError
 
   const handlePlaybackFinished = useCallback(() => {
     actions.onEnded()
@@ -1132,6 +1158,7 @@ const Player: React.FC = () => {
                   onVolumeChange={actions.onVolumeChange}
                   onWaiting={actions.onWaiting}
                   onPlaying={actions.onPlaying}
+                  onError={handleVideoSourceError}
                 />
               )}
             </>

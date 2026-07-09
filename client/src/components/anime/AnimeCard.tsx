@@ -178,7 +178,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     const ct = anime.currentTime || 0
     const dur = anime.duration || 0
     const hasProgress = ct > 5 && dur > 5 && ct < dur * 0.95
-    const showFullBar = dur <= 5 || ct >= dur * 0.95
+    const showFullBar = ct > 0 && (dur <= 5 || ct >= dur * 0.95)
 
     const displayTitle = (anime[titlePreference as keyof Anime] as string) || anime.name
 

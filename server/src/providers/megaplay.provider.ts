@@ -347,6 +347,20 @@ export class MegaPlayProvider implements Provider {
           type: 'player',
           actualEpisodeNumber: targetEpisode,
         },
+        {
+          sourceName: `MegaPlay (${mode.toUpperCase()}) [Fallback]`,
+          links: [
+            {
+              link: streamPageUrl,
+              resolutionStr: 'Auto',
+              hls: false,
+              headers: { Referer: 'https://megaplay.buzz/' },
+            },
+          ],
+          subtitles: [],
+          type: 'iframe',
+          actualEpisodeNumber: targetEpisode,
+        },
       ]
 
       this.cache.set(cacheKey, result, 3600)
