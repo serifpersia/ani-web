@@ -175,7 +175,10 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     }
 
     const hasNewEpisodes = (anime.newEpisodesCount || 0) > 0
-    const hasProgress = (anime.currentTime || 0) > 0 && (anime.duration || 0) > 0
+    const ct = anime.currentTime || 0
+    const dur = anime.duration || 0
+    const hasProgress = ct > 5 && dur > 5 && ct < dur * 0.95
+    const showFullBar = dur <= 5 || ct >= dur * 0.95
 
     const displayTitle = (anime[titlePreference as keyof Anime] as string) || anime.name
 
@@ -193,9 +196,8 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
           ? `/watch/${anime._id}/${anime.episodeNumber}`
           : `/anime/${anime._id}`
 
-    const progressPercent = hasProgress
-      ? ((anime.currentTime || 0) / (anime.duration || 1)) * 100
-      : 0
+    const showAnyBar = hasProgress || showFullBar
+    const progressPercent = hasProgress ? (ct / dur) * 100 : showFullBar ? 100 : 0
 
     const handleRemoveClick = useCallback(
       (e: React.MouseEvent) => {
@@ -345,15 +347,17 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
               </div>
             )}
 
-            {showProgress && (continueWatching || lowEndMode) && hasProgress && (
+            {showProgress && (continueWatching || lowEndMode) && showAnyBar && (
               <div>
                 <div className={styles.progressContainer}>
                   <div className={styles.progressBar} style={{ width: `${progressPercent}%` }} />
                 </div>
-                {!lowEndMode && (
+                {hasProgress ? (
                   <div className={styles.timestamp}>
-                    {formatTime(anime.currentTime || 0)} / {formatTime(anime.duration || 0)}
+                    {formatTime(ct)} / {formatTime(dur)}
                   </div>
+                ) : (
+                  <div className={styles.timestamp}>Watched</div>
                 )}
               </div>
             )}

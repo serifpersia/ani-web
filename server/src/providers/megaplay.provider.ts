@@ -3,6 +3,8 @@ import {
   Provider,
   Show,
   VideoSource,
+  VideoLink,
+  SubtitleTrack,
   EpisodeDetails,
   SkipIntervals,
   SearchOptions,
@@ -249,6 +251,14 @@ export class MegaPlayProvider implements Provider {
     }
   }
 
+  private megaPlayApi = 'https://megaplay.buzz/stream/getSources'
+
+  private readonly megaPlayHeaders = {
+    'User-Agent':
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    Referer: 'https://megaplay.buzz/',
+  }
+
   async getStreamUrls(
     showId: string,
     episodeNumber: string,
@@ -261,22 +271,90 @@ export class MegaPlayProvider implements Provider {
       targetEpisode = '1'
     }
 
-    const streamUrl = `${this.megaPlayBase}/${showId}/${targetEpisode}/${mode}`
+    try {
+      const cacheKey = `megaplay_stream_${showId}_${targetEpisode}_${mode}`
+      const cached = this.cache.get<VideoSource[]>(cacheKey)
+      if (cached) return cached
 
-    return [
-      {
-        sourceName: `MegaPlay (${mode.toUpperCase()})`,
-        links: [
-          {
-            resolutionStr: 'Auto',
-            link: streamUrl,
-            hls: false,
-          },
-        ],
-        type: 'iframe',
-        actualEpisodeNumber: targetEpisode,
-      },
-    ]
+      const streamPageUrl = `${this.megaPlayBase}/${showId}/${targetEpisode}/${mode}`
+
+      const pageRes = await fetch(streamPageUrl, {
+        headers: this.megaPlayHeaders,
+      })
+      if (!pageRes.ok) {
+        throw new Error(`Stream page failed: ${pageRes.statusText}`)
+      }
+
+      const html = await pageRes.text()
+      const idMatch = html.match(/data-id="([0-9]+)"/)
+      const extractedId = idMatch ? idMatch[1] : html.match(/<title>File ([0-9]+)/i)?.[1]
+      if (!extractedId) {
+        throw new Error('Could not extract media ID from stream page')
+      }
+
+      const sourcesRes = await fetch(`${this.megaPlayApi}?id=${extractedId}`, {
+        headers: {
+          ...this.megaPlayHeaders,
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      })
+      if (!sourcesRes.ok) {
+        throw new Error(`Sources API failed: ${sourcesRes.statusText}`)
+      }
+
+      const data = (await sourcesRes.json()) as {
+        sources?: { file: string; type?: string }[] | { file: string; type?: string }
+        tracks?: { file: string; label?: string; kind?: string }[]
+      }
+
+      let sources: { file: string; type?: string }[] = []
+      if (Array.isArray(data.sources)) {
+        sources = data.sources
+      } else if (data.sources && 'file' in data.sources) {
+        sources = [data.sources]
+      }
+
+      if (sources.length === 0) {
+        throw new Error('No video sources found in API response')
+      }
+
+      const links: VideoLink[] = sources.map((s) => ({
+        resolutionStr: 'Auto',
+        link: s.file,
+        hls: s.file.includes('.m3u8'),
+        headers: {
+          Referer: 'https://megaplay.buzz/',
+          'User-Agent': this.megaPlayHeaders['User-Agent'],
+        },
+      }))
+
+      const subtitles: SubtitleTrack[] = (data.tracks || [])
+        .filter((t) => {
+          const kind = (t.kind || '').toLowerCase()
+          return t.file && (!kind || kind.includes('caption') || kind.includes('sub'))
+        })
+        .map((t) => ({
+          language: t.label || 'Unknown',
+          label: t.label || 'Unknown',
+          url: t.file,
+        }))
+
+      const result: VideoSource[] = [
+        {
+          sourceName: `MegaPlay (${mode.toUpperCase()})`,
+          links,
+          subtitles,
+          type: 'player',
+          actualEpisodeNumber: targetEpisode,
+        },
+      ]
+
+      this.cache.set(cacheKey, result, 3600)
+      return result
+    } catch (error) {
+      logger.error({ error, showId, episodeNumber, mode }, '[MegaPlay] getStreamUrls failed')
+      return null
+    }
   }
 
   async getShowMeta(showId: string): Promise<Partial<Show> | null> {

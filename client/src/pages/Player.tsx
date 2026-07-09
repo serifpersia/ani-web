@@ -842,7 +842,9 @@ const Player: React.FC = () => {
   const isCurrentEpisodeWatched = !!(
     state.currentEpisode && state.watchedEpisodes.includes(state.currentEpisode)
   )
-  const showManualWatchedButton = state.selectedProvider !== 'allanime'
+  const showManualWatchedButton =
+    (state.selectedProvider !== 'allanime' && state.selectedProvider !== 'megaplay') ||
+    state.selectedSource?.type === 'iframe'
   const queuedItem = useMemo(() => {
     if (!showId || !suggestedEpisode) return undefined
     return queue.find(
