@@ -1,4 +1,4 @@
-import axios from 'axios'
+﻿import axios from 'axios'
 import logger from '../logger'
 import * as crypto from 'node:crypto'
 import {
@@ -21,11 +21,12 @@ const REFERER = 'https://youtu-chan.com'
 
 // AllAnime anti-bot crypto constants (aaReq envelope + tobeparsed decryption)
 const AA_EPOCH = '4128'
-const AA_BUILD_ID = '9'
-const AA_KEY_PART_A_HEX = 'b1a9a4d051988f1b1b12dbb747439d9bd64b09ea17835600a7eaa4de87c1ad87'
-const AA_KEY_PART_B_B64 = 'k7DLdv5SGiuEyGUtcncl5wQOR7r4aenLfDV3AOBKlAU='
+const AA_BUILD_ID = '20'
+const AA_KEY_PART_A_HEX = '52735823afe9a3eb96958a8b8981254d8b70d2ebc3ae1999960b1a7ab7fbbe5b'
+const AA_KEY_PART_B_B64 = 'oKiKwzAcWq3bSUa6n4zsQ+fALjLB9Wy3gICICxadGog='
 // Window used to derive the IV timestamp (5 minutes, in milliseconds)
 const AA_TS_WINDOW_MS = 300_000
+const FALLBACK_TP_STRING = 'Xot36i3lK3'
 
 const DEOBFUSCATION_MAP: { [key: string]: string } = {
   '79': 'A',
@@ -136,10 +137,12 @@ export class AllAnimeProvider implements Provider {
   name = 'AllAnime'
   private cache: NodeCache
   private aaAesKey: Buffer
+  private tobeparsedKey: Buffer
 
   constructor(cache: NodeCache) {
     this.cache = cache
     this.aaAesKey = AllAnimeProvider.computeAesKey()
+    this.tobeparsedKey = crypto.createHash('sha256').update(FALLBACK_TP_STRING + ':v1', 'utf8').digest()
   }
 
   private static computeAesKey(): Buffer {
@@ -165,7 +168,7 @@ export class AllAnimeProvider implements Provider {
       const tag = encryptedBuffer.subarray(encryptedBuffer.length - 16)
       const ciphertext = encryptedBuffer.subarray(13, encryptedBuffer.length - 16)
 
-      const decipher = crypto.createDecipheriv('aes-256-gcm', this.aaAesKey, iv)
+      const decipher = crypto.createDecipheriv('aes-256-gcm', this.tobeparsedKey, iv)
       decipher.setAuthTag(tag)
       let decrypted = decipher.update(ciphertext)
       decrypted = Buffer.concat([decrypted, decipher.final()])
