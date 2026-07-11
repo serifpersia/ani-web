@@ -226,7 +226,7 @@ export class WatchlistController {
     const episodeFetchResults = new Map<string, number>()
     const episodeMappingResults = new Map<string, string[]>()
     if (showsNeedingEpisodes.length > 0) {
-      const BATCH_SIZE = 2
+      const BATCH_SIZE = 5
       for (let i = 0; i < showsNeedingEpisodes.length; i += BATCH_SIZE) {
         const batch = showsNeedingEpisodes.slice(i, i + BATCH_SIZE)
         const batchResults = await Promise.allSettled(
@@ -247,10 +247,6 @@ export class WatchlistController {
             }
           }
         })
-
-        if (i + BATCH_SIZE < showsNeedingEpisodes.length) {
-          await new Promise((res) => setTimeout(res, 1000))
-        }
       }
     }
 
@@ -796,7 +792,7 @@ export class WatchlistController {
     const watchingShows = await WatchlistRepository.getWatchingShows(db)
 
     const notifications: EpisodeNotification[] = []
-    const BATCH_SIZE = 2
+    const BATCH_SIZE = 5
 
     for (let i = 0; i < watchingShows.length; i += BATCH_SIZE) {
       const batch = watchingShows.slice(i, i + BATCH_SIZE)
@@ -861,7 +857,7 @@ export class WatchlistController {
       )
 
       if (i + BATCH_SIZE < watchingShows.length) {
-        await new Promise((res) => setTimeout(res, 1500))
+        await new Promise((res) => setImmediate(res))
       }
     }
 
@@ -929,7 +925,7 @@ export class WatchlistController {
       return res.json([])
     }
 
-    const BATCH_SIZE = 2
+    const BATCH_SIZE = 5
     const episodeFetchResults = new Map<string, string[]>()
 
     for (let i = 0; i < filteredRows.length; i += BATCH_SIZE) {
@@ -944,10 +940,6 @@ export class WatchlistController {
           episodeFetchResults.set(show.id, result.value.episodes)
         }
       })
-
-      if (i + BATCH_SIZE < filteredRows.length) {
-        await new Promise((res) => setTimeout(res, 1000))
-      }
     }
 
     const enrichedRows = filteredRows.map((show) => {

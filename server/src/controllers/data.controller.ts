@@ -224,21 +224,7 @@ export class DataController {
           )
         }
 
-        if (!meta || !meta.name) {
-          try {
-            if (this.providers['animepahe']) {
-              meta = await this.providers['animepahe'].getShowMeta(id)
-            }
-          } catch (e) {
-            if ((e as Error).message === 'AUTH_REQUIRED') {
-              return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'animepahe' })
-            }
-            logger.warn(
-              { id, error: (e as Error).message },
-              'AnimePahe fallback getShowMeta failed'
-            )
-          }
-        }
+
       }
 
       res.json(meta || {})

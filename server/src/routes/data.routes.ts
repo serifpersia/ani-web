@@ -82,9 +82,7 @@ export function createDataRouter(
       apiCache,
       (req) => `meta-${req.params.id}-${req.query.provider || 'allanime'}`,
       3600,
-      (d) =>
-        !!d &&
-        (typeof (d as Show).bannerImage === 'string' || typeof (d as Show).description === 'string')
+      (d) => !!d
     ),
     controller.getShowMeta
   )
