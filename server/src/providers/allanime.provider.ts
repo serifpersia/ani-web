@@ -1,4 +1,4 @@
-﻿import axios from 'axios'
+﻿import axios, { AxiosResponse } from 'axios'
 import logger from '../logger'
 import * as crypto from 'node:crypto'
 import {
@@ -142,7 +142,10 @@ export class AllAnimeProvider implements Provider {
   constructor(cache: NodeCache) {
     this.cache = cache
     this.aaAesKey = AllAnimeProvider.computeAesKey()
-    this.tobeparsedKey = crypto.createHash('sha256').update(FALLBACK_TP_STRING + ':v1', 'utf8').digest()
+    this.tobeparsedKey = crypto
+      .createHash('sha256')
+      .update(FALLBACK_TP_STRING + ':v1', 'utf8')
+      .digest()
   }
 
   private static computeAesKey(): Buffer {
@@ -548,11 +551,10 @@ export class AllAnimeProvider implements Provider {
         timeout: 15000,
       }
     )
-    const responseData = axiosResponse
-    if (responseData?.data?.tobeparsed) {
-      responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
+    if (axiosResponse?.data?.tobeparsed) {
+      axiosResponse.data = this.decryptTobeparsed(axiosResponse.data.tobeparsed)
     }
-    const show = responseData.data?.show
+    const show = axiosResponse.data?.show
     if (show) {
       return {
         _id: show._id,
@@ -615,7 +617,7 @@ export class AllAnimeProvider implements Provider {
     if (responseData?.data?.tobeparsed) {
       responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
     }
-    const showData = responseData.data.show
+    const showData = responseData.data?.show
     if (showData) {
       const episodeDetails = {
         episodes: (showData.availableEpisodesDetail[mode] as string[]) || [],
