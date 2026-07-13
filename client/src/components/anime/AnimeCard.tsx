@@ -209,25 +209,15 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
       [onRemove, anime.id, anime.showId, anime._id]
     )
 
-    const displayEpisodeCount = (() => {
-      const epCount = anime.episodeCount ?? 0
-      const watched = anime.watchedCount ?? 0
-      if (epCount && epCount >= watched) return epCount
-      if (watched > 0) return watched
-      return epCount || undefined
-    })()
-
     const progressString = (() => {
       const episodeToDisplay = anime.relativeEpisodeNumber ?? episodeToPlay
 
       if (continueWatching && episodeToDisplay) {
-        return displayEpisodeCount
-          ? `EP ${episodeToDisplay} / ${displayEpisodeCount}`
-          : `EP ${episodeToDisplay}`
+        return `EP ${episodeToDisplay}`
       }
 
-      if (anime.watchedCount !== undefined && (displayEpisodeCount || anime.watchedCount)) {
-        return `EP ${anime.watchedCount} / ${displayEpisodeCount ?? anime.watchedCount}`
+      if (anime.watchedCount !== undefined && anime.watchedCount > 0) {
+        return `EP ${anime.watchedCount}`
       }
 
       return null

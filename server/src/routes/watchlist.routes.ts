@@ -3,17 +3,18 @@ import { WatchlistController } from '../controllers/watchlist.controller'
 import { AllAnimeProvider } from '../providers/allanime.provider'
 import { AnimePaheProvider } from '../providers/animepahe.provider'
 import { discordRPCService } from '../discord-rpc'
+import { DatabaseWrapper } from '../db'
 
 export function createWatchlistRouter(
   allAnime: AllAnimeProvider,
-  animePahe?: AnimePaheProvider
+  animePahe: AnimePaheProvider,
+  getDb: () => DatabaseWrapper
 ): Router {
   const router = Router()
   const controller = new WatchlistController({ allAnime, animePahe })
 
-  router.get('/continue-watching', controller.getContinueWatching)
-  router.get('/continue-watching/fast', controller.getContinueWatchingFast)
-  router.get('/continue-watching/up-next', controller.getContinueWatchingUpNext)
+  controller.startNotificationDiscovery(getDb)
+
   router.get('/continue-watching/all', controller.getAllContinueWatching)
   router.get('/continue-watching/this-week', controller.getThisWeekSchedule)
   router.post('/continue-watching/remove', controller.removeContinueWatching)

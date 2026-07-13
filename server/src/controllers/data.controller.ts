@@ -223,8 +223,6 @@ export class DataController {
             'AllAnime getShowMeta failed, trying fallback'
           )
         }
-
-
       }
 
       res.json(meta || {})

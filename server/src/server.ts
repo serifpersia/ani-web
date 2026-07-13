@@ -134,7 +134,10 @@ app.use(
   createAuthRouter((database) => runSyncSequence(database))
 )
 
-app.use('/api', createWatchlistRouter(allAnimeProvider, animepaheProvider))
+app.use(
+  '/api',
+  createWatchlistRouter(allAnimeProvider, animepaheProvider, () => db)
+)
 app.use('/api', createDataRouter(apiCache, providers))
 app.use('/api', createProxyRouter())
 app.use('/api', createInsightsRouter(allAnimeProvider))

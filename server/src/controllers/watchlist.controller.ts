@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import logger from '../logger'
+import { DatabaseWrapper } from '../db'
 import { AllAnimeProvider } from '../providers/allanime.provider'
 import { AnimePaheProvider } from '../providers/animepahe.provider'
 import { performWriteTransaction } from '../sync'
@@ -17,6 +18,7 @@ import { SearchOptions } from '../providers/provider.interface'
 import { SettingsRepository } from '../repositories/settings.repository'
 import { discordRPCService } from '../discord-rpc'
 import { requestContext } from '../utils/request-context'
+import { dbAll } from '../utils/db-utils'
 
 interface CombinedContinueWatchingShow {
   _id: string
@@ -73,6 +75,88 @@ export class WatchlistController {
   constructor(providers: { allAnime: AllAnimeProvider; animePahe?: AnimePaheProvider }) {
     this.allAnime = providers.allAnime
     this.animePahe = providers.animePahe
+  }
+
+  startNotificationDiscovery(getDb: () => DatabaseWrapper): void {
+    let currentIndex = 0
+    let busy = false
+
+    setInterval(async () => {
+      if (busy) return
+      busy = true
+
+      const db = getDb()
+      if (!db || db.isClosedCheck()) {
+        busy = false
+        return
+      }
+
+      try {
+        const watchingShows = await WatchlistRepository.getWatchingShows(db)
+        if (watchingShows.length === 0) {
+          busy = false
+          return
+        }
+
+        if (currentIndex >= watchingShows.length) {
+          currentIndex = 0
+        }
+
+        const show = watchingShows[currentIndex]
+        currentIndex++
+
+        try {
+          let episodes: string[] | undefined
+
+          try {
+            const meta = await this.getProviderForId(show.id).getShowMeta(show.id)
+            if (meta?.availableEpisodesDetail) {
+              episodes = (meta.availableEpisodesDetail as Record<string, string[]>)['sub']
+            }
+            if (
+              meta?.status &&
+              !['Ongoing', 'Releasing', 'Currently Airing', 'Not Yet Released'].includes(
+                meta.status
+              )
+            ) {
+              return
+            }
+          } catch {
+            const epDetails = await this.getProviderForId(show.id).getEpisodes(show.id, 'sub')
+            episodes = epDetails?.episodes as string[] | undefined
+          }
+
+          if (!episodes || episodes.length === 0) return
+
+          const [watchedEps, dismissedEps] = await Promise.all([
+            WatchedEpisodesRepository.getWatchedEpisodeNumbers(db, show.id),
+            NotificationsRepository.getDismissedByShow(db, show.id),
+          ])
+
+          const watchedSet = new Set(watchedEps.map((e) => e.toString()))
+          const dismissedSet = new Set(dismissedEps.map((e) => e.episodeNumber.toString()))
+          const maxWatched = Math.max(0, ...Array.from(watchedSet).map((e) => parseFloat(e)))
+
+          const sortedEps = [...episodes].sort((a, b) => parseFloat(a) - parseFloat(b))
+          const latestAvailable = sortedEps[sortedEps.length - 1]
+
+          if (
+            parseFloat(latestAvailable) > maxWatched &&
+            !watchedSet.has(latestAvailable.toString()) &&
+            !dismissedSet.has(latestAvailable.toString())
+          ) {
+            await NotificationsRepository.addDiscovered(db, show.id, latestAvailable.toString())
+            db.scheduleSave()
+          }
+        } catch (e) {
+          // show doesn't support this query, skip
+        }
+      } catch (e) {
+        // db closed, skip
+      } finally {
+        busy = false
+      }
+    }, 5000)
   }
 
   private getProviderForId(showId: string): AllAnimeProvider | AnimePaheProvider {
@@ -215,188 +299,15 @@ export class WatchlistController {
   ): Promise<CombinedContinueWatchingShow[]> {
     const rows = await WatchedEpisodesRepository.getContinueWatching(req.db, limit)
 
-    const showsNeedingEpisodes = rows.filter((show) => {
-      const isAnimePahe = this.getProviderForId(show.id).name === 'AnimePahe'
-      const watchedCount = show.watchedCount || 0
-      return (
-        isAnimePahe || !show.episodeCount || (watchedCount > 0 && show.episodeCount <= watchedCount)
-      )
-    })
-
-    const episodeFetchResults = new Map<string, number>()
-    const episodeMappingResults = new Map<string, string[]>()
-    if (showsNeedingEpisodes.length > 0) {
-      const BATCH_SIZE = 5
-      for (let i = 0; i < showsNeedingEpisodes.length; i += BATCH_SIZE) {
-        const batch = showsNeedingEpisodes.slice(i, i + BATCH_SIZE)
-        const batchResults = await Promise.allSettled(
-          batch.map((show) => this.getProviderForId(show.id).getEpisodes(show.id, 'sub'))
-        )
-
-        batch.forEach((show, index) => {
-          const result = batchResults[index]
-          if (result.status === 'fulfilled' && result.value?.episodes) {
-            const epList = result.value.episodes
-            const epCount = epList.length
-            episodeFetchResults.set(show.id, epCount)
-            episodeMappingResults.set(show.id, epList)
-            try {
-              ShowsMetaRepository.updateEpisodeCount(req.db, show.id, epCount)
-            } catch (e) {
-              logger.error({ err: e, showId: show.id }, 'Failed to update episode count in DB')
-            }
-          }
-        })
-      }
-    }
-
-    const enrichedRows = rows.map((show) => {
-      const epCount = episodeFetchResults.get(show.id) ?? show.episodeCount
-      const epList = episodeMappingResults.get(show.id)
-
-      let relativeEpisodeNumber = show.episodeNumber
-      if (epList) {
-        const sortedEpList = [...epList].sort((a, b) => Number(a) - Number(b))
-        const idx = sortedEpList.indexOf(String(show.episodeNumber))
-        if (idx !== -1) {
-          relativeEpisodeNumber = (idx + 1).toString()
-        }
-      }
-
-      return {
-        ...show,
-        episodeCount: epCount,
-        relativeEpisodeNumber: relativeEpisodeNumber,
-        type: show.type || show.smType,
-        thumbnail: this.deobfuscateUrl(show.thumbnail ?? '', show.id),
-      }
-    })
-
-    setImmediate(async () => {
-      if (req.db.isClosedCheck()) return
-      const delay = () => new Promise((res) => setImmediate(res))
-      for (const show of enrichedRows) {
-        const currentThumbnail = show.thumbnail || ''
-        const fixedThumbnail = this.deobfuscateUrl(currentThumbnail, show.id)
-        const needsThumbnailUpdate = fixedThumbnail !== currentThumbnail
-
-        if ((!show.type || needsThumbnailUpdate) && !this.activeTypeFetches.has(show.id)) {
-          this.activeTypeFetches.add(show.id)
-          try {
-            let didUpdate = false
-            if (needsThumbnailUpdate && !req.db.isClosedCheck()) {
-              await WatchlistRepository.updateThumbnail(req.db, show.id, fixedThumbnail)
-              await ShowsMetaRepository.updateThumbnail(req.db, show.id, fixedThumbnail)
-              didUpdate = true
-            }
-
-            if (!show.type) {
-              const meta = await this.getProviderForId(show.id).getShowMeta(
-                show.id,
-                req.headers['x-animepahe-ua'] as string,
-                req.headers['x-animepahe-cookie'] as string
-              )
-              if (meta && meta.type && !req.db.isClosedCheck()) {
-                await ShowsMetaRepository.updateType(req.db, show.id, meta.type)
-                await WatchlistRepository.updateType(req.db, show.id, meta.type)
-                didUpdate = true
-              }
-            }
-            if (didUpdate) req.db.scheduleSave()
-          } catch (e) {
-            logger.error({ err: e, showId: show.id }, 'Lazy migration error for show')
-          } finally {
-            this.activeTypeFetches.delete(show.id)
-          }
-          await delay()
-        }
-      }
-    })
+    const enrichedRows = rows.map((show) => ({
+      ...show,
+      relativeEpisodeNumber: show.episodeNumber,
+      episodeCount: show.episodeCount,
+      type: show.type || show.smType,
+      thumbnail: this.deobfuscateUrl(show.thumbnail ?? '', show.id),
+    }))
 
     return enrichedRows
-  }
-
-  private async getUpNextShowsData(req: Request): Promise<CombinedContinueWatchingShow[]> {
-    const watchingShows = await WatchedEpisodesRepository.getUpNextShows(req.db)
-    if (watchingShows.length === 0) return []
-
-    const showIds = watchingShows.map((s) => s.id)
-    const allWatchedEps = await WatchedEpisodesRepository.getEpisodesForShows(req.db, showIds)
-
-    const watchedByShow = new Map<string, WatchedEpisode[]>()
-    for (const ep of allWatchedEps) {
-      const arr = watchedByShow.get(ep.showId)
-      if (arr) arr.push(ep)
-      else watchedByShow.set(ep.showId, [ep])
-    }
-
-    const BATCH_SIZE = 5
-    const upNextShows: CombinedContinueWatchingShow[] = []
-
-    for (let i = 0; i < watchingShows.length; i += BATCH_SIZE) {
-      const batch = watchingShows.slice(i, i + BATCH_SIZE)
-      const batchResults = await Promise.allSettled(
-        batch.map(async (show) => {
-          try {
-            const epDetails = await this.getProviderForId(show.id).getEpisodes(show.id, 'sub')
-            const watchedEpisodesResult = watchedByShow.get(show.id) ?? []
-            const allEps = epDetails?.episodes?.sort((a, b) => parseFloat(a) - parseFloat(b)) || []
-            const watchedEpsMap = new Map(
-              watchedEpisodesResult.map((r) => [r.episodeNumber.toString(), r])
-            )
-            const unwatchedEps = allEps.filter((ep) => !watchedEpsMap.has(ep))
-
-            if (unwatchedEps.length > 0) {
-              return {
-                _id: show.id,
-                id: show.id,
-                name: show.name,
-                thumbnail: this.deobfuscateUrl(show.thumbnail ?? '', show.id),
-                nativeName: show.nativeName,
-                englishName: show.englishName,
-                type: show.type || show.smType,
-                nextEpisodeToWatch: unwatchedEps[0],
-                newEpisodesCount: unwatchedEps.length,
-                episodeCount: allEps.length,
-                watchedCount: watchedEpsMap.size,
-              } as CombinedContinueWatchingShow
-            }
-            return null
-          } catch (e) {
-            logger.error({ err: e, showId: show.id }, 'Error processing show for Up Next list')
-            return null
-          }
-        })
-      )
-      for (const result of batchResults) {
-        if (result.status === 'fulfilled' && result.value) {
-          upNextShows.push(result.value)
-        }
-      }
-
-      if (i + BATCH_SIZE < watchingShows.length) {
-        await new Promise((res) => setImmediate(res))
-      }
-    }
-
-    return upNextShows
-  }
-
-  getContinueWatchingFast = async (req: Request, res: Response) => {
-    const limit = parseInt(req.query.limit as string) || 10
-    const data = await this.getContinueWatchingData(req, limit)
-    res.json(data)
-  }
-
-  getContinueWatchingUpNext = async (req: Request, res: Response) => {
-    const data = await this.getUpNextShowsData(req)
-    res.json(data)
-  }
-
-  getContinueWatching = async (req: Request, res: Response) => {
-    const limit = parseInt(req.query.limit as string) || 10
-    const data = await this.getContinueWatchingData(req)
-    res.json(data.slice(0, limit))
   }
 
   getAllContinueWatching = async (req: Request, res: Response) => {
@@ -792,72 +703,39 @@ export class WatchlistController {
     const watchingShows = await WatchlistRepository.getWatchingShows(db)
 
     const notifications: EpisodeNotification[] = []
-    const BATCH_SIZE = 5
 
-    for (let i = 0; i < watchingShows.length; i += BATCH_SIZE) {
-      const batch = watchingShows.slice(i, i + BATCH_SIZE)
-      await Promise.allSettled(
-        batch.map(async (show) => {
-          try {
-            const [epDetails, watchedEps, dismissedEps, showStatus, discoveredEps] =
-              await Promise.all([
-                this.getProviderForId(show.id).getEpisodes(show.id, 'sub'),
-                WatchedEpisodesRepository.getWatchedEpisodeNumbers(db, show.id),
-                NotificationsRepository.getDismissedByShow(db, show.id),
-                ShowsMetaRepository.getStatus(db, show.id),
-                NotificationsRepository.getDiscoveredByShow(db, show.id),
-              ])
+    for (const show of watchingShows) {
+      try {
+        const [watchedEps, dismissedEps, discoveredEps] = await Promise.all([
+          WatchedEpisodesRepository.getWatchedEpisodeNumbers(db, show.id),
+          NotificationsRepository.getDismissedByShow(db, show.id),
+          NotificationsRepository.getDiscoveredByShow(db, show.id),
+        ])
 
-            if (!epDetails || !epDetails.episodes || epDetails.episodes.length === 0) return
+        const watchedSet = new Set(watchedEps.map((e) => e.toString()))
+        const dismissedSet = new Set(dismissedEps.map((e) => e.episodeNumber.toString()))
+        const maxWatched = Math.max(0, ...Array.from(watchedSet).map((e) => parseFloat(e)))
 
-            if (
-              showStatus &&
-              !['Ongoing', 'Releasing', 'Currently Airing', 'Not Yet Released'].includes(showStatus)
-            ) {
-              return
-            }
-
-            const watchedSet = new Set(watchedEps.map((e) => e.toString()))
-            const dismissedSet = new Set(dismissedEps.map((e) => e.episodeNumber.toString()))
-            const discoveredSet = new Set(discoveredEps.map((e) => e.episodeNumber.toString()))
-
-            const maxWatched = Math.max(0, ...Array.from(watchedSet).map((e) => parseFloat(e)))
-            const episodes = epDetails.episodes
-            const sortedEpisodes = [...episodes].sort((a, b) => parseFloat(a) - parseFloat(b))
-            const latestAvailable = sortedEpisodes[sortedEpisodes.length - 1]
-
-            if (
-              parseFloat(latestAvailable) > maxWatched &&
-              !watchedSet.has(latestAvailable.toString()) &&
-              !dismissedSet.has(latestAvailable.toString()) &&
-              !discoveredSet.has(latestAvailable.toString())
-            ) {
-              await NotificationsRepository.addDiscovered(db, show.id, latestAvailable.toString())
-              discoveredSet.add(latestAvailable.toString())
-            }
-
-            Array.from(discoveredSet).forEach((epStr: string) => {
-              const epNum = parseFloat(epStr)
-              if (epNum > maxWatched && !watchedSet.has(epStr) && !dismissedSet.has(epStr)) {
-                notifications.push({
-                  showId: show.id,
-                  name: show.name,
-                  nativeName: show.nativeName,
-                  englishName: show.englishName,
-                  thumbnail: this.deobfuscateUrl(show.thumbnail, show.id),
-                  episodeNumber: epStr,
-                  id: `${show.id}-${epStr}`,
-                })
-              }
+        for (const discovered of discoveredEps) {
+          const epNum = parseFloat(discovered.episodeNumber)
+          if (
+            epNum > maxWatched &&
+            !watchedSet.has(discovered.episodeNumber) &&
+            !dismissedSet.has(discovered.episodeNumber)
+          ) {
+            notifications.push({
+              showId: show.id,
+              name: show.name,
+              nativeName: show.nativeName,
+              englishName: show.englishName,
+              thumbnail: this.deobfuscateUrl(show.thumbnail, show.id),
+              episodeNumber: discovered.episodeNumber,
+              id: `${show.id}-${discovered.episodeNumber}`,
             })
-          } catch (e) {
-            logger.error({ err: e, showId: show.id }, 'Failed to fetch notifications for show')
           }
-        })
-      )
-
-      if (i + BATCH_SIZE < watchingShows.length) {
-        await new Promise((res) => setImmediate(res))
+        }
+      } catch (e) {
+        logger.error({ err: e, showId: show.id }, 'Failed to get notifications for show')
       }
     }
 
@@ -883,95 +761,51 @@ export class WatchlistController {
   }
 
   getThisWeekSchedule = async (req: Request, res: Response) => {
-    const db = req.db
-    let rows = await WatchlistRepository.getShowsWithNewEpisodes(db)
-
-    if (rows.length === 0) {
-      return res.json([])
-    }
-
-    const showsNeedingStatus = rows.filter((r) => !r.smStatus)
-    if (showsNeedingStatus.length > 0) {
-      const BATCH_SIZE = 5
-      for (let i = 0; i < showsNeedingStatus.length; i += BATCH_SIZE) {
-        const batch = showsNeedingStatus.slice(i, i + BATCH_SIZE)
-        await Promise.allSettled(
-          batch.map((show) =>
-            this.getProviderForId(show.id)
-              .getShowMeta(show.id)
-              .then((meta) => {
-                if (meta?.status) {
-                  return ShowsMetaRepository.upsert(db, { id: show.id, status: meta.status })
-                }
-              })
-              .catch(() => {})
-          )
+    const rows = await dbAll<{
+      id: string
+      name: string
+      thumbnail: string
+      nativeName?: string
+      englishName?: string
+      type?: string
+      episodeNumber: string
+      discoveredAt: string
+    }>(
+      req.db,
+      `SELECT
+        w.id, w.name, w.thumbnail, w.nativeName, w.englishName, w.type,
+        dn.episodeNumber, dn.discoveredAt
+      FROM discovered_notifications dn
+      JOIN watchlist w ON dn.showId = w.id
+      WHERE w.status = 'Watching'
+        AND dn.discoveredAt = (
+          SELECT MAX(dn2.discoveredAt)
+          FROM discovered_notifications dn2
+          WHERE dn2.showId = dn.showId
+            AND dn2.discoveredAt >= datetime('now', '-7 days')
+            AND NOT EXISTS (
+              SELECT 1 FROM watched_episodes we2
+              WHERE we2.showId = dn2.showId AND we2.episodeNumber = dn2.episodeNumber
+            )
         )
-      }
-      await db.saveNow()
-    }
-
-    rows = await WatchlistRepository.getShowsWithNewEpisodes(db)
-
-    const filteredRows = rows.filter(
-      (r) =>
-        r.smStatus === 'Ongoing' ||
-        r.smStatus === 'Releasing' ||
-        r.smStatus === 'Currently Airing' ||
-        r.smStatus === 'Not Yet Released'
+        AND NOT EXISTS (
+          SELECT 1 FROM watched_episodes we
+          WHERE we.showId = dn.showId AND we.episodeNumber = dn.episodeNumber
+        )
+      ORDER BY dn.discoveredAt DESC`
     )
 
-    if (filteredRows.length === 0) {
-      return res.json([])
-    }
-
-    const BATCH_SIZE = 5
-    const episodeFetchResults = new Map<string, string[]>()
-
-    for (let i = 0; i < filteredRows.length; i += BATCH_SIZE) {
-      const batch = filteredRows.slice(i, i + BATCH_SIZE)
-      const batchResults = await Promise.allSettled(
-        batch.map((show) => this.getProviderForId(show.id).getEpisodes(show.id, 'sub'))
-      )
-
-      batch.forEach((show, index) => {
-        const result = batchResults[index]
-        if (result.status === 'fulfilled' && result.value?.episodes) {
-          episodeFetchResults.set(show.id, result.value.episodes)
-        }
-      })
-    }
-
-    const enrichedRows = filteredRows.map((show) => {
-      const epList = episodeFetchResults.get(show.id)
-      let relativeEpisodeNumber = show.latestDiscoveredEpisode
-
-      if (epList) {
-        const sortedEpList = [...epList].sort((a, b) => Number(a) - Number(b))
-        const idx = sortedEpList.indexOf(show.latestDiscoveredEpisode)
-        if (idx !== -1) {
-          relativeEpisodeNumber = String(idx + 1)
-        }
-      }
-
-      return {
-        _id: show.id,
-        id: show.id,
-        name: show.name,
-        thumbnail: this.deobfuscateUrl(show.thumbnail ?? '', show.id),
-        nativeName: show.nativeName,
-        englishName: show.englishName,
-        episodeNumber: show.latestDiscoveredEpisode,
-        relativeEpisodeNumber: show.latestDiscoveredEpisode,
-        currentTime: 0,
-        duration: 0,
-        episodeCount: show.episodeCount,
-        nextEpisodeToWatch: show.latestDiscoveredEpisode,
-        newEpisodesCount: 1,
-        type: show.type || show.smType,
-      }
-    })
-
-    res.json(enrichedRows)
+    res.json(
+      rows.map((row) => ({
+        _id: row.id,
+        id: row.id,
+        name: row.name,
+        thumbnail: this.deobfuscateUrl(row.thumbnail || '', row.id),
+        nativeName: row.nativeName,
+        englishName: row.englishName,
+        type: row.type,
+        episodeNumber: parseInt(row.episodeNumber) || row.episodeNumber,
+      }))
+    )
   }
 }

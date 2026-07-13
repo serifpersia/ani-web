@@ -142,13 +142,15 @@ export class AllAnimeProvider implements Provider {
   constructor(cache: NodeCache) {
     this.cache = cache
     this.aaAesKey = AllAnimeProvider.computeAesKey()
-    this.tobeparsedKey = crypto.createHash('sha256').update(FALLBACK_TP_STRING + ':v1', 'utf8').digest()
+    this.tobeparsedKey = crypto
+      .createHash('sha256')
+      .update(FALLBACK_TP_STRING + ':v1', 'utf8')
+      .digest()
   }
 
-  private async _request(
-    config: AxiosRequestConfig,
-    retryCount = 0
-  ): Promise<any> {
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  private async _request(config: AxiosRequestConfig, retryCount = 0): Promise<any> {
+    /* eslint-enable @typescript-eslint/no-explicit-any */
     const response = await axios(config)
     const responseData = response.data
 
@@ -164,12 +166,9 @@ export class AllAnimeProvider implements Provider {
       )
       if (rateLimitMatch) {
         if (retryCount >= 3) {
-          throw new Error(
-            `Rate limited after ${retryCount} retries: ${errorMsg}`
-          )
+          throw new Error(`Rate limited after ${retryCount} retries: ${errorMsg}`)
         }
         const timeout = parseInt(rateLimitMatch[1], 10)
-        logger.warn({ timeout, retryCount }, 'AllAnime rate limited, retrying')
         await new Promise((resolve) => setTimeout(resolve, timeout * 1000))
         return this._request(config, retryCount + 1)
       }
