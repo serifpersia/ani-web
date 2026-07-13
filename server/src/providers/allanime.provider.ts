@@ -1,4 +1,4 @@
-﻿import axios from 'axios'
+﻿import axios, { type AxiosRequestConfig } from 'axios'
 import logger from '../logger'
 import * as crypto from 'node:crypto'
 import {
@@ -143,6 +143,45 @@ export class AllAnimeProvider implements Provider {
     this.cache = cache
     this.aaAesKey = AllAnimeProvider.computeAesKey()
     this.tobeparsedKey = crypto.createHash('sha256').update(FALLBACK_TP_STRING + ':v1', 'utf8').digest()
+  }
+
+  private async _request(
+    config: AxiosRequestConfig,
+    retryCount = 0
+  ): Promise<any> {
+    const response = await axios(config)
+    const responseData = response.data
+
+    if (responseData?.data?.tobeparsed) {
+      responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
+    }
+
+    if (responseData.errors && responseData.errors.length > 0) {
+      const errorMsg: string = responseData.errors[0].message
+
+      const rateLimitMatch = errorMsg.match(
+        /^Too many requests, please try again in (\d+) seconds\.$/
+      )
+      if (rateLimitMatch) {
+        if (retryCount >= 3) {
+          throw new Error(
+            `Rate limited after ${retryCount} retries: ${errorMsg}`
+          )
+        }
+        const timeout = parseInt(rateLimitMatch[1], 10)
+        logger.warn({ timeout, retryCount }, 'AllAnime rate limited, retrying')
+        await new Promise((resolve) => setTimeout(resolve, timeout * 1000))
+        return this._request(config, retryCount + 1)
+      }
+
+      if (errorMsg === 'PersistedQueryNotFound') {
+        throw new Error('PersistedQueryNotFound')
+      }
+
+      throw new Error(`Server responded with unknown error: ${errorMsg}`)
+    }
+
+    return responseData
   }
 
   private static computeAesKey(): Buffer {
@@ -314,17 +353,13 @@ export class AllAnimeProvider implements Provider {
       body.query = fullQuery
     }
     try {
-      const response = await axios.post(API_ENDPOINT, body, {
+      const responseData = await this._request({
+        method: 'POST',
+        url: API_ENDPOINT,
+        data: body,
         headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
         timeout: 15000,
       })
-      const responseData = response.data
-      if (responseData?.data?.tobeparsed) {
-        responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
-      }
-      if (responseData.errors && responseData.errors[0]?.message === 'PersistedQueryNotFound') {
-        throw new Error('PersistedQueryNotFound')
-      }
       const shows = responseData?.data?.shows?.edges || []
       return shows.map((show: Show) => ({
         ...show,
@@ -334,18 +369,13 @@ export class AllAnimeProvider implements Provider {
       const err = error as { message?: string }
       if (err.message === 'PersistedQueryNotFound' && extensions) {
         logger.info('Search hash expired, falling back to full query')
-        const response = await axios.post(
-          API_ENDPOINT,
-          { variables, query: fullQuery },
-          {
-            headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-            timeout: 15000,
-          }
-        )
-        const responseData = response.data
-        if (responseData?.data?.tobeparsed) {
-          responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
-        }
+        const responseData = await this._request({
+          method: 'POST',
+          url: API_ENDPOINT,
+          data: { variables, query: fullQuery },
+          headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+          timeout: 15000,
+        })
         const shows = responseData?.data?.shows?.edges || []
         return shows.map((show: Show) => ({
           ...show,
@@ -426,21 +456,13 @@ export class AllAnimeProvider implements Provider {
       },
     }
     try {
-      const response = await axios.post(
-        API_ENDPOINT,
-        { variables, extensions },
-        {
-          headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-          timeout: 15000,
-        }
-      )
-      const responseData = response.data
-      if (responseData?.data?.tobeparsed) {
-        responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
-      }
-      if (responseData.errors && responseData.errors[0]?.message === 'PersistedQueryNotFound') {
-        throw new Error('PersistedQueryNotFound')
-      }
+      const responseData = await this._request({
+        method: 'POST',
+        url: API_ENDPOINT,
+        data: { variables, extensions },
+        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+        timeout: 15000,
+      })
       const recommendations = responseData?.data?.queryPopular?.recommendations || []
       return recommendations.map((rec: { anyCard: Show }) => {
         const card = rec.anyCard
@@ -458,18 +480,13 @@ export class AllAnimeProvider implements Provider {
               }
             }
           }`
-        const response = await axios.post(
-          API_ENDPOINT,
-          { query: fullQuery, variables },
-          {
-            headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-            timeout: 15000,
-          }
-        )
-        const responseData = response.data
-        if (responseData?.data?.tobeparsed) {
-          responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
-        }
+        const responseData = await this._request({
+          method: 'POST',
+          url: API_ENDPOINT,
+          data: { query: fullQuery, variables },
+          headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+          timeout: 15000,
+        })
         const recommendations = responseData?.data?.queryPopular?.recommendations || []
         return recommendations.map((rec: { anyCard: Show }) => {
           const card = rec.anyCard
@@ -532,9 +549,10 @@ export class AllAnimeProvider implements Provider {
   }
 
   async getShowMeta(showId: string, _ua?: string, _cookie?: string): Promise<Partial<Show> | null> {
-    const { data: axiosResponse } = await axios.post(
-      API_ENDPOINT,
-      {
+    const responseData = await this._request({
+      method: 'POST',
+      url: API_ENDPOINT,
+      data: {
         variables: { _id: showId },
         extensions: {
           persistedQuery: {
@@ -543,15 +561,9 @@ export class AllAnimeProvider implements Provider {
           },
         },
       },
-      {
-        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-        timeout: 15000,
-      }
-    )
-    const responseData = axiosResponse
-    if (responseData?.data?.tobeparsed) {
-      responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
-    }
+      headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+      timeout: 15000,
+    })
     const show = responseData.data?.show
     if (show) {
       return {
@@ -600,21 +612,16 @@ export class AllAnimeProvider implements Provider {
     const cacheKey = `episodes-${showId}-${mode}`
     const cachedData = this.cache.get<EpisodeDetails>(cacheKey)
     if (cachedData) return cachedData
-    const response = await axios.post(
-      API_ENDPOINT,
-      {
+    const responseData = await this._request({
+      method: 'POST',
+      url: API_ENDPOINT,
+      data: {
         query: `query($showId: String!) { show(_id: $showId) { availableEpisodesDetail, description } }`,
         variables: { showId },
       },
-      {
-        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-        timeout: 15000,
-      }
-    )
-    const responseData = response.data
-    if (responseData?.data?.tobeparsed) {
-      responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
-    }
+      headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+      timeout: 15000,
+    })
     const showData = responseData.data.show
     if (showData) {
       const episodeDetails = {
@@ -629,21 +636,16 @@ export class AllAnimeProvider implements Provider {
 
   async getSkipTimes(showId: string, episodeNumber: string): Promise<SkipIntervals> {
     try {
-      const malIdResponse = await axios.post(
-        API_ENDPOINT,
-        {
+      const responseData = await this._request({
+        method: 'POST',
+        url: API_ENDPOINT,
+        data: {
           query: `query($showId: String!) { show(_id: $showId) { malId } }`,
           variables: { showId },
         },
-        {
-          headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-          timeout: 10000,
-        }
-      )
-      const responseData = malIdResponse.data
-      if (responseData?.data?.tobeparsed) {
-        responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
-      }
+        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+        timeout: 10000,
+      })
       const malId = responseData?.data?.show?.malId
       if (!malId) return { found: false, results: [] }
       const response = await axios.get(
@@ -667,9 +669,10 @@ export class AllAnimeProvider implements Provider {
     const aaReqToken = this.makeAaReq(
       'd405d0edd690624b66baba3068e0edc3ac90f1597d898a1ec8db4e5c43c00fec'
     )
-    const { data: axiosResponse } = await axios.post(
-      API_ENDPOINT,
-      {
+    const responseData = await this._request({
+      method: 'POST',
+      url: API_ENDPOINT,
+      data: {
         variables: { showId, translationType: mode, episodeString: episodeNumber },
         extensions: {
           persistedQuery: {
@@ -679,15 +682,9 @@ export class AllAnimeProvider implements Provider {
           aaReq: aaReqToken,
         },
       },
-      {
-        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-        timeout: 15000,
-      }
-    )
-    const responseData = axiosResponse
-    if (responseData?.data?.tobeparsed) {
-      responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
-    }
+      headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+      timeout: 15000,
+    })
     const sourceUrls = responseData.data?.episode?.sourceUrls as {
       sourceName: string
       sourceUrl: string
