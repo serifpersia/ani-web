@@ -119,7 +119,12 @@ export class _123AnimeProvider implements Provider {
   async search(options: SearchOptions): Promise<Show[]> {
     try {
       const rawQuery = options.query || ''
-      const query = rawQuery.replace(/[""]/g, '').replace(/[']/g, '').replace(/\s+/g, ' ').trim()
+      const query = rawQuery
+        .replace(/[""]/g, '')
+        .replace(/[']/g, '')
+        .replace(/[.:]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
 
       const performSearch = async (q: string): Promise<ApiAnime[]> => {
         const url = `${BASE_URL}/search?keyword=${encodeURIComponent(q)}`
@@ -176,6 +181,7 @@ export class _123AnimeProvider implements Provider {
       }
 
       const results = await this.search({ query: showId.replace(/ /g, '-') })
+
       const show =
         results.find((s) => s.id === showId || s._id === showId) ||
         (results.length > 0 ? this.bestMatch(results, showId) : undefined)

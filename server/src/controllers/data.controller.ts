@@ -106,10 +106,49 @@ export class DataController {
             showId = results[0].session || results[0].id || results[0]._id
           }
         }
+
+        const data = await provider.getEpisodes(showId, req.query.mode as 'sub' | 'dub')
+        return res.json(data)
       }
 
-      const data = await provider.getEpisodes(showId, req.query.mode as 'sub' | 'dub')
-      res.json(data)
+      const fallbackProviders = ['allanime', '123anime', 'megaplay']
+      const startIndex = fallbackProviders.indexOf(providerName)
+      const chain = startIndex >= 0 ? fallbackProviders.slice(startIndex) : [providerName]
+
+      for (const name of chain) {
+        const p = this.providers[name]
+        if (!p) continue
+        try {
+          let id = showId
+          if (name === '123anime' || name === 'megaplay') {
+            const meta = await this.providers['allanime'].getShowMeta(showId)
+            const names = [meta?.name, meta?.englishName, meta?.nativeName, showId].filter(
+              Boolean
+            ) as string[]
+            let searchResults: Show[] = []
+            for (const n of names) {
+              searchResults = await p.search({ query: n })
+              if (searchResults.length > 0) {
+                break
+              }
+            }
+            if (searchResults.length === 0) continue
+            id = searchResults[0].id || searchResults[0]._id || showId
+          }
+          const data = await p.getEpisodes(id, req.query.mode as 'sub' | 'dub')
+          if (data && data.episodes && data.episodes.length > 0) {
+            return res.json(data)
+          }
+        } catch (e) {
+          logger.warn(
+            { provider: name, error: (e as Error).message },
+            'Episode fallback provider failed'
+          )
+          continue
+        }
+      }
+
+      res.json({ episodes: [], description: '' })
     } catch (e) {
       if ((e as Error).message === 'AUTH_REQUIRED') {
         return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'animepahe' })
