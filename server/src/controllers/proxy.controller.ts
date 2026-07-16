@@ -70,7 +70,7 @@ export class ProxyController {
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
       }
       if (referer) headers['Referer'] = refererStr
-      if (req.headers.range) headers['Range'] = req.headers.range
+      if (req.headers.range && urlStr.includes('.m3u8')) headers['Range'] = req.headers.range
 
       if (urlStr.includes('.m3u8')) {
         const cached = proxyCache.get<string>(cacheKey)
@@ -124,17 +124,18 @@ export class ProxyController {
           .set('Access-Control-Allow-Origin', '*')
           .send(rewritten)
       } else {
-        const resp = await gotScraping({
+        const resp = await axiosInstance({
           url: urlStr,
-          method: 'GET',
+          method: 'get',
           headers,
-          responseType: 'buffer',
-          timeout: { request: 30000 },
-          followRedirect: true,
-          throwHttpErrors: false,
+          responseType: 'stream',
+          timeout: 30000,
+          signal: abortController.signal,
         })
 
-        res.status(resp.statusCode ?? 200)
+        if (resp.status !== 200) {
+          return res.status(resp.status ?? 502).send('Upstream error')
+        }
 
         const ct = resp.headers['content-type']
         if (ct) res.set('Content-Type', ct as string)
@@ -149,7 +150,7 @@ export class ProxyController {
         if (ar) res.set('Accept-Ranges', ar as string)
 
         res.set('Access-Control-Allow-Origin', '*')
-        res.send(resp.rawBody)
+        resp.data.pipe(res)
       }
     } catch (e) {
       if (axios.isCancel(e)) return

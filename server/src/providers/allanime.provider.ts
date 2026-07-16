@@ -692,18 +692,7 @@ export class AllAnimeProvider implements Provider {
     }[]
 
     if (!Array.isArray(sourceUrls)) return null
-    const supportedSources = [
-      'Yt-mp4',
-      'S-mp4',
-      'wixmp',
-      'Default',
-      'Fm-Hls',
-      'Vg',
-      'Sw',
-      'Mp4',
-      'Ok',
-      'Uni',
-    ]
+    const supportedSources = ['Mp4', 'wixmp', 'Default', 'Ok', 'Fm-Hls', 'Vg', 'Sw', 'Uni']
     const filteredSources = sourceUrls
       .filter((s) => supportedSources.includes(s.sourceName))
       .sort((a, b) => (b.priority || 0) - (a.priority || 0))
@@ -713,7 +702,7 @@ export class AllAnimeProvider implements Provider {
           let videoLinks: VideoLink[] = []
           let subtitles: SubtitleTrack[] = []
 
-          if (['Yt-mp4', 'S-mp4', 'wixmp', 'Default'].includes(source.sourceName)) {
+          if (['wixmp', 'Default'].includes(source.sourceName)) {
             let decryptedUrl = this.deobfuscateStreamUrl(source.sourceUrl)
             if (decryptedUrl.includes('/clock') && !decryptedUrl.includes('.json')) {
               decryptedUrl = decryptedUrl.replace('/clock', '/clock.json')
@@ -799,7 +788,10 @@ export class AllAnimeProvider implements Provider {
                 },
                 timeout: 10000,
               })
-              const match = embedHtml.match(/src:\s*"(https:\/\/.*?\.mp4)"/)
+              const match =
+                typeof embedHtml === 'string'
+                  ? embedHtml.match(/src:\s*"(https:\/\/[^"]+\.mp4)"/)
+                  : null
               if (match) {
                 return {
                   sourceName: source.sourceName,
