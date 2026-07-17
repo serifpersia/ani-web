@@ -14,19 +14,21 @@ import {
 import NodeCache from 'node-cache'
 
 const API_BASE_URL = 'https://allanime.day'
-const API_ENDPOINT = `https://api.allanime.day/api`
+const API_ENDPOINT = `https://api.mkissa.net/api`
+const BOOTSTRAP_ENDPOINT = 'https://api.mkissa.net/client-crypto/v1/bootstrap?buildId=39'
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0'
 const REFERER = 'https://youtu-chan.com'
 
-// AllAnime anti-bot crypto constants (aaReq envelope + tobeparsed decryption)
-const AA_EPOCH = '4128'
-const AA_BUILD_ID = '20'
-const AA_KEY_PART_A_HEX = '52735823afe9a3eb96958a8b8981254d8b70d2ebc3ae1999960b1a7ab7fbbe5b'
-const AA_KEY_PART_B_B64 = 'oKiKwzAcWq3bSUa6n4zsQ+fALjLB9Wy3gICICxadGog='
-// Window used to derive the IV timestamp (5 minutes, in milliseconds)
+// AllAnime anti-bot crypto constants
+const AA_BUILD_ID = '39'
+const AA_MASK_HEX = '4fe6aaa6e15433ead82075823f9ea1c8b6ac6a632e521131cf10bb510f2e31b2'
 const AA_TS_WINDOW_MS = 300_000
-const FALLBACK_TP_STRING = 'Xot36i3lK3'
+
+interface BootstrapData {
+  epoch: number
+  partB: string
+}
 
 const DEOBFUSCATION_MAP: { [key: string]: string } = {
   '79': 'A',
@@ -137,20 +139,53 @@ export class AllAnimeProvider implements Provider {
   name = 'AllAnime'
   private cache: NodeCache
   private aaAesKey: Buffer
-  private tobeparsedKey: Buffer
+  private aaEpoch: number
 
   constructor(cache: NodeCache) {
     this.cache = cache
-    this.aaAesKey = AllAnimeProvider.computeAesKey()
-    this.tobeparsedKey = crypto
-      .createHash('sha256')
-      .update(FALLBACK_TP_STRING + ':v1', 'utf8')
-      .digest()
+    this.aaEpoch = 0
+    this.aaAesKey = Buffer.alloc(32)
+  }
+
+  private async fetchBootstrap(): Promise<BootstrapData> {
+    const response = await axios.get(BOOTSTRAP_ENDPOINT, {
+      headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+      timeout: 10000,
+    })
+    const data = response.data as BootstrapData
+    if (!data?.partB || !data?.epoch) {
+      throw new Error('Invalid bootstrap response')
+    }
+    return data
+  }
+
+  private deriveKey(partB: string): Buffer {
+    const mask = Buffer.from(AA_MASK_HEX, 'hex')
+    const partBBuf = Buffer.from(partB, 'base64')
+    const key = Buffer.alloc(32)
+    for (let i = 0; i < 32; i++) {
+      key[i] = mask[i % mask.length] ^ partBBuf[i]
+    }
+    return key
+  }
+
+  private async ensureKey(): Promise<void> {
+    if (this.aaAesKey.length === 32 && this.aaEpoch > 0) return
+    const bootstrap = await this.fetchBootstrap()
+    this.aaEpoch = bootstrap.epoch
+    this.aaAesKey = this.deriveKey(bootstrap.partB)
+  }
+
+  private async refreshKey(): Promise<void> {
+    const bootstrap = await this.fetchBootstrap()
+    this.aaEpoch = bootstrap.epoch
+    this.aaAesKey = this.deriveKey(bootstrap.partB)
   }
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
   private async _request(config: AxiosRequestConfig, retryCount = 0): Promise<any> {
     /* eslint-enable @typescript-eslint/no-explicit-any */
+    await this.ensureKey()
     const response = await axios(config)
     const responseData = response.data
 
@@ -177,20 +212,22 @@ export class AllAnimeProvider implements Provider {
         throw new Error('PersistedQueryNotFound')
       }
 
+      if (
+        errorMsg === 'AA_CRYPTO_STALE' ||
+        errorMsg === 'AA_CRYPTO_EXPIRED' ||
+        errorMsg === 'AA_CRYPTO_BUILD_MISMATCH' ||
+        errorMsg === 'AA_CRYPTO_QUERY_MISMATCH'
+      ) {
+        if (retryCount < 1) {
+          await this.refreshKey()
+          return this._request(config, retryCount + 1)
+        }
+      }
+
       throw new Error(`Server responded with unknown error: ${errorMsg}`)
     }
 
     return responseData
-  }
-
-  private static computeAesKey(): Buffer {
-    const partA = Buffer.from(AA_KEY_PART_A_HEX, 'hex')
-    const partB = Buffer.from(AA_KEY_PART_B_B64, 'base64')
-    const key = Buffer.alloc(partA.length)
-    for (let i = 0; i < partA.length; i++) {
-      key[i] = partA[i] ^ partB[i]
-    }
-    return key
   }
 
   private decryptTobeparsed(encryptedBase64: string): unknown {
@@ -206,7 +243,7 @@ export class AllAnimeProvider implements Provider {
       const tag = encryptedBuffer.subarray(encryptedBuffer.length - 16)
       const ciphertext = encryptedBuffer.subarray(13, encryptedBuffer.length - 16)
 
-      const decipher = crypto.createDecipheriv('aes-256-gcm', this.tobeparsedKey, iv)
+      const decipher = crypto.createDecipheriv('aes-256-gcm', this.aaAesKey, iv)
       decipher.setAuthTag(tag)
       let decrypted = decipher.update(ciphertext)
       decrypted = Buffer.concat([decrypted, decipher.final()])
@@ -224,14 +261,15 @@ export class AllAnimeProvider implements Provider {
 
   private makeAaReq(queryHash: string): string {
     const ts = Math.floor(Date.now() / AA_TS_WINDOW_MS) * AA_TS_WINDOW_MS
+    const epoch = this.aaEpoch
     const payload = JSON.stringify({
       v: 1,
       ts,
-      epoch: parseInt(AA_EPOCH, 10),
+      epoch,
       buildId: AA_BUILD_ID,
       qh: queryHash,
     })
-    const k = `${AA_EPOCH}:${AA_BUILD_ID}:${queryHash}:${ts}`
+    const k = `${epoch}:${AA_BUILD_ID}:${queryHash}:${ts}`
     const iv = crypto.createHash('sha256').update(k).digest().subarray(0, 12)
     const cipher = crypto.createCipheriv('aes-256-gcm', this.aaAesKey, iv)
     const encrypted = Buffer.concat([cipher.update(payload, 'utf8'), cipher.final()])
@@ -665,22 +703,24 @@ export class AllAnimeProvider implements Provider {
     episodeNumber: string,
     mode: 'sub' | 'dub'
   ): Promise<VideoSource[] | null> {
-    const aaReqToken = this.makeAaReq(
-      'd405d0edd690624b66baba3068e0edc3ac90f1597d898a1ec8db4e5c43c00fec'
+    const episodeQueryHash = '09caca435564416f37d5c78256c8e6e517007c3006529857e84ba2466bfcbea6'
+    const aaReqToken = this.makeAaReq(episodeQueryHash)
+    const variablesParam = encodeURIComponent(
+      JSON.stringify({ showId, translationType: mode, episodeString: episodeNumber })
     )
-    const responseData = await this._request({
-      method: 'POST',
-      url: API_ENDPOINT,
-      data: {
-        variables: { showId, translationType: mode, episodeString: episodeNumber },
-        extensions: {
-          persistedQuery: {
-            version: 1,
-            sha256Hash: 'd405d0edd690624b66baba3068e0edc3ac90f1597d898a1ec8db4e5c43c00fec',
-          },
-          aaReq: aaReqToken,
+    const extensionsParam = encodeURIComponent(
+      JSON.stringify({
+        persistedQuery: {
+          version: 1,
+          sha256Hash: episodeQueryHash,
         },
-      },
+        aaReq: aaReqToken,
+      })
+    )
+    const requestUrl = `${API_ENDPOINT}?variables=${variablesParam}&extensions=${extensionsParam}`
+    const responseData = await this._request({
+      method: 'GET',
+      url: requestUrl,
       headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
       timeout: 15000,
     })
