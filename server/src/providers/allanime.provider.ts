@@ -732,10 +732,7 @@ export class AllAnimeProvider implements Provider {
     }[]
 
     if (!Array.isArray(sourceUrls)) return null
-    const supportedSources = ['Mp4', 'wixmp', 'Default', 'Ok', 'Fm-Hls', 'Vg', 'Sw', 'Uni']
-    const filteredSources = sourceUrls
-      .filter((s) => supportedSources.includes(s.sourceName))
-      .sort((a, b) => (b.priority || 0) - (a.priority || 0))
+    const filteredSources = sourceUrls.sort((a, b) => (b.priority || 0) - (a.priority || 0))
     const processedSources: (VideoSource | null)[] = await Promise.all(
       filteredSources.map(async (source) => {
         try {
@@ -855,6 +852,24 @@ export class AllAnimeProvider implements Provider {
               type: 'iframe',
             }
           } else {
+            const skipSources = ['Luf-Mp4', 'S-mp4', 'Vn-Hls', 'Ak', 'Ss-Hls', 'Sl-mp4']
+            if (skipSources.includes(source.sourceName)) return null
+            const directSources = ['Yt-mp4', 'Default', 'wixmp']
+            if (directSources.includes(source.sourceName)) {
+              const decryptedUrl = this.deobfuscateStreamUrl(source.sourceUrl)
+              return {
+                sourceName: source.sourceName,
+                links: [
+                  {
+                    resolutionStr: 'Default',
+                    link: decryptedUrl,
+                    hls: decryptedUrl.includes('.m3u8'),
+                    headers: { Referer: REFERER },
+                  },
+                ],
+                type: 'player',
+              }
+            }
             return {
               sourceName: source.sourceName,
               links: [{ resolutionStr: 'iframe', link: source.sourceUrl, hls: false }],

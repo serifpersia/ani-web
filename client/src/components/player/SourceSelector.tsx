@@ -25,8 +25,8 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
           )
         }
       >
-        <option value="megaplay">MegaPlay</option>
         <option value="allanime">AllAnime</option>
+        <option value="megaplay">MegaPlay</option>
         <option value="animeya">Animeya</option>
         <option value="animepahe">AnimePahe</option>
         <option value="123anime">123Anime</option>
