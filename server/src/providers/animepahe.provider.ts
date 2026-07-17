@@ -300,7 +300,10 @@ export class AnimePaheProvider implements Provider {
               : `/api/proxy?url=${encodeURIComponent(resolved.m3u8)}&referer=${encodeURIComponent(resolved.referer)}`
           }
         } catch (e) {
-          logger.error({ url: src.url, error: (e as Error).message }, '[AnimePahe] direct resolve failed')
+          logger.error(
+            { url: src.url, error: (e as Error).message },
+            '[AnimePahe] direct resolve failed'
+          )
         }
 
         if (directLink) {

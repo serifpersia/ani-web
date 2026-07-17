@@ -31,6 +31,24 @@ export class ProxyController {
   private static readonly KWIK_DOMAINS = new Set(['kwik.cx', 'kwik.si', 'kwik.pro'])
   private static readonly ANIMEPAHE_URL = 'https://animepahe.pw/'
   private static readonly VAULT_CDN_HOST = 'owocdn.top'
+  private static readonly GOT_SCRAPING_HOSTS = new Set([
+    'kwik.cx',
+    'kwik.si',
+    'kwik.pro',
+    'animepahe.pw',
+    'animepahe.ru',
+  ])
+  private static readonly GOT_SCRAPING_SUFFIXES = ['.owocdn.top']
+
+  private static isGotScrapingHost(urlStr: string): boolean {
+    try {
+      const host = new URL(urlStr).hostname.toLowerCase()
+      if (ProxyController.GOT_SCRAPING_HOSTS.has(host)) return true
+      return ProxyController.GOT_SCRAPING_SUFFIXES.some((s) => host.endsWith(s))
+    } catch {
+      return false
+    }
+  }
 
   private abortWhenClientLeaves(res: Response, abortController: AbortController) {
     res.on('close', () => {
@@ -139,37 +157,72 @@ export class ProxyController {
           .set('Access-Control-Allow-Origin', '*')
           .send(rewritten)
       } else {
-        if (req.headers.range && !isVaultCdn) headers['Range'] = req.headers.range as string
+        if (ProxyController.isGotScrapingHost(urlStr)) {
+          if (req.headers.range) headers['Range'] = req.headers.range as string
 
-        const resp = await gotScraping({
-          url: urlStr,
-          method: 'GET',
-          headers,
-          responseType: 'buffer',
-          timeout: { request: 30000 },
-          followRedirect: true,
-          throwHttpErrors: false,
-        })
+          const resp = await gotScraping({
+            url: urlStr,
+            method: 'GET',
+            headers,
+            responseType: 'buffer',
+            timeout: { request: 30000 },
+            followRedirect: true,
+            throwHttpErrors: false,
+          })
 
-        if (resp.statusCode !== 200) {
-          return res.status(resp.statusCode ?? 502).send('Upstream error')
+          if (resp.statusCode !== 200) {
+            return res.status(resp.statusCode ?? 502).send('Upstream error')
+          }
+
+          const ct = resp.headers['content-type']
+          if (ct) res.set('Content-Type', ct)
+          const cl = resp.headers['content-length']
+          if (cl) res.set('Content-Length', cl)
+          const cr = resp.headers['content-range']
+          if (cr) res.set('Content-Range', cr)
+          const ar = resp.headers['accept-ranges']
+          if (ar) res.set('Accept-Ranges', ar)
+
+          res.set('Access-Control-Allow-Origin', '*')
+          res.send(resp.body)
+        } else {
+          // Plain media (yt-mp4, allanime, etc.) streams via axios without
+          // forwarding Range, matching the original pre-commit behavior.
+          const resp = await axiosInstance({
+            url: urlStr,
+            method: 'get',
+            headers,
+            responseType: 'stream',
+            timeout: 30000,
+            signal: abortController.signal,
+          })
+
+          if (resp.status !== 200) {
+            return res.status(resp.status ?? 502).send('Upstream error')
+          }
+
+          const ct = resp.headers['content-type']
+          if (ct) res.set('Content-Type', ct as string)
+          const cl = resp.headers['content-length']
+          if (cl) res.set('Content-Length', cl as string)
+          const cr = resp.headers['content-range']
+          if (cr) res.set('Content-Range', cr as string)
+          const ar = resp.headers['accept-ranges']
+          if (ar) res.set('Accept-Ranges', ar as string)
+
+          res.set('Access-Control-Allow-Origin', '*')
+          resp.data.pipe(res)
         }
-
-        const ct = resp.headers['content-type']
-        if (ct) res.set('Content-Type', ct)
-        const cl = resp.headers['content-length']
-        if (cl) res.set('Content-Length', cl)
-        const cr = resp.headers['content-range']
-        if (cr) res.set('Content-Range', cr)
-        const ar = resp.headers['accept-ranges']
-        if (ar) res.set('Accept-Ranges', ar)
-
-        res.set('Access-Control-Allow-Origin', '*')
-        res.send(resp.body)
       }
     } catch (e) {
       if (axios.isCancel(e)) return
-      if (!res.headersSent) res.status(500).send('Proxy error')
+      if (!res.headersSent) {
+        logger.error(
+          { url: urlStr, error: (e as Error)?.message },
+          '[proxy] upstream request failed'
+        )
+        res.status(500).send('Proxy error')
+      }
     }
   }
 
@@ -382,7 +435,9 @@ export class ProxyController {
           body = Buffer.from(resp.rawBody)
           contentType = String(resp.headers['content-type'] || 'image/webp')
         } else {
-          logger.warn(`[image-proxy] attempt ${attempt + 1} upstream ${resp.statusCode} ${targetUrl}`)
+          logger.warn(
+            `[image-proxy] attempt ${attempt + 1} upstream ${resp.statusCode} ${targetUrl}`
+          )
           if (attempt < 2) await new Promise((r) => setTimeout(r, 400 * (attempt + 1)))
         }
       }
