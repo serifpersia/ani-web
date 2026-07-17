@@ -9,6 +9,7 @@ import NodeCache from 'node-cache'
 import { CONFIG } from '../config'
 import fs from 'fs'
 import logger from '../logger'
+import { buildCfClearanceCookie, sanitizeCfClearance } from '../utils/cookie.utils'
 
 const proxyCache = new NodeCache({ stdTTL: 30, checkperiod: 60 })
 
@@ -29,6 +30,7 @@ axiosRetry(axiosInstance, { retries: 3, retryDelay: axiosRetry.exponentialDelay 
 export class ProxyController {
   private static readonly KWIK_DOMAINS = new Set(['kwik.cx', 'kwik.si', 'kwik.pro'])
   private static readonly ANIMEPAHE_URL = 'https://animepahe.pw/'
+  private static readonly VAULT_CDN_HOST = 'owocdn.top'
 
   private abortWhenClientLeaves(res: Response, abortController: AbortController) {
     res.on('close', () => {
@@ -54,22 +56,29 @@ export class ProxyController {
   }
 
   handleProxy = async (req: Request, res: Response) => {
-    const { url, referer } = req.query
+    const { url, referer, cookie } = req.query
     if (!url) return res.status(400).send('URL required')
 
     const urlStr = url as string
     const refererStr = (referer as string) || ''
+    const cookieStr = (cookie as string) || ''
     const cacheKey = `m3u8-${urlStr}-${refererStr}`
 
     const abortController = new AbortController()
     this.abortWhenClientLeaves(res, abortController)
 
     try {
+      const isVaultCdn = urlStr.includes(ProxyController.VAULT_CDN_HOST)
       const headers: Record<string, string> = {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
       }
       if (referer) headers['Referer'] = refererStr
+      if (isVaultCdn) {
+        headers['Origin'] = refererStr || ProxyController.ANIMEPAHE_URL
+        const cookieHeader = buildCfClearanceCookie(cookieStr)
+        if (cookieHeader) headers['Cookie'] = cookieHeader
+      }
       if (req.headers.range && urlStr.includes('.m3u8')) headers['Range'] = req.headers.range
 
       if (urlStr.includes('.m3u8')) {
@@ -97,8 +106,11 @@ export class ProxyController {
 
         const baseUrl = new URL(urlStr)
         const proxiedMediaUrl = (targetUrl: string) =>
-          `/api/proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererStr)}`
+          `/api/proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererStr)}` +
+          (cookieStr ? `&cookie=${encodeURIComponent(sanitizeCfClearance(cookieStr))}` : '')
         const needsProxy = Boolean(refererStr)
+
+        const isProxied = (value: string) => value.includes('/api/proxy')
 
         const rewritten = resp.body
           .split('\n')
@@ -108,10 +120,13 @@ export class ProxyController {
 
             if (trimmed.startsWith('#')) {
               return trimmed.replace(/URI="([^"]+)"/g, (_, uri) => {
+                if (isProxied(uri)) return `URI="${uri}"`
                 const absolute = new URL(uri, baseUrl).href
                 return `URI="${needsProxy || absolute.includes('.m3u8') ? proxiedMediaUrl(absolute) : absolute}"`
               })
             }
+
+            if (isProxied(trimmed)) return line
 
             const absolute = new URL(trimmed, baseUrl).href
             return needsProxy || absolute.includes('.m3u8') ? proxiedMediaUrl(absolute) : absolute
@@ -124,33 +139,33 @@ export class ProxyController {
           .set('Access-Control-Allow-Origin', '*')
           .send(rewritten)
       } else {
-        const resp = await axiosInstance({
+        if (req.headers.range && !isVaultCdn) headers['Range'] = req.headers.range as string
+
+        const resp = await gotScraping({
           url: urlStr,
-          method: 'get',
+          method: 'GET',
           headers,
-          responseType: 'stream',
-          timeout: 30000,
-          signal: abortController.signal,
+          responseType: 'buffer',
+          timeout: { request: 30000 },
+          followRedirect: true,
+          throwHttpErrors: false,
         })
 
-        if (resp.status !== 200) {
-          return res.status(resp.status ?? 502).send('Upstream error')
+        if (resp.statusCode !== 200) {
+          return res.status(resp.statusCode ?? 502).send('Upstream error')
         }
 
         const ct = resp.headers['content-type']
-        if (ct) res.set('Content-Type', ct as string)
-
+        if (ct) res.set('Content-Type', ct)
         const cl = resp.headers['content-length']
-        if (cl) res.set('Content-Length', cl as string)
-
+        if (cl) res.set('Content-Length', cl)
         const cr = resp.headers['content-range']
-        if (cr) res.set('Content-Range', cr as string)
-
+        if (cr) res.set('Content-Range', cr)
         const ar = resp.headers['accept-ranges']
-        if (ar) res.set('Accept-Ranges', ar as string)
+        if (ar) res.set('Accept-Ranges', ar)
 
         res.set('Access-Control-Allow-Origin', '*')
-        resp.data.pipe(res)
+        res.send(resp.body)
       }
     } catch (e) {
       if (axios.isCancel(e)) return
@@ -162,19 +177,26 @@ export class ProxyController {
     const kwikUrl = this.validateKwikUrl(req.query.url)
     if (!kwikUrl) return res.status(400).send('Invalid or unsupported gateway URL')
 
+    const cookieStr = (req.query.cookie as string) || ''
     const abortController = new AbortController()
     this.abortWhenClientLeaves(res, abortController)
 
     try {
+      const headers: Record<string, string> = {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
+        Referer: ProxyController.ANIMEPAHE_URL,
+        Origin: 'https://animepahe.pw',
+      }
+      if (cookieStr) {
+        const cookieHeader = buildCfClearanceCookie(cookieStr)
+        if (cookieHeader) headers['Cookie'] = cookieHeader
+      }
+
       const response = await gotScraping({
         url: kwikUrl.href,
         method: 'GET',
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
-          Referer: ProxyController.ANIMEPAHE_URL,
-          Origin: 'https://animepahe.pw',
-        },
+        headers,
         responseType: 'text',
         timeout: { request: 30000 },
         followRedirect: true,
@@ -182,7 +204,7 @@ export class ProxyController {
       })
 
       const originalHtml = response.body as string
-      const patched = this.applyKwikPatches(originalHtml, kwikUrl)
+      const patched = this.applyKwikPatches(originalHtml, kwikUrl, cookieStr)
       if (!patched) return res.status(502).send('Failed to patch video gateway')
 
       return res
@@ -197,8 +219,9 @@ export class ProxyController {
     }
   }
 
-  private applyKwikPatches(html: string, kwikUrl: URL): string | null {
+  private applyKwikPatches(html: string, kwikUrl: URL, cookieStr: string = ''): string | null {
     const safeReferer = JSON.stringify(kwikUrl.href).replace(/</g, '\\u003c')
+    const safeCookie = JSON.stringify(cookieStr).replace(/</g, '\\u003c')
 
     const patched = html.replace(
       /\b(src|href|url)\s*[=:]\s*(["']?)(\/\/[^"'>)]+|\/(?!\/)[^"'>)]*)\2/gi,
@@ -220,7 +243,7 @@ export class ProxyController {
           var original = Hls.prototype.loadSource;
           Hls.prototype.loadSource = function(src) {
             if (typeof src === 'string' && src.includes('.m3u8')) {
-              src = window.location.origin + '/api/proxy?url=' + encodeURIComponent(src) + '&referer=' + encodeURIComponent(${safeReferer});
+              src = window.location.origin + '/api/proxy?url=' + encodeURIComponent(src) + '&referer=' + encodeURIComponent(${safeReferer}) + (${safeCookie} ? '&cookie=' + encodeURIComponent(${safeCookie}) : '');
             }
             return original.call(this, src);
           };
@@ -336,26 +359,46 @@ export class ProxyController {
       }
 
       headers['Referer'] = refererValue
-      const imageResponse = await axiosInstance({
-        method: 'get',
-        url: targetUrl,
-        responseType: 'stream',
-        headers,
-        timeout: 30000,
-        signal: abortController.signal,
-      })
 
-      if (imageResponse.status === 200) {
+      // Use got-scraping for a browser-like TLS fingerprint (needed for hosts
+      // like i.animepahe.pw that reject axios's fingerprint with 403). Retry a
+      // couple times since Cloudflare can intermittently challenge.
+      let lastStatus = 0
+      let body: Buffer | null = null
+      let contentType = 'image/webp'
+      for (let attempt = 0; attempt < 3 && !body; attempt++) {
+        const resp = await gotScraping({
+          url: targetUrl,
+          method: 'GET',
+          headers,
+          responseType: 'buffer',
+          followRedirect: true,
+          throwHttpErrors: false,
+          timeout: { request: 30000 },
+          signal: abortController.signal,
+        })
+        lastStatus = resp.statusCode
+        if (resp.statusCode === 200 && resp.rawBody?.length) {
+          body = Buffer.from(resp.rawBody)
+          contentType = String(resp.headers['content-type'] || 'image/webp')
+        } else {
+          logger.warn(`[image-proxy] attempt ${attempt + 1} upstream ${resp.statusCode} ${targetUrl}`)
+          if (attempt < 2) await new Promise((r) => setTimeout(r, 400 * (attempt + 1)))
+        }
+      }
+
+      if (body) {
         res.set('Cache-Control', 'public, max-age=604800, immutable')
-        res.set('Content-Type', String(imageResponse.headers['content-type'] ?? 'image/webp'))
-        imageResponse.data.pipe(res)
-      } else {
-        this.sendPlaceholder(res)
+        res.set('Content-Type', contentType)
+        res.set('Access-Control-Allow-Origin', '*')
+        return res.send(body)
       }
+      logger.warn(`[image-proxy] giving up upstream ${lastStatus} ${targetUrl}`)
+      this.sendPlaceholder(res)
     } catch (e) {
-      if (axios.isCancel(e)) {
-        return
-      }
+      if (abortController.signal.aborted) return
+      const err = e as { message?: string }
+      logger.error(`[image-proxy] error ${targetUrl} :: ${err?.message || e}`)
       if (!res.headersSent) {
         this.sendPlaceholder(res)
       }

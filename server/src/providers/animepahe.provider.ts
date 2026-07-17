@@ -13,6 +13,7 @@ import {
 } from './provider.interface'
 import logger from '../logger'
 import { requestContext } from '../utils/request-context'
+import { sanitizeCfClearance } from '../utils/cookie.utils'
 
 interface AnimePaheSearchResult {
   session: string
@@ -272,6 +273,10 @@ export class AnimePaheProvider implements Provider {
 
       const isDubSource = (audio: string) => audio.includes('eng') || audio.includes('dub')
 
+      const store = requestContext.getStore()
+      const rawCookie = store?.get('cookie') || ''
+      const cookieValue = sanitizeCfClearance(rawCookie)
+
       for (const src of sources) {
         const audio = (src.audio || '').toLowerCase()
         const sourceMode = isDubSource(audio) ? 'dub' : 'sub'
@@ -282,12 +287,43 @@ export class AnimePaheProvider implements Provider {
           ? `${src.quality || 'Auto'} - ${src.fansub} (${sourceMode.toUpperCase()})`
           : `${src.quality || 'Auto'} (${sourceMode.toUpperCase()})`
 
+        const embedLink = cookieValue
+          ? `/api/embed-proxy?url=${encodeURIComponent(src.url)}&cookie=${encodeURIComponent(cookieValue)}`
+          : `/api/embed-proxy?url=${encodeURIComponent(src.url)}`
+
+        let directLink: string | null = null
+        try {
+          const resolved = await this.resolveKwik(src.url, store?.get('ua'), rawCookie)
+          if (resolved.m3u8) {
+            directLink = cookieValue
+              ? `/api/proxy?url=${encodeURIComponent(resolved.m3u8)}&referer=${encodeURIComponent(resolved.referer)}&cookie=${encodeURIComponent(cookieValue)}`
+              : `/api/proxy?url=${encodeURIComponent(resolved.m3u8)}&referer=${encodeURIComponent(resolved.referer)}`
+          }
+        } catch (e) {
+          logger.error({ url: src.url, error: (e as Error).message }, '[AnimePahe] direct resolve failed')
+        }
+
+        if (directLink) {
+          results.push({
+            sourceName: `${label} (Direct)`,
+            links: [
+              {
+                resolutionStr: src.quality || 'Auto',
+                link: directLink,
+                hls: true,
+              },
+            ],
+            type: 'player',
+            actualEpisodeNumber: episodeNumber,
+          })
+        }
+
         results.push({
-          sourceName: label,
+          sourceName: `${label}`,
           links: [
             {
               resolutionStr: src.quality || 'Auto',
-              link: `/api/embed-proxy?url=${encodeURIComponent(src.url)}`,
+              link: embedLink,
               hls: false,
             },
           ],
@@ -340,8 +376,70 @@ export class AnimePaheProvider implements Provider {
     }
   }
 
-  async resolveKwik(_kwikUrl: string): Promise<{ m3u8: string; referer: string }> {
-    return { m3u8: '', referer: '' }
+  private async resolveKwik(
+    kwikUrl: string,
+    ua?: string,
+    cookie?: string
+  ): Promise<{ m3u8: string; referer: string }> {
+    try {
+      const headers: Record<string, string> = {
+        'User-Agent':
+          ua ||
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
+        Referer: `${this.BASE_URL}/`,
+        Origin: this.BASE_URL,
+      }
+
+      const resp = await gotScraping({
+        url: kwikUrl,
+        method: 'GET',
+        headers,
+        responseType: 'text',
+        timeout: { request: 30000 },
+        followRedirect: true,
+        throwHttpErrors: false,
+      })
+      if (resp.statusCode !== 200) {
+        return { m3u8: '', referer: kwikUrl }
+      }
+      const html = resp.body
+
+      let searchFrom = 0
+      while (true) {
+        const evalStart = html.indexOf('eval(function(p,a,c,k,e,d)', searchFrom)
+        if (evalStart === -1) break
+        let depth = 0
+        let parenEnd = -1
+        for (let i = evalStart + 4; i < html.length; i++) {
+          if (html[i] === '(') depth++
+          else if (html[i] === ')') {
+            depth--
+            if (depth === 0) {
+              parenEnd = i
+              break
+            }
+          }
+        }
+        if (parenEnd === -1) {
+          searchFrom = evalStart + 1
+          continue
+        }
+        try {
+          const result = eval(html.slice(evalStart + 4, parenEnd + 1)) as unknown
+          if (typeof result === 'string') {
+            const m = result.match(/source\s*=\s*['"]([^'"]+\.m3u8[^'"]*)['"]/)
+            if (m) return { m3u8: m[1], referer: kwikUrl }
+          }
+        } catch {
+          // ignore and keep scanning
+        }
+        searchFrom = parenEnd + 1
+      }
+      return { m3u8: '', referer: kwikUrl }
+    } catch (e) {
+      logger.error({ kwikUrl, error: (e as Error).message }, '[AnimePahe] resolveKwik failed')
+      return { m3u8: '', referer: kwikUrl }
+    }
   }
 
   async getShowMeta(showId: string, ua?: string, cookie?: string): Promise<Partial<Show> | null> {

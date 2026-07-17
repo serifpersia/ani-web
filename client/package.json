@@ -22,7 +22,6 @@
     "@tanstack/react-query-persist-client": "^5.99.2",
     "@types/nprogress": "^0.2.3",
     "@types/uuid": "^10.0.0",
-    "hls.js": "^1.6.16",
     "nprogress": "^0.2.0",
     "preact": "^10.29.1",
     "react": "^19.2.5",

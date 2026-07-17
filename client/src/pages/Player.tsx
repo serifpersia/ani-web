@@ -18,7 +18,6 @@ import {
 import { fixThumbnailUrl } from '../lib/utils'
 import ResumeModal from '../components/common/ResumeModal'
 import useIsMobile from '../hooks/useIsMobile'
-import type Hls from 'hls.js'
 import { useTitlePreference } from '../contexts/TitlePreferenceContext'
 import PlayerControls from '../components/player/PlayerControls'
 import PlayerStatusArea from '../components/player/PlayerStatusArea'
@@ -225,9 +224,12 @@ const Player: React.FC = () => {
       seekToTimeRef.current = 0
     }
 
-    let proxiedUrl = `/api/proxy?url=${encodeURIComponent(state.selectedLink.link)}`
-    if (state.selectedLink.headers?.Referer) {
-      proxiedUrl += `&referer=${encodeURIComponent(state.selectedLink.headers.Referer)}`
+    let proxiedUrl = state.selectedLink.link
+    if (!proxiedUrl.startsWith('/api/proxy')) {
+      proxiedUrl = `/api/proxy?url=${encodeURIComponent(proxiedUrl)}`
+      if (state.selectedLink.headers?.Referer) {
+        proxiedUrl += `&referer=${encodeURIComponent(state.selectedLink.headers.Referer)}`
+      }
     }
 
     if (state.selectedSource.subtitles) {
@@ -272,29 +274,27 @@ const Player: React.FC = () => {
       if (canPlayNativeHls) {
         videoElement.src = proxiedUrl
       } else {
-        import('hls.js/dist/hls.light.mjs').then((module) => {
-          const Hls = module.default
-          if (Hls.isSupported()) {
-            const isLowEnd = document.body.classList.contains('low-end')
-            const hls = new Hls({
-              maxBufferLength: isLowEnd ? 15 : 30,
-              maxMaxBufferLength: isLowEnd ? 30 : 60,
-              maxBufferSize: isLowEnd ? 25 * 1000 * 1000 : 60 * 1000 * 1000,
-              startLevel: -1,
-              enableWorker: true,
-            })
-            hlsInstance.current = hls
-            hls.on('hlsError', (_event, data) => {
-              if (data.fatal && !hasAutoFallbackRef.current) {
-                handleVideoSourceErrorRef.current()
-              }
-            })
-            hls.loadSource(proxiedUrl)
-            hls.attachMedia(videoElement)
-          } else {
-            videoElement.src = proxiedUrl
-          }
-        })
+        const Hls = (window as unknown as { Hls?: typeof Hls }).Hls
+        if (Hls && Hls.isSupported()) {
+          const isLowEnd = document.body.classList.contains('low-end')
+          const hls = new Hls({
+            maxBufferLength: isLowEnd ? 15 : 30,
+            maxMaxBufferLength: isLowEnd ? 30 : 60,
+            maxBufferSize: isLowEnd ? 25 * 1000 * 1000 : 60 * 1000 * 1000,
+            startLevel: -1,
+            enableWorker: true,
+          })
+          hlsInstance.current = hls
+          hls.on(Hls.Events.ERROR, (_event, data) => {
+            if (data.fatal && !hasAutoFallbackRef.current) {
+              handleVideoSourceErrorRef.current()
+            }
+          })
+          hls.loadSource(proxiedUrl)
+          hls.attachMedia(videoElement)
+        } else {
+          videoElement.src = proxiedUrl
+        }
       }
     } else {
       videoElement.src = proxiedUrl
