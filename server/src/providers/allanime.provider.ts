@@ -489,7 +489,7 @@ export class AllAnimeProvider implements Provider {
     const extensions = {
       persistedQuery: {
         version: 1,
-        sha256Hash: '60f50b84bb545fa25ee7f7c8c0adbf8f5cea40f7b1ef8501cbbff70e38589489',
+        sha256Hash: 'a0aca6827cc9a3ad7bc711da4d200a04adea8f1a7545dc418d5e92e74c3aad15',
       },
     }
     try {
@@ -586,7 +586,7 @@ export class AllAnimeProvider implements Provider {
   }
 
   async getShowMeta(showId: string, _ua?: string, _cookie?: string): Promise<Partial<Show> | null> {
-    let responseData: any
+    let responseData: { data?: { show?: Record<string, unknown> } }
     try {
       responseData = await this._request({
         method: 'POST',
@@ -596,7 +596,7 @@ export class AllAnimeProvider implements Provider {
           extensions: {
             persistedQuery: {
               version: 1,
-              sha256Hash: '043448386c7a686bc2aabfbb6b80f6074e795d350df48015023b079527b0848a',
+              sha256Hash: '3b6702a28d9bd4d4c045293b0bb17ecb3a1e7af28eca9ead0970228138ff4385',
             },
           },
         },
@@ -621,39 +621,49 @@ export class AllAnimeProvider implements Provider {
         throw error
       }
     }
-    const show = responseData.data?.show
+    const show = responseData.data?.show as Record<string, unknown> | undefined
     if (show) {
       return {
-        _id: show._id,
-        name: show.name,
-        thumbnail: this.deobfuscateUrl(show.thumbnail || ''),
-        thumbnails: Array.isArray(show.thumbnails) ? show.thumbnails : undefined,
-        bannerImage: show.banner,
-        description: show.description,
-        genres: show.genres ? show.genres.map((g: string) => ({ name: g })) : [],
-        tags: show.tags ? show.tags.map((t: string) => ({ name: t })) : [],
-        nativeName: show.nativeName,
-        englishName: show.englishName,
-        type: show.type,
-        availableEpisodes: show.availableEpisodes,
-        availableEpisodesDetail: show.availableEpisodesDetail,
-        episodeCount: show.episodeCount,
-        episodeDuration: show.episodeDuration,
-        score: show.score,
-        averageScore: show.averageScore,
-        isAdult: show.isAdult,
-        status: show.status,
-        studios: show.studios ? show.studios.map((s: string) => ({ name: s })) : [],
-        airedStart: show.airedStart,
-        airedEnd: show.airedEnd,
-        rating: show.rating,
-        country: show.countryOfOrigin,
-        season: show.season,
+        _id: show._id as string | undefined,
+        name: show.name as string | undefined,
+        thumbnail: this.deobfuscateUrl((show.thumbnail as string) || ''),
+        thumbnails: Array.isArray(show.thumbnails) ? (show.thumbnails as string[]) : undefined,
+        bannerImage: show.banner as string | undefined,
+        description: show.description as string | undefined,
+        genres: Array.isArray(show.genres)
+          ? (show.genres as string[]).map((g: string) => ({ name: g }))
+          : [],
+        tags: Array.isArray(show.tags)
+          ? (show.tags as string[]).map((t: string) => ({ name: t }))
+          : [],
+        nativeName: show.nativeName as string | undefined,
+        englishName: show.englishName as string | undefined,
+        type: show.type as string | undefined,
+        availableEpisodes: show.availableEpisodes as
+          | { sub?: number; dub?: number; raw?: number }
+          | undefined,
+        availableEpisodesDetail: show.availableEpisodesDetail as
+          | { sub?: string[]; dub?: string[]; raw?: string[] }
+          | undefined,
+        episodeCount: show.episodeCount as string | number | null | undefined,
+        episodeDuration: show.episodeDuration as string | number | null | undefined,
+        score: show.score as number | null | undefined,
+        averageScore: show.averageScore as number | null | undefined,
+        isAdult: show.isAdult as boolean | undefined,
+        status: show.status as string | undefined,
+        studios: Array.isArray(show.studios)
+          ? (show.studios as string[]).map((s: string) => ({ name: s }))
+          : [],
+        airedStart: show.airedStart as Record<string, unknown> | null | undefined,
+        airedEnd: show.airedEnd as Record<string, unknown> | null | undefined,
+        rating: show.rating as string | undefined,
+        country: show.countryOfOrigin as string | null | undefined,
+        season: show.season as Record<string, unknown> | null | undefined,
         names: {
-          romaji: show.name,
-          english: show.englishName,
-          native: show.nativeName,
-          synonyms: show.altNames,
+          romaji: show.name as string | undefined,
+          english: show.englishName as string | undefined,
+          native: show.nativeName as string | undefined,
+          synonyms: show.altNames as string[] | undefined,
         },
       }
     }
@@ -748,7 +758,18 @@ export class AllAnimeProvider implements Provider {
       })
     }
 
-    let responseData: any
+    let responseData: {
+      data?: {
+        episode?: {
+          sourceUrls?: Array<{
+            sourceName: string
+            sourceUrl: string
+            priority?: number
+            type?: string
+          }>
+        }
+      }
+    }
     try {
       responseData = await makeRequest()
     } catch (error: unknown) {
@@ -909,6 +930,79 @@ export class AllAnimeProvider implements Provider {
                   },
                 ],
                 type: 'player',
+              }
+            }
+            if (source.sourceName === 'Ok') {
+              const decryptedUrl = this.deobfuscateStreamUrl(source.sourceUrl)
+              try {
+                const { data: embedHtml } = await axios.get(decryptedUrl, {
+                  headers: { 'User-Agent': USER_AGENT, Referer: 'https://allanime.day/' },
+                  timeout: 10000,
+                })
+                if (typeof embedHtml === 'string') {
+                  const match = embedHtml.match(/data-options=['"]({.*?})['"]/)
+                  if (match) {
+                    const parsed = JSON.parse(match[1].replace(/&quot;/g, '"'))
+                    let metadata: Record<string, unknown> | null = null
+                    if (typeof parsed.flashvars?.metadata === 'string') {
+                      try {
+                        metadata = JSON.parse(parsed.flashvars.metadata)
+                      } catch {
+                        /* ignore */
+                      }
+                    }
+                    const links: VideoLink[] = []
+                    const videos = metadata?.videos as
+                      | Array<{ name?: string; url?: string }>
+                      | undefined
+                    if (videos && Array.isArray(videos)) {
+                      const qualityMap: Record<string, string> = {
+                        mobile: '144p',
+                        lowest: '240p',
+                        low: '360p',
+                        sd: '480p',
+                        hd: '720p',
+                        full: '1080p',
+                      }
+                      for (const v of videos) {
+                        if (
+                          v.url &&
+                          !v.url.includes('disallowed') &&
+                          v.name &&
+                          qualityMap[v.name]
+                        ) {
+                          links.push({
+                            resolutionStr: qualityMap[v.name],
+                            link: v.url,
+                            hls: false,
+                            headers: { Referer: 'https://ok.ru/' },
+                          })
+                        }
+                      }
+                    }
+                    if (links.length === 0) {
+                      const hlsUrl =
+                        metadata?.ondemandHls || metadata?.hlsManifestUrl || parsed.ondemandHls
+                      if (hlsUrl) {
+                        links.push({
+                          resolutionStr: 'Auto',
+                          link: hlsUrl as string,
+                          hls: true,
+                          headers: { Referer: 'https://ok.ru/' },
+                        })
+                      }
+                    }
+                    if (links.length > 0) {
+                      return {
+                        sourceName: 'Ok',
+                        links,
+                        type: 'player',
+                      }
+                    }
+                  }
+                }
+              } catch (e) {
+                // ignore, fall through to iframe
               }
             }
             return {
