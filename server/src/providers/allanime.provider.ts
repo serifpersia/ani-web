@@ -15,14 +15,14 @@ import NodeCache from 'node-cache'
 
 const API_BASE_URL = 'https://allanime.day'
 const API_ENDPOINT = `https://api.mkissa.net/api`
-const BOOTSTRAP_ENDPOINT = 'https://api.mkissa.net/client-crypto/v1/bootstrap?buildId=39'
+const BOOTSTRAP_ENDPOINT = 'https://api.mkissa.net/client-crypto/v1/bootstrap?buildId=43'
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0'
 const REFERER = 'https://youtu-chan.com'
 
 // AllAnime anti-bot crypto constants
-const AA_BUILD_ID = '39'
-const AA_MASK_HEX = '4fe6aaa6e15433ead82075823f9ea1c8b6ac6a632e521131cf10bb510f2e31b2'
+const AA_BUILD_ID = '43'
+const AA_MASK_HEX = '283330a221fe16145c0529bd318e419fccd3b837af213bf4f3138d510a2ad94b'
 const AA_TS_WINDOW_MS = 300_000
 
 interface BootstrapData {
@@ -586,21 +586,41 @@ export class AllAnimeProvider implements Provider {
   }
 
   async getShowMeta(showId: string, _ua?: string, _cookie?: string): Promise<Partial<Show> | null> {
-    const responseData = await this._request({
-      method: 'POST',
-      url: API_ENDPOINT,
-      data: {
-        variables: { _id: showId },
-        extensions: {
-          persistedQuery: {
-            version: 1,
-            sha256Hash: '043448386c7a686bc2aabfbb6b80f6074e795d350df48015023b079527b0848a',
+    let responseData: any
+    try {
+      responseData = await this._request({
+        method: 'POST',
+        url: API_ENDPOINT,
+        data: {
+          variables: { _id: showId },
+          extensions: {
+            persistedQuery: {
+              version: 1,
+              sha256Hash: '043448386c7a686bc2aabfbb6b80f6074e795d350df48015023b079527b0848a',
+            },
           },
         },
-      },
-      headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-      timeout: 15000,
-    })
+        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+        timeout: 15000,
+      })
+    } catch (error: unknown) {
+      const err = error as { message?: string }
+      if (err.message === 'PersistedQueryNotFound') {
+        logger.info('Show meta hash expired, falling back to full query')
+        responseData = await this._request({
+          method: 'POST',
+          url: API_ENDPOINT,
+          data: {
+            query: `query($showId: String!) { show(_id: $showId) { _id name nativeName englishName altNames thumbnail thumbnails banner description genres tags type availableEpisodes availableEpisodesDetail episodeCount episodeDuration score averageScore isAdult status studios airedStart airedEnd rating countryOfOrigin season } }`,
+            variables: { showId },
+          },
+          headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+          timeout: 15000,
+        })
+      } else {
+        throw error
+      }
+    }
     const show = responseData.data?.show
     if (show) {
       return {
@@ -704,26 +724,47 @@ export class AllAnimeProvider implements Provider {
     mode: 'sub' | 'dub'
   ): Promise<VideoSource[] | null> {
     const episodeQueryHash = '09caca435564416f37d5c78256c8e6e517007c3006529857e84ba2466bfcbea6'
-    const aaReqToken = this.makeAaReq(episodeQueryHash)
-    const variablesParam = encodeURIComponent(
-      JSON.stringify({ showId, translationType: mode, episodeString: episodeNumber })
-    )
-    const extensionsParam = encodeURIComponent(
-      JSON.stringify({
-        persistedQuery: {
-          version: 1,
-          sha256Hash: episodeQueryHash,
-        },
-        aaReq: aaReqToken,
+
+    const makeRequest = async () => {
+      const aaReqToken = this.makeAaReq(episodeQueryHash)
+      const variablesParam = encodeURIComponent(
+        JSON.stringify({ showId, translationType: mode, episodeString: episodeNumber })
+      )
+      const extensionsParam = encodeURIComponent(
+        JSON.stringify({
+          persistedQuery: {
+            version: 1,
+            sha256Hash: episodeQueryHash,
+          },
+          aaReq: aaReqToken,
+        })
+      )
+      const requestUrl = `${API_ENDPOINT}?variables=${variablesParam}&extensions=${extensionsParam}`
+      return this._request({
+        method: 'GET',
+        url: requestUrl,
+        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+        timeout: 15000,
       })
-    )
-    const requestUrl = `${API_ENDPOINT}?variables=${variablesParam}&extensions=${extensionsParam}`
-    const responseData = await this._request({
-      method: 'GET',
-      url: requestUrl,
-      headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-      timeout: 15000,
-    })
+    }
+
+    let responseData: any
+    try {
+      responseData = await makeRequest()
+    } catch (error: unknown) {
+      const err = error as { message?: string }
+      if (
+        err.message?.includes('AA_CRYPTO_STALE') ||
+        err.message?.includes('AA_CRYPTO_EXPIRED') ||
+        err.message?.includes('AA_CRYPTO_BUILD_MISMATCH') ||
+        err.message?.includes('AA_CRYPTO_QUERY_MISMATCH')
+      ) {
+        await this.refreshKey()
+        responseData = await makeRequest()
+      } else {
+        throw error
+      }
+    }
     const sourceUrls = responseData.data?.episode?.sourceUrls as {
       sourceName: string
       sourceUrl: string
