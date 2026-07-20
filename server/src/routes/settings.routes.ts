@@ -1,18 +1,16 @@
 import { Router } from 'express'
 import { SettingsController } from '../controllers/settings.controller'
-import { AllAnimeProvider } from '../providers/allanime.provider'
 import multer from 'multer'
 import { CONFIG } from '../config'
 import { DatabaseWrapper } from '../db'
 
 export function createSettingsRouter(
-  provider: AllAnimeProvider,
   getDb: () => DatabaseWrapper,
   initializeDatabase: (path: string) => Promise<DatabaseWrapper>,
   setDb: (newDb: DatabaseWrapper) => void
 ): Router {
   const router = Router()
-  const controller = new SettingsController(provider)
+  const controller = new SettingsController()
 
   router.get('/settings', controller.getSettings)
   router.post('/settings', controller.updateSettings)

@@ -1,10 +1,9 @@
 import { Router } from 'express'
 import { InsightsController } from '../controllers/insights.controller'
-import { AllAnimeProvider } from '../providers/allanime.provider'
 
-export function createInsightsRouter(provider: AllAnimeProvider): Router {
+export function createInsightsRouter(): Router {
   const router = Router()
-  const controller = new InsightsController(provider)
+  const controller = new InsightsController()
 
   router.get('/insights', controller.getWatchInsights)
   router.get('/insights/genre-cards', controller.getGenreCards)

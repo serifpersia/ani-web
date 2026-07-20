@@ -10,6 +10,7 @@ import {
   getSchedule,
   searchAnilist,
 } from '../lib/anilist'
+import { getMigratedId } from '../lib/migration'
 import logger from '../logger'
 
 export class DataController {
@@ -77,10 +78,18 @@ export class DataController {
 
   getSkipTimes = async (req: Request, res: Response) => {
     try {
-      const data = await this.getProvider(req).getSkipTimes(
-        req.params.showId as string,
-        req.params.episodeNumber as string
-      )
+      const showId = req.params.showId as string
+      const episodeNumber = req.params.episodeNumber as string
+      if (/^\d+$/.test(showId)) {
+        const skipRes = await fetch(
+          `https://api.aniskip.com/v1/skip-times/${showId}/${episodeNumber}?types=op&types=ed`
+        )
+        if (skipRes.ok) {
+          const data = await skipRes.json()
+          return res.json(data)
+        }
+      }
+      const data = await this.getProvider(req).getSkipTimes(showId, episodeNumber)
       res.json(data)
     } catch {
       res.json({ found: false, results: [] })
@@ -105,11 +114,13 @@ export class DataController {
   }
 
   getEpisodes = async (req: Request, res: Response) => {
-    const showId = req.query.showId as string
+    const showIdRaw = req.query.showId as string
 
-    if (!showId) {
+    if (!showIdRaw) {
       return res.json({ episodes: [] })
     }
+
+    const showId = await getMigratedId(req.db, showIdRaw, this.providers)
 
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(showId)) {
       try {
@@ -170,7 +181,7 @@ export class DataController {
 
   search = async (req: Request, res: Response) => {
     try {
-      const providerName = (req.query.provider as string) || 'allanime'
+      const providerName = (req.query.provider as string) || 'anilist'
       if (providerName.toLowerCase() === 'anilist') {
         const query = (req.query.query as string) || ''
         const page = parseInt(req.query.page as string) || 1
@@ -243,7 +254,8 @@ export class DataController {
   }
 
   getShowMeta = async (req: Request, res: Response) => {
-    const id = req.params.id as string
+    const showIdRaw = req.params.id as string
+    const id = await getMigratedId(req.db, showIdRaw, this.providers)
     const providerName = (req.query.provider as string) || 'allanime'
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
     const isNumeric = /^\d+$/.test(id)

@@ -143,11 +143,10 @@ app.use(
 )
 app.use('/api', createDataRouter(apiCache, providers))
 app.use('/api', createProxyRouter())
-app.use('/api', createInsightsRouter(allAnimeProvider))
+app.use('/api', createInsightsRouter())
 app.use(
   '/api',
   createSettingsRouter(
-    allAnimeProvider,
     () => db,
     initializeDatabase,
     (newDb) => {

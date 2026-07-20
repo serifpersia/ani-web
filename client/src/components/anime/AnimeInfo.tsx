@@ -11,7 +11,7 @@ import {
   FaTv,
   FaLayerGroup,
 } from 'react-icons/fa'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useAnimeInfoData } from '../../hooks/useAnimeInfoData'
 import { useAddToQueue, useQueue, useRemoveFromQueue } from '../../hooks/useAnimeData'
 import { fixThumbnailUrl } from '../../lib/utils'
@@ -29,6 +29,12 @@ export default function AnimeInfo() {
   const [queueConfirmed, setQueueConfirmed] = useState(false)
 
   const { showMeta, loadingMeta, toggleWatchlist, inWatchlist } = useAnimeInfoData(showId)
+
+  useEffect(() => {
+    if (showId && showMeta?.id && showMeta.id !== showId) {
+      navigate(`/anime/${showMeta.id}`, { replace: true })
+    }
+  }, [showId, showMeta, navigate])
   const { data: queue = [] } = useQueue()
   const addQueue = useAddToQueue()
   const removeQueue = useRemoveFromQueue()

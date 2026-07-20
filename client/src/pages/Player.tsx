@@ -60,6 +60,15 @@ const Player: React.FC = () => {
     isUpdatingWatchlistStatus,
   } = usePlayerData(showId, episodeNumber)
 
+  useEffect(() => {
+    if (showId && state.showMeta?.id && state.showMeta.id !== showId) {
+      const url = episodeNumber
+        ? `/watch/${state.showMeta.id}/${episodeNumber}${window.location.search}`
+        : `/watch/${state.showMeta.id}${window.location.search}`
+      navigate(url, { replace: true })
+    }
+  }, [showId, state.showMeta?.id, episodeNumber, navigate])
+
   const memoizedShowMeta = useMemo(() => {
     if (!state.showMeta.name) return undefined
     return {

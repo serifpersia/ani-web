@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
 import { performWriteTransaction } from '../sync'
-import { AllAnimeProvider } from '../providers/allanime.provider'
+import { searchAnilistByTitle } from '../lib/anilist'
 import { parseStringPromise } from 'xml2js'
 import logger from '../logger'
 import path from 'path'
@@ -24,8 +24,6 @@ interface ShowToInsert {
 }
 
 export class SettingsController {
-  constructor(private provider: AllAnimeProvider) {}
-
   getSettings = async (req: Request, res: Response) => {
     try {
       const row = await SettingsRepository.getByKey(req.db, req.query.key as string)
@@ -141,14 +139,15 @@ export class SettingsController {
     for (let i = 0; i < animeList.length; i += BATCH_SIZE) {
       const batch = animeList.slice(i, i + BATCH_SIZE)
       const batchResults = await Promise.allSettled(
-        batch.map((item) => this.provider.search({ query: item.series_title[0] }))
+        batch.map((item) => searchAnilistByTitle(item.series_title[0]))
       )
       batchResults.forEach((r, idx) => {
-        if (r.status === 'fulfilled' && r.value.length > 0) {
+        if (r.status === 'fulfilled' && r.value) {
+          const show = r.value
+          const title = show.title?.english || show.title?.romaji || batch[idx].series_title[0]
           showsToInsert.push({
-            id: r.value[0]._id,
-            name: r.value[0].name,
-            thumbnail: r.value[0].thumbnail,
+            id: String(show.id),
+            name: title,
             status: batch[idx].my_status[0],
           })
         } else {

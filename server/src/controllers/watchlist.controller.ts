@@ -20,6 +20,7 @@ import { discordRPCService } from '../discord-rpc'
 import { requestContext } from '../utils/request-context'
 import { dbAll } from '../utils/db-utils'
 import { searchAnilistByTitle, getAiredEpisodesForShows } from '../lib/anilist'
+import { getMigratedId } from '../lib/migration'
 
 interface CombinedContinueWatchingShow {
   _id: string
@@ -344,7 +345,7 @@ export class WatchlistController {
 
   updateProgress = async (req: Request, res: Response) => {
     const {
-      showId,
+      showId: showIdRaw,
       episodeNumber,
       currentTime,
       duration,
@@ -360,6 +361,11 @@ export class WatchlistController {
       isPlaying,
       sessionId,
     } = req.body
+
+    const showId = await getMigratedId(req.db, showIdRaw, {
+      allanime: this.allAnime,
+      animepahe: this.animePahe,
+    })
 
     const titlePreferenceRow = await SettingsRepository.getByKey(req.db, 'titlePreference')
     const titlePreference = titlePreferenceRow ? titlePreferenceRow.value : 'englishName'
@@ -440,7 +446,11 @@ export class WatchlistController {
   }
 
   removeContinueWatching = async (req: Request, res: Response) => {
-    const { showId } = req.body
+    const { showId: showIdRaw } = req.body
+    const showId = await getMigratedId(req.db, showIdRaw, {
+      allanime: this.allAnime,
+      animepahe: this.animePahe,
+    })
     await performWriteTransaction(req.db, (tx) => {
       WatchedEpisodesRepository.deleteByShow(tx, showId)
       NotificationsRepository.deleteByShow(tx, showId)
@@ -523,7 +533,11 @@ export class WatchlistController {
   }
 
   checkWatchlist = async (req: Request, res: Response) => {
-    const item = await WatchlistRepository.getById(req.db, req.params.showId as string)
+    const showId = await getMigratedId(req.db, req.params.showId as string, {
+      allanime: this.allAnime,
+      animepahe: this.animePahe,
+    })
+    const item = await WatchlistRepository.getById(req.db, showId)
     res.json({ inWatchlist: !!item, status: item?.status ?? null })
   }
 
@@ -540,12 +554,24 @@ export class WatchlistController {
   }
 
   addToQueue = async (req: Request, res: Response) => {
-    const { showId, episodeNumber, showName, showThumbnail, nativeName, englishName, type } =
-      req.body
+    const {
+      showId: showIdRaw,
+      episodeNumber,
+      showName,
+      showThumbnail,
+      nativeName,
+      englishName,
+      type,
+    } = req.body
 
-    if (!showId || !episodeNumber) {
+    if (!showIdRaw || !episodeNumber) {
       return res.status(400).json({ error: 'showId and episodeNumber are required' })
     }
+
+    const showId = await getMigratedId(req.db, showIdRaw, {
+      allanime: this.allAnime,
+      animepahe: this.animePahe,
+    })
 
     const existing = await QueueRepository.getByEpisode(req.db, showId, String(episodeNumber))
 
@@ -573,7 +599,11 @@ export class WatchlistController {
   }
 
   removeFromQueue = async (req: Request, res: Response) => {
-    const { showId, episodeNumber } = req.body
+    const { showId: showIdRaw, episodeNumber } = req.body
+    const showId = await getMigratedId(req.db, showIdRaw, {
+      allanime: this.allAnime,
+      animepahe: this.animePahe,
+    })
     await performWriteTransaction(req.db, (tx) => {
       QueueRepository.removeEpisode(tx, showId, String(episodeNumber))
     })
@@ -600,7 +630,11 @@ export class WatchlistController {
   }
 
   getSuggestedQueueEpisode = async (req: Request, res: Response) => {
-    const showId = req.params.showId as string
+    const showIdRaw = req.params.showId as string
+    const showId = await getMigratedId(req.db, showIdRaw, {
+      allanime: this.allAnime,
+      animepahe: this.animePahe,
+    })
     const resumeProgress = await WatchedEpisodesRepository.getLatestResumeProgress(req.db, showId)
 
     if (resumeProgress) {
@@ -644,25 +678,34 @@ export class WatchlistController {
   }
 
   getEpisodeProgress = async (req: Request, res: Response) => {
+    const showId = await getMigratedId(req.db, req.params.showId as string, {
+      allanime: this.allAnime,
+      animepahe: this.animePahe,
+    })
     const progress = await WatchedEpisodesRepository.getByShowAndEpisode(
       req.db,
-      req.params.showId as string,
+      showId,
       req.params.episodeNumber as string
     )
     res.json(progress || { currentTime: 0, duration: 0 })
   }
 
   getWatchedEpisodes = async (req: Request, res: Response) => {
-    const episodes = await WatchedEpisodesRepository.getWatchedEpisodeNumbers(
-      req.db,
-      req.params.showId as string
-    )
+    const showId = await getMigratedId(req.db, req.params.showId as string, {
+      allanime: this.allAnime,
+      animepahe: this.animePahe,
+    })
+    const episodes = await WatchedEpisodesRepository.getWatchedEpisodeNumbers(req.db, showId)
     res.json(episodes)
   }
 
   addToWatchlist = async (req: Request, res: Response) => {
-    const { id, status, nativeName, englishName } = req.body
+    const { id: idRaw, status, nativeName, englishName } = req.body
     let { name, thumbnail, type } = req.body
+    const id = await getMigratedId(req.db, idRaw, {
+      allanime: this.allAnime,
+      animepahe: this.animePahe,
+    })
 
     if (id && !id.startsWith('show_')) {
       try {
@@ -698,7 +741,11 @@ export class WatchlistController {
   }
 
   removeFromWatchlist = async (req: Request, res: Response) => {
-    const { id } = req.body
+    const { id: idRaw } = req.body
+    const id = await getMigratedId(req.db, idRaw, {
+      allanime: this.allAnime,
+      animepahe: this.animePahe,
+    })
     await performWriteTransaction(req.db, (tx) => {
       WatchlistRepository.delete(tx, id)
       WatchedEpisodesRepository.deleteByShow(tx, id)
@@ -708,7 +755,11 @@ export class WatchlistController {
   }
 
   updateWatchlistStatus = async (req: Request, res: Response) => {
-    const { id, status } = req.body
+    const { id: idRaw, status } = req.body
+    const id = await getMigratedId(req.db, idRaw, {
+      allanime: this.allAnime,
+      animepahe: this.animePahe,
+    })
     await performWriteTransaction(req.db, (tx) => {
       WatchlistRepository.updateStatus(tx, id, status)
     })

@@ -187,15 +187,14 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
 
     const episodeToPlay = anime.episodeNumber ?? anime.nextEpisodeToWatch
 
-    const titleParam = `?title=${encodeURIComponent(anime.name)}`
     const linkTarget = continueWatching
       ? episodeToPlay
-        ? `/watch/${anime._id}/${episodeToPlay}${titleParam}`
-        : `/watch/${anime._id}${titleParam}`
+        ? `/watch/${anime._id}/${episodeToPlay}`
+        : `/watch/${anime._id}`
       : episodeToPlay && anime.episodeNumber
-        ? `/watch/${anime._id}/${anime.episodeNumber}${titleParam}`
+        ? `/watch/${anime._id}/${anime.episodeNumber}`
         : hasProgress
-          ? `/watch/${anime._id}/${anime.episodeNumber}${titleParam}`
+          ? `/watch/${anime._id}/${anime.episodeNumber}`
           : `/anime/${anime._id}`
 
     const showAnyBar = hasProgress || showFullBar
