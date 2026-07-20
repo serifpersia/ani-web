@@ -15,14 +15,14 @@ import NodeCache from 'node-cache'
 
 const API_BASE_URL = 'https://allanime.day'
 const API_ENDPOINT = `https://api.mkissa.net/api`
-const BOOTSTRAP_ENDPOINT = 'https://api.mkissa.net/client-crypto/v1/bootstrap?buildId=47'
+const BOOTSTRAP_ENDPOINT = 'https://api.mkissa.net/client-crypto/v1/bootstrap?buildId=50'
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0'
 const REFERER = 'https://youtu-chan.com'
 
 // AllAnime anti-bot crypto constants
-const AA_BUILD_ID = '47'
-const AA_MASK_HEX = 'ba9bbabe5b9b725b426932299fb74eb7530487780611eef62767c2244a99a550'
+const AA_BUILD_ID = '50'
+const AA_MASK_HEX = '1be5fd5d5adefbeec8546b2283570eb066b51d2e503b83532a4ef7de684d9a8d'
 const AA_TS_WINDOW_MS = 300_000
 
 interface BootstrapData {
