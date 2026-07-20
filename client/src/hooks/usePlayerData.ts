@@ -36,8 +36,7 @@ interface RawSkipInterval {
 
 export const usePlayerData = (
   showId: string | undefined,
-  episodeNumber: string | undefined,
-  initialTitle?: string
+  episodeNumber: string | undefined
 ): UsePlayerDataReturn => {
   const [uiState, dispatch] = useReducer(playerReducer, undefined, createInitialState)
   const queryClient = useQueryClient()
@@ -71,48 +70,44 @@ export const usePlayerData = (
       const isUuid = UUID_RE.test(showId)
 
       const fetchMeta = async (): Promise<Record<string, unknown>> => {
-        if (isUuid) {
+        if (uiState.selectedProvider === 'animepahe') {
           try {
-            return await fetchApi(
-              `/api/show-meta/${showId}?provider=animepahe${initialTitle ? `&title=${encodeURIComponent(initialTitle)}` : ''}`
-            )
+            return await fetchApi(`/api/show-meta/${showId}?provider=animepahe`)
           } catch {
             return {}
           }
         }
-        const fallbackProviders = ['allanime', 'megaplay', 'animeya', '123anime']
-        for (const provider of fallbackProviders) {
-          try {
-            return await fetchApi(
-              `/api/show-meta/${showId}?provider=${provider}${initialTitle ? `&title=${encodeURIComponent(initialTitle)}` : ''}`
-            )
-          } catch {
-            continue
-          }
+        try {
+          return await fetchApi(`/api/show-meta/${showId}`)
+        } catch {
+          return {}
         }
-        return {}
       }
 
       const meta = await fetchMeta()
-      const showTitle =
-        initialTitle || (meta?.name as string) || (meta?.englishName as string) || ''
+      const showTitle = (meta?.name as string) || (meta?.englishName as string) || ''
 
       const fetchEpisodes = async (): Promise<{
         episodes: string[]
         description?: string
       } | null> => {
-        const fallbackProviders = isUuid
-          ? ['animepahe', 'allanime', 'megaplay', 'animeya', '123anime']
-          : ['allanime', 'megaplay', 'animeya', 'animepahe', '123anime']
-        for (const provider of fallbackProviders) {
+        if (uiState.selectedProvider === 'animepahe') {
           try {
-            let url = `/api/episodes?showId=${showId}&mode=${uiState.currentMode}&provider=${provider}`
+            let url = `/api/episodes?showId=${showId}&mode=${uiState.currentMode}&provider=animepahe`
             if (showTitle) url += `&title=${encodeURIComponent(showTitle)}`
             const data = await fetchApi(url)
             if (data?.episodes?.length) return data
           } catch {
-            continue
+            // ignore
           }
+        }
+        try {
+          let url = `/api/episodes?showId=${showId}&mode=${uiState.currentMode}`
+          if (showTitle) url += `&title=${encodeURIComponent(showTitle)}`
+          const data = await fetchApi(url)
+          if (data?.episodes?.length) return data
+        } catch {
+          // ignore
         }
         return null
       }
@@ -170,7 +165,7 @@ export const usePlayerData = (
 
       try {
         let providerShowId = showId
-        if (['123anime', 'animeya', 'megaplay'].includes(uiState.selectedProvider)) {
+        if (['allanime', '123anime', 'animeya', 'megaplay'].includes(uiState.selectedProvider)) {
           const names = showData?.showMeta?.names
           // AlAnime's `name` field is often the native Japanese script (e.g. "ブリーチ"
           // for Bleach), which gets mapped to names.romaji. Sending katakana/kanji to
@@ -204,6 +199,7 @@ export const usePlayerData = (
                 session?: string
                 name?: string
                 title?: string
+                _id?: string
               }
               // Score each result by title closeness to the search query AND
               // whether it matches the current sub/dub mode.
@@ -247,7 +243,7 @@ export const usePlayerData = (
                 }
               }
 
-              providerShowId = bestMatch.session || bestMatch.id
+              providerShowId = bestMatch.session || bestMatch.id || bestMatch._id
             }
           }
         } else if (uiState.selectedProvider === 'animepahe') {

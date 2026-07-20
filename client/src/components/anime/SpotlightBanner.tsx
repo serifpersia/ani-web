@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { useQueries } from '@tanstack/react-query'
-import { FaChevronLeft, FaChevronRight, FaStar } from 'react-icons/fa'
+import { useNavigate } from 'react-router-dom'
+import { FaStar } from 'react-icons/fa'
 import { Button } from '../common/Button'
 import type { Anime } from '../../hooks/useAnimeData'
 import { fixThumbnailUrl } from '../../lib/utils'
@@ -10,33 +9,8 @@ import { useLowEndMode } from '../../contexts/LowEndModeContext'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 import useIsMobile from '../../hooks/useIsMobile'
 
-import { fetchApi } from '../../lib/fetchApi'
-
 interface SpotlightBannerProps {
   animeList: Anime[]
-}
-
-interface ShowMeta {
-  description?: string
-  genres?: { name: string; route?: string }[]
-  bannerImage?: string
-  thumbnail?: string
-  season?: { title?: string }
-  score?: number
-  status?: string
-  type?: string
-  episodeCount?: number
-  rating?: string
-}
-
-const fetchShowMeta = async (id: string): Promise<ShowMeta> => {
-  try {
-    const response = await fetch(`/api/show-meta/${id}`)
-    if (!response.ok) return {}
-    return await response.json()
-  } catch {
-    return {}
-  }
 }
 
 const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
@@ -99,28 +73,17 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  const metaQueries = useQueries({
-    queries: top6.map((anime) => ({
-      queryKey: ['spotlight-meta', anime._id],
-      queryFn: () => fetchShowMeta(anime._id),
-      enabled: !!anime._id,
-      staleTime: 1000 * 60 * 5,
-      gcTime: 1000 * 60 * 10,
-    })),
-  })
-
   if (top6.length === 0) return null
 
   const anime = top6[currentIndex]
-  const meta: ShowMeta = metaQueries[currentIndex]?.data ?? {}
 
-  const rawDesc = meta.description ?? ''
+  const rawDesc = anime.description ?? ''
   const synopsis = rawDesc.replace(/<[^>]*>?/gm, '').trim()
-  const genres: { name: string }[] = meta.genres ?? []
+  const genres = anime.genres ?? []
   const visibleGenres = genres.slice(0, isMobile ? 2 : 4)
 
-  const bannerSrc = meta.bannerImage
-    ? fixThumbnailUrl(meta.bannerImage, 1920, 840)
+  const bannerSrc = anime.bannerImage
+    ? fixThumbnailUrl(anime.bannerImage, 1920, 840)
     : fixThumbnailUrl(anime.thumbnail, 1280, 450)
 
   const handleWatch = () => {
@@ -141,10 +104,10 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   }
 
   const metadata = [
-    meta.type || 'Anime',
-    meta.status,
-    meta.episodeCount ? `${meta.episodeCount} Episodes` : undefined,
-    meta.rating,
+    anime.type || 'Anime',
+    anime.status,
+    anime.episodeCount ? `${anime.episodeCount} Episodes` : undefined,
+    anime.rating,
   ].filter(Boolean)
 
   if (isMobile) return null
@@ -163,10 +126,10 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
           <div className={styles.content}>
             <div className={styles.badgeRow}>
               <span className={styles.featureLabel}>Featured</span>
-              {meta.score && (
+              {anime.score && (
                 <div className={styles.metaRow} style={{ color: '#fbbf24' }}>
                   <FaStar size={14} />
-                  <span>{meta.score}</span>
+                  <span>{anime.score}</span>
                 </div>
               )}
             </div>

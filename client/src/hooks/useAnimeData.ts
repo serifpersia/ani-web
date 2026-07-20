@@ -9,6 +9,10 @@ export interface Anime {
   nativeName?: string
   englishName?: string
   thumbnail: string
+  bannerImage?: string
+  description?: string
+  genres?: { name: string }[]
+  score?: number
   type?: string
   status?: string
   episodeNumber?: number
@@ -23,6 +27,9 @@ export interface Anime {
   episodeCount?: number
   isAdult?: boolean
   rating?: string
+  season?: { title?: string }
+  nextAiring?: { episode: number; timeUntilAiring: number }
+  studios?: { name: string }[]
 }
 
 export interface QueueItem {
@@ -36,6 +43,14 @@ export interface QueueItem {
   englishName?: string
   thumbnail?: string
   type?: string
+}
+
+export const useTrendingAnime = () => {
+  return useQuery<Anime[]>({
+    queryKey: ['trending'],
+    queryFn: () => fetchApi('/api/trending'),
+    staleTime: 1000 * 60 * 5,
+  })
 }
 
 export const usePopularAnime = (timeframe: string) => {
@@ -52,6 +67,18 @@ export const usePaginatedPopularAnime = (timeframe: string, page: number, size: 
   })
 }
 
+export const useInfiniteTrendingList = (sort: string = 'TRENDING_DESC', size: number = 10) => {
+  return useInfiniteQuery<Anime[]>({
+    queryKey: ['trendingList', sort, size],
+    queryFn: ({ pageParam = 1 }) =>
+      fetchApi(`/api/popular-list?sort=${sort}&page=${pageParam as number}&size=${size}`),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage: Anime[], allPages) => {
+      return lastPage.length >= size ? allPages.length + 1 : undefined
+    },
+  })
+}
+
 export const useInfinitePopularAnime = (timeframe: string, size: number = 7) => {
   return useInfiniteQuery<Anime[]>({
     queryKey: ['popularInfinite', timeframe, size],
@@ -64,18 +91,18 @@ export const useInfinitePopularAnime = (timeframe: string, size: number = 7) => 
   })
 }
 
-export const useLatestReleases = () => {
+export const useLatestReleases = (format: string = 'TV') => {
   return useQuery<Anime[]>({
-    queryKey: ['latestReleases'],
-    queryFn: () => fetchApi('/api/latest-releases'),
+    queryKey: ['latestReleases', format],
+    queryFn: () => fetchApi(`/api/latest-releases?format=${format}`),
   })
 }
 
-export const useInfiniteLatestReleases = (size: number = 14) => {
+export const useInfiniteLatestReleases = (format: string = 'TV', size: number = 12) => {
   return useInfiniteQuery<Anime[]>({
-    queryKey: ['latestReleasesInfinite', size],
+    queryKey: ['latestReleases', format, size],
     queryFn: ({ pageParam = 1 }) =>
-      fetchApi(`/api/latest-releases?page=${pageParam as number}&size=${size}`),
+      fetchApi(`/api/latest-releases?format=${format}&page=${pageParam as number}&size=${size}`),
     initialPageParam: 1,
     getNextPageParam: (lastPage: Anime[], allPages) => {
       return lastPage.length >= size ? allPages.length + 1 : undefined
@@ -83,10 +110,10 @@ export const useInfiniteLatestReleases = (size: number = 14) => {
   })
 }
 
-export const useCurrentSeason = () => {
+export const useCurrentSeason = (format: string = 'ALL') => {
   return useInfiniteQuery({
-    queryKey: ['currentSeason'],
-    queryFn: ({ pageParam = 1 }) => fetchApi(`/api/seasonal?page=${pageParam}`),
+    queryKey: ['currentSeason', format],
+    queryFn: ({ pageParam = 1 }) => fetchApi(`/api/seasonal?format=${format}&page=${pageParam}`),
     initialPageParam: 1,
     getNextPageParam: (lastPage: Anime[], allPages) => {
       return lastPage.length > 0 ? allPages.length + 1 : undefined
@@ -94,10 +121,10 @@ export const useCurrentSeason = () => {
   })
 }
 
-export const usePaginatedCurrentSeason = (page: number) => {
+export const usePaginatedCurrentSeason = (page: number, format: string = 'TV') => {
   return useQuery<Anime[]>({
-    queryKey: ['currentSeason', page],
-    queryFn: () => fetchApi(`/api/seasonal?page=${page}`),
+    queryKey: ['currentSeason', page, format],
+    queryFn: () => fetchApi(`/api/seasonal?page=${page}&format=${format}&size=14`),
   })
 }
 

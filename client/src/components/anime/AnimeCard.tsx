@@ -39,6 +39,7 @@ interface Anime {
   isAdult?: boolean
   rating?: string
   rank?: number
+  airTime?: string
 }
 
 interface AnimeCardConfig {
@@ -308,6 +309,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
                 {showEpBadge && (progressString || anime.episodeNumber) && (
                   <div className={styles.epBadge}>
                     {progressString ? progressString : `EP ${anime.episodeNumber}`}
+                    {anime.airTime && <span className={styles.airTime}>{anime.airTime}</span>}
                   </div>
                 )}
               </>

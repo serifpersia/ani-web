@@ -4,6 +4,7 @@ import { FaChevronLeft, FaChevronRight, FaHistory } from 'react-icons/fa'
 import { Button } from '../components/common/Button'
 import AnimeSection from '../components/anime/AnimeSection'
 import TrendingList from '../components/anime/TrendingList'
+import LatestReleasesList from '../components/anime/LatestReleasesList'
 import Schedule from '../components/anime/Schedule'
 import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
@@ -11,11 +12,10 @@ import RemoveConfirmationModal from '../components/common/RemoveConfirmationModa
 import SpotlightBanner from '../components/anime/SpotlightBanner'
 import QueueRail from '../components/player/QueueRail'
 import {
-  useInfiniteLatestReleases,
   usePaginatedCurrentSeason,
   useAllContinueWatching,
   useRemoveFromWatchlist,
-  usePopularAnime,
+  useTrendingAnime,
   useQueue,
   useRemoveFromQueue,
   useClearQueue,
@@ -33,9 +33,12 @@ const Home: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
     return (localStorage.getItem('home_activeTab') as ActiveTab) || 'latest'
   })
+  const [seasonFormat, setSeasonFormat] = useState(() => {
+    return localStorage.getItem('season_format') || 'TV'
+  })
   const seasonalRef = useRef<HTMLDivElement>(null)
 
-  const { data: nextPageData } = usePaginatedCurrentSeason(page + 1)
+  const { data: nextPageData } = usePaginatedCurrentSeason(page + 1, seasonFormat)
 
   const { titlePreference } = useTitlePreference()
   const [itemToRemove, setItemToRemove] = React.useState<{ id: string; name: string } | null>(null)
@@ -57,33 +60,15 @@ const Home: React.FC = () => {
   }, [activeTab])
 
   useEffect(() => {
+    localStorage.setItem('season_format', seasonFormat)
+    setPage(1)
+  }, [seasonFormat])
+
+  useEffect(() => {
     if (thisWeekList !== undefined && thisWeekList.length === 0 && activeTab === 'week') {
       setActiveTab('latest')
     }
   }, [thisWeekList, activeTab])
-
-  const {
-    data: latestInfinite,
-    isLoading: loadingLatestInfinite,
-    fetchNextPage: fetchMoreLatest,
-    hasNextPage: hasMoreLatest,
-    isFetchingNextPage: fetchingMoreLatest,
-  } = useInfiniteLatestReleases(14)
-
-  const latestList = useMemo(() => {
-    return latestInfinite?.pages.flatMap((page) => page) || []
-  }, [latestInfinite])
-
-  const handleLatestScroll = useCallback(
-    (e: React.UIEvent<HTMLDivElement>) => {
-      if (!hasMoreLatest || fetchingMoreLatest || loadingLatestInfinite) return
-      const { scrollLeft, clientWidth, scrollWidth } = e.currentTarget
-      if (scrollLeft + clientWidth > scrollWidth * 0.7) {
-        fetchMoreLatest()
-      }
-    },
-    [hasMoreLatest, fetchingMoreLatest, loadingLatestInfinite, fetchMoreLatest]
-  )
 
   const {
     data: continueWatchingInfinite,
@@ -112,14 +97,17 @@ const Home: React.FC = () => {
     ]
   )
 
-  const { data: popularWeekly } = usePopularAnime('weekly')
+  const { data: trendingAnime } = useTrendingAnime()
   const cwList = useMemo(() => continueWatchingInfinite?.pages || [], [continueWatchingInfinite])
 
-  const { data: currentSeason, isLoading: loadingSeason } = usePaginatedCurrentSeason(page)
+  const { data: currentSeason, isLoading: loadingSeason } = usePaginatedCurrentSeason(
+    page,
+    seasonFormat
+  )
   const seasonLimit = 14
 
   const canGoNext =
-    currentSeason && currentSeason.length >= 14 && nextPageData && nextPageData.length > 0
+    currentSeason && currentSeason.length >= seasonLimit && nextPageData && nextPageData.length > 0
 
   const removeCw = useMutation({
     mutationFn: async (showId: string) => {
@@ -171,16 +159,7 @@ const Home: React.FC = () => {
   const renderTabContent = () => {
     switch (displayTab) {
       case 'latest':
-        return (
-          <AnimeSection
-            title="Latest Releases"
-            animeList={latestList}
-            loading={loadingLatestInfinite}
-            carousel
-            onScroll={handleLatestScroll}
-            isFetchingNextPage={fetchingMoreLatest}
-          />
-        )
+        return <LatestReleasesList />
       case 'season':
         return (
           <section style={{ marginBottom: '2.5rem' }}>
@@ -189,6 +168,38 @@ const Home: React.FC = () => {
                 <div className="section-title" style={{ marginBottom: 0 }}>
                   Current Season
                 </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <select
+                  style={{
+                    width: '90px',
+                    height: '34px',
+                    padding: '0 8px',
+                    paddingRight: '1.5rem',
+                    backgroundColor: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-primary)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--text-primary)',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    backgroundImage:
+                      "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23a1a1aa' stroke-width='2' viewBox='0 0 12 12'%3E%3Cpolyline points='3 5 6 8 9 5'/%3E%3C/svg%3E\")",
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 0.5rem center',
+                  }}
+                  value={seasonFormat}
+                  onChange={(e) => setSeasonFormat(e.currentTarget.value)}
+                >
+                  <option value="TV">TV</option>
+                  <option value="ONA">ONA</option>
+                  <option value="OVA">OVA</option>
+                  <option value="MOVIE">Movie</option>
+                  <option value="ALL">All</option>
+                  <option value="ADULT">Mature</option>
+                </select>
                 <div className={styles['pagination-controls']}>
                   <button
                     className={styles['nav-button']}
@@ -264,7 +275,7 @@ const Home: React.FC = () => {
 
   return (
     <div style={{ paddingBottom: '2rem' }}>
-      <SpotlightBanner animeList={popularWeekly || []} />
+      <SpotlightBanner animeList={trendingAnime || []} />
       <QueueRail
         title="Queue"
         items={queueData}

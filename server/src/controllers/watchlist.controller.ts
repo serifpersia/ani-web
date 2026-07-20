@@ -19,6 +19,7 @@ import { SettingsRepository } from '../repositories/settings.repository'
 import { discordRPCService } from '../discord-rpc'
 import { requestContext } from '../utils/request-context'
 import { dbAll } from '../utils/db-utils'
+import { searchAnilistByTitle, getAiredEpisodesForShows } from '../lib/anilist'
 
 interface CombinedContinueWatchingShow {
   _id: string
@@ -78,8 +79,23 @@ export class WatchlistController {
   }
 
   startNotificationDiscovery(getDb: () => DatabaseWrapper): void {
-    let currentIndex = 0
     let busy = false
+    const anilistIdCache = new Map<string, number | null>()
+
+    const getAnilistId = async (showId: string, showName: string): Promise<number | null> => {
+      if (/^\d+$/.test(showId)) {
+        return parseInt(showId)
+      }
+
+      if (anilistIdCache.has(showId)) {
+        return anilistIdCache.get(showId) || null
+      }
+
+      const result = await searchAnilistByTitle(showName)
+      const id = result?.id || null
+      anilistIdCache.set(showId, id)
+      return id
+    }
 
     setInterval(async () => {
       if (busy) return
@@ -98,65 +114,66 @@ export class WatchlistController {
           return
         }
 
-        if (currentIndex >= watchingShows.length) {
-          currentIndex = 0
+        const showIdMap = new Map<string, number>()
+        for (const show of watchingShows) {
+          const anilistId = await getAnilistId(show.id, show.name)
+          if (anilistId) {
+            showIdMap.set(show.id, anilistId)
+          }
         }
 
-        const show = watchingShows[currentIndex]
-        currentIndex++
+        if (showIdMap.size === 0) {
+          busy = false
+          return
+        }
 
-        try {
-          let episodes: string[] | undefined
+        const now = new Date()
+        const weekStart = new Date(now)
+        weekStart.setDate(now.getDate() - 7)
+        weekStart.setHours(0, 0, 0, 0)
+        const weekEnd = new Date(now)
+        weekEnd.setHours(23, 59, 59, 999)
 
-          try {
-            const meta = await this.getProviderForId(show.id).getShowMeta(show.id)
-            if (meta?.availableEpisodesDetail) {
-              episodes = (meta.availableEpisodesDetail as Record<string, string[]>)['sub']
-            }
-            if (
-              meta?.status &&
-              !['Ongoing', 'Releasing', 'Currently Airing', 'Not Yet Released'].includes(
-                meta.status
-              )
-            ) {
-              return
-            }
-          } catch {
-            const epDetails = await this.getProviderForId(show.id).getEpisodes(show.id, 'sub')
-            episodes = epDetails?.episodes as string[] | undefined
-          }
+        const schedules = await getAiredEpisodesForShows(
+          Array.from(showIdMap.values()),
+          weekStart,
+          weekEnd
+        )
 
-          if (!episodes || episodes.length === 0) return
+        const nowUnix = Math.floor(Date.now() / 1000)
+        const reverseMap = new Map<number, string>()
+        for (const [watchlistId, anilistId] of showIdMap.entries()) {
+          reverseMap.set(anilistId, watchlistId)
+        }
+
+        for (const entry of schedules) {
+          if (entry.airingAt > nowUnix) continue
+
+          const watchlistId = reverseMap.get(entry.mediaId)
+          if (!watchlistId) continue
 
           const [watchedEps, dismissedEps] = await Promise.all([
-            WatchedEpisodesRepository.getWatchedEpisodeNumbers(db, show.id),
-            NotificationsRepository.getDismissedByShow(db, show.id),
+            WatchedEpisodesRepository.getWatchedEpisodeNumbers(db, watchlistId),
+            NotificationsRepository.getDismissedByShow(db, watchlistId),
           ])
 
           const watchedSet = new Set(watchedEps.map((e) => e.toString()))
           const dismissedSet = new Set(dismissedEps.map((e) => e.episodeNumber.toString()))
-          const maxWatched = Math.max(0, ...Array.from(watchedSet).map((e) => parseFloat(e)))
-
-          const sortedEps = [...episodes].sort((a, b) => parseFloat(a) - parseFloat(b))
-          const latestAvailable = sortedEps[sortedEps.length - 1]
 
           if (
-            parseFloat(latestAvailable) > maxWatched &&
-            !watchedSet.has(latestAvailable.toString()) &&
-            !dismissedSet.has(latestAvailable.toString())
+            !watchedSet.has(entry.episode.toString()) &&
+            !dismissedSet.has(entry.episode.toString())
           ) {
-            await NotificationsRepository.addDiscovered(db, show.id, latestAvailable.toString())
+            await NotificationsRepository.addDiscovered(db, watchlistId, entry.episode.toString())
             db.scheduleSave()
           }
-        } catch (e) {
-          // show doesn't support this query, skip
         }
       } catch (e) {
-        // db closed, skip
+        logger.error({ err: e }, 'AniList notification discovery failed')
       } finally {
         busy = false
       }
-    }, 5000)
+    }, 300000)
   }
 
   private getProviderForId(showId: string): AllAnimeProvider | AnimePaheProvider {

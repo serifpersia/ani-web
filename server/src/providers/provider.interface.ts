@@ -16,6 +16,7 @@ export interface Show {
   bannerImage?: string
   description?: string
   type?: string
+  episodeNumber?: number
   availableEpisodesDetail?: {
     sub?: string[]
     dub?: string[]
@@ -45,6 +46,8 @@ export interface Show {
     episode: number
     timeUntilAiring: number
   }
+  nextEpisodeAirDate?: string
+  airTime?: string
 }
 
 export interface VideoLink {

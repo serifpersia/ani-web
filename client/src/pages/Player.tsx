@@ -47,7 +47,6 @@ const Player: React.FC = () => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const initialTitle = searchParams.get('title') || undefined
 
   const {
     state,
@@ -59,7 +58,7 @@ const Player: React.FC = () => {
     markEpisodeWatched,
     isMarkingWatched,
     isUpdatingWatchlistStatus,
-  } = usePlayerData(showId, episodeNumber, initialTitle)
+  } = usePlayerData(showId, episodeNumber)
 
   const memoizedShowMeta = useMemo(() => {
     if (!state.showMeta.name) return undefined
