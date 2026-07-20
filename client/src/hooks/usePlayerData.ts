@@ -165,7 +165,11 @@ export const usePlayerData = (
 
       try {
         let providerShowId = showId
-        if (['allanime', '123anime', 'animeya', 'megaplay'].includes(uiState.selectedProvider)) {
+        if (
+          ['allanime', '123anime', 'animeya', 'megaplay', 'whapi'].includes(
+            uiState.selectedProvider
+          )
+        ) {
           const names = showData?.showMeta?.names
           // AlAnime's `name` field is often the native Japanese script (e.g. "ブリーチ"
           // for Bleach), which gets mapped to names.romaji. Sending katakana/kanji to

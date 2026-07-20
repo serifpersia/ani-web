@@ -428,7 +428,6 @@ export class ProxyController {
           followRedirect: true,
           throwHttpErrors: false,
           timeout: { request: 30000 },
-          signal: abortController.signal,
         })
         lastStatus = resp.statusCode
         if (resp.statusCode === 200 && resp.rawBody?.length) {

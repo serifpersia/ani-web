@@ -138,6 +138,19 @@ export class DataController {
       return
     }
 
+    const providerName = (req.query.provider as string) || 'allanime'
+    const provider = this.providers[providerName.toLowerCase()]
+    if (provider && providerName.toLowerCase() !== 'allanime') {
+      try {
+        const data = await provider.getEpisodes(showId, req.query.mode as 'sub' | 'dub')
+        if (data?.episodes?.length) {
+          return res.json(data)
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     try {
       if (this.providers['allanime']) {
         const data = await this.providers['allanime'].getEpisodes(
@@ -231,6 +244,7 @@ export class DataController {
 
   getShowMeta = async (req: Request, res: Response) => {
     const id = req.params.id as string
+    const providerName = (req.query.provider as string) || 'allanime'
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
     const isNumeric = /^\d+$/.test(id)
 
@@ -258,6 +272,21 @@ export class DataController {
         res.json({})
       }
       return
+    }
+
+    const provider = this.providers[providerName.toLowerCase()]
+    if (provider && providerName.toLowerCase() !== 'allanime') {
+      try {
+        const meta = await provider.getShowMeta(id)
+        if (meta) {
+          return res.json(meta)
+        }
+      } catch (e) {
+        logger.warn(
+          { id, provider: providerName, error: (e as Error).message },
+          'Provider getShowMeta failed'
+        )
+      }
     }
 
     try {
