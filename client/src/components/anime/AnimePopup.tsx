@@ -149,7 +149,10 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
 
             <div className={styles.footer}>
               <div className={styles.primaryAction}>
-                <Link to={`/watch/${showId}`} className={styles.watchBtn}>
+                <Link
+                  to={`/watch/${showId}${showMeta?.name ? `?title=${encodeURIComponent(showMeta.name)}` : ''}`}
+                  className={styles.watchBtn}
+                >
                   <FaPlay size={14} />
                   Watch now
                 </Link>

@@ -124,7 +124,7 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
     : fixThumbnailUrl(anime.thumbnail, 1280, 450)
 
   const handleWatch = () => {
-    navigate(`/watch/${anime._id}`)
+    navigate(`/watch/${anime._id}?title=${encodeURIComponent(anime.name)}`)
   }
 
   const handleWheel = (e: React.WheelEvent) => {

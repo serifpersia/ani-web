@@ -36,7 +36,8 @@ interface RawSkipInterval {
 
 export const usePlayerData = (
   showId: string | undefined,
-  episodeNumber: string | undefined
+  episodeNumber: string | undefined,
+  initialTitle?: string
 ): UsePlayerDataReturn => {
   const [uiState, dispatch] = useReducer(playerReducer, undefined, createInitialState)
   const queryClient = useQueryClient()
@@ -68,47 +69,78 @@ export const usePlayerData = (
 
       const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
       const isUuid = UUID_RE.test(showId)
-      const metaProvider = isUuid ? 'animepahe' : 'allanime'
-      const episodeProvider = metaProvider
 
-      try {
-        const [meta, episodeData, watchlistStatus, watchedEpisodes] = await Promise.all([
-          fetchApi(`/api/show-meta/${showId}?provider=${metaProvider}`),
-          fetchApi(
-            `/api/episodes?showId=${showId}&mode=${uiState.currentMode}&provider=${episodeProvider}`
-          ).catch(() => null),
-          fetchApi(`/api/watchlist/check/${showId}`).catch(() => ({ inWatchlist: false })),
-          fetchApi(`/api/watched-episodes/${showId}`).catch(() => []),
-        ])
+      const fetchMeta = async (): Promise<Record<string, unknown>> => {
+        if (isUuid) {
+          try {
+            return await fetchApi(
+              `/api/show-meta/${showId}?provider=animepahe${initialTitle ? `&title=${encodeURIComponent(initialTitle)}` : ''}`
+            )
+          } catch {
+            return {}
+          }
+        }
+        const fallbackProviders = ['allanime', 'megaplay', 'animeya', '123anime']
+        for (const provider of fallbackProviders) {
+          try {
+            return await fetchApi(
+              `/api/show-meta/${showId}?provider=${provider}${initialTitle ? `&title=${encodeURIComponent(initialTitle)}` : ''}`
+            )
+          } catch {
+            continue
+          }
+        }
+        return {}
+      }
 
-        const episodes = episodeData?.episodes
-          ? episodeData.episodes.sort((a: string, b: string) => parseFloat(a) - parseFloat(b))
-          : []
+      const meta = await fetchMeta()
+      const showTitle =
+        initialTitle || (meta?.name as string) || (meta?.englishName as string) || ''
 
-        return {
-          showMeta: {
-            ...meta,
-            description: episodeData?.description || meta?.description,
-            names: meta?.names || {
-              romaji: meta?.name,
-              english: meta?.englishName,
-              native: meta?.nativeName,
-            },
+      const fetchEpisodes = async (): Promise<{
+        episodes: string[]
+        description?: string
+      } | null> => {
+        const fallbackProviders = isUuid
+          ? ['animepahe', 'allanime', 'megaplay', 'animeya', '123anime']
+          : ['allanime', 'megaplay', 'animeya', 'animepahe', '123anime']
+        for (const provider of fallbackProviders) {
+          try {
+            let url = `/api/episodes?showId=${showId}&mode=${uiState.currentMode}&provider=${provider}`
+            if (showTitle) url += `&title=${encodeURIComponent(showTitle)}`
+            const data = await fetchApi(url)
+            if (data?.episodes?.length) return data
+          } catch {
+            continue
+          }
+        }
+        return null
+      }
+
+      const [episodeData, watchlistStatus, watchedEpisodes] = await Promise.all([
+        fetchEpisodes(),
+        fetchApi(`/api/watchlist/check/${showId}`).catch(() => ({ inWatchlist: false })),
+        fetchApi(`/api/watched-episodes/${showId}`).catch(() => []),
+      ])
+
+      const episodes = episodeData?.episodes
+        ? episodeData.episodes.sort((a: string, b: string) => parseFloat(a) - parseFloat(b))
+        : []
+
+      return {
+        showMeta: {
+          ...meta,
+          description: episodeData?.description || (meta?.description as string) || '',
+          names: meta?.names || {
+            romaji: meta?.name as string,
+            english: meta?.englishName as string,
+            native: meta?.nativeName as string,
           },
-          episodes,
-          inWatchlist: watchlistStatus.inWatchlist,
-          watchlistStatus: watchlistStatus.status ?? null,
-          watchedEpisodes,
-        }
-      } catch (e) {
-        const error = e as Error & { provider?: string }
-        if (error.message === 'AUTH_REQUIRED') {
-          dispatch({
-            type: 'SET_STATE',
-            payload: { showCookieModal: true, cookieProvider: error.provider },
-          })
-        }
-        throw e
+        },
+        episodes,
+        inWatchlist: watchlistStatus.inWatchlist,
+        watchlistStatus: watchlistStatus.status ?? null,
+        watchedEpisodes,
       }
     },
     enabled: !!showId,
@@ -331,7 +363,7 @@ export const usePlayerData = (
         throw e
       }
     },
-    enabled: !!showId && !!currentEpisode && !!showData?.showMeta?.name,
+    enabled: !!showId && !!currentEpisode,
   })
 
   const loadingDetails = false

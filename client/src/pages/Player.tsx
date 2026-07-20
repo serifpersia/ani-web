@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import styles from './Player.module.css'
@@ -44,8 +44,10 @@ import AnimePaheCookieModal from '../components/anime/AnimePaheCookieModal'
 
 const Player: React.FC = () => {
   const { id: showId, episodeNumber } = useParams<{ id: string; episodeNumber?: string }>()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const initialTitle = searchParams.get('title') || undefined
 
   const {
     state,
@@ -57,7 +59,7 @@ const Player: React.FC = () => {
     markEpisodeWatched,
     isMarkingWatched,
     isUpdatingWatchlistStatus,
-  } = usePlayerData(showId, episodeNumber)
+  } = usePlayerData(showId, episodeNumber, initialTitle)
 
   const memoizedShowMeta = useMemo(() => {
     if (!state.showMeta.name) return undefined
@@ -956,9 +958,13 @@ const Player: React.FC = () => {
     refs.videoRef,
   ])
 
-  if (state.error) return <p className="error-message">Error: {state.error}</p>
-  if (!state.loadingShowData && !state.showMeta.name && !state.showCookieModal)
-    return <p>Show not found.</p>
+  if (
+    state.error &&
+    !state.showMeta.name &&
+    state.videoSources.length === 0 &&
+    state.episodes.length === 0
+  )
+    return <p className="error-message">Error: {state.error}</p>
 
   const isVideoLoading = state.loadingShowData || state.loadingVideo
 

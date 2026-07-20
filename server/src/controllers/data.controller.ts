@@ -78,28 +78,24 @@ export class DataController {
       let showId = req.query.showId as string
       const provider = this.getProvider(req)
       const providerName = ((req.query.provider as string) || 'allanime').toLowerCase()
+      const titleParam = req.query.title as string | undefined
+
+      const resolveTitle = async (): Promise<string> => {
+        if (titleParam) return titleParam
+        try {
+          const meta = await this.providers['allanime'].getShowMeta(showId)
+          return meta?.name || meta?.englishName || ''
+        } catch {
+          return ''
+        }
+      }
 
       if (providerName === 'animepahe') {
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
           showId
         )
         if (!isUuid) {
-          let animeName = ''
-          try {
-            const allAnimeProvider = this.providers['allanime']
-            if (allAnimeProvider) {
-              const meta = await allAnimeProvider.getShowMeta(showId)
-              if (meta) {
-                animeName = meta.name || meta.englishName || ''
-              }
-            }
-          } catch (e) {
-            logger.warn(
-              { showId, error: (e as Error).message },
-              'Failed to resolve AllAnime metadata for AnimePahe name resolution'
-            )
-          }
-
+          const animeName = await resolveTitle()
           const searchFor = animeName || showId
           const results = await provider.search({ query: searchFor })
           if (results.length > 0) {
@@ -120,11 +116,9 @@ export class DataController {
         if (!p) continue
         try {
           let id = showId
-          if (name === '123anime' || name === 'megaplay') {
-            const meta = await this.providers['allanime'].getShowMeta(showId)
-            const names = [meta?.name, meta?.englishName, meta?.nativeName, showId].filter(
-              Boolean
-            ) as string[]
+          if (name === '123anime' || name === 'megaplay' || name === 'animeya') {
+            const animeName = await resolveTitle()
+            const names = [animeName, showId].filter(Boolean) as string[]
             let searchResults: Show[] = []
             for (const n of names) {
               searchResults = await p.search({ query: n })
@@ -212,20 +206,23 @@ export class DataController {
           if (providerQuery.toLowerCase() === 'allanime') {
             meta = await provider.getShowMeta(id)
           } else {
-            let animeName = ''
-            try {
-              const allAnimeProvider = this.providers['allanime']
-              if (allAnimeProvider) {
-                const localMeta = await allAnimeProvider.getShowMeta(id)
-                if (localMeta) {
-                  animeName = localMeta.name || localMeta.englishName || ''
+            const titleParam = req.query.title as string | undefined
+            let animeName = titleParam || ''
+            if (!animeName) {
+              try {
+                const allAnimeProvider = this.providers['allanime']
+                if (allAnimeProvider) {
+                  const localMeta = await allAnimeProvider.getShowMeta(id)
+                  if (localMeta) {
+                    animeName = localMeta.name || localMeta.englishName || ''
+                  }
                 }
+              } catch (e) {
+                logger.warn(
+                  { id, error: (e as Error).message },
+                  'Failed to resolve AllAnime name in getShowMeta'
+                )
               }
-            } catch (e) {
-              logger.warn(
-                { id, error: (e as Error).message },
-                'Failed to resolve AllAnime name in getShowMeta'
-              )
             }
 
             const searchFor = animeName || id
