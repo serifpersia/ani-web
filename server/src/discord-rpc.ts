@@ -15,11 +15,13 @@ interface DiscordActivityData {
   providerName: string
   sessionId?: string
   thumbnails?: string[]
+  isAdult?: boolean
 }
 
 class DiscordRPCService {
   private client: Client | null = null
   private isEnabled: boolean = false
+  private hideMature: boolean = true
   private reconnectTimeout: NodeJS.Timeout | null = null
   private lastActivity: DiscordActivityData | null = null
   private currentSessionId: string | null = null
@@ -28,15 +30,23 @@ class DiscordRPCService {
   private readonly INITIAL_RECONNECT_DELAY = 15000
   private readonly MAX_RECONNECT_DELAY = 300000
 
-  public setEnabled(enabled: boolean) {
+  public async setEnabled(enabled: boolean) {
     if (this.isEnabled === enabled) return
     this.isEnabled = enabled
     if (enabled) {
       this.retryCount = 0
       this.connect()
     } else {
-      this.disconnect()
+      await this.disconnect()
     }
+  }
+
+  public get isServiceEnabled(): boolean {
+    return this.isEnabled
+  }
+
+  public setHideMature(hide: boolean) {
+    this.hideMature = hide
   }
 
   private async connect() {
@@ -134,13 +144,21 @@ class DiscordRPCService {
     }
   }
 
-  public disconnect() {
+  public async disconnect() {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout)
       this.reconnectTimeout = null
     }
+
+    if (this.client?.user) {
+      try {
+        await this.client.user.clearActivity()
+      } catch {
+        // ignore
+      }
+    }
+
     this.cleanup()
-    this.isEnabled = false
     this.lastActivity = null
     this.currentSessionId = null
   }
@@ -165,6 +183,14 @@ class DiscordRPCService {
       this.currentSessionId = data.sessionId
     }
     if (!this.isEnabled || !this.client || !this.client.user) return
+    if (this.hideMature && data.isAdult) {
+      try {
+        await this.client.user.clearActivity()
+      } catch {
+        // ignore
+      }
+      return
+    }
 
     const isSafeUrl = (url: string): boolean => {
       if (!url.startsWith('http://') && !url.startsWith('https://')) {

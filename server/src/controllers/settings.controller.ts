@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
 import { performWriteTransaction } from '../sync'
-import { AllAnimeProvider } from '../providers/allanime.provider'
+import { searchAnilistByTitle } from '../lib/anilist'
 import { parseStringPromise } from 'xml2js'
 import logger from '../logger'
 import path from 'path'
@@ -10,6 +10,7 @@ import { DatabaseWrapper } from '../db'
 import { SettingsRepository } from '../repositories/settings.repository'
 import { getMachineId } from '../utils/machine-id'
 import { discordRPCService } from '../discord-rpc'
+import { AllAnimeProvider } from '../providers/allanime.provider'
 
 interface MalAnimeItem {
   series_title: string[]
@@ -24,13 +25,15 @@ interface ShowToInsert {
 }
 
 export class SettingsController {
-  constructor(private provider: AllAnimeProvider) {}
-
+  constructor(private allAnimeProvider?: AllAnimeProvider) {}
   getSettings = async (req: Request, res: Response) => {
     try {
       const row = await SettingsRepository.getByKey(req.db, req.query.key as string)
       let value = row ? row.value : null
       if (value === null && req.query.key === 'discordRPCEnabled') {
+        value = 'true'
+      }
+      if (value === null && req.query.key === 'discordRPCHideMature') {
         value = 'true'
       }
       res.json({ value: value })
@@ -46,6 +49,9 @@ export class SettingsController {
       })
       if (req.body.key === 'discordRPCEnabled') {
         discordRPCService.setEnabled(req.body.value === 'true' || req.body.value === true)
+      }
+      if (req.body.key === 'discordRPCHideMature') {
+        discordRPCService.setHideMature(req.body.value === 'true' || req.body.value === true)
       }
       res.json({ success: true })
     } catch {
@@ -141,14 +147,15 @@ export class SettingsController {
     for (let i = 0; i < animeList.length; i += BATCH_SIZE) {
       const batch = animeList.slice(i, i + BATCH_SIZE)
       const batchResults = await Promise.allSettled(
-        batch.map((item) => this.provider.search({ query: item.series_title[0] }))
+        batch.map((item) => searchAnilistByTitle(item.series_title[0]))
       )
       batchResults.forEach((r, idx) => {
-        if (r.status === 'fulfilled' && r.value.length > 0) {
+        if (r.status === 'fulfilled' && r.value) {
+          const show = r.value
+          const title = show.title?.english || show.title?.romaji || batch[idx].series_title[0]
           showsToInsert.push({
-            id: r.value[0]._id,
-            name: r.value[0].name,
-            thumbnail: r.value[0].thumbnail,
+            id: String(show.id),
+            name: title,
             status: batch[idx].my_status[0],
           })
         } else {
@@ -174,10 +181,12 @@ export class SettingsController {
   }
 
   recoverAllanime = async (_req: Request, res: Response) => {
+    if (!this.allAnimeProvider) {
+      return res.status(500).json({ error: 'AllAnime provider not available' })
+    }
     const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0'
 
     try {
-      // 1. Fetch mkissa.to to find entry JS
       const htmlRes = await fetch('https://mkissa.to', { headers: { 'User-Agent': UA } })
       const html = await htmlRes.text()
       const entryMatch = html.match(/import\("([^"]+entry[/\\]app\.[^"]+\.js)"\)/i)
@@ -187,7 +196,6 @@ export class SettingsController {
         ? entryMatch[1]
         : `https://mkissa.to${entryMatch[1]}`
 
-      // 2. Download entry JS to list chunks
       const entryRes = await fetch(entryUrl, { headers: { 'User-Agent': UA } })
       const entryCode = await entryRes.text()
       const chunkNames = [
@@ -198,7 +206,6 @@ export class SettingsController {
       const CDN = 'https://cdn.mkissa.net/all/mk/_app/immutable'
       const buildIdRe = /\w+=\w+\(\d+\)!==["']string["']\?["'](\d+)["']/
 
-      // 3. Search each chunk for the build ID pattern (first 200KB)
       let cryptoUrl = ''
       for (const name of chunkNames) {
         const url = `${CDN}/chunks/${name}`
@@ -219,7 +226,6 @@ export class SettingsController {
       }
       if (!cryptoUrl) throw new Error('Could not find crypto chunk')
 
-      // 4. Download full crypto chunk
       const cryptoRes = await fetch(cryptoUrl, { headers: { 'User-Agent': UA } })
       const cryptoCode = await cryptoRes.text()
 
@@ -230,7 +236,6 @@ export class SettingsController {
       const maskHex = maskMatch[1]
       const buildId = buildIdMatch[1]
 
-      // 5. Verify bootstrap accepts new build ID
       const bootRes = await fetch(
         `https://api.mkissa.net/client-crypto/v1/bootstrap?buildId=${buildId}`,
         { headers: { 'User-Agent': UA, Referer: 'https://youtu-chan.com' } }
@@ -238,12 +243,10 @@ export class SettingsController {
       const bootData = await bootRes.json()
       if (!bootData?.partB) throw new Error(`Bootstrap rejected build ID ${buildId}`)
 
-      // 6. Patch env vars in-memory and rebootstrap
       process.env.AA_BUILD_ID = buildId
       process.env.AA_MASK_HEX = maskHex
-      await this.provider.refreshKey()
+      await this.allAnimeProvider.refreshKey()
 
-      // 7. Persist to .env files for next restart
       const envLine = (key: string, val: string) => `${key}=${val}`
       const upsertEnv = (filePath: string) => {
         let content = ''

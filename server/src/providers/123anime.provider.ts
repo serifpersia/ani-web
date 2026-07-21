@@ -172,6 +172,12 @@ export class _123AnimeProvider implements Provider {
     }
   }
 
+  async resolveShowId(title: string, _romaji?: string): Promise<string | null> {
+    const results = await this.search({ query: title })
+    const best = results.length > 0 ? this.bestMatch(results, title) : undefined
+    return best?._id || null
+  }
+
   async getEpisodes(showId: string): Promise<EpisodeDetails | null> {
     try {
       const cacheKey = `123anime_eps_${showId}`

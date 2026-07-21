@@ -12,8 +12,6 @@ import AnimeCard from '../components/anime/AnimeCard'
 import SkeletonGrid from '../components/common/SkeletonGrid'
 import { Button } from '../components/common/Button'
 import ErrorMessage from '../components/common/ErrorMessage'
-import SearchableSelect from '../components/common/SearchableSelect'
-import ToggleSwitch from '../components/common/ToggleSwitch'
 import { usePaginatedSearchAnime, useGenresAndStudios } from '../hooks/useAnimeData'
 import { useLowEndMode } from '../contexts/LowEndModeContext'
 import { hideVirtualKeyboard } from '../hooks/useVirtualKeyboard'
@@ -30,6 +28,9 @@ const typeOptions: Option[] = [
   { value: 'Movie', label: 'Movie' },
   { value: 'OVA', label: 'OVA' },
   { value: 'ONA', label: 'ONA' },
+  { value: 'TV_SHORT', label: 'TV Short' },
+  { value: 'SPECIAL', label: 'Special' },
+  { value: 'ADULT', label: 'Mature' },
 ]
 
 const seasonOptions: Option[] = [
@@ -46,6 +47,24 @@ const countryOptions: Option[] = [
   { value: 'CN', label: 'China' },
 ]
 
+const sortOptions: Option[] = [
+  { value: 'POPULARITY_DESC', label: 'Popularity' },
+  { value: 'TRENDING_DESC', label: 'Trending' },
+  { value: 'SCORE_DESC', label: 'Score' },
+  { value: 'START_DATE_DESC', label: 'Newest' },
+  { value: 'START_DATE_ASC', label: 'Oldest' },
+  { value: 'EPISODES_DESC', label: 'Most Episodes' },
+  { value: 'FAVOURITES_DESC', label: 'Favourites' },
+]
+
+const anilistStatusOptions: Option[] = [
+  { value: 'RELEASING', label: 'Currently Airing' },
+  { value: 'FINISHED', label: 'Finished' },
+  { value: 'NOT_YET_RELEASED', label: 'Not Yet Released' },
+  { value: 'CANCELLED', label: 'Cancelled' },
+  { value: 'HIATUS', label: 'Hiatus' },
+]
+
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [query, setQuery] = useState(searchParams.get('query') || '')
@@ -55,17 +74,25 @@ export default function Search() {
   const [season, setSeason] = useState(searchParams.get('season') || 'ALL')
   const [year, setYear] = useState(searchParams.get('year') || 'ALL')
   const [country, setCountry] = useState(searchParams.get('country') || 'ALL')
-  const [studio, setStudio] = useState(searchParams.get('studios') || 'ALL')
-  const [provider, setProvider] = useState(searchParams.get('provider') || 'allanime')
+  const [provider, setProvider] = useState(searchParams.get('provider') || 'anilist')
+  const [sort, setSort] = useState(searchParams.get('sortBy') || 'POPULARITY_DESC')
+  const [status, setStatus] = useState(searchParams.get('status') || '')
   const [showFilters, setShowFilters] = useState(false)
+
+  useEffect(() => {
+    if (type === 'TV_SHORT') {
+      setType('ALL')
+    }
+  }, [type])
   const { lowEndMode } = useLowEndMode()
   const resultsRef = useRef<HTMLDivElement>(null)
 
   const { data: metaData } = useGenresAndStudios()
   const availableGenres = metaData?.genres || []
-  const availableStudios = metaData?.studios || []
 
-  const [genreStates, setGenreStates] = useState<{ [key: string]: 'include' | 'exclude' }>(() => {
+  const [anilistGenreState, setAnilistGenreState] = useState<{
+    [key: string]: 'include' | 'exclude'
+  }>(() => {
     const states: { [key: string]: 'include' | 'exclude' } = {}
     const genres = searchParams.get('genres')?.split(',') || []
     const exclude = searchParams.get('excludeGenres')?.split(',') || []
@@ -91,6 +118,7 @@ export default function Search() {
   const [showMature, setShowMature] = useState(false)
 
   const filteredResults = React.useMemo(() => {
+    if (provider === 'anilist' && type === 'ADULT') return results
     if (showMature) return results
     return results.filter((anime) => {
       const isAdult =
@@ -100,7 +128,7 @@ export default function Search() {
         anime.rating?.includes('17+')
       return !isAdult
     })
-  }, [results, showMature])
+  }, [results, showMature, provider, type])
 
   useEffect(() => {
     setQuery(searchParams.get('query') || '')
@@ -108,8 +136,9 @@ export default function Search() {
     setSeason(searchParams.get('season') || 'ALL')
     setYear(searchParams.get('year') || 'ALL')
     setCountry(searchParams.get('country') || 'ALL')
-    setStudio(searchParams.get('studios') || 'ALL')
-    setProvider(searchParams.get('provider') || 'allanime')
+    setProvider(searchParams.get('provider') || 'anilist')
+    setSort(searchParams.get('sortBy') || 'POPULARITY_DESC')
+    setStatus(searchParams.get('status') || '')
     setPage(parseInt(searchParams.get('page') || '1'))
 
     const states: { [key: string]: 'include' | 'exclude' } = {}
@@ -117,7 +146,7 @@ export default function Search() {
     const exclude = searchParams.get('excludeGenres')?.split(',') || []
     genres.forEach((g) => g && (states[g] = 'include'))
     exclude.forEach((g) => g && (states[g] = 'exclude'))
-    setGenreStates(states)
+    setAnilistGenreState(states)
   }, [searchParams])
 
   const handleSearch = (newPage = 1) => {
@@ -127,21 +156,24 @@ export default function Search() {
     if (query.trim()) params.set('query', query.trim())
 
     if (type !== 'ALL') params.set('type', type)
+    if (status) params.set('status', status)
     if (season !== 'ALL') params.set('season', season)
     if (year !== 'ALL') params.set('year', year)
     if (country !== 'ALL') params.set('country', country)
-    if (studio !== 'ALL') params.set('studios', studio)
-    if (provider !== 'allanime') params.set('provider', provider)
+    if (sort !== 'POPULARITY_DESC') params.set('sortBy', sort)
 
-    const genres = Object.entries(genreStates)
+    const anilistGenres = Object.entries(anilistGenreState)
       .filter(([, s]) => s === 'include')
       .map(([g]) => g)
-    const exclude = Object.entries(genreStates)
+    const anilistExclude = Object.entries(anilistGenreState)
       .filter(([, s]) => s === 'exclude')
       .map(([g]) => g)
 
-    if (genres.length > 0) params.set('genres', genres.join(','))
-    if (exclude.length > 0) params.set('excludeGenres', exclude.join(','))
+    if (anilistGenres.length > 0) params.set('genres', anilistGenres.join(','))
+    if (anilistExclude.length > 0) params.set('excludeGenres', anilistExclude.join(','))
+    if (type !== 'ADULT' && !showMature) params.set('adult', 'false')
+
+    params.set('provider', 'anilist')
 
     if (newPage > 1) params.set('page', newPage.toString())
 
@@ -159,19 +191,6 @@ export default function Search() {
     }
   }
 
-  const toggleGenre = (genre: string) => {
-    setGenreStates((prev) => {
-      const current = prev[genre]
-      const next = current === 'include' ? 'exclude' : current === 'exclude' ? undefined : 'include'
-
-      const newState = { ...prev }
-      if (next) newState[genre] = next
-      else delete newState[genre]
-
-      return newState
-    })
-  }
-
   const currentYear = new Date().getFullYear()
   const yearOptions: Option[] = [
     { value: 'ALL', label: 'All Years' },
@@ -179,11 +198,6 @@ export default function Search() {
       value: String(currentYear - i),
       label: String(currentYear - i),
     })),
-  ]
-
-  const studioOptions: Option[] = [
-    { value: 'ALL', label: 'All Studios' },
-    ...availableStudios.map((s) => ({ value: s, label: s })),
   ]
 
   const canGoNext = results.length >= 14 && nextPageData && nextPageData.length > 0
@@ -212,140 +226,137 @@ export default function Search() {
             />
           </div>
           <div className={styles.searchActions}>
-            <div className={styles.filterItem} style={{ marginRight: '10px' }}>
-              <select
-                value={provider}
-                onChange={(e) => setProvider(e.currentTarget.value)}
-                className={styles.providerSelect}
-              >
-                <option value="allanime">AllAnime</option>
-                <option value="animepahe">AnimePahe</option>
-              </select>
-            </div>
             <Button onClick={() => handleSearch()} className={styles.searchBtn}>
               Search
             </Button>
-            {provider === 'allanime' && (
-              <button
-                className={`${styles.filterToggleBtn} ${showFilters ? styles.active : ''}`}
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <FaFilter size={14} />
-                <span>Filters</span>
-                {showFilters ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
-              </button>
-            )}
+            <button
+              className={`${styles.filterToggleBtn} ${showFilters ? styles.active : ''}`}
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <FaFilter size={14} />
+              <span>Filters</span>
+              {showFilters ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
+            </button>
           </div>
         </div>
 
-        {provider === 'allanime' && (
-          <div className={`${styles.advancedFilters} ${showFilters ? styles.show : ''}`}>
-            <div className={styles.filterDivider} />
-            <div className={styles.filterGrid}>
-              <div className={styles.filterItem}>
-                <label>Type</label>
-                <select value={type} onChange={(e) => setType(e.currentTarget.value)}>
-                  {typeOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className={styles.filterItem}>
-                <label>Season</label>
-                <select value={season} onChange={(e) => setSeason(e.currentTarget.value)}>
-                  {seasonOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className={styles.filterItem}>
-                <label>Year</label>
-                <select value={year} onChange={(e) => setYear(e.currentTarget.value)}>
-                  {yearOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className={styles.filterItem}>
-                <label>Country</label>
-                <select value={country} onChange={(e) => setCountry(e.currentTarget.value)}>
-                  {countryOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {studioOptions.length > 1 && (
-                <div className={styles.filterItem}>
-                  <label>Studio</label>
-                  <SearchableSelect
-                    options={studioOptions}
-                    value={studio}
-                    onChange={setStudio}
-                    placeholder="All Studios"
-                  />
-                </div>
-              )}
-              <div className={styles.filterItem}>
-                <label>Content</label>
-                <div style={{ display: 'flex', alignItems: 'center', height: '40px', gap: '8px' }}>
-                  <ToggleSwitch
-                    isChecked={showMature}
-                    onChange={(e) => setShowMature(e.target.checked)}
-                    id="search-mature-toggle"
-                  />
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                    Show mature content
-                  </span>{' '}
-                </div>
-              </div>
+        <div className={`${styles.advancedFilters} ${showFilters ? styles.show : ''}`}>
+          <div className={styles.filterDivider} />
+          <div className={styles.filterGrid}>
+            <div className={styles.filterItem}>
+              <label>Type</label>
+              <select value={type} onChange={(e) => setType(e.currentTarget.value)}>
+                {typeOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
-
-            {availableGenres.length > 0 && (
-              <div className={styles.genreSection}>
-                <label className={styles.genreLabel}>Genres</label>
-                <div className={styles.genreContainer}>
-                  {availableGenres.map((g) => (
-                    <button
-                      key={g}
-                      className={`${styles.genreButton} ${styles[genreStates[g] || '']}`}
-                      onClick={() => toggleGenre(g)}
-                    >
-                      {g}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className={styles.filterActions}>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setGenreStates({})
-                  setType('ALL')
-                  setSeason('ALL')
-                  setYear('ALL')
-                  setCountry('ALL')
-                  setStudio('ALL')
-                  setShowMature(false)
-                }}
-              >
-                Reset All
-              </Button>
-              <Button onClick={() => handleSearch()} className={styles.applyBtn}>
-                Apply Filters
-              </Button>
+            <div className={styles.filterItem}>
+              <label>Status</label>
+              <select value={status} onChange={(e) => setStatus(e.currentTarget.value)}>
+                <option value="">All Status</option>
+                {anilistStatusOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.filterItem}>
+              <label>Season</label>
+              <select value={season} onChange={(e) => setSeason(e.currentTarget.value)}>
+                {seasonOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.filterItem}>
+              <label>Year</label>
+              <select value={year} onChange={(e) => setYear(e.currentTarget.value)}>
+                {yearOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.filterItem}>
+              <label>Country</label>
+              <select value={country} onChange={(e) => setCountry(e.currentTarget.value)}>
+                {countryOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.filterItem}>
+              <label>Sort By</label>
+              <select value={sort} onChange={(e) => setSort(e.currentTarget.value)}>
+                {sortOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
-        )}
+
+          {availableGenres.length > 0 && (
+            <div className={styles.genreSection}>
+              <label className={styles.genreLabel}>Genres</label>
+              <div className={styles.genreContainer}>
+                {availableGenres.map((g) => (
+                  <button
+                    key={g}
+                    className={`${styles.genreButton} ${styles[anilistGenreState[g] || '']}`}
+                    onClick={() => {
+                      setAnilistGenreState((prev) => {
+                        const current = prev[g]
+                        const newState = { ...prev }
+                        if (current === 'include') {
+                          newState[g] = 'exclude'
+                        } else if (current === 'exclude') {
+                          delete newState[g]
+                        } else {
+                          newState[g] = 'include'
+                        }
+                        return newState
+                      })
+                    }}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className={styles.filterActions}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setAnilistGenreState({})
+                setType('ALL')
+                setSeason('ALL')
+                setYear('ALL')
+                setCountry('ALL')
+                setSort('POPULARITY_DESC')
+                setStatus('')
+                setShowMature(false)
+              }}
+            >
+              Reset All
+            </Button>
+            <Button onClick={() => handleSearch()} className={styles.applyBtn}>
+              Apply Filters
+            </Button>
+          </div>
+        </div>
       </div>
 
       {isError && <ErrorMessage message={error?.message || 'Error'} />}

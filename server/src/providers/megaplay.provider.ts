@@ -10,6 +10,7 @@ import {
   SearchOptions,
 } from './provider.interface'
 import logger from '../logger'
+import { anilistRequest } from '../lib/anilist'
 
 interface AniListTitle {
   romaji?: string
@@ -36,50 +37,13 @@ interface AniListPage {
   airingSchedule?: { media?: AniListMedia }[]
 }
 
-interface AniListResponse {
-  data?: {
-    Page?: AniListPage
-    Media?: AniListMedia
-  }
-  errors?: { message: string }[]
-}
-
 export class MegaPlayProvider implements Provider {
   name = 'MegaPlay'
-  private anilistBase = 'https://graphql.anilist.co'
   private megaPlayBase = 'https://megaplay.buzz/stream/mal'
   private cache: NodeCache
 
   constructor(cache: NodeCache) {
     this.cache = cache
-  }
-
-  private async anilistRequest(
-    query: string,
-    variables: Record<string, unknown>
-  ): Promise<AniListResponse['data'] | null> {
-    try {
-      const response = await fetch(this.anilistBase, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({ query, variables }),
-      })
-
-      if (!response.ok) return null
-
-      const json = (await response.json()) as AniListResponse
-      if (json.errors && json.errors.length > 0) {
-        return null
-      }
-
-      return json.data ?? null
-    } catch (error) {
-      logger.error({ error }, '[MegaPlay] AniList request failed')
-      return null
-    }
   }
 
   private stripHtml(input?: string | null): string {
@@ -187,8 +151,12 @@ export class MegaPlayProvider implements Provider {
         }
       }`
 
-      const data = await this.anilistRequest(gql, { q: query, page: 1, perPage: 20 })
-      const media = data?.Page?.media
+      const data = await anilistRequest<{ Page: { media: AniListMedia[] } }>(gql, {
+        q: query,
+        page: 1,
+        perPage: 20,
+      })
+      const media = data?.data?.Page?.media
       if (!media || media.length === 0) return []
 
       const results = media.map((m) => this.toShow(m))
@@ -209,6 +177,11 @@ export class MegaPlayProvider implements Provider {
     }
   }
 
+  async resolveShowId(title: string, _romaji?: string): Promise<string | null> {
+    const results = await this.search({ query: title })
+    return results[0]?._id || null
+  }
+
   async getEpisodes(showId: string, _mode: 'sub' | 'dub'): Promise<EpisodeDetails | null> {
     try {
       if (!/^\d+$/.test(showId)) return null
@@ -224,8 +197,8 @@ export class MegaPlayProvider implements Provider {
         }
       }`
 
-      const data = await this.anilistRequest(gql, { idMal: Number(showId) })
-      const media = data?.Media
+      const data = await anilistRequest<{ Media: AniListMedia }>(gql, { idMal: Number(showId) })
+      const media = data?.data?.Media
       if (!media) return null
 
       const episodeCount = media.episodes || 0
@@ -381,8 +354,8 @@ export class MegaPlayProvider implements Provider {
         }
       }`
 
-      const data = await this.anilistRequest(gql, { idMal: Number(showId) })
-      const media = data?.Media
+      const data = await anilistRequest<{ Media: AniListMedia }>(gql, { idMal: Number(showId) })
+      const media = data?.data?.Media
       if (!media) return null
 
       return this.toShow(media)
@@ -406,8 +379,11 @@ export class MegaPlayProvider implements Provider {
         }
       }`
 
-      const data = await this.anilistRequest(gql, { page: page || 1, perPage: size || 10 })
-      const media = data?.Page?.media
+      const data = await anilistRequest<{ Page: { media: AniListMedia[] } }>(gql, {
+        page: page || 1,
+        perPage: size || 10,
+      })
+      const media = data?.data?.Page?.media
       if (!media) return []
 
       return media.map((m) => this.toShow(m))
@@ -431,8 +407,11 @@ export class MegaPlayProvider implements Provider {
         }
       }`
 
-      const data = await this.anilistRequest(gql, { dayStart, dayEnd })
-      const schedule = data?.Page?.airingSchedule
+      const data = await anilistRequest<{ Page: { airingSchedule: { media?: AniListMedia }[] } }>(
+        gql,
+        { dayStart, dayEnd }
+      )
+      const schedule = data?.data?.Page?.airingSchedule
       if (!schedule) return []
 
       const seen = new Set<number>()
@@ -477,13 +456,13 @@ export class MegaPlayProvider implements Provider {
         }
       }`
 
-      const data = await this.anilistRequest(gql, {
+      const data = await anilistRequest<{ Page: { media: AniListMedia[] } }>(gql, {
         page,
         perPage: 20,
         season,
         year,
       })
-      const media = data?.Page?.media
+      const media = data?.data?.Page?.media
       if (!media) return []
 
       return media.map((m) => this.toShow(m))
@@ -502,8 +481,11 @@ export class MegaPlayProvider implements Provider {
         }
       }`
 
-      const data = await this.anilistRequest(gql, { page: page || 1, perPage: size || 10 })
-      const media = data?.Page?.media
+      const data = await anilistRequest<{ Page: { media: AniListMedia[] } }>(gql, {
+        page: page || 1,
+        perPage: size || 10,
+      })
+      const media = data?.data?.Page?.media
       if (!media) return []
 
       return media.map((m) => this.toShow(m))

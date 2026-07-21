@@ -511,6 +511,11 @@ export class AnimeyaProvider implements Provider {
     }
   }
 
+  async resolveShowId(title: string, _romaji?: string): Promise<string | null> {
+    const results = await this.search({ query: title })
+    return results[0]?._id || null
+  }
+
   private async getInfoInternal(slug: string): Promise<AnimeyaShowInfo> {
     const res = await this.fetchRetry(`https://animeya.cc/watch/${slug}`)
     const html = await res.text()

@@ -417,6 +417,9 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     )
     db.run(`CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value INTEGER)`)
     db.run(`INSERT OR IGNORE INTO sync_metadata (key, value) VALUES ('db_version', 1)`)
+    db.run(
+      `CREATE TABLE IF NOT EXISTS legacy_id_mapping (legacyId TEXT PRIMARY KEY, numericId TEXT)`
+    )
 
     db.run(`CREATE INDEX IF NOT EXISTS idx_watched_episodes_showId ON watched_episodes(showId)`)
     db.run(
@@ -437,6 +440,7 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     db.run(
       'DELETE FROM shows_meta WHERE id NOT IN (SELECT id FROM watchlist) AND id NOT IN (SELECT showId FROM queue)'
     )
+    db.run('DELETE FROM legacy_id_mapping WHERE legacyId NOT IN (SELECT id FROM watchlist)')
 
     db.run(
       'DELETE FROM dismissed_notifications WHERE EXISTS (SELECT 1 FROM watched_episodes we WHERE we.showId = dismissed_notifications.showId AND we.episodeNumber = dismissed_notifications.episodeNumber)'
@@ -461,6 +465,7 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     addCol('shows_meta', 'popularityScore', 'INTEGER')
     addCol('watchlist', 'type', 'TEXT')
     addCol('shows_meta', 'type', 'TEXT')
+    addCol('shows_meta', 'anilistId', 'INTEGER')
 
     await db.saveNow()
     return db

@@ -59,6 +59,9 @@ const Settings: React.FC = () => {
   const { data: discordSetting } = useSetting('discordRPCEnabled')
   const updateSetting = useUpdateSetting()
 
+  const [discordHideMature, setDiscordHideMature] = useState(true)
+  const { data: discordHideMatureSetting } = useSetting('discordRPCHideMature')
+
   useEffect(() => {
     if (discordSetting !== undefined) {
       setDiscordEnabled(
@@ -67,9 +70,24 @@ const Settings: React.FC = () => {
     }
   }, [discordSetting])
 
+  useEffect(() => {
+    if (discordHideMatureSetting !== undefined) {
+      setDiscordHideMature(
+        discordHideMatureSetting === 'true' ||
+          discordHideMatureSetting === true ||
+          discordHideMatureSetting === null
+      )
+    }
+  }, [discordHideMatureSetting])
+
   const toggleDiscord = (enabled: boolean) => {
     setDiscordEnabled(enabled)
     updateSetting.mutate({ key: 'discordRPCEnabled', value: String(enabled) })
+  }
+
+  const toggleDiscordHideMature = (enabled: boolean) => {
+    setDiscordHideMature(enabled)
+    updateSetting.mutate({ key: 'discordRPCHideMature', value: String(enabled) })
   }
 
   const toggleTelemetry = (enabled: boolean) => {
@@ -234,6 +252,30 @@ const Settings: React.FC = () => {
                   />
                 </div>
               </div>
+
+              {discordEnabled && (
+                <div className={styles.settingItem} style={{ marginTop: '1rem' }}>
+                  <div className={styles.settingRow}>
+                    <div style={{ minWidth: 0 }}>
+                      <h4 style={{ margin: 0, fontSize: '1rem' }}>Discord Rich Presence</h4>
+                      <p
+                        style={{
+                          margin: '0.25rem 0 0',
+                          fontSize: '0.85rem',
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        Hide mature content (18+) from Discord Rich Presence.
+                      </p>
+                    </div>
+                    <ToggleSwitch
+                      isChecked={discordHideMature}
+                      onChange={(e) => toggleDiscordHideMature(e.target.checked)}
+                      id="discord-hide-mature"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className={styles.settingItem} style={{ marginTop: '1.5rem' }}>
                 <div className={styles.settingRow}>

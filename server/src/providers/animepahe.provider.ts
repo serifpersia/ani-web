@@ -171,6 +171,11 @@ export class AnimePaheProvider implements Provider {
     }
   }
 
+  async resolveShowId(title: string, _romaji?: string): Promise<string | null> {
+    const results = await this.search({ query: title })
+    return results[0]?._id || null
+  }
+
   async getEpisodes(
     showId: string,
     _mode: 'sub' | 'dub',
@@ -287,10 +292,6 @@ export class AnimePaheProvider implements Provider {
           ? `${src.quality || 'Auto'} - ${src.fansub} (${sourceMode.toUpperCase()})`
           : `${src.quality || 'Auto'} (${sourceMode.toUpperCase()})`
 
-        const embedLink = cookieValue
-          ? `/api/embed-proxy?url=${encodeURIComponent(src.url)}&cookie=${encodeURIComponent(cookieValue)}`
-          : `/api/embed-proxy?url=${encodeURIComponent(src.url)}`
-
         let directLink: string | null = null
         try {
           const resolved = await this.resolveKwik(src.url, store?.get('ua'), rawCookie)
@@ -308,7 +309,7 @@ export class AnimePaheProvider implements Provider {
 
         if (directLink) {
           results.push({
-            sourceName: `${label} (Direct)`,
+            sourceName: label,
             links: [
               {
                 resolutionStr: src.quality || 'Auto',
@@ -320,19 +321,6 @@ export class AnimePaheProvider implements Provider {
             actualEpisodeNumber: episodeNumber,
           })
         }
-
-        results.push({
-          sourceName: `${label}`,
-          links: [
-            {
-              resolutionStr: src.quality || 'Auto',
-              link: embedLink,
-              hls: false,
-            },
-          ],
-          type: 'iframe',
-          actualEpisodeNumber: episodeNumber,
-        })
       }
 
       return results.length > 0 ? results : null

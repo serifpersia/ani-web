@@ -161,6 +161,13 @@
   color: white;
 }
 
+.airTime {
+  margin-left: 6px;
+  font-size: 10px;
+  opacity: 0.85;
+  font-weight: 500;
+}
+
 .adultBadge {
   composes: badge;
   bottom: var(--space-2);

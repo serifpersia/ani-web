@@ -149,10 +149,7 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
 
             <div className={styles.footer}>
               <div className={styles.primaryAction}>
-                <Link
-                  to={`/watch/${showId}${showMeta?.name ? `?title=${encodeURIComponent(showMeta.name)}` : ''}`}
-                  className={styles.watchBtn}
-                >
+                <Link to={`/watch/${showMeta?.id || showId}`} className={styles.watchBtn}>
                   <FaPlay size={14} />
                   Watch now
                 </Link>
@@ -180,7 +177,7 @@ const AnimePopup: React.FC<AnimePopupProps> = ({
                   {queuedItem || queueConfirmed ? <FaCheck size={12} /> : <FaPlus size={12} />}
                   <span>{queuedItem || queueConfirmed ? 'Queued' : 'Queue'}</span>
                 </button>
-                <Link to={`/anime/${showId}`} className={styles.detailsBtn}>
+                <Link to={`/anime/${showMeta?.id || showId}`} className={styles.detailsBtn}>
                   Read more
                 </Link>
               </div>

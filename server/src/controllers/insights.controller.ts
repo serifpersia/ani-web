@@ -1,5 +1,4 @@
 import { Request, Response } from 'express'
-import { AllAnimeProvider } from '../providers/allanime.provider'
 import logger from '../logger'
 import { InsightsRepository } from '../repositories/insights.repository'
 
@@ -72,8 +71,6 @@ interface WatchedEpisodeWithMeta {
 }
 
 export class InsightsController {
-  constructor(private provider: AllAnimeProvider) {}
-
   getWatchInsights = async (req: Request, res: Response) => {
     const db = req.db
 

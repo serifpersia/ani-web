@@ -20,9 +20,9 @@ const USER_AGENT =
 const REFERER = 'https://youtu-chan.com'
 
 // AllAnime anti-bot crypto constants — set via env vars, fallback to compiled defaults
-const AA_BUILD_ID = () => process.env.AA_BUILD_ID || '55'
+const AA_BUILD_ID = () => process.env.AA_BUILD_ID || '63'
 const AA_MASK_HEX = () =>
-  process.env.AA_MASK_HEX || 'b14d484b8f450ff9655961e4366269e12c78d8d662b9a957ea6bbf5f3473209b'
+  process.env.AA_MASK_HEX || 'a39b86dbbcf57f884f3e9074969e7fe26656c74012e4545605896621ffa441c1'
 const BOOTSTRAP_ENDPOINT = () =>
   `https://api.mkissa.net/client-crypto/v1/bootstrap?buildId=${AA_BUILD_ID()}`
 const AA_TS_WINDOW_MS = 300_000
@@ -198,6 +198,14 @@ export class AllAnimeProvider implements Provider {
     process.env.AA_BUILD_ID = buildId
     process.env.AA_MASK_HEX = maskHex
     await this.refreshKey()
+  }
+
+  getCurrentBuildId(): string {
+    return AA_BUILD_ID()
+  }
+
+  getCurrentMaskHex(): string {
+    return AA_MASK_HEX()
   }
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -479,6 +487,28 @@ export class AllAnimeProvider implements Provider {
     return this._fetchShows(variables)
   }
 
+  async resolveShowId(title: string, _romaji?: string): Promise<string | null> {
+    try {
+      const result = await this._request({
+        method: 'POST',
+        url: API_ENDPOINT,
+        data: {
+          query: `query($search: SearchInput) { shows(search: $search, limit: 1, page: 1, translationType: sub, countryOrigin: ALL) { edges { _id name } } }`,
+          variables: { search: { query: title, allowAdult: true } },
+        },
+        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+        timeout: 10000,
+      })
+      const edge = result?.data?.shows?.edges?.[0]
+      if (edge?._id) {
+        return edge._id as string
+      }
+      return null
+    } catch (err) {
+      return null
+    }
+  }
+
   async getPopular(
     timeframe: 'daily' | 'weekly' | 'monthly' | 'all',
     page: number = 1,
@@ -614,7 +644,7 @@ export class AllAnimeProvider implements Provider {
           extensions: {
             persistedQuery: {
               version: 1,
-              sha256Hash: '3b6702a28d9bd4d4c045293b0bb17ecb3a1e7af28eca9ead0970228138ff4385',
+              sha256Hash: 'bc896210babaf9967479eb204c27b9cd8312f9d6b84cb7a8a8defe47bdd6da16',
             },
           },
         },
@@ -697,26 +727,45 @@ export class AllAnimeProvider implements Provider {
     const cacheKey = `episodes-${showId}-${mode}`
     const cachedData = this.cache.get<EpisodeDetails>(cacheKey)
     if (cachedData) return cachedData
-    const responseData = await this._request({
-      method: 'POST',
-      url: API_ENDPOINT,
-      data: {
-        query: `query($showId: String!) { show(_id: $showId) { availableEpisodesDetail, description } }`,
-        variables: { showId },
-      },
-      headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-      timeout: 15000,
-    })
-    const showData = responseData.data.show
-    if (showData) {
-      const episodeDetails = {
-        episodes: (showData.availableEpisodesDetail[mode] as string[]) || [],
-        description: showData.description,
-      }
-      this.cache.set(cacheKey, episodeDetails)
-      return episodeDetails
+
+    let responseData: { data?: { show?: Record<string, unknown> } }
+    try {
+      responseData = await this._request({
+        method: 'POST',
+        url: API_ENDPOINT,
+        data: {
+          query: `query($showId: String!) { show(_id: $showId) { availableEpisodesDetail episodeCount description } }`,
+          variables: { showId },
+        },
+        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+        timeout: 15000,
+      })
+    } catch {
+      return null
     }
-    return null
+
+    const showData = responseData.data?.show as Record<string, unknown> | undefined
+    if (!showData) {
+      logger.warn({ showId, mode }, 'AllAnime getEpisodes: no show data returned')
+      return null
+    }
+
+    let episodes = (showData.availableEpisodesDetail as Record<string, string[]> | undefined)?.[
+      mode
+    ]
+    if (!episodes || episodes.length === 0) {
+      const total = (showData.episodeCount as number) || 0
+      if (total > 0) {
+        episodes = Array.from({ length: total }, (_, i) => String(i + 1))
+      }
+    }
+
+    const episodeDetails: EpisodeDetails = {
+      episodes: episodes || [],
+      description: (showData.description as string) || '',
+    }
+    this.cache.set(cacheKey, episodeDetails)
+    return episodeDetails
   }
 
   async getSkipTimes(showId: string, episodeNumber: string): Promise<SkipIntervals> {
@@ -792,7 +841,19 @@ export class AllAnimeProvider implements Provider {
       responseData = await makeRequest()
     } catch (error: unknown) {
       const err = error as { message?: string }
-      if (
+      if (err.message === 'PersistedQueryNotFound') {
+        logger.info('Episode hash expired, falling back to full query')
+        responseData = await this._request({
+          method: 'POST',
+          url: API_ENDPOINT,
+          data: {
+            query: `query($showId: String!, $translationType: VaildTranslationTypeEnumType!, $episodeString: String!) { episode(showId: $showId translationType: $translationType episodeString: $episodeString) { episodeString uploadDate sourceUrls thumbnail notes } }`,
+            variables: { showId, translationType: mode, episodeString: episodeNumber },
+          },
+          headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+          timeout: 15000,
+        })
+      } else if (
         err.message?.includes('AA_CRYPTO_STALE') ||
         err.message?.includes('AA_CRYPTO_EXPIRED') ||
         err.message?.includes('AA_CRYPTO_BUILD_MISMATCH') ||

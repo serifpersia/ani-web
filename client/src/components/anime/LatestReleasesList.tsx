@@ -1,39 +1,39 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa'
-import ErrorMessage from '../common/ErrorMessage'
 import AnimeCard from './AnimeCard'
-import { useInfiniteTrendingList } from '../../hooks/useAnimeData'
+import ErrorMessage from '../common/ErrorMessage'
+import { useInfiniteLatestReleases } from '../../hooks/useAnimeData'
 import styles from './TrendingList.module.css'
 import { useLowEndMode } from '../../contexts/LowEndModeContext'
 
-interface TrendingListProps {
-  title: string
-}
-
-const sortOptions = [
-  { value: 'TRENDING_DESC', label: 'Trending' },
-  { value: 'POPULARITY_DESC', label: 'All Time' },
+const formatOptions = [
+  { value: 'TV', label: 'TV' },
+  { value: 'ONA', label: 'ONA' },
+  { value: 'OVA', label: 'OVA' },
+  { value: 'MOVIE', label: 'Movie' },
+  { value: 'ALL', label: 'All' },
+  { value: 'ADULT', label: 'Mature' },
 ]
 
 const PAGE_SIZE = 10
 
-export default function TrendingList({ title }: TrendingListProps) {
+export default function LatestReleasesList() {
   const { lowEndMode } = useLowEndMode()
-  const [sort, setSort] = useState(() => {
-    return localStorage.getItem('trending_sort') || 'TRENDING_DESC'
+  const [format, setFormat] = useState(() => {
+    return localStorage.getItem('latest_releases_format') || 'TV'
   })
   const carouselRef = useRef<HTMLDivElement>(null)
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, error } =
-    useInfiniteTrendingList(sort, PAGE_SIZE)
+    useInfiniteLatestReleases(format, PAGE_SIZE)
 
-  const trendingList = useMemo(() => {
+  const animeList = useMemo(() => {
     return data?.pages.flatMap((page) => page) || []
   }, [data])
 
   useEffect(() => {
-    localStorage.setItem('trending_sort', sort)
-  }, [sort])
+    localStorage.setItem('latest_releases_format', format)
+  }, [format])
 
   const handleScroll = useCallback(() => {
     if (!carouselRef.current || !hasNextPage || isFetchingNextPage || isLoading) return
@@ -68,11 +68,10 @@ export default function TrendingList({ title }: TrendingListProps) {
 
   return (
     <section style={{ marginBottom: '2.5rem' }}>
-      {/* Header — matches AnimeSection header style */}
       <div className={styles['section-header']}>
         <div className={styles['title-wrapper']}>
           <div className="section-title" style={{ marginBottom: 0 }}>
-            {title}
+            Latest Releases
           </div>
           <div className={styles['nav-arrows']}>
             <button
@@ -103,10 +102,10 @@ export default function TrendingList({ title }: TrendingListProps) {
         <div className={styles['header-actions']}>
           <select
             className={styles.timeSelect}
-            value={sort}
-            onChange={(e) => setSort(e.currentTarget.value)}
+            value={format}
+            onChange={(e) => setFormat(e.currentTarget.value)}
           >
-            {sortOptions.map((opt) => (
+            {formatOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
@@ -115,7 +114,6 @@ export default function TrendingList({ title }: TrendingListProps) {
         </div>
       </div>
 
-      {/* Carousel */}
       {isLoading ? (
         <div className={styles.carousel}>
           {Array.from({ length: 7 }).map((_, i) => (
@@ -132,9 +130,9 @@ export default function TrendingList({ title }: TrendingListProps) {
       ) : (
         <div className={styles.carouselContainer}>
           <div className={styles.carousel} ref={carouselRef} onScroll={handleScroll}>
-            {trendingList.map((item, i) => (
+            {animeList.map((item) => (
               <div key={item._id} className={styles.carouselItem}>
-                <AnimeCard anime={item} rank={i + 1} />
+                <AnimeCard anime={item} />
               </div>
             ))}
             {isFetchingNextPage && (

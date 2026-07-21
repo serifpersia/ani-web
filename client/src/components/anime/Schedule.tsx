@@ -20,6 +20,7 @@ interface Anime {
     sub?: string[]
     dub?: string[]
   }
+  airTime?: string
 }
 
 const Schedule: React.FC = () => {
@@ -27,14 +28,25 @@ const Schedule: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [format, setFormat] = useState(() => {
+    return localStorage.getItem('schedule_format') || 'TV'
+  })
   const carouselRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    localStorage.setItem('schedule_format', format)
+  }, [format])
 
   useEffect(() => {
     const fetchEpisodeSchedule = async (date: string) => {
       setLoading(true)
       setError(null)
       try {
-        const response = await fetch(`/api/schedule/${date}`)
+        const url =
+          format && format !== 'ALL'
+            ? `/api/schedule/${date}?format=${format}`
+            : `/api/schedule/${date}`
+        const response = await fetch(url)
         if (!response.ok) throw new Error('Failed to fetch episode schedule')
         const data = await response.json()
         setScheduleData(data)
@@ -47,7 +59,7 @@ const Schedule: React.FC = () => {
     }
 
     fetchEpisodeSchedule(selectedDate)
-  }, [selectedDate])
+  }, [selectedDate, format])
 
   const scroll = (direction: 'left' | 'right') => {
     if (!carouselRef.current) return
@@ -89,6 +101,14 @@ const Schedule: React.FC = () => {
     }
   }, [selectedDate])
 
+  const formatOptions = [
+    { value: 'TV', label: 'TV' },
+    { value: 'ONA', label: 'ONA' },
+    { value: 'OVA', label: 'OVA' },
+    { value: 'MOVIE', label: 'Movie' },
+    { value: 'ALL', label: 'All' },
+  ]
+
   return (
     <div className={styles.scheduleSection}>
       <div className={styles.sectionHeader}>
@@ -114,6 +134,20 @@ const Schedule: React.FC = () => {
               </button>
             </div>
           )}
+        </div>
+
+        <div className={styles.headerActions}>
+          <select
+            className={styles.timeSelect}
+            value={format}
+            onChange={(e) => setFormat(e.target.value)}
+          >
+            {formatOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

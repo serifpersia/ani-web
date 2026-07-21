@@ -48,7 +48,10 @@ export function createDataRouter(
 
   router.get(
     '/schedule/:date',
-    makeCacheMiddleware(apiCache, (req) => `schedule-${req.params.date}`),
+    makeCacheMiddleware(
+      apiCache,
+      (req) => `schedule-${req.params.date}-${req.query.format || 'TV'}`
+    ),
     controller.getSchedule
   )
 
@@ -56,7 +59,8 @@ export function createDataRouter(
     '/latest-releases',
     makeCacheMiddleware(
       apiCache,
-      (req) => `latest-releases-${req.query.page || 1}-${req.query.size || 14}`,
+      (req) =>
+        `latest-releases-${req.query.format || 'TV'}-${req.query.page || 1}-${req.query.size || 12}`,
       300
     ),
     controller.getLatestReleases
@@ -70,10 +74,19 @@ export function createDataRouter(
 
   router.get('/skip-times/:showId/:episodeNumber', controller.getSkipTimes)
   router.get('/video', controller.getVideo)
-  router.get('/episodes', controller.getEpisodes)
+  router.get(
+    '/episodes',
+    makeCacheMiddleware(apiCache, (req) => `episodes-${req.query.showId || ''}`, 3600),
+    controller.getEpisodes
+  )
   router.get(
     '/seasonal',
-    makeCacheMiddleware(apiCache, (req) => `seasonal-14-${req.query.page || 1}`, 1800),
+    makeCacheMiddleware(
+      apiCache,
+      (req) =>
+        `seasonal-${req.query.format || 'ALL'}-${req.query.page || 1}-${req.query.size || 14}`,
+      300
+    ),
     controller.getSeasonal
   )
   router.get(
@@ -86,6 +99,23 @@ export function createDataRouter(
     ),
     controller.getShowMeta
   )
+  router.get(
+    '/popular-list',
+    makeCacheMiddleware(
+      apiCache,
+      (req) =>
+        `popular-list-${req.query.sort || 'TRENDING_DESC'}-${req.query.page || 1}-${req.query.size || 20}`,
+      300
+    ),
+    controller.getPopularList
+  )
+
+  router.get(
+    '/trending',
+    makeCacheMiddleware(apiCache, () => 'trending', 300),
+    controller.getTrending
+  )
+
   router.get('/genres-and-tags', controller.getGenresAndTags)
 
   return router
