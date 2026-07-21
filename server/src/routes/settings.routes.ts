@@ -31,6 +31,7 @@ export function createSettingsRouter(
   )
 
   router.post('/import/mal-xml', multer().single('xmlfile'), controller.importMalXml)
+  router.post('/recover-allanime', controller.recoverAllanime)
 
   return router
 }

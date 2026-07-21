@@ -11,13 +11,29 @@ export const fetchApi = async (url: string) => {
   const response = await fetch(url, { headers })
 
   if (!response.ok) {
-    if (response.status === 403) {
-      const data = await response.json().catch(() => ({}))
-      if (data.error === 'AUTH_REQUIRED' && data.provider === 'animepahe') {
-        window.dispatchEvent(new CustomEvent('ANIMEPAHE_AUTH_REQUIRED'))
-      }
+    const text = await response.text().catch(() => '')
+    let data: Record<string, unknown> = {}
+    try {
+      data = JSON.parse(text)
+    } catch {
+      /* ignore parse errors */
     }
-    throw new Error(`Failed to fetch from ${url}`)
+
+    const errorMsg = typeof data.error === 'string' ? data.error : ''
+
+    if (response.status === 403 && errorMsg === 'AUTH_REQUIRED' && data.provider === 'animepahe') {
+      window.dispatchEvent(new CustomEvent('ANIMEPAHE_AUTH_REQUIRED'))
+    }
+
+    if (
+      errorMsg.includes('AA_CRYPTO_STALE') ||
+      errorMsg.includes('AA_CRYPTO_EXPIRED') ||
+      errorMsg.includes('AA_CRYPTO_BUILD_MISMATCH')
+    ) {
+      window.dispatchEvent(new CustomEvent('ALLANIME_RECOVERY_NEEDED'))
+    }
+
+    throw new Error(errorMsg || `Failed to fetch from ${url}`)
   }
   return response.json()
 }

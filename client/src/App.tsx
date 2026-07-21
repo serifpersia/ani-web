@@ -1,4 +1,4 @@
-import { useEffect, Suspense, lazy, useState } from 'react'
+import { useEffect, Suspense, lazy, useState, useCallback } from 'react'
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom'
 import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
@@ -9,6 +9,7 @@ import VirtualKeyboard from './components/common/VirtualKeyboard'
 import { useVirtualKeyboard } from './hooks/useVirtualKeyboard'
 import { useAnimePaheCookie } from './hooks/useAnimePaheCookie'
 import AnimePaheCookieModal from './components/anime/AnimePaheCookieModal'
+import RecoveryModal from './components/anime/RecoveryModal'
 
 function useDiscordPageStatus() {
   const location = useLocation()
@@ -57,14 +58,23 @@ function App() {
   const { isOpen, openModal, closeModal, onSuccess } = useAnimePaheCookie()
   const { isOpen: sidebarOpen, setIsOpen } = useSidebar()
   const virtualKeyboard = useVirtualKeyboard()
+  const [showRecovery, setShowRecovery] = useState(false)
   useTelemetry()
   useDiscordPageStatus()
+
+  const openRecovery = useCallback(() => setShowRecovery(true), [])
 
   useEffect(() => {
     const handleAuthRequired = () => openModal()
     window.addEventListener('ANIMEPAHE_AUTH_REQUIRED', handleAuthRequired)
     return () => window.removeEventListener('ANIMEPAHE_AUTH_REQUIRED', handleAuthRequired)
   }, [openModal])
+
+  useEffect(() => {
+    const handle = () => openRecovery()
+    window.addEventListener('ALLANIME_RECOVERY_NEEDED', handle)
+    return () => window.removeEventListener('ALLANIME_RECOVERY_NEEDED', handle)
+  }, [openRecovery])
 
   useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {
@@ -90,6 +100,7 @@ function App() {
   return (
     <div className="app-container">
       <AnimePaheCookieModal isOpen={isOpen} onClose={closeModal} onSuccess={onSuccess} />
+      <RecoveryModal show={showRecovery} onClose={() => setShowRecovery(false)} />
       <Toaster
         position="top-center"
         toastOptions={{

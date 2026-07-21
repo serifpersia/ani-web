@@ -15,14 +15,16 @@ import NodeCache from 'node-cache'
 
 const API_BASE_URL = 'https://allanime.day'
 const API_ENDPOINT = `https://api.mkissa.net/api`
-const BOOTSTRAP_ENDPOINT = 'https://api.mkissa.net/client-crypto/v1/bootstrap?buildId=50'
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0'
 const REFERER = 'https://youtu-chan.com'
 
-// AllAnime anti-bot crypto constants
-const AA_BUILD_ID = '50'
-const AA_MASK_HEX = '1be5fd5d5adefbeec8546b2283570eb066b51d2e503b83532a4ef7de684d9a8d'
+// AllAnime anti-bot crypto constants — set via env vars, fallback to compiled defaults
+const AA_BUILD_ID = () => process.env.AA_BUILD_ID || '55'
+const AA_MASK_HEX = () =>
+  process.env.AA_MASK_HEX || 'b14d484b8f450ff9655961e4366269e12c78d8d662b9a957ea6bbf5f3473209b'
+const BOOTSTRAP_ENDPOINT = () =>
+  `https://api.mkissa.net/client-crypto/v1/bootstrap?buildId=${AA_BUILD_ID()}`
 const AA_TS_WINDOW_MS = 300_000
 
 interface BootstrapData {
@@ -148,19 +150,29 @@ export class AllAnimeProvider implements Provider {
   }
 
   private async fetchBootstrap(): Promise<BootstrapData> {
-    const response = await axios.get(BOOTSTRAP_ENDPOINT, {
-      headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-      timeout: 10000,
-    })
-    const data = response.data as BootstrapData
-    if (!data?.partB || !data?.epoch) {
-      throw new Error('Invalid bootstrap response')
+    try {
+      const response = await axios.get(BOOTSTRAP_ENDPOINT(), {
+        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+        timeout: 10000,
+      })
+      const data = response.data as BootstrapData
+      if (!data?.partB || !data?.epoch) {
+        throw new Error('Invalid bootstrap response')
+      }
+      return data
+    } catch (err: unknown) {
+      if (
+        axios.isAxiosError(err) &&
+        (err.response?.data as Record<string, unknown>)?.error === 'unknown_build_id'
+      ) {
+        throw new Error('AA_CRYPTO_STALE: unknown build ID', { cause: err })
+      }
+      throw err
     }
-    return data
   }
 
   private deriveKey(partB: string): Buffer {
-    const mask = Buffer.from(AA_MASK_HEX, 'hex')
+    const mask = Buffer.from(AA_MASK_HEX(), 'hex')
     const partBBuf = Buffer.from(partB, 'base64')
     const key = Buffer.alloc(32)
     for (let i = 0; i < 32; i++) {
@@ -176,10 +188,16 @@ export class AllAnimeProvider implements Provider {
     this.aaAesKey = this.deriveKey(bootstrap.partB)
   }
 
-  private async refreshKey(): Promise<void> {
+  async refreshKey(): Promise<void> {
     const bootstrap = await this.fetchBootstrap()
     this.aaEpoch = bootstrap.epoch
     this.aaAesKey = this.deriveKey(bootstrap.partB)
+  }
+
+  async recoverFromStale(buildId: string, maskHex: string): Promise<void> {
+    process.env.AA_BUILD_ID = buildId
+    process.env.AA_MASK_HEX = maskHex
+    await this.refreshKey()
   }
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -266,10 +284,10 @@ export class AllAnimeProvider implements Provider {
       v: 1,
       ts,
       epoch,
-      buildId: AA_BUILD_ID,
+      buildId: AA_BUILD_ID(),
       qh: queryHash,
     })
-    const k = `${epoch}:${AA_BUILD_ID}:${queryHash}:${ts}`
+    const k = `${epoch}:${AA_BUILD_ID()}:${queryHash}:${ts}`
     const iv = crypto.createHash('sha256').update(k).digest().subarray(0, 12)
     const cipher = crypto.createCipheriv('aes-256-gcm', this.aaAesKey, iv)
     const encrypted = Buffer.concat([cipher.update(payload, 'utf8'), cipher.final()])
