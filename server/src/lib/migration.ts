@@ -1,13 +1,15 @@
 import { DatabaseWrapper } from '../db'
 import { performWriteTransaction } from '../sync'
-import { searchAnilistByTitle, getShowMetaById } from './anilist'
+import { searchAnilistByTitle } from './anilist'
 import { WatchlistRepository } from '../repositories/watchlist.repository'
 import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
 import { dbGet, dbRun } from '../utils/db-utils'
 import logger from '../logger'
 import { Provider } from '../providers/provider.interface'
 
-export async function getMigratedId(
+const inFlightMigrations = new Map<string, Promise<string>>()
+
+async function migrateId(
   db: DatabaseWrapper,
   legacyId: string,
   providers: { [key: string]: Provider | undefined }
@@ -23,7 +25,56 @@ export async function getMigratedId(
       [legacyId]
     )
     if (mapping) {
-      return mapping.numericId
+      const mappedMeta = (await ShowsMetaRepository.getById(db, mapping.numericId)) as {
+        anilistId?: number
+      } | null
+      const canonicalId = mappedMeta?.anilistId ? String(mappedMeta.anilistId) : undefined
+      if (!canonicalId || canonicalId === mapping.numericId) {
+        return mapping.numericId
+      }
+
+      await performWriteTransaction(db, (tx) => {
+        tx.run('UPDATE OR IGNORE watchlist SET id = ? WHERE id = ?', [
+          canonicalId,
+          mapping.numericId,
+        ])
+        tx.run('DELETE FROM watchlist WHERE id = ?', [mapping.numericId])
+        tx.run('UPDATE OR IGNORE shows_meta SET id = ? WHERE id = ?', [
+          canonicalId,
+          mapping.numericId,
+        ])
+        tx.run('DELETE FROM shows_meta WHERE id = ?', [mapping.numericId])
+        tx.run('UPDATE OR IGNORE watched_episodes SET showId = ? WHERE showId = ?', [
+          canonicalId,
+          mapping.numericId,
+        ])
+        tx.run('DELETE FROM watched_episodes WHERE showId = ?', [mapping.numericId])
+        tx.run('UPDATE OR IGNORE queue SET showId = ? WHERE showId = ?', [
+          canonicalId,
+          mapping.numericId,
+        ])
+        tx.run('DELETE FROM queue WHERE showId = ?', [mapping.numericId])
+        tx.run('UPDATE OR IGNORE dismissed_notifications SET showId = ? WHERE showId = ?', [
+          canonicalId,
+          mapping.numericId,
+        ])
+        tx.run('DELETE FROM dismissed_notifications WHERE showId = ?', [mapping.numericId])
+        tx.run('UPDATE OR IGNORE discovered_notifications SET showId = ? WHERE showId = ?', [
+          canonicalId,
+          mapping.numericId,
+        ])
+        tx.run('DELETE FROM discovered_notifications WHERE showId = ?', [mapping.numericId])
+        tx.run('UPDATE legacy_id_mapping SET numericId = ? WHERE legacyId = ?', [
+          canonicalId,
+          legacyId,
+        ])
+      })
+      db.scheduleSave()
+      logger.info(
+        { legacyId, previousId: mapping.numericId, newId: canonicalId },
+        'Canonicalized migrated show ID'
+      )
+      return canonicalId
     }
 
     // 2. We need to find the title/name of the show
@@ -41,27 +92,6 @@ export async function getMigratedId(
       }
     }
 
-    // If not found locally, try providers
-    if (!showName) {
-      const isUuid =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(legacyId) ||
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(legacyId)
-      const provider = isUuid ? providers['animepahe'] : providers['allanime']
-      if (provider) {
-        try {
-          const meta = await provider.getShowMeta(legacyId)
-          if (meta) {
-            showName = meta.name
-          }
-        } catch (e) {
-          logger.warn(
-            { id: legacyId, error: (e as Error).message },
-            'Failed to fetch provider metadata for migration'
-          )
-        }
-      }
-    }
-
     if (!showName) {
       logger.warn({ id: legacyId }, 'No show name found for legacy ID migration')
       return legacyId
@@ -74,17 +104,7 @@ export async function getMigratedId(
       return legacyId
     }
 
-    // 4. Get detailed show meta to obtain MAL ID or AniList ID
-    const detailedShow = await getShowMetaById(String(aniListShow.id))
-    if (!detailedShow) {
-      logger.warn(
-        { id: legacyId, showName, aniListId: aniListShow.id },
-        'No detailed show meta found for legacy ID migration'
-      )
-      return legacyId
-    }
-
-    const newId = detailedShow._id
+    const newId = String(aniListShow.id)
 
     // 5. Save the mapping to DB
     dbRun(db, 'INSERT OR REPLACE INTO legacy_id_mapping (legacyId, numericId) VALUES (?, ?)', [
@@ -143,4 +163,23 @@ export async function getMigratedId(
     logger.error({ err, legacyId }, 'Error migrating legacy show ID')
     return legacyId
   }
+}
+
+export function getMigratedId(
+  db: DatabaseWrapper,
+  legacyId: string,
+  providers: { [key: string]: Provider | undefined }
+): Promise<string> {
+  if (/^\d+$/.test(legacyId)) return Promise.resolve(legacyId)
+
+  const existing = inFlightMigrations.get(legacyId)
+  if (existing) return existing
+
+  const migration = migrateId(db, legacyId, providers)
+  inFlightMigrations.set(legacyId, migration)
+  migration.then(
+    () => inFlightMigrations.delete(legacyId),
+    () => inFlightMigrations.delete(legacyId)
+  )
+  return migration
 }

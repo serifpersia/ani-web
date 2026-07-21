@@ -30,7 +30,7 @@ axiosRetry(axiosInstance, { retries: 3, retryDelay: axiosRetry.exponentialDelay 
 export class ProxyController {
   private static readonly KWIK_DOMAINS = new Set(['kwik.cx', 'kwik.si', 'kwik.pro'])
   private static readonly ANIMEPAHE_URL = 'https://animepahe.pw/'
-  private static readonly VAULT_CDN_HOST = 'uwucdn.top'
+  private static readonly VAULT_CDN_HOSTS = new Set(['uwucdn.top', 'owocdn.top'])
   private static readonly GOT_SCRAPING_HOSTS = new Set([
     'kwik.cx',
     'kwik.si',
@@ -38,7 +38,7 @@ export class ProxyController {
     'animepahe.pw',
     'animepahe.ru',
   ])
-  private static readonly GOT_SCRAPING_SUFFIXES = ['.uwucdn.top']
+  private static readonly GOT_SCRAPING_SUFFIXES = ['.uwucdn.top', '.owocdn.top']
 
   private static isGotScrapingHost(urlStr: string): boolean {
     try {
@@ -86,7 +86,9 @@ export class ProxyController {
     this.abortWhenClientLeaves(res, abortController)
 
     try {
-      const isVaultCdn = urlStr.includes(ProxyController.VAULT_CDN_HOST)
+      const isVaultCdn = Array.from(ProxyController.VAULT_CDN_HOSTS).some((host) =>
+        urlStr.includes(host)
+      )
       const headers: Record<string, string> = {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
@@ -434,9 +436,6 @@ export class ProxyController {
           body = Buffer.from(resp.rawBody)
           contentType = String(resp.headers['content-type'] || 'image/webp')
         } else {
-          logger.warn(
-            `[image-proxy] attempt ${attempt + 1} upstream ${resp.statusCode} ${targetUrl}`
-          )
           if (attempt < 2) await new Promise((r) => setTimeout(r, 400 * (attempt + 1)))
         }
       }
@@ -447,12 +446,10 @@ export class ProxyController {
         res.set('Access-Control-Allow-Origin', '*')
         return res.send(body)
       }
-      logger.warn(`[image-proxy] giving up upstream ${lastStatus} ${targetUrl}`)
       this.sendPlaceholder(res)
     } catch (e) {
       if (abortController.signal.aborted) return
       const err = e as { message?: string }
-      logger.error(`[image-proxy] error ${targetUrl} :: ${err?.message || e}`)
       if (!res.headersSent) {
         this.sendPlaceholder(res)
       }

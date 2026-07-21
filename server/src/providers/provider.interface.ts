@@ -2,6 +2,7 @@ export interface Show {
   _id: string
   id?: string
   session?: string
+  anilistId?: number
   name: string
   names?: {
     romaji?: string
@@ -138,4 +139,5 @@ export interface Provider {
     mode?: 'sub' | 'dub'
   ): Promise<VideoSource[] | null>
   getSkipTimes(showId: string, episodeNumber: string): Promise<SkipIntervals>
+  resolveShowId?(title: string, romaji?: string): Promise<string | null>
 }

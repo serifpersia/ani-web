@@ -440,6 +440,7 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     db.run(
       'DELETE FROM shows_meta WHERE id NOT IN (SELECT id FROM watchlist) AND id NOT IN (SELECT showId FROM queue)'
     )
+    db.run('DELETE FROM legacy_id_mapping WHERE legacyId NOT IN (SELECT id FROM watchlist)')
 
     db.run(
       'DELETE FROM dismissed_notifications WHERE EXISTS (SELECT 1 FROM watched_episodes we WHERE we.showId = dismissed_notifications.showId AND we.episodeNumber = dismissed_notifications.episodeNumber)'
@@ -464,6 +465,7 @@ export async function initializeDatabase(dbPath: string): Promise<DatabaseWrappe
     addCol('shows_meta', 'popularityScore', 'INTEGER')
     addCol('watchlist', 'type', 'TEXT')
     addCol('shows_meta', 'type', 'TEXT')
+    addCol('shows_meta', 'anilistId', 'INTEGER')
 
     await db.saveNow()
     return db

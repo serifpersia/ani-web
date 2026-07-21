@@ -175,19 +175,17 @@ const log = (prefix, color, data) => {
       if (clientProcess) spawn('taskkill', ['/pid', clientProcess.pid, '/f', '/t'], { shell: true })
     } else {
       if (serverProcess) {
-        serverProcess.kill('SIGTERM')
-        setTimeout(() => {
-          if (serverProcess.connected || !serverProcess.killed) serverProcess.kill('SIGKILL')
-        }, 5000)
+        try {
+          process.kill(-serverProcess.pid, 'SIGTERM')
+        } catch {}
       }
       if (clientProcess) {
-        clientProcess.kill('SIGTERM')
-        setTimeout(() => {
-          if (clientProcess.connected || !clientProcess.killed) clientProcess.kill('SIGKILL')
-        }, 5000)
+        try {
+          process.kill(-clientProcess.pid, 'SIGTERM')
+        } catch {}
       }
     }
-    setTimeout(() => process.exit(0), 5500)
+    setTimeout(() => process.exit(0), 2000)
     return
   }
 
@@ -210,7 +208,7 @@ const log = (prefix, color, data) => {
   }
 }
 
-const spawnOpts = (cwd) => ({ stdio: 'pipe', shell: isWin, cwd })
+const spawnOpts = (cwd) => ({ stdio: 'pipe', shell: isWin, cwd, detached: true })
 let serverProcess, clientProcess
 let isShuttingDown = false
 
@@ -286,14 +284,18 @@ const shutdown = () => {
     if (isWin && serverProcess)
       spawn('taskkill', ['/pid', serverProcess.pid, '/f', '/t'], { shell: true })
     else if (serverProcess) {
-      serverProcess.kill('SIGTERM')
-      setTimeout(() => {
-        if (serverProcess.connected || !serverProcess.killed) serverProcess.kill('SIGKILL')
-        process.exit(0)
-      }, 5000)
-      return
+      try {
+        process.kill(-serverProcess.pid, 'SIGKILL')
+      } catch {}
     }
-    process.exit(0)
+    if (clientProcess) {
+      if (isWin) spawn('taskkill', ['/pid', clientProcess.pid, '/f', '/t'], { shell: true })
+      else
+        try {
+          process.kill(-clientProcess.pid, 'SIGKILL')
+        } catch {}
+    }
+    setTimeout(() => process.exit(0), 1000)
   })
 
   req.end()
@@ -303,14 +305,18 @@ const shutdown = () => {
     if (isWin && serverProcess)
       spawn('taskkill', ['/pid', serverProcess.pid, '/f', '/t'], { shell: true })
     else if (serverProcess) {
-      serverProcess.kill('SIGTERM')
-      setTimeout(() => {
-        if (serverProcess.connected || !serverProcess.killed) serverProcess.kill('SIGKILL')
-        process.exit(1)
-      }, 5000)
-      return
+      try {
+        process.kill(-serverProcess.pid, 'SIGKILL')
+      } catch {}
     }
-    process.exit(1)
+    if (clientProcess) {
+      if (isWin) spawn('taskkill', ['/pid', clientProcess.pid, '/f', '/t'], { shell: true })
+      else
+        try {
+          process.kill(-clientProcess.pid, 'SIGKILL')
+        } catch {}
+    }
+    setTimeout(() => process.exit(1), 1000)
   }, 15000)
 }
 

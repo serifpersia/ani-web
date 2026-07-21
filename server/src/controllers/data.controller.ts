@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { Provider, Show } from '../providers/provider.interface'
+import { AllAnimeProvider } from '../providers/allanime.provider'
 import { genres, tags, studios } from '../constants.json'
 import {
   getTrending,
@@ -11,6 +12,7 @@ import {
   searchAnilist,
 } from '../lib/anilist'
 import { getMigratedId } from '../lib/migration'
+import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
 import logger from '../logger'
 
 export class DataController {
@@ -98,8 +100,99 @@ export class DataController {
 
   getVideo = async (req: Request, res: Response) => {
     try {
+      let showId = req.query.showId as string
+      const providerName = req.query.provider as string
+
+      const providerKey = providerName?.toLowerCase()
+      if (providerKey && /^\d+$/.test(showId) && providerKey !== 'megaplay') {
+        const meta = (await ShowsMetaRepository.getById(req.db, showId)) as {
+          name?: string
+          englishName?: string
+        } | null
+        let targetTitle = meta?.name || meta?.englishName
+        let anilistShow: Show | null = null
+
+        if (!targetTitle) {
+          try {
+            anilistShow = await getShowMetaById(showId)
+            targetTitle = anilistShow?.name || anilistShow?.englishName
+
+            if (anilistShow && targetTitle) {
+              await ShowsMetaRepository.upsert(req.db, {
+                id: showId,
+                name: anilistShow.name,
+                thumbnail: anilistShow.thumbnail,
+                nativeName: anilistShow.nativeName,
+                englishName: anilistShow.englishName,
+                genres: anilistShow.genres
+                  ? JSON.stringify(anilistShow.genres.map((genre) => genre.name))
+                  : undefined,
+                status: anilistShow.status,
+                episodeCount:
+                  anilistShow.episodeCount != null ? Number(anilistShow.episodeCount) : undefined,
+                type: anilistShow.type,
+                anilistId: anilistShow.anilistId,
+              })
+            }
+          } catch (err) {
+            logger.warn(
+              { err, provider: providerKey, showId },
+              '[Video] AniList metadata lookup failed while resolving numeric showId'
+            )
+          }
+        }
+
+        if (targetTitle) {
+          let romaji = anilistShow?.names?.romaji
+          if (!romaji) {
+            try {
+              const show = await getShowMetaById(showId)
+              romaji = show?.names?.romaji
+            } catch {
+              // A title from local metadata is still enough to attempt provider resolution.
+            }
+          }
+          const resolved = await this.providers[providerKey]?.resolveShowId?.(targetTitle, romaji)
+          if (resolved) {
+            showId = resolved
+          } else {
+            logger.warn(
+              { provider: providerKey, showId, title: targetTitle, romaji },
+              '[Video] resolveShowId failed, attempting fallback provider search'
+            )
+            try {
+              const fallbackResults = await this.providers[providerKey]?.search?.({
+                query: targetTitle,
+              })
+              const fallbackId = fallbackResults?.[0]?.id
+              if (fallbackId) {
+                showId = fallbackId
+              } else {
+                logger.warn(
+                  { provider: providerKey, showId, title: targetTitle },
+                  '[Video] fallback provider search returned no results'
+                )
+                return res.json([])
+              }
+            } catch (fallbackErr) {
+              logger.error(
+                { err: fallbackErr, provider: providerKey, showId, title: targetTitle },
+                '[Video] fallback provider search failed'
+              )
+              return res.json([])
+            }
+          }
+        } else {
+          logger.warn(
+            { provider: providerKey, showId },
+            '[Video] numeric showId passed to provider but local meta missing title'
+          )
+          return res.json([])
+        }
+      }
+
       const urls = await this.getProvider(req).getStreamUrls(
-        req.query.showId as string,
+        showId,
         req.query.episodeNumber as string,
         req.query.mode as 'sub' | 'dub'
       )
@@ -182,7 +275,7 @@ export class DataController {
   search = async (req: Request, res: Response) => {
     try {
       const providerName = (req.query.provider as string) || 'anilist'
-      if (providerName.toLowerCase() === 'anilist') {
+      if (providerName.toLowerCase() !== 'animepahe') {
         const query = (req.query.query as string) || ''
         const page = parseInt(req.query.page as string) || 1
         const perPage = parseInt(req.query.limit as string) || 14
@@ -256,60 +349,31 @@ export class DataController {
   getShowMeta = async (req: Request, res: Response) => {
     const showIdRaw = req.params.id as string
     const id = await getMigratedId(req.db, showIdRaw, this.providers)
-    const providerName = (req.query.provider as string) || 'allanime'
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
     const isNumeric = /^\d+$/.test(id)
-
-    if (isUuid) {
-      try {
-        if (this.providers['animepahe']) {
-          const meta = await this.providers['animepahe'].getShowMeta(id)
-          return res.json(meta || {})
-        }
-      } catch (e) {
-        if ((e as Error).message === 'AUTH_REQUIRED') {
-          return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'animepahe' })
-        }
-        logger.warn({ id, error: (e as Error).message }, 'AnimePahe getShowMeta failed for UUID')
-      }
-      return res.json({})
-    }
 
     if (isNumeric) {
       try {
         const meta = await getShowMetaById(id)
+        if (meta) {
+          ShowsMetaRepository.upsert(req.db, {
+            id: meta.id || id,
+            name: meta.name,
+            thumbnail: meta.thumbnail,
+            nativeName: meta.nativeName,
+            englishName: meta.englishName,
+            genres: meta.genres ? JSON.stringify(meta.genres.map((g) => g.name)) : undefined,
+            status: meta.status,
+            episodeCount: meta.episodeCount != null ? Number(meta.episodeCount) : undefined,
+            type: meta.type,
+            anilistId: meta.anilistId,
+          })
+        }
         res.set('Cache-Control', 'public, max-age=3600').json(meta || {})
       } catch (e) {
         logger.error({ err: e, id }, 'AniList show-meta fetch failed')
         res.json({})
       }
       return
-    }
-
-    const provider = this.providers[providerName.toLowerCase()]
-    if (provider && providerName.toLowerCase() !== 'allanime') {
-      try {
-        const meta = await provider.getShowMeta(id)
-        if (meta) {
-          return res.json(meta)
-        }
-      } catch (e) {
-        logger.warn(
-          { id, provider: providerName, error: (e as Error).message },
-          'Provider getShowMeta failed'
-        )
-      }
-    }
-
-    try {
-      if (this.providers['allanime']) {
-        const meta = await this.providers['allanime'].getShowMeta(id)
-        if (meta) {
-          return res.json(meta)
-        }
-      }
-    } catch (e) {
-      logger.warn({ id, error: (e as Error).message }, 'AllAnime getShowMeta failed')
     }
 
     res.json({})

@@ -16,7 +16,7 @@ import { _123AnimeProvider as Anime123Provider } from './providers/123anime.prov
 import { AnimeyaProvider } from './providers/animeya.provider'
 import { MegaPlayProvider } from './providers/megaplay.provider'
 import { AnimePaheProvider } from './providers/animepahe.provider'
-import { WhApiProvider } from './providers/whapi.provider'
+import { WhProvider } from './providers/wh.provider'
 import { googleDriveService } from './google'
 import { CONFIG } from './config'
 import { initializeDatabase, syncDownOnBoot, syncUp, initSyncProvider, waitForSync } from './sync'
@@ -56,7 +56,7 @@ const _123AnimeProvider = new Anime123Provider(apiCache)
 const animeyaProvider = new AnimeyaProvider(apiCache)
 const megaPlayProvider = new MegaPlayProvider(apiCache)
 const animepaheProvider = new AnimePaheProvider(apiCache)
-const whApiProvider = new WhApiProvider(apiCache)
+const whProvider = new WhProvider(apiCache)
 
 const providers = {
   allanime: allAnimeProvider,
@@ -64,7 +64,7 @@ const providers = {
   animeya: animeyaProvider,
   megaplay: megaPlayProvider,
   animepahe: animepaheProvider,
-  whapi: whApiProvider,
+  wh: whProvider,
 }
 
 let db: DatabaseWrapper
@@ -151,7 +151,8 @@ app.use(
     initializeDatabase,
     (newDb) => {
       db = newDb
-    }
+    },
+    allAnimeProvider
   )
 )
 
@@ -202,7 +203,7 @@ async function main() {
 
   const rpcEnabledSetting = await SettingsRepository.getByKey(db, 'discordRPCEnabled')
   const isRpcEnabled = rpcEnabledSetting ? rpcEnabledSetting.value === 'true' : true
-  discordRPCService.setEnabled(isRpcEnabled)
+  await discordRPCService.setEnabled(isRpcEnabled)
 
   await runSyncSequence(db)
 
@@ -263,13 +264,9 @@ async function main() {
 
     db.close(() => {
       console.log('[SERVER_EXIT]')
-      setTimeout(() => {
-        if (signal === 'SIGUSR2') {
-          process.kill(process.pid, 'SIGUSR2')
-        } else {
-          process.exit(0)
-        }
-      }, 600)
+      if (signal === 'SIGUSR2') {
+        process.kill(process.pid, 'SIGUSR2')
+      }
     })
   }
 

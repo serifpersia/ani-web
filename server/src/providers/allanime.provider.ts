@@ -15,14 +15,16 @@ import NodeCache from 'node-cache'
 
 const API_BASE_URL = 'https://allanime.day'
 const API_ENDPOINT = `https://api.mkissa.net/api`
-const BOOTSTRAP_ENDPOINT = 'https://api.mkissa.net/client-crypto/v1/bootstrap?buildId=50'
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0'
 const REFERER = 'https://youtu-chan.com'
 
-// AllAnime anti-bot crypto constants
-const AA_BUILD_ID = '50'
-const AA_MASK_HEX = '1be5fd5d5adefbeec8546b2283570eb066b51d2e503b83532a4ef7de684d9a8d'
+// AllAnime anti-bot crypto constants — set via env vars, fallback to compiled defaults
+const AA_BUILD_ID = () => process.env.AA_BUILD_ID || '63'
+const AA_MASK_HEX = () =>
+  process.env.AA_MASK_HEX || 'a39b86dbbcf57f884f3e9074969e7fe26656c74012e4545605896621ffa441c1'
+const BOOTSTRAP_ENDPOINT = () =>
+  `https://api.mkissa.net/client-crypto/v1/bootstrap?buildId=${AA_BUILD_ID()}`
 const AA_TS_WINDOW_MS = 300_000
 
 interface BootstrapData {
@@ -148,19 +150,29 @@ export class AllAnimeProvider implements Provider {
   }
 
   private async fetchBootstrap(): Promise<BootstrapData> {
-    const response = await axios.get(BOOTSTRAP_ENDPOINT, {
-      headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-      timeout: 10000,
-    })
-    const data = response.data as BootstrapData
-    if (!data?.partB || !data?.epoch) {
-      throw new Error('Invalid bootstrap response')
+    try {
+      const response = await axios.get(BOOTSTRAP_ENDPOINT(), {
+        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+        timeout: 10000,
+      })
+      const data = response.data as BootstrapData
+      if (!data?.partB || !data?.epoch) {
+        throw new Error('Invalid bootstrap response')
+      }
+      return data
+    } catch (err: unknown) {
+      if (
+        axios.isAxiosError(err) &&
+        (err.response?.data as Record<string, unknown>)?.error === 'unknown_build_id'
+      ) {
+        throw new Error('AA_CRYPTO_STALE: unknown build ID', { cause: err })
+      }
+      throw err
     }
-    return data
   }
 
   private deriveKey(partB: string): Buffer {
-    const mask = Buffer.from(AA_MASK_HEX, 'hex')
+    const mask = Buffer.from(AA_MASK_HEX(), 'hex')
     const partBBuf = Buffer.from(partB, 'base64')
     const key = Buffer.alloc(32)
     for (let i = 0; i < 32; i++) {
@@ -176,10 +188,24 @@ export class AllAnimeProvider implements Provider {
     this.aaAesKey = this.deriveKey(bootstrap.partB)
   }
 
-  private async refreshKey(): Promise<void> {
+  async refreshKey(): Promise<void> {
     const bootstrap = await this.fetchBootstrap()
     this.aaEpoch = bootstrap.epoch
     this.aaAesKey = this.deriveKey(bootstrap.partB)
+  }
+
+  async recoverFromStale(buildId: string, maskHex: string): Promise<void> {
+    process.env.AA_BUILD_ID = buildId
+    process.env.AA_MASK_HEX = maskHex
+    await this.refreshKey()
+  }
+
+  getCurrentBuildId(): string {
+    return AA_BUILD_ID()
+  }
+
+  getCurrentMaskHex(): string {
+    return AA_MASK_HEX()
   }
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -266,10 +292,10 @@ export class AllAnimeProvider implements Provider {
       v: 1,
       ts,
       epoch,
-      buildId: AA_BUILD_ID,
+      buildId: AA_BUILD_ID(),
       qh: queryHash,
     })
-    const k = `${epoch}:${AA_BUILD_ID}:${queryHash}:${ts}`
+    const k = `${epoch}:${AA_BUILD_ID()}:${queryHash}:${ts}`
     const iv = crypto.createHash('sha256').update(k).digest().subarray(0, 12)
     const cipher = crypto.createCipheriv('aes-256-gcm', this.aaAesKey, iv)
     const encrypted = Buffer.concat([cipher.update(payload, 'utf8'), cipher.final()])
@@ -461,6 +487,28 @@ export class AllAnimeProvider implements Provider {
     return this._fetchShows(variables)
   }
 
+  async resolveShowId(title: string, _romaji?: string): Promise<string | null> {
+    try {
+      const result = await this._request({
+        method: 'POST',
+        url: API_ENDPOINT,
+        data: {
+          query: `query($search: SearchInput) { shows(search: $search, limit: 1, page: 1, translationType: sub, countryOrigin: ALL) { edges { _id name } } }`,
+          variables: { search: { query: title, allowAdult: true } },
+        },
+        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+        timeout: 10000,
+      })
+      const edge = result?.data?.shows?.edges?.[0]
+      if (edge?._id) {
+        return edge._id as string
+      }
+      return null
+    } catch (err) {
+      return null
+    }
+  }
+
   async getPopular(
     timeframe: 'daily' | 'weekly' | 'monthly' | 'all',
     page: number = 1,
@@ -596,7 +644,7 @@ export class AllAnimeProvider implements Provider {
           extensions: {
             persistedQuery: {
               version: 1,
-              sha256Hash: '3b6702a28d9bd4d4c045293b0bb17ecb3a1e7af28eca9ead0970228138ff4385',
+              sha256Hash: 'bc896210babaf9967479eb204c27b9cd8312f9d6b84cb7a8a8defe47bdd6da16',
             },
           },
         },
@@ -679,26 +727,45 @@ export class AllAnimeProvider implements Provider {
     const cacheKey = `episodes-${showId}-${mode}`
     const cachedData = this.cache.get<EpisodeDetails>(cacheKey)
     if (cachedData) return cachedData
-    const responseData = await this._request({
-      method: 'POST',
-      url: API_ENDPOINT,
-      data: {
-        query: `query($showId: String!) { show(_id: $showId) { availableEpisodesDetail, description } }`,
-        variables: { showId },
-      },
-      headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-      timeout: 15000,
-    })
-    const showData = responseData.data.show
-    if (showData) {
-      const episodeDetails = {
-        episodes: (showData.availableEpisodesDetail[mode] as string[]) || [],
-        description: showData.description,
-      }
-      this.cache.set(cacheKey, episodeDetails)
-      return episodeDetails
+
+    let responseData: { data?: { show?: Record<string, unknown> } }
+    try {
+      responseData = await this._request({
+        method: 'POST',
+        url: API_ENDPOINT,
+        data: {
+          query: `query($showId: String!) { show(_id: $showId) { availableEpisodesDetail episodeCount description } }`,
+          variables: { showId },
+        },
+        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+        timeout: 15000,
+      })
+    } catch {
+      return null
     }
-    return null
+
+    const showData = responseData.data?.show as Record<string, unknown> | undefined
+    if (!showData) {
+      logger.warn({ showId, mode }, 'AllAnime getEpisodes: no show data returned')
+      return null
+    }
+
+    let episodes = (showData.availableEpisodesDetail as Record<string, string[]> | undefined)?.[
+      mode
+    ]
+    if (!episodes || episodes.length === 0) {
+      const total = (showData.episodeCount as number) || 0
+      if (total > 0) {
+        episodes = Array.from({ length: total }, (_, i) => String(i + 1))
+      }
+    }
+
+    const episodeDetails: EpisodeDetails = {
+      episodes: episodes || [],
+      description: (showData.description as string) || '',
+    }
+    this.cache.set(cacheKey, episodeDetails)
+    return episodeDetails
   }
 
   async getSkipTimes(showId: string, episodeNumber: string): Promise<SkipIntervals> {
@@ -774,7 +841,19 @@ export class AllAnimeProvider implements Provider {
       responseData = await makeRequest()
     } catch (error: unknown) {
       const err = error as { message?: string }
-      if (
+      if (err.message === 'PersistedQueryNotFound') {
+        logger.info('Episode hash expired, falling back to full query')
+        responseData = await this._request({
+          method: 'POST',
+          url: API_ENDPOINT,
+          data: {
+            query: `query($showId: String!, $translationType: VaildTranslationTypeEnumType!, $episodeString: String!) { episode(showId: $showId translationType: $translationType episodeString: $episodeString) { episodeString uploadDate sourceUrls thumbnail notes } }`,
+            variables: { showId, translationType: mode, episodeString: episodeNumber },
+          },
+          headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+          timeout: 15000,
+        })
+      } else if (
         err.message?.includes('AA_CRYPTO_STALE') ||
         err.message?.includes('AA_CRYPTO_EXPIRED') ||
         err.message?.includes('AA_CRYPTO_BUILD_MISMATCH') ||

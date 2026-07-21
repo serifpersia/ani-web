@@ -19,7 +19,7 @@ import { SettingsRepository } from '../repositories/settings.repository'
 import { discordRPCService } from '../discord-rpc'
 import { requestContext } from '../utils/request-context'
 import { dbAll } from '../utils/db-utils'
-import { searchAnilistByTitle, getAiredEpisodesForShows } from '../lib/anilist'
+import { searchAnilistByTitle, getAiredEpisodesForShows, getShowMetaById } from '../lib/anilist'
 import { getMigratedId } from '../lib/migration'
 
 interface CombinedContinueWatchingShow {
@@ -71,8 +71,10 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 export class WatchlistController {
   private activeTypeFetches = new Set<string>()
+  private lastFinishedStatusCheckAt = 0
   private allAnime: AllAnimeProvider
   private animePahe?: AnimePaheProvider
+  private triggerDiscovery?: () => void
 
   constructor(providers: { allAnime: AllAnimeProvider; animePahe?: AnimePaheProvider }) {
     this.allAnime = providers.allAnime
@@ -84,21 +86,34 @@ export class WatchlistController {
     const anilistIdCache = new Map<string, number | null>()
 
     const getAnilistId = async (showId: string, showName: string): Promise<number | null> => {
-      if (/^\d+$/.test(showId)) {
-        return parseInt(showId)
-      }
-
       if (anilistIdCache.has(showId)) {
         return anilistIdCache.get(showId) || null
+      }
+
+      const db = getDb()
+      const meta = (await ShowsMetaRepository.getById(db, showId)) as { anilistId?: number } | null
+      if (meta?.anilistId) {
+        anilistIdCache.set(showId, meta.anilistId)
+        return meta.anilistId
       }
 
       const result = await searchAnilistByTitle(showName)
       const id = result?.id || null
       anilistIdCache.set(showId, id)
-      return id
+      if (id && db && !db.isClosedCheck()) {
+        ShowsMetaRepository.upsert(db, { id: showId, anilistId: id })
+        db.scheduleSave()
+      }
+      if (id) return id
+
+      if (/^\d+$/.test(showId)) {
+        return parseInt(showId)
+      }
+
+      return null
     }
 
-    setInterval(async () => {
+    const runDiscovery = async (): Promise<void> => {
       if (busy) return
       busy = true
 
@@ -147,6 +162,69 @@ export class WatchlistController {
           reverseMap.set(anilistId, watchlistId)
         }
 
+        const finishedShowIds = new Set<number>()
+        const refreshFinishedStatuses =
+          Date.now() - this.lastFinishedStatusCheckAt >= 60 * 60 * 1000
+        for (const [watchlistId, anilistId] of showIdMap.entries()) {
+          const localMeta = (await ShowsMetaRepository.getById(db, watchlistId)) as {
+            status?: string
+          } | null
+          if (localMeta?.status === 'FINISHED') {
+            finishedShowIds.add(anilistId)
+          } else if (refreshFinishedStatuses) {
+            try {
+              const meta = await getShowMetaById(String(anilistId))
+              if (meta?.status === 'FINISHED') {
+                finishedShowIds.add(anilistId)
+              }
+            } catch {
+              // ignore AniList lookup failure
+            }
+          }
+        }
+        if (refreshFinishedStatuses) {
+          this.lastFinishedStatusCheckAt = Date.now()
+        }
+
+        if (finishedShowIds.size > 0) {
+          const monthStart = new Date(now)
+          monthStart.setDate(now.getDate() - 30)
+          monthStart.setHours(0, 0, 0, 0)
+          const monthEnd = new Date(now)
+          monthEnd.setHours(23, 59, 59, 999)
+
+          const finishedSchedules = await getAiredEpisodesForShows(
+            Array.from(finishedShowIds),
+            monthStart,
+            monthEnd
+          )
+
+          for (const entry of finishedSchedules) {
+            if (entry.airingAt > nowUnix) continue
+            const latestAired = Math.max(
+              ...finishedSchedules.filter((s) => s.mediaId === entry.mediaId).map((s) => s.airingAt)
+            )
+            if (nowUnix - latestAired > 30 * 24 * 60 * 60) continue
+
+            const watchlistId = reverseMap.get(entry.mediaId)
+            if (!watchlistId) continue
+
+            const [watchedEps, dismissedEps] = await Promise.all([
+              WatchedEpisodesRepository.getWatchedEpisodeNumbers(db, watchlistId),
+              NotificationsRepository.getDismissedByShow(db, watchlistId),
+            ])
+
+            const watchedSet = new Set(watchedEps.map((e) => e.toString()))
+            const dismissedSet = new Set(dismissedEps.map((e) => e.episodeNumber.toString()))
+            const episodeKey = String(Math.round(entry.episode))
+
+            if (!watchedSet.has(episodeKey) && !dismissedSet.has(episodeKey)) {
+              await NotificationsRepository.addDiscovered(db, watchlistId, episodeKey)
+              db.scheduleSave()
+            }
+          }
+        }
+
         for (const entry of schedules) {
           if (entry.airingAt > nowUnix) continue
 
@@ -160,12 +238,10 @@ export class WatchlistController {
 
           const watchedSet = new Set(watchedEps.map((e) => e.toString()))
           const dismissedSet = new Set(dismissedEps.map((e) => e.episodeNumber.toString()))
+          const episodeKey = String(Math.round(entry.episode))
 
-          if (
-            !watchedSet.has(entry.episode.toString()) &&
-            !dismissedSet.has(entry.episode.toString())
-          ) {
-            await NotificationsRepository.addDiscovered(db, watchlistId, entry.episode.toString())
+          if (!watchedSet.has(episodeKey) && !dismissedSet.has(episodeKey)) {
+            await NotificationsRepository.addDiscovered(db, watchlistId, episodeKey)
             db.scheduleSave()
           }
         }
@@ -174,7 +250,12 @@ export class WatchlistController {
       } finally {
         busy = false
       }
-    }, 300000)
+    }
+
+    this.triggerDiscovery = () => runDiscovery()
+
+    setInterval(runDiscovery, 300000)
+    runDiscovery()
   }
 
   private getProviderForId(showId: string): AllAnimeProvider | AnimePaheProvider {
@@ -360,6 +441,7 @@ export class WatchlistController {
       episodeCount,
       isPlaying,
       sessionId,
+      isAdult,
     } = req.body
 
     const showId = await getMigratedId(req.db, showIdRaw, {
@@ -413,6 +495,7 @@ export class WatchlistController {
       providerName: this.getProviderForId(showId).name,
       sessionId,
       thumbnails: discordThumbnails,
+      isAdult,
     })
 
     const genresStr = Array.isArray(genres) ? JSON.stringify(genres) : genres
@@ -770,6 +853,10 @@ export class WatchlistController {
     const db = req.db
     const watchingShows = await WatchlistRepository.getWatchingShows(db)
 
+    if (this.triggerDiscovery && watchingShows.length > 0) {
+      this.triggerDiscovery()
+    }
+
     const notifications: EpisodeNotification[] = []
 
     for (const show of watchingShows) {
@@ -782,12 +869,9 @@ export class WatchlistController {
 
         const watchedSet = new Set(watchedEps.map((e) => e.toString()))
         const dismissedSet = new Set(dismissedEps.map((e) => e.episodeNumber.toString()))
-        const maxWatched = Math.max(0, ...Array.from(watchedSet).map((e) => parseFloat(e)))
 
         for (const discovered of discoveredEps) {
-          const epNum = parseFloat(discovered.episodeNumber)
           if (
-            epNum > maxWatched &&
             !watchedSet.has(discovered.episodeNumber) &&
             !dismissedSet.has(discovered.episodeNumber)
           ) {
@@ -846,8 +930,8 @@ export class WatchlistController {
       FROM discovered_notifications dn
       JOIN watchlist w ON dn.showId = w.id
       WHERE w.status = 'Watching'
-        AND dn.discoveredAt = (
-          SELECT MAX(dn2.discoveredAt)
+        AND dn.episodeNumber = (
+          SELECT MAX(CAST(dn2.episodeNumber AS INTEGER))
           FROM discovered_notifications dn2
           WHERE dn2.showId = dn.showId
             AND dn2.discoveredAt >= datetime('now', '-7 days')
@@ -856,11 +940,12 @@ export class WatchlistController {
               WHERE we2.showId = dn2.showId AND we2.episodeNumber = dn2.episodeNumber
             )
         )
+        AND dn.discoveredAt >= datetime('now', '-7 days')
         AND NOT EXISTS (
           SELECT 1 FROM watched_episodes we
           WHERE we.showId = dn.showId AND we.episodeNumber = dn.episodeNumber
         )
-      ORDER BY dn.discoveredAt DESC`
+      ORDER BY CAST(dn.episodeNumber AS INTEGER) DESC`
     )
 
     res.json(

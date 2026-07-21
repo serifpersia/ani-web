@@ -41,6 +41,7 @@ export const usePlayerData = (
   const [uiState, dispatch] = useReducer(playerReducer, undefined, createInitialState)
   const queryClient = useQueryClient()
   const hasForcedProvider = useRef<string | null>(null)
+  const hasForcedAdultProvider = useRef<string | null>(null)
 
   const currentEpisode = episodeNumber || uiState.initialEpisode
 
@@ -147,6 +148,17 @@ export const usePlayerData = (
     }
   }, [showData, episodeNumber])
 
+  useEffect(() => {
+    if (
+      showData?.showMeta?.isAdult &&
+      uiState.selectedProvider !== 'wh' &&
+      hasForcedAdultProvider.current !== showId
+    ) {
+      hasForcedAdultProvider.current = showId
+      dispatch({ type: 'SET_PROVIDER', payload: 'wh' })
+    }
+  }, [showData?.showMeta?.isAdult, uiState.selectedProvider, showId])
+
   const {
     data: videoData,
     isLoading: loadingVideo,
@@ -166,9 +178,7 @@ export const usePlayerData = (
       try {
         let providerShowId = showId
         if (
-          ['allanime', '123anime', 'animeya', 'megaplay', 'whapi'].includes(
-            uiState.selectedProvider
-          )
+          ['allanime', '123anime', 'animeya', 'megaplay', 'wh'].includes(uiState.selectedProvider)
         ) {
           const names = showData?.showMeta?.names
           // AlAnime's `name` field is often the native Japanese script (e.g. "ブリーチ"
@@ -363,7 +373,7 @@ export const usePlayerData = (
         throw e
       }
     },
-    enabled: !!showId && !!currentEpisode,
+    enabled: !!showId && !!currentEpisode && !!showData,
   })
 
   const loadingDetails = false
@@ -473,6 +483,7 @@ export const usePlayerData = (
           type: showMeta.type,
           status: showMeta.status,
           episodeCount: episodes.length,
+          isAdult: showMeta.isAdult,
         }),
         keepalive: true,
       })

@@ -3,14 +3,16 @@ import { SettingsController } from '../controllers/settings.controller'
 import multer from 'multer'
 import { CONFIG } from '../config'
 import { DatabaseWrapper } from '../db'
+import { AllAnimeProvider } from '../providers/allanime.provider'
 
 export function createSettingsRouter(
   getDb: () => DatabaseWrapper,
   initializeDatabase: (path: string) => Promise<DatabaseWrapper>,
-  setDb: (newDb: DatabaseWrapper) => void
+  setDb: (newDb: DatabaseWrapper) => void,
+  allAnimeProvider?: AllAnimeProvider
 ): Router {
   const router = Router()
-  const controller = new SettingsController()
+  const controller = new SettingsController(allAnimeProvider)
 
   router.get('/settings', controller.getSettings)
   router.post('/settings', controller.updateSettings)
@@ -29,6 +31,7 @@ export function createSettingsRouter(
   )
 
   router.post('/import/mal-xml', multer().single('xmlfile'), controller.importMalXml)
+  router.post('/recover-allanime', controller.recoverAllanime)
 
   return router
 }

@@ -15,6 +15,7 @@ interface VideoPlayerProps {
     genres?: { name: string }[]
     score?: number
     type?: string
+    isAdult?: boolean
   }
 }
 
@@ -115,6 +116,7 @@ const useVideoPlayer = ({
       type: showMeta.type,
       isPlaying: video ? !video.paused : true,
       sessionId: sessionIdRef.current,
+      isAdult: showMeta.isAdult,
     }
   }, [showId, episodeNumber, episodeCount, showMeta])
 

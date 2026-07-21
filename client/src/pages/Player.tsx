@@ -39,6 +39,7 @@ import type { QueueItem } from '../hooks/useAnimeData'
 import type { VideoLink, SubtitleTrack } from '../types/player'
 import AnimeMetaDetails from '../components/anime/AnimeMetaDetails'
 import SynopsisText from '../components/anime/SynopsisText'
+import RecoveryModal from '../components/anime/RecoveryModal'
 import { getSuggestedEpisode } from '../lib/queue'
 import AnimePaheCookieModal from '../components/anime/AnimePaheCookieModal'
 
@@ -77,6 +78,7 @@ const Player: React.FC = () => {
       names: state.showMeta.names,
       genres: state.showMeta.genres,
       score: state.showMeta.score,
+      isAdult: state.showMeta.isAdult,
     }
   }, [
     state.showMeta.name,
@@ -84,6 +86,7 @@ const Player: React.FC = () => {
     state.showMeta.names,
     state.showMeta.genres,
     state.showMeta.score,
+    state.showMeta.isAdult,
   ])
 
   const player = useVideoPlayer({
@@ -854,7 +857,9 @@ const Player: React.FC = () => {
     state.episodes.length > 0 &&
     !!state.currentEpisode &&
     state.episodes[state.episodes.length - 1] === state.currentEpisode
-  const normalizedShowStatus = (state.showMeta.status || '').trim().toLowerCase()
+  const normalizedShowStatus = String(state.showMeta.status || '')
+    .trim()
+    .toLowerCase()
   const isFinishedShow = ['finished', 'completed', 'complete', 'ended'].some((status) =>
     normalizedShowStatus.includes(status)
   )
@@ -878,8 +883,11 @@ const Player: React.FC = () => {
   const isCurrentEpisodeWatched = !!(
     state.currentEpisode && state.watchedEpisodes.includes(state.currentEpisode)
   )
+  const [showAaRecovery, setShowAaRecovery] = useState(false)
+
   const showManualWatchedButton =
-    (state.selectedProvider !== 'allanime' && state.selectedProvider !== 'megaplay') ||
+    (state.selectedProvider?.toLowerCase() !== 'allanime' &&
+      state.selectedProvider !== 'megaplay') ||
     state.selectedSource?.type === 'iframe'
   const queuedItem = useMemo(() => {
     if (!showId || !suggestedEpisode) return undefined
@@ -1100,10 +1108,21 @@ const Player: React.FC = () => {
                   <p className={styles.errorSubtext}>
                     Please try selecting a different provider below.
                   </p>
+                  {state.selectedProvider?.toLowerCase() === 'allanime' && !showAaRecovery && (
+                    <button
+                      className={styles.retryButton}
+                      onClick={() => setShowAaRecovery(true)}
+                      data-speed-boost-ignore="true"
+                      style={{ marginTop: 8 }}
+                    >
+                      Recover AllAnime
+                    </button>
+                  )}
                   <button
                     className={styles.retryButton}
                     onClick={() => window.location.reload()}
                     data-speed-boost-ignore="true"
+                    style={{ marginTop: 8 }}
                   >
                     Retry
                   </button>
@@ -1400,6 +1419,8 @@ const Player: React.FC = () => {
           navigate(`/watch/${showId}/${ep}`)
         }}
       />
+
+      <RecoveryModal show={showAaRecovery} onClose={() => setShowAaRecovery(false)} />
     </div>
   )
 }

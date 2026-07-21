@@ -342,10 +342,13 @@ const Watchlist: React.FC = () => {
               key={f}
               className={`${styles.filterBtn} ${filterBy === f ? styles.active : ''}`}
               onClick={() => {
+                const params = new URLSearchParams(searchParams)
+                params.delete('page')
                 navigate({
                   pathname: `/watchlist/${f}`,
-                  search: searchParams.toString(),
+                  search: params.toString(),
                 })
+                setPage(1)
               }}
             >
               {f}

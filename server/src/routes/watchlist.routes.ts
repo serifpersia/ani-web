@@ -38,15 +38,19 @@ export function createWatchlistRouter(
 
   router.post('/discord/clear', (req, res) => {
     const { sessionId } = req.body
+    if (!discordRPCService.isServiceEnabled) {
+      return res.json({ success: true })
+    }
     discordRPCService.clearPresence(sessionId)
     res.json({ success: true })
   })
 
   router.post('/discord/status', (req, res) => {
     const { page } = req.body
-    if (typeof page === 'string') {
-      discordRPCService.setIdleStatus(page)
+    if (typeof page !== 'string' || !discordRPCService.isServiceEnabled) {
+      return res.json({ success: true })
     }
+    discordRPCService.setIdleStatus(page)
     res.json({ success: true })
   })
 

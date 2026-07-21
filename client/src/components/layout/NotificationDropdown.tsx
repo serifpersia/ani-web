@@ -1,11 +1,17 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import NotificationItem from './NotificationItem'
 import { useNotifications, useClearAllNotifications } from '../../hooks/useAnimeData'
+import { useQueryClient } from '@tanstack/react-query'
 import styles from './Notification.module.css'
 
 const NotificationDropdown: React.FC = () => {
   const { data: notifications = [], isLoading } = useNotifications()
   const clearAllMutation = useClearAllNotifications()
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ['notifications'] })
+  }, [queryClient])
 
   const handleClearAll = () => {
     clearAllMutation.mutate(undefined)

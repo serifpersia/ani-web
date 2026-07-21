@@ -5,7 +5,7 @@ export type Action =
   | { type: 'SET_MODE'; payload: 'sub' | 'dub' }
   | {
       type: 'SET_PROVIDER'
-      payload: 'allanime' | 'animepahe' | '123anime' | 'animeya' | 'megaplay' | 'whapi'
+      payload: 'allanime' | 'animepahe' | '123anime' | 'animeya' | 'megaplay' | 'wh'
     }
   | { type: 'SET_OVERRIDE_SOURCE'; payload: { source: VideoSource; link: VideoLink } | null }
 
@@ -21,7 +21,7 @@ const getPreferredProvider = (): PlayerState['selectedProvider'] => {
     'animeya',
     'animepahe',
     '123anime',
-    'whapi',
+    'wh',
   ]
   if (provider && validProviders.includes(provider)) {
     return provider as PlayerState['selectedProvider']

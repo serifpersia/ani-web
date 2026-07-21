@@ -199,8 +199,8 @@ function extractPlayerData(html: string) {
   return { sources, defaultSrc, thumbnail, duration }
 }
 
-export class WhApiProvider implements Provider {
-  name = 'WH-API'
+export class WhProvider implements Provider {
+  name = 'WH'
 
   private cache: NodeCache
 
@@ -211,9 +211,9 @@ export class WhApiProvider implements Provider {
   private bestMatch(
     results: { title: string; url: string; poster: string; year: string }[],
     query: string
-  ): { title: string; url: string; poster: string; year: string } | null {
+  ): { title: string; url: string; poster: string; year: string; score: number } | null {
     if (!results.length) return null
-    if (results.length === 1) return results[0]
+    if (results.length === 1) return { ...results[0], score: 0 }
 
     const q = query.toLowerCase().trim()
     let best = results[0]
@@ -232,7 +232,8 @@ export class WhApiProvider implements Provider {
         if (score === 3) break
       }
     }
-    return best
+
+    return { ...best, score: bestScore }
   }
 
   async search(options: SearchOptions): Promise<Show[]> {
@@ -245,7 +246,8 @@ export class WhApiProvider implements Provider {
 
       if (results.length === 0) return []
 
-      const matched = this.bestMatch(results, query) || results[0]
+      const matchResult = this.bestMatch(results, query)
+      const matched = matchResult || results[0]
       const slug = matched.url.split('/').filter(Boolean).pop() || ''
 
       return [
@@ -261,16 +263,46 @@ export class WhApiProvider implements Provider {
         },
       ]
     } catch (error) {
-      logger.error({ error }, '[WH-API] Search failed')
+      logger.error({ error }, '[WH] Search failed')
       return []
     }
+  }
+
+  async resolveShowId(title: string, romaji?: string): Promise<string | null> {
+    const query = (romaji || title).trim()
+    if (!query) return null
+
+    const words = query.split(/\s+/).filter(Boolean)
+    const variants = [
+      query,
+      query
+        .replace(/[^\w\s]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim(),
+      words.slice(0, 3).join(' '),
+      words.slice(0, 2).join(' '),
+      words[0] || '',
+    ].filter(Boolean)
+
+    for (const variant of variants) {
+      const html = await fetchText(`${BASE_URL}/?s=${encodeURIComponent(variant)}`)
+      const results = parseSearchArticles(html)
+      if (results.length === 0) continue
+
+      const matchResult = this.bestMatch(results, variant)
+      if (matchResult && matchResult.score >= 1) {
+        return matchResult.url.split('/').filter(Boolean).pop() || null
+      }
+    }
+
+    return null
   }
 
   async getEpisodes(showId: string, _mode: 'sub' | 'dub'): Promise<EpisodeDetails | null> {
     try {
       if (!showId) return null
 
-      const cacheKey = `whapi_eps_${showId}`
+      const cacheKey = `wh_eps_${showId}`
       const cached = this.cache.get<{
         episodes: string[]
         description: string
@@ -310,35 +342,39 @@ export class WhApiProvider implements Provider {
           description,
           episodeMap,
         },
-        3600
+        120
       )
 
       return result
     } catch (error) {
-      logger.error({ error, showId }, '[WH-API] getEpisodes failed')
+      logger.error({ error, showId }, '[WH] getEpisodes failed')
       return null
     }
   }
 
   private async getEpisodeSlug(seriesSlug: string, episodeNumber: string): Promise<string | null> {
     try {
-      const cacheKey = `whapi_epmap_${seriesSlug}`
+      const cacheKey = `wh_epmap_${seriesSlug}`
       let cached = this.cache.get<Record<string, string>>(cacheKey) || {}
 
-      if (Object.keys(cached).length === 0) {
+      const buildEpisodeMap = async (): Promise<Record<string, string>> => {
         const html = await fetchText(`${BASE_URL}/series/${seriesSlug}/`)
         const videosLinks = html.match(/\/videos\/[^"'\s]+/gi) || []
-
-        cached = {}
+        const map: Record<string, string> = {}
         videosLinks.forEach((link) => {
           const slug = link.replace(/^\/videos\//, '').replace(/\/$/, '')
           const numM = slug.match(/episode[-\s]?(\d+)/i)
           const num = numM ? numM[1] : ''
           if (num && slug) {
-            cached[num] = slug
+            map[num] = slug
           }
         })
-        this.cache.set(cacheKey, cached, 3600)
+        this.cache.set(cacheKey, map, 3600)
+        return map
+      }
+
+      if (Object.keys(cached).length === 0) {
+        cached = await buildEpisodeMap()
       }
 
       if (cached[episodeNumber]) return cached[episodeNumber]
@@ -353,9 +389,19 @@ export class WhApiProvider implements Provider {
       const first = Number(sorted[0])
       if (target < first && sorted.length > 0) return cached[sorted[0]]
 
+      cached = await buildEpisodeMap()
+
+      if (cached[episodeNumber]) return cached[episodeNumber]
+      for (const key of Object.keys(cached)) {
+        if (parseFloat(key) === target) return cached[key]
+      }
+      const sorted2 = Object.keys(cached).sort((a, b) => Number(a) - Number(b))
+      const first2 = Number(sorted2[0])
+      if (target < first2 && sorted2.length > 0) return cached[sorted2[0]]
+
       return null
     } catch (error) {
-      logger.error({ error, seriesSlug, episodeNumber }, '[WH-API] getEpisodeSlug failed')
+      logger.error({ error, seriesSlug, episodeNumber }, '[WH] getEpisodeSlug failed')
       return null
     }
   }
@@ -371,11 +417,11 @@ export class WhApiProvider implements Provider {
 
       const episodeSlug = await this.getEpisodeSlug(showId, targetEpisode)
       if (!episodeSlug) {
-        logger.warn({ showId, episodeNumber }, '[WH-API] Could not resolve episode slug')
+        logger.warn({ showId, episodeNumber }, '[WH] Could not resolve episode slug')
         return null
       }
 
-      const cacheKey = `whapi_stream_${showId}_${targetEpisode}`
+      const cacheKey = `wh_stream_${showId}_${targetEpisode}`
       const cached = this.cache.get<VideoSource[]>(cacheKey)
       if (cached) return cached
 
@@ -405,7 +451,7 @@ export class WhApiProvider implements Provider {
 
       const result: VideoSource[] = [
         {
-          sourceName: 'WH-API',
+          sourceName: 'WH',
           links,
           type: 'player',
           actualEpisodeNumber: targetEpisode,
@@ -415,7 +461,7 @@ export class WhApiProvider implements Provider {
       this.cache.set(cacheKey, result, 3600)
       return result
     } catch (error) {
-      logger.error({ error, showId, episodeNumber }, '[WH-API] getStreamUrls failed')
+      logger.error({ error, showId, episodeNumber }, '[WH] getStreamUrls failed')
       return null
     }
   }
@@ -481,7 +527,7 @@ export class WhApiProvider implements Provider {
         },
       }
     } catch (error) {
-      logger.error({ error, showId }, '[WH-API] getShowMeta failed')
+      logger.error({ error, showId }, '[WH] getShowMeta failed')
       return null
     }
   }

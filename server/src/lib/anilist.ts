@@ -2,6 +2,15 @@ import { Show } from '../providers/provider.interface'
 import logger from '../logger'
 
 const ANILIST_API = 'https://graphql.anilist.co'
+const ANILIST_MIN_INTERVAL = 2100
+let nextAnilistRequestAt = 0
+let anilistCooldownUntil = 0
+const anilistMemoryCache = new Map<string, { data: unknown; expiry: number }>()
+const ANILIST_MEMORY_TTL = 60 * 60 * 1000
+const airedEpisodesCache = new Map<string, { data: unknown; expiry: number }>()
+const AIRED_EPISODES_TTL = 60 * 60 * 1000
+type AnilistResponse<T> = { data: T | null; errors?: { message: string }[] } | null
+const inFlightAnilistRequests = new Map<string, Promise<AnilistResponse<unknown>>>()
 
 export interface AnilistMedia {
   id: number
@@ -87,16 +96,72 @@ export function mediaFields(): string {
   `
 }
 
-export async function anilistRequest<T>(
+function getAnilistCacheKey(query: string, variables?: Record<string, unknown>): string {
+  return `${query}:${JSON.stringify(variables || {})}`
+}
+
+function getCachedAnilist<T>(key: string): T | null {
+  const entry = anilistMemoryCache.get(key)
+  if (entry && Date.now() < entry.expiry) return entry.data as T
+  anilistMemoryCache.delete(key)
+  return null
+}
+
+function setCachedAnilist(key: string, data: unknown): void {
+  anilistMemoryCache.set(key, { data, expiry: Date.now() + ANILIST_MEMORY_TTL })
+}
+
+function getCachedAiredEpisodes(
+  key: string
+): { mediaId: number; episode: number; airingAt: number }[] | null {
+  const entry = airedEpisodesCache.get(key)
+  if (entry && Date.now() < entry.expiry)
+    return entry.data as { mediaId: number; episode: number; airingAt: number }[]
+  airedEpisodesCache.delete(key)
+  return null
+}
+
+function setCachedAiredEpisodes(key: string, data: unknown): void {
+  airedEpisodesCache.set(key, { data, expiry: Date.now() + AIRED_EPISODES_TTL })
+}
+
+async function waitForAnilistSlot(): Promise<void> {
+  while (true) {
+    const now = Date.now()
+    const scheduledAt = Math.max(now, nextAnilistRequestAt, anilistCooldownUntil)
+    nextAnilistRequestAt = scheduledAt + ANILIST_MIN_INTERVAL
+
+    if (scheduledAt > now) {
+      await new Promise((resolve) => setTimeout(resolve, scheduledAt - now))
+    }
+
+    if (Date.now() >= anilistCooldownUntil) return
+  }
+}
+
+async function performAnilistRequest<T>(
   query: string,
-  variables?: Record<string, unknown>
-): Promise<{ data: T | null; errors?: { message: string }[] } | null> {
+  variables?: Record<string, unknown>,
+  retryCount = 0
+): Promise<AnilistResponse<T>> {
+  await waitForAnilistSlot()
+
   try {
     const response = await fetch(ANILIST_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ query, variables }),
     })
+
+    if (response.status === 429 && retryCount < 5) {
+      const retryAfterHeader = Number.parseInt(response.headers.get('Retry-After') || '', 10)
+      const retryAfter =
+        Number.isFinite(retryAfterHeader) && retryAfterHeader >= 0 ? retryAfterHeader : 5
+      const delay = Math.min(retryAfter * 1000, 60000)
+      anilistCooldownUntil = Math.max(anilistCooldownUntil, Date.now() + delay)
+      logger.warn({ retryAfter, retryCount }, 'AniList rate limited, retrying')
+      return performAnilistRequest(query, variables, retryCount + 1)
+    }
 
     const json = (await response.json()) as {
       data?: T | null
@@ -112,6 +177,23 @@ export async function anilistRequest<T>(
     logger.error({ err }, 'AniList request error')
     return null
   }
+}
+
+export function anilistRequest<T>(
+  query: string,
+  variables?: Record<string, unknown>
+): Promise<AnilistResponse<T>> {
+  const cacheKey = getAnilistCacheKey(query, variables)
+  const existing = inFlightAnilistRequests.get(cacheKey)
+  if (existing) return existing as Promise<AnilistResponse<T>>
+
+  const request = performAnilistRequest<T>(query, variables)
+  inFlightAnilistRequests.set(cacheKey, request as Promise<AnilistResponse<unknown>>)
+  request.then(
+    () => inFlightAnilistRequests.delete(cacheKey),
+    () => inFlightAnilistRequests.delete(cacheKey)
+  )
+  return request
 }
 
 function stripHtml(input?: string | null): string {
@@ -145,6 +227,7 @@ export function fromAnilistMedia(m: AnilistMedia): Show {
   return {
     _id: id,
     id,
+    anilistId: m.id,
     name,
     englishName: title?.english,
     nativeName: title?.native,
@@ -205,6 +288,7 @@ export async function getLatestReleases(
   }
 
   const now = Math.floor(Date.now() / 1000)
+  const thirtyDaysAgo = now - 30 * 86400
   const needed = page * size
   const accumulated: Show[] = []
   const seen = new Set<number>()
@@ -212,10 +296,10 @@ export async function getLatestReleases(
 
   while (accumulated.length < needed && anilistPage <= 10) {
     const query = `
-      query ($page: Int, $perPage: Int, $airingAt: Int) {
+      query ($page: Int, $perPage: Int, $airingAtGt: Int, $airingAtLt: Int) {
         Page(page: $page, perPage: $perPage) {
           pageInfo { hasNextPage }
-          airingSchedules(sort: TIME_DESC, airingAt_lesser: $airingAt) {
+          airingSchedules(sort: TIME_DESC, airingAt_lesser: $airingAtLt, airingAt_greater: $airingAtGt) {
             id episode airingAt
             media {
               ${mediaFields()}
@@ -235,7 +319,7 @@ export async function getLatestReleases(
           media?: AnilistMedia
         }[]
       }
-    }>(query, { page: anilistPage, perPage: 50, airingAt: now })
+    }>(query, { page: anilistPage, perPage: 50, airingAtLt: now, airingAtGt: thirtyDaysAgo })
 
     const schedules = result?.data?.Page?.airingSchedules
     if (!schedules || schedules.length === 0) break
@@ -298,59 +382,29 @@ export async function getSeasonal(
   const currentSeason =
     month <= 3 ? 'WINTER' : month <= 6 ? 'SPRING' : month <= 9 ? 'SUMMER' : 'FALL'
 
-  const airingNow = Math.floor(Date.now() / 1000)
-  const needed = page * size
-  const accumulated: Show[] = []
-  const seen = new Set<number>()
-  let anilistPage = 1
-
-  while (accumulated.length < needed && anilistPage <= 10) {
-    const query = `
-      query ($page: Int, $perPage: Int, $airingAt: Int) {
-        Page(page: $page, perPage: $perPage) {
-          pageInfo { hasNextPage }
-          airingSchedules(sort: TIME_DESC, airingAt_lesser: $airingAt) {
-            id episode airingAt
-            media {
-              ${mediaFields()}
-            }
-          }
+  const query = `
+    query ($page: Int, $perPage: Int, $season: MediaSeason, $seasonYear: Int, $format: MediaFormat) {
+      Page(page: $page, perPage: $perPage) {
+        pageInfo { hasNextPage total }
+        media(season: $season, seasonYear: $seasonYear, type: ANIME, format: $format, isAdult: false, sort: [POPULARITY_DESC, SCORE_DESC]) {
+          ${mediaFields()}
         }
       }
-    `
-
-    const result = await anilistRequest<{
-      Page: {
-        pageInfo: { hasNextPage: boolean }
-        airingSchedules?: {
-          id: number
-          episode: number
-          airingAt: number
-          media?: AnilistMedia
-        }[]
-      }
-    }>(query, { page: anilistPage, perPage: 50, airingAt: airingNow })
-
-    const schedules = result?.data?.Page?.airingSchedules
-    if (!schedules || schedules.length === 0) break
-
-    for (const s of schedules) {
-      if (!s.media) continue
-      if (s.media.isAdult) continue
-      if (format && format !== 'ALL' && s.media.format !== format) continue
-      if (s.media.season !== currentSeason || s.media.seasonYear !== year) continue
-      if (!s.media.id || seen.has(s.media.id)) continue
-      seen.add(s.media.id)
-      accumulated.push(fromAnilistMedia(s.media))
-      if (accumulated.length >= needed) break
     }
+  `
 
-    if (!result.data?.Page?.pageInfo?.hasNextPage) break
-    anilistPage++
-  }
+  const formatVar = format && format !== 'ALL' ? format.toUpperCase() : undefined
+  const result = await anilistRequest<{
+    Page: {
+      pageInfo: { hasNextPage: boolean; total: number }
+      media?: AnilistMedia[]
+    }
+  }>(query, { page, perPage: size, season: currentSeason, seasonYear: year, format: formatVar })
 
-  const start = (page - 1) * size
-  return accumulated.slice(start, start + size)
+  const media = result?.data?.Page?.media
+  if (!media) return []
+
+  return media.map(fromAnilistMedia)
 }
 
 export async function getTrending(
@@ -385,14 +439,26 @@ export async function getShowMetaById(id: string): Promise<Show | null> {
   if (isNaN(numericId)) return null
 
   const fields = mediaFields()
+  const cacheKey = `meta:${id}`
+  const cached = getCachedAnilist<Show>(cacheKey)
+  if (cached) return cached
+
   const query = `query ($id: Int) { Media(id: $id, type: ANIME) { ${fields} } }`
   const queryMal = `query ($id: Int) { Media(idMal: $id, type: ANIME) { ${fields} } }`
 
   const byId = await anilistRequest<{ Media?: AnilistMedia | null }>(query, { id: numericId })
-  if (byId?.data?.Media) return fromAnilistMedia(byId.data.Media)
+  if (byId?.data?.Media) {
+    const show = fromAnilistMedia(byId.data.Media)
+    setCachedAnilist(cacheKey, show)
+    return show
+  }
 
   const byMal = await anilistRequest<{ Media?: AnilistMedia | null }>(queryMal, { id: numericId })
-  if (byMal?.data?.Media) return fromAnilistMedia(byMal.data.Media)
+  if (byMal?.data?.Media) {
+    const show = fromAnilistMedia(byMal.data.Media)
+    setCachedAnilist(cacheKey, show)
+    return show
+  }
 
   return null
 }
@@ -400,6 +466,10 @@ export async function getShowMetaById(id: string): Promise<Show | null> {
 export async function getAnilistEpisodes(id: string): Promise<string[]> {
   const numericId = parseInt(id)
   if (isNaN(numericId)) return []
+
+  const cacheKey = `eps:${id}`
+  const cached = getCachedAnilist<string[]>(cacheKey)
+  if (cached) return cached
 
   const subquery = `id episodes status nextAiringEpisode { episode airingAt } airingSchedule(perPage: 100) { nodes { episode airingAt } }`
   const query = `query ($id: Int) { Media(id: $id, type: ANIME) { ${subquery} } }`
@@ -426,9 +496,13 @@ export async function getAnilistEpisodes(id: string): Promise<string[]> {
       } | null
     }>(queryMal, { id: numericId })
     if (!byMal?.data?.Media) return []
-    return extractEpisodes(byMal.data.Media)
+    const episodes = extractEpisodes(byMal.data.Media)
+    setCachedAnilist(cacheKey, episodes)
+    return episodes
   }
-  return extractEpisodes(media)
+  const episodes = extractEpisodes(media)
+  setCachedAnilist(cacheKey, episodes)
+  return episodes
 }
 
 function extractEpisodes(result: {
@@ -464,7 +538,7 @@ export async function searchAnilistByTitle(
   const query = `
     query ($search: String) {
       Page(page: 1, perPage: 5) {
-        media(search: $search, type: ANIME, isAdult: false) {
+        media(search: $search, type: ANIME) {
           id
           title { romaji english native }
         }
@@ -472,13 +546,27 @@ export async function searchAnilistByTitle(
     }
   `
 
-  const result = await anilistRequest<{
-    Page: {
-      media?: { id: number; title: { romaji?: string; english?: string; native?: string } }[]
-    }
-  }>(query, { search: title })
+  const normalizedTitle = title.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const shortenedTitle = normalizedTitle
+    .split(/\s+/)
+    .filter((word) => word.length >= 3)
+    .slice(0, 2)
+    .join(' ')
+  const searchTerms = [...new Set([title, normalizedTitle, shortenedTitle].filter(Boolean))]
+  let media:
+    | { id: number; title: { romaji?: string; english?: string; native?: string } }[]
+    | undefined
 
-  const media = result?.data?.Page?.media
+  for (const searchTerm of searchTerms) {
+    const result = await anilistRequest<{
+      Page: {
+        media?: { id: number; title: { romaji?: string; english?: string; native?: string } }[]
+      }
+    }>(query, { search: searchTerm })
+    media = result?.data?.Page?.media
+    if (media?.length) break
+  }
+
   if (!media || media.length === 0) return null
 
   const lowerTitle = title.toLowerCase()
@@ -504,45 +592,56 @@ export async function getAiredEpisodesForShows(
   const dayStart = Math.floor(startDate.getTime() / 1000)
   const dayEnd = Math.floor(endDate.getTime() / 1000)
 
-  const query = `
-    query ($page: Int, $perPage: Int, $dayStart: Int, $dayEnd: Int) {
-      Page(page: $page, perPage: $perPage) {
-        pageInfo { hasNextPage }
-        airingSchedules(airingAt_greater: $dayStart, airingAt_lesser: $dayEnd) {
-          episode
-          airingAt
-          media {
-            id
+  const cacheKey = `aired:${dayStart}:${dayEnd}:${Array.from(ids)
+    .sort((a, b) => a - b)
+    .join(',')}`
+  const cached = getCachedAiredEpisodes(cacheKey)
+  if (cached) return cached
+
+  const now = Math.floor(Date.now() / 1000)
+  const results: { mediaId: number; episode: number; airingAt: number }[] = []
+  const seen = new Set<string>()
+  const idSet = new Set(ids)
+  const BATCH = 5
+
+  for (let i = 0; i < ids.length; i += BATCH) {
+    const batch = ids.slice(i, i + BATCH)
+    const aliases = batch
+      .map(
+        (id, idx) =>
+          `a${idx}: Media(id: $id${idx}, type: ANIME) { id airingSchedule(perPage: 100) { nodes { episode airingAt } } }`
+      )
+      .join('\n')
+
+    const variables: Record<string, unknown> = {}
+    batch.forEach((id, idx) => {
+      variables[`id${idx}`] = id
+    })
+
+    const result = await anilistRequest<
+      Record<
+        string,
+        { id: number; airingSchedule?: { nodes?: { episode: number; airingAt: number }[] } }
+      >
+    >(`query (${batch.map((_, idx) => `$id${idx}: Int`).join(', ')}) { ${aliases} }`, variables)
+
+    for (let j = 0; j < batch.length; j++) {
+      const alias = `a${j}`
+      const media = result?.data?.[alias]
+      if (!media?.airingSchedule?.nodes) continue
+      for (const node of media.airingSchedule.nodes) {
+        if (node.airingAt >= dayStart && node.airingAt <= dayEnd && node.airingAt <= now) {
+          const key = `${media.id}:${node.episode}`
+          if (!seen.has(key)) {
+            seen.add(key)
+            results.push({ mediaId: media.id, episode: node.episode, airingAt: node.airingAt })
           }
         }
       }
     }
-  `
-
-  const idSet = new Set(ids)
-  const now = Math.floor(Date.now() / 1000)
-  const results: { mediaId: number; episode: number; airingAt: number }[] = []
-  let page = 1
-
-  while (true) {
-    const result = await anilistRequest<{
-      Page: {
-        pageInfo: { hasNextPage: boolean }
-        airingSchedules?: { episode: number; airingAt: number; media?: { id: number } }[]
-      }
-    }>(query, { page, perPage: 100, dayStart, dayEnd })
-
-    const schedules = result?.data?.Page?.airingSchedules || []
-    for (const s of schedules) {
-      if (s.media && idSet.has(s.media.id) && s.airingAt <= now) {
-        results.push({ mediaId: s.media.id, episode: s.episode, airingAt: s.airingAt })
-      }
-    }
-
-    if (!result?.data?.Page?.pageInfo?.hasNextPage) break
-    page++
   }
 
+  setCachedAiredEpisodes(cacheKey, results)
   return results
 }
 
