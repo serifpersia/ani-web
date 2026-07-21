@@ -30,7 +30,7 @@ axiosRetry(axiosInstance, { retries: 3, retryDelay: axiosRetry.exponentialDelay 
 export class ProxyController {
   private static readonly KWIK_DOMAINS = new Set(['kwik.cx', 'kwik.si', 'kwik.pro'])
   private static readonly ANIMEPAHE_URL = 'https://animepahe.pw/'
-  private static readonly VAULT_CDN_HOST = 'owocdn.top'
+  private static readonly VAULT_CDN_HOST = 'uwucdn.top'
   private static readonly GOT_SCRAPING_HOSTS = new Set([
     'kwik.cx',
     'kwik.si',
@@ -38,7 +38,7 @@ export class ProxyController {
     'animepahe.pw',
     'animepahe.ru',
   ])
-  private static readonly GOT_SCRAPING_SUFFIXES = ['.owocdn.top']
+  private static readonly GOT_SCRAPING_SUFFIXES = ['.uwucdn.top']
 
   private static isGotScrapingHost(urlStr: string): boolean {
     try {
