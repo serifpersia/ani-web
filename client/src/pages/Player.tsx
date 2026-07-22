@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import styles from './Player.module.css'
@@ -48,6 +48,7 @@ const Player: React.FC = () => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const location = useLocation()
 
   const {
     state,
@@ -59,7 +60,7 @@ const Player: React.FC = () => {
     markEpisodeWatched,
     isMarkingWatched,
     isUpdatingWatchlistStatus,
-  } = usePlayerData(showId, episodeNumber)
+  } = usePlayerData(showId, episodeNumber, (location.state as Record<string, unknown>) || null)
 
   useEffect(() => {
     if (showId && state.showMeta?.id && state.showMeta.id !== showId) {

@@ -10,6 +10,7 @@ import type {
 } from '../types/player'
 import { playerReducer, createInitialState, type Action } from '../reducers/playerReducer'
 import { fetchApi } from '../lib/fetchApi'
+import { useShowMeta } from './useShowMeta'
 
 interface UsePlayerDataReturn {
   state: PlayerState
@@ -36,9 +37,25 @@ interface RawSkipInterval {
 
 export const usePlayerData = (
   showId: string | undefined,
-  episodeNumber: string | undefined
+  episodeNumber: string | undefined,
+  initialMeta?: Record<string, unknown> | null
 ): UsePlayerDataReturn => {
-  const [uiState, dispatch] = useReducer(playerReducer, undefined, createInitialState)
+  const [uiState, dispatch] = useReducer(playerReducer, initialMeta, (meta) => ({
+    ...createInitialState(),
+    showMeta: meta?.name
+      ? {
+          name: meta.name as string,
+          thumbnail: meta.thumbnail as string,
+          nativeName: meta.nativeName as string,
+          englishName: meta.englishName as string,
+          names: {
+            romaji: (meta.englishName as string) || (meta.name as string),
+            english: (meta.englishName as string) || (meta.name as string),
+            native: meta.nativeName as string,
+          },
+        }
+      : {},
+  }))
   const queryClient = useQueryClient()
   const hasForcedProvider = useRef<string | null>(null)
   const hasForcedAdultProvider = useRef<string | null>(null)
@@ -58,35 +75,14 @@ export const usePlayerData = (
     }
   }, [showId, uiState.selectedProvider])
 
-  const {
-    data: showData,
-    isLoading: loadingShowData,
-    error: showDataError,
-  } = useQuery({
-    queryKey: ['show-data', showId, uiState.currentMode],
+  const { data: showMeta, isLoading: loadingShowData, error: showDataError } = useShowMeta(showId)
+
+  const { data: playerData } = useQuery({
+    queryKey: ['player-data', showId, uiState.currentMode],
     queryFn: async () => {
       if (!showId) throw new Error('No showId')
 
-      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-      const isUuid = UUID_RE.test(showId)
-
-      const fetchMeta = async (): Promise<Record<string, unknown>> => {
-        if (uiState.selectedProvider === 'animepahe') {
-          try {
-            return await fetchApi(`/api/show-meta/${showId}?provider=animepahe`)
-          } catch {
-            return {}
-          }
-        }
-        try {
-          return await fetchApi(`/api/show-meta/${showId}`)
-        } catch {
-          return {}
-        }
-      }
-
-      const meta = await fetchMeta()
-      const showTitle = (meta?.name as string) || (meta?.englishName as string) || ''
+      const showTitle = (showMeta?.name as string) || (showMeta?.englishName as string) || ''
 
       const fetchEpisodes = async (): Promise<{
         episodes: string[]
@@ -124,15 +120,7 @@ export const usePlayerData = (
         : []
 
       return {
-        showMeta: {
-          ...meta,
-          description: episodeData?.description || (meta?.description as string) || '',
-          names: meta?.names || {
-            romaji: meta?.name as string,
-            english: meta?.englishName as string,
-            native: meta?.nativeName as string,
-          },
-        },
+        description: episodeData?.description || '',
         episodes,
         inWatchlist: watchlistStatus.inWatchlist,
         watchlistStatus: watchlistStatus.status ?? null,
@@ -143,21 +131,26 @@ export const usePlayerData = (
   })
 
   useEffect(() => {
-    if (!episodeNumber && showData?.episodes && showData.episodes.length > 0 && !episodeNumber) {
-      dispatch({ type: 'SET_STATE', payload: { initialEpisode: showData.episodes[0] } })
+    if (
+      !episodeNumber &&
+      playerData?.episodes &&
+      playerData.episodes.length > 0 &&
+      !episodeNumber
+    ) {
+      dispatch({ type: 'SET_STATE', payload: { initialEpisode: playerData.episodes[0] } })
     }
-  }, [showData, episodeNumber])
+  }, [playerData, episodeNumber])
 
   useEffect(() => {
     if (
-      showData?.showMeta?.isAdult &&
+      showMeta?.isAdult &&
       uiState.selectedProvider !== 'wh' &&
       hasForcedAdultProvider.current !== showId
     ) {
       hasForcedAdultProvider.current = showId
       dispatch({ type: 'SET_PROVIDER', payload: 'wh' })
     }
-  }, [showData?.showMeta?.isAdult, uiState.selectedProvider, showId])
+  }, [showMeta?.isAdult, uiState.selectedProvider, showId])
 
   const {
     data: videoData,
@@ -170,7 +163,7 @@ export const usePlayerData = (
       currentEpisode,
       uiState.selectedProvider,
       uiState.currentMode,
-      showData?.showMeta?.name,
+      showMeta?.name,
     ],
     queryFn: async () => {
       if (!showId || !currentEpisode) throw new Error('Missing params')
@@ -180,7 +173,7 @@ export const usePlayerData = (
         if (
           ['allanime', '123anime', 'animeya', 'megaplay', 'wh'].includes(uiState.selectedProvider)
         ) {
-          const names = showData?.showMeta?.names
+          const names = showMeta?.names
           // AlAnime's `name` field is often the native Japanese script (e.g. "ブリーチ"
           // for Bleach), which gets mapped to names.romaji. Sending katakana/kanji to
           // other providers causes them to search for the transliteration ("Burichi")
@@ -193,8 +186,7 @@ export const usePlayerData = (
             return true
           }
           const romajiName = names?.romaji && isAscii(names.romaji) ? names.romaji : null
-          const englishName =
-            names?.english || showData?.showMeta?.englishName || showData?.showMeta?.name
+          const englishName = names?.english || showMeta?.englishName || showMeta?.name
           const searchQuery =
             uiState.currentMode === 'dub' ? englishName || romajiName : romajiName || englishName
 
@@ -263,17 +255,46 @@ export const usePlayerData = (
         } else if (uiState.selectedProvider === 'animepahe') {
           const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
           if (!UUID_RE.test(showId)) {
-            let searchResults
-            try {
-              searchResults = await fetchApi(
-                `/api/search?query=${encodeURIComponent(showData?.showMeta?.name || showId)}&provider=animepahe`
+            const searchQueries = [
+              showMeta?.name || showId,
+              showMeta?.englishName || showMeta?.names?.english || '',
+            ].filter(Boolean)
+
+            let bestScore = -Infinity
+            let bestResult: { id?: string; session?: string; name?: string } = {}
+
+            for (const searchQuery of searchQueries) {
+              let searchResults: Array<{
+                id?: string
+                session?: string
+                name?: string
+                englishName?: string
+              }> = []
+              try {
+                searchResults = await fetchApi(
+                  `/api/search?query=${encodeURIComponent(searchQuery)}&provider=animepahe`
+                )
+              } catch {
+                searchResults = []
+              }
+              const queryWords = new Set(
+                searchQuery
+                  .toLowerCase()
+                  .split(/\s+/)
+                  .filter((w) => w.length >= 2)
               )
-            } catch {
-              searchResults = []
+              for (const r of searchResults) {
+                const name = (r.name || r.englishName || '').toLowerCase()
+                const overlap = name.split(/\s+/).filter((w) => queryWords.has(w)).length
+                if (overlap > bestScore) {
+                  bestScore = overlap
+                  bestResult = r
+                }
+              }
+              if (bestScore >= 3) break
             }
-            if (searchResults && searchResults.length > 0) {
-              providerShowId = searchResults[0].session || searchResults[0].id
-            }
+
+            providerShowId = bestResult.session || bestResult.id || ''
           } else {
             providerShowId = showId
           }
@@ -373,7 +394,7 @@ export const usePlayerData = (
         throw e
       }
     },
-    enabled: !!showId && !!currentEpisode && !!showData,
+    enabled: !!showId && !!currentEpisode && !!showMeta,
   })
 
   const loadingDetails = false
@@ -405,9 +426,12 @@ export const usePlayerData = (
   })
 
   const toggleWatchlist = useCallback(async () => {
-    if (!showId || !showData?.showMeta) return
-    await toggleWatchlistMutation({ wasIn: !!showData.inWatchlist, showMeta: showData.showMeta })
-  }, [showId, showData, toggleWatchlistMutation])
+    if (!showId || !showMeta) return
+    await toggleWatchlistMutation({
+      wasIn: !!playerData?.inWatchlist,
+      showMeta: showMeta as DetailedShowMeta,
+    })
+  }, [showId, showMeta, playerData?.inWatchlist, toggleWatchlistMutation])
 
   const setPreferredSource = useCallback(async (sourceName: string) => {
     try {
@@ -490,7 +514,8 @@ export const usePlayerData = (
     },
     onSuccess: (data, variables) => {
       toast.success(`Episode ${variables.episodeNumber} marked as watched`)
-      queryClient.invalidateQueries({ queryKey: ['show-data', showId] })
+      queryClient.invalidateQueries({ queryKey: ['player-data', showId] })
+      queryClient.invalidateQueries({ queryKey: ['show-meta', showId] })
       queryClient.invalidateQueries({
         queryKey: ['video-sources', showId, variables.episodeNumber],
       })
@@ -502,15 +527,15 @@ export const usePlayerData = (
 
   const markEpisodeWatched = useCallback(
     async (episodeNumber: string, duration: number) => {
-      if (!showId || !showData?.showMeta) return
+      if (!showId || !showMeta) return
       await markEpisodeWatchedMutation({
         episodeNumber,
         duration,
-        showMeta: showData.showMeta,
-        episodes: showData.episodes,
+        showMeta: showMeta as DetailedShowMeta,
+        episodes: playerData?.episodes || [],
       })
     },
-    [showId, showData, markEpisodeWatchedMutation]
+    [showId, showMeta, playerData?.episodes, markEpisodeWatchedMutation]
   )
 
   const handleToggleDetails = useCallback(async () => {
@@ -527,13 +552,13 @@ export const usePlayerData = (
       ...uiState,
       currentEpisode,
       showMeta: {
-        ...(showData?.showMeta || {}),
-        name: showData?.showMeta?.name,
+        ...(uiState.showMeta || {}),
+        ...(showMeta || {}),
       },
-      episodes: showData?.episodes || [],
-      watchedEpisodes: showData?.watchedEpisodes || [],
-      inWatchlist: !!showData?.inWatchlist,
-      watchlistStatus: showData?.watchlistStatus ?? uiState.watchlistStatus ?? null,
+      episodes: playerData?.episodes || [],
+      watchedEpisodes: playerData?.watchedEpisodes || [],
+      inWatchlist: !!playerData?.inWatchlist,
+      watchlistStatus: playerData?.watchlistStatus ?? uiState.watchlistStatus ?? null,
       videoSources: videoData?.videoSources || [],
       selectedSource: uiState.selectedSource || videoData?.selectedSource || null,
       selectedLink: uiState.selectedLink || videoData?.selectedLink || null,
@@ -549,7 +574,8 @@ export const usePlayerData = (
     }
   }, [
     uiState,
-    showData,
+    showMeta,
+    playerData,
     videoData,
     loadingShowData,
     loadingVideo,

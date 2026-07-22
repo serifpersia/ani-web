@@ -18,8 +18,13 @@ import { SearchOptions } from '../providers/provider.interface'
 import { SettingsRepository } from '../repositories/settings.repository'
 import { discordRPCService } from '../discord-rpc'
 import { requestContext } from '../utils/request-context'
-import { dbAll } from '../utils/db-utils'
-import { searchAnilistByTitle, getAiredEpisodesForShows, getShowMetaById } from '../lib/anilist'
+import { dbAll, dbGet } from '../utils/db-utils'
+import {
+  searchAnilist,
+  searchAnilistByTitle,
+  getAiredEpisodesForShows,
+  getShowMetaById,
+} from '../lib/anilist'
 import { getMigratedId } from '../lib/migration'
 
 interface CombinedContinueWatchingShow {
@@ -56,13 +61,8 @@ interface WatchlistFilterOptions {
   type?: string
   season?: string
   year?: string
-  country?: string
-  translation?: string
   genres?: string
   excludeGenres?: string
-  tags?: string
-  excludeTags?: string
-  studios?: string
   sortBy?: string
   titlePreference?: 'name' | 'nativeName' | 'englishName'
 }
@@ -282,13 +282,8 @@ export class WatchlistController {
       type: this.normalizeFilterValue(query.type),
       season: this.normalizeFilterValue(query.season),
       year: this.normalizeFilterValue(query.year),
-      country: this.normalizeFilterValue(query.country),
-      translation: this.normalizeFilterValue(query.translation),
       genres: this.normalizeFilterValue(query.genres),
       excludeGenres: this.normalizeFilterValue(query.excludeGenres),
-      tags: this.normalizeFilterValue(query.tags),
-      excludeTags: this.normalizeFilterValue(query.excludeTags),
-      studios: this.normalizeFilterValue(query.studios),
       sortBy: this.normalizeFilterValue(query.sortBy),
       titlePreference: ['name', 'nativeName', 'englishName'].includes(String(query.titlePreference))
         ? (query.titlePreference as 'name' | 'nativeName' | 'englishName')
@@ -296,30 +291,20 @@ export class WatchlistController {
     }
   }
 
-  private hasProviderFilters(filters: WatchlistFilterOptions): boolean {
-    return !!(
-      filters.season ||
-      filters.year ||
-      filters.country ||
-      filters.translation ||
-      filters.genres ||
-      filters.excludeGenres ||
-      filters.tags ||
-      filters.excludeTags ||
-      filters.studios
-    )
-  }
-
   private matchesLocalFilters<
     T extends { name?: string; nativeName?: string; englishName?: string; type?: string },
   >(row: T, filters: WatchlistFilterOptions): boolean {
     if (filters.query) {
-      const needle = filters.query.toLowerCase()
-      const haystack = [row.name, row.nativeName, row.englishName]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-      if (!haystack.includes(needle)) return false
+      const queryWords = new Set(
+        filters.query
+          .toLowerCase()
+          .split(/\s+/)
+          .filter((w) => w.length >= 2)
+      )
+      const rowTitle = (row.englishName || row.name || row.nativeName || '').toLowerCase()
+      const titleWords = rowTitle.split(/\s+/)
+      const overlap = titleWords.filter((w) => queryWords.has(w)).length
+      if (overlap < queryWords.size) return false
     }
 
     if (filters.type && row.type !== filters.type) return false
@@ -345,32 +330,87 @@ export class WatchlistController {
     return rows
   }
 
-  private async getProviderMatchedIds(filters: WatchlistFilterOptions): Promise<Set<string>> {
-    if (!this.hasProviderFilters(filters)) return new Set()
+  private async getAnilistSeasonYearMatches(
+    season?: string,
+    year?: string
+  ): Promise<Map<number, { title: { romaji?: string; english?: string; native?: string } }>> {
+    const matched = new Map<
+      number,
+      { title: { romaji?: string; english?: string; native?: string } }
+    >()
 
-    const searchOptions: SearchOptions = {
-      season: filters.season,
-      year: filters.year,
-      country: filters.country,
-      translation: filters.translation,
-      genres: filters.genres,
-      excludeGenres: filters.excludeGenres,
-      tags: filters.tags,
-      excludeTags: filters.excludeTags,
-      studios: filters.studios,
+    if (!year || year === 'ALL') {
+      return matched
     }
 
-    const ids = new Set<string>()
-    const maxPages = 25
+    const seasonYear = parseInt(year)
+    if (Number.isNaN(seasonYear)) return matched
 
-    for (let page = 1; page <= maxPages; page += 1) {
-      const results = await this.allAnime.search({ ...searchOptions, page: String(page) })
-      for (const show of results) ids.add(show._id)
-      if (results.length < 28) break
-      await new Promise((res) => setImmediate(res))
+    const perPage = 50
+    let page = 1
+
+    while (true) {
+      const searchVars: Record<string, unknown> = {
+        seasonYear,
+        page,
+        perPage,
+      }
+      if (season && season !== 'ALL') {
+        searchVars.season = season.toUpperCase()
+      }
+
+      const results = await searchAnilist(searchVars)
+
+      for (const show of results) {
+        if (show.anilistId) {
+          matched.set(show.anilistId, { title: show.names || {} })
+        }
+      }
+
+      if (results.length < perPage) break
+      page++
+      if (page > 10) break
     }
 
-    return ids
+    return matched
+  }
+
+  private rowMatchesAnilistSeasonYear<
+    T extends { id: string; name?: string; nativeName?: string; englishName?: string },
+  >(
+    row: T,
+    anilistMatches: Map<number, { title: { romaji?: string; english?: string; native?: string } }>
+  ): boolean {
+    if (anilistMatches.size === 0) return true
+
+    if (/^\d+$/.test(row.id) && anilistMatches.has(parseInt(row.id))) {
+      return true
+    }
+
+    const rowTitle = (row.englishName || row.name || row.nativeName || '').toLowerCase()
+    if (!rowTitle) return false
+
+    const rowWords = new Set(rowTitle.split(/\s+/).filter((w) => w.length >= 2))
+    if (rowWords.size === 0) return false
+
+    for (const [, media] of anilistMatches) {
+      const titles = [media.title?.romaji, media.title?.english, media.title?.native].filter(
+        Boolean
+      ) as string[]
+      for (const title of titles) {
+        const titleWords = new Set(
+          title
+            .toLowerCase()
+            .split(/\s+/)
+            .filter((w) => w.length >= 2)
+        )
+        const overlap = [...rowWords].filter((w) => titleWords.has(w)).length
+        const minLen = Math.min(rowWords.size, titleWords.size)
+        if (minLen >= 2 && overlap / minLen >= 0.7) return true
+      }
+    }
+
+    return false
   }
 
   private async filterWatchlistRows<
@@ -381,12 +421,39 @@ export class WatchlistController {
       englishName?: string
       type?: string
     },
-  >(rows: T[], filters: WatchlistFilterOptions): Promise<T[]> {
+  >(rows: T[], filters: WatchlistFilterOptions, db?: DatabaseWrapper): Promise<T[]> {
     let filtered = rows.filter((row) => this.matchesLocalFilters(row, filters))
 
-    if (this.hasProviderFilters(filters)) {
-      const matchedIds = await this.getProviderMatchedIds(filters)
-      filtered = filtered.filter((row) => matchedIds.has(row.id))
+    if ((filters.genres || filters.excludeGenres) && db) {
+      const ids = filtered.map((r) => r.id)
+      const placeholders = ids.map(() => '?').join(',')
+      const genreRows = await dbAll<{ id: string; genres: string | null }>(
+        db,
+        `SELECT id, genres FROM shows_meta WHERE id IN (${placeholders})`,
+        ids
+      )
+      const idToGenres = new Map(
+        genreRows.map((r) => [r.id, r.genres ? (JSON.parse(r.genres) as string[]) : []])
+      )
+      const includeList = filters.genres?.split(',') || []
+      const excludeList = filters.excludeGenres?.split(',') || []
+
+      filtered = filtered.filter((row) => {
+        const rowGenres: string[] = idToGenres.get(row.id) || []
+        if (includeList.length && !includeList.every((g) => rowGenres.includes(g))) return false
+        if (excludeList.length && excludeList.some((g) => rowGenres.includes(g))) return false
+        return true
+      })
+    }
+
+    if (
+      ((filters.season && filters.season !== 'ALL') || (filters.year && filters.year !== 'ALL')) &&
+      filtered.length > 0
+    ) {
+      const anilistMatches = await this.getAnilistSeasonYearMatches(filters.season, filters.year)
+      if (anilistMatches.size > 0) {
+        filtered = filtered.filter((row) => this.rowMatchesAnilistSeasonYear(row, anilistMatches))
+      }
     }
 
     return this.sortFilteredRows(filtered, filters)
@@ -414,7 +481,11 @@ export class WatchlistController {
     const limit = parseInt(req.query.limit as string) || 10
     const offset = (page - 1) * limit
     const filters = this.getWatchlistFilters(req.query)
-    const data = await this.filterWatchlistRows(await this.getContinueWatchingData(req), filters)
+    const data = await this.filterWatchlistRows(
+      await this.getContinueWatchingData(req),
+      filters,
+      req.db
+    )
 
     res.json({
       data: data.slice(offset, offset + limit),
@@ -499,6 +570,13 @@ export class WatchlistController {
     })
 
     const genresStr = Array.isArray(genres) ? JSON.stringify(genres) : genres
+    const anilistId = /^\d+$/.test(showId)
+      ? (dbGet<{ anilistId: number }>(
+          req.db,
+          'SELECT anilistId FROM shows_meta WHERE id = ? AND anilistId IS NOT NULL',
+          [showId]
+        )?.anilistId ?? parseInt(showId))
+      : undefined
 
     await performWriteTransaction(req.db, (tx) => {
       ShowsMetaRepository.upsert(tx, {
@@ -512,6 +590,7 @@ export class WatchlistController {
         status,
         episodeCount,
         type,
+        anilistId,
       })
 
       WatchedEpisodesRepository.upsert(tx, {
@@ -549,7 +628,7 @@ export class WatchlistController {
     const filters = this.getWatchlistFilters(req.query)
 
     const allRows = await WatchlistRepository.getAll(req.db, status as string)
-    const filteredRows = await this.filterWatchlistRows(allRows, filters)
+    const filteredRows = await this.filterWatchlistRows(allRows, filters, req.db)
     const rows = filteredRows.slice(offset, offset + limit)
 
     res.json({

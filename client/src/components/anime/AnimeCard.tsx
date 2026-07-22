@@ -1,5 +1,5 @@
 import React, { memo, useState, useCallback } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, type To } from 'react-router-dom'
 import { FaMicrophone, FaClosedCaptioning, FaTimes, FaInfo } from 'react-icons/fa'
 import AnimePopup from './AnimePopup'
 import GenericModal from '../common/GenericModal'
@@ -188,9 +188,16 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
     const episodeToPlay = anime.episodeNumber ?? anime.nextEpisodeToWatch
 
     const linkTarget = continueWatching
-      ? episodeToPlay
-        ? `/watch/${anime._id}/${episodeToPlay}`
-        : `/watch/${anime._id}`
+      ? {
+          pathname: episodeToPlay ? `/watch/${anime._id}/${episodeToPlay}` : `/watch/${anime._id}`,
+          state: {
+            name: anime.name,
+            thumbnail: anime.thumbnail,
+            nativeName: anime.nativeName,
+            englishName: anime.englishName,
+            type: anime.type,
+          },
+        }
       : episodeToPlay && anime.episodeNumber
         ? `/watch/${anime._id}/${anime.episodeNumber}`
         : hasProgress
@@ -247,7 +254,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
       localStorage.getItem('agreedToViewMature') === 'true'
     )
     const [showModal, setShowModal] = React.useState(false)
-    const pendingMatureTargetRef = React.useRef<string | null>(null)
+    const pendingMatureTargetRef = React.useRef<To | null>(null)
 
     const handleConfirmViewMature = () => {
       localStorage.setItem('agreedToViewMature', 'true')

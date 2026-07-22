@@ -171,9 +171,30 @@ export class AnimePaheProvider implements Provider {
     }
   }
 
-  async resolveShowId(title: string, _romaji?: string): Promise<string | null> {
-    const results = await this.search({ query: title })
-    return results[0]?._id || null
+  async resolveShowId(title: string, romaji?: string): Promise<string | null> {
+    const queries = [title, romaji].filter((t): t is string => !!t && t !== title)
+    let bestScore = 0
+    let bestId: string | null = null
+    const titleWords = new Set(
+      title
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length >= 2)
+    )
+
+    for (const q of queries) {
+      const results = await this.search({ query: q })
+      for (const r of results) {
+        const resultName = (r.name || r.englishName || '').toLowerCase()
+        const overlap = resultName.split(/\s+/).filter((w) => titleWords.has(w)).length
+        if (overlap > bestScore) {
+          bestScore = overlap
+          bestId = r.session ?? r._id ?? r.id ?? null
+        }
+      }
+      if (bestScore >= 3) break
+    }
+    return bestId
   }
 
   async getEpisodes(

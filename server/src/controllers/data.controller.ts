@@ -367,27 +367,48 @@ export class DataController {
     const isNumeric = /^\d+$/.test(id)
 
     if (isNumeric) {
+      let meta: Show | null = null
       try {
-        const meta = await getShowMetaById(id)
-        if (meta) {
-          ShowsMetaRepository.upsert(req.db, {
-            id: meta.id || id,
-            name: meta.name,
-            thumbnail: meta.thumbnail,
-            nativeName: meta.nativeName,
-            englishName: meta.englishName,
-            genres: meta.genres ? JSON.stringify(meta.genres.map((g) => g.name)) : undefined,
-            status: meta.status,
-            episodeCount: meta.episodeCount != null ? Number(meta.episodeCount) : undefined,
-            type: meta.type,
-            anilistId: meta.anilistId,
-          })
-        }
-        res.set('Cache-Control', 'public, max-age=3600').json(meta || {})
+        meta = await getShowMetaById(id)
       } catch (e) {
-        logger.error({ err: e, id }, 'AniList show-meta fetch failed')
-        res.json({})
+        logger.warn({ err: e, id }, 'AniList show-meta fetch failed, trying local cache')
+        const localMeta = (await ShowsMetaRepository.getById(req.db, id)) as Record<
+          string,
+          unknown
+        > | null
+        if (localMeta) {
+          if (typeof localMeta.genres === 'string') {
+            try {
+              localMeta.genres = JSON.parse(localMeta.genres as string)
+            } catch {
+              localMeta.genres = []
+            }
+          }
+          res.set('Cache-Control', 'public, max-age=3600').json(localMeta)
+          return
+        }
       }
+
+      if (meta) {
+        ShowsMetaRepository.upsert(req.db, {
+          id,
+          name: meta.name,
+          thumbnail: meta.thumbnail,
+          nativeName: meta.nativeName,
+          englishName: meta.englishName,
+          genres: meta.genres
+            ? JSON.stringify(
+                meta.genres.map((g) => (typeof g === 'string' ? g : g?.name)).filter(Boolean)
+              )
+            : undefined,
+          status: meta.status,
+          episodeCount: meta.episodeCount != null ? Number(meta.episodeCount) : undefined,
+          type: meta.type,
+          anilistId: meta.anilistId,
+        })
+      }
+
+      res.set('Cache-Control', 'public, max-age=3600').json(meta || {})
       return
     }
 

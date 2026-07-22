@@ -548,12 +548,17 @@ export async function searchAnilistByTitle(
   `
 
   const normalizedTitle = title.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  const shortenedTitle = normalizedTitle
-    .split(/\s+/)
-    .filter((word) => word.length >= 3)
-    .slice(0, 2)
-    .join(' ')
-  const searchTerms = [...new Set([title, normalizedTitle, shortenedTitle].filter(Boolean))]
+  const words = normalizedTitle.split(/\s+/).filter((word) => word.length >= 3)
+  const searchTerms = [
+    title,
+    normalizedTitle,
+    normalizedTitle.replace(/:/g, ''),
+    words.slice(0, 5).join(' '),
+    words.slice(0, 4).join(' '),
+    words.slice(0, 3).join(' '),
+    words.slice(0, 2).join(' ').replace(/:/g, ''),
+    normalizedTitle.replace(/\s*\d+(?:st|nd|rd|th)?\s*Season\s*\d*/gi, '').trim(),
+  ].filter((t, i, a) => t && a.indexOf(t) === i)
   let media:
     | { id: number; title: { romaji?: string; english?: string; native?: string } }[]
     | undefined
@@ -582,7 +587,23 @@ export async function searchAnilistByTitle(
     return { id: exactMatch.id, title: exactMatch.title }
   }
 
-  return { id: media[0].id, title: media[0].title }
+  const inputWords = new Set(
+    normalizedTitle
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length >= 2)
+  )
+  let best = media[0]
+  let bestScore = 0
+  for (const m of media) {
+    const text = (m.title?.romaji || m.title?.english || '').toLowerCase()
+    const overlap = text.split(/\s+/).filter((w) => inputWords.has(w)).length
+    if (overlap > bestScore) {
+      bestScore = overlap
+      best = m
+    }
+  }
+  return { id: best.id, title: best.title }
 }
 
 export async function getAiredEpisodesForShows(

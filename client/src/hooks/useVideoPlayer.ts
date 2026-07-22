@@ -111,7 +111,9 @@ const useVideoPlayer = ({
       showThumbnail: showMeta.thumbnail,
       nativeName: showMeta.names?.native,
       englishName: showMeta.names?.english,
-      genres: showMeta.genres?.map((g) => g.name),
+      genres: Array.isArray(showMeta.genres)
+        ? showMeta.genres.map((g) => (typeof g === 'string' ? g : g?.name)).filter(Boolean)
+        : undefined,
       popularityScore: showMeta.score,
       type: showMeta.type,
       isPlaying: video ? !video.paused : true,

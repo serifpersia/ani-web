@@ -152,13 +152,19 @@ export default function AnimeInfo() {
                 )}
               </div>
 
-              {showMeta.genres && showMeta.genres.length > 0 && (
+              {Array.isArray(showMeta.genres) && showMeta.genres.length > 0 && (
                 <div className={styles.genres}>
-                  {showMeta.genres.slice(0, 5).map((g) => (
-                    <span key={g.name} className={styles.genre}>
-                      {g.name}
-                    </span>
-                  ))}
+                  {showMeta.genres
+                    .filter(Boolean)
+                    .slice(0, 5)
+                    .map((g) => {
+                      const genreName = typeof g === 'string' ? g : g?.name
+                      return (
+                        <span key={genreName} className={styles.genre}>
+                          {genreName}
+                        </span>
+                      )
+                    })}
                 </div>
               )}
             </div>

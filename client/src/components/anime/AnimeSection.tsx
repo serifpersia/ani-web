@@ -88,6 +88,18 @@ const AnimeSection: React.FC<AnimeSectionProps> = ({
     setIsExpanded(defaultExpanded)
   }, [defaultExpanded])
 
+  const prevCwLength = React.useRef(0)
+  React.useEffect(() => {
+    if (continueWatching && animeList.length > 0 && isExpanded && carouselRef.current) {
+      if (animeList.length <= prevCwLength.current || prevCwLength.current === 0) {
+        carouselRef.current.scrollTo({ left: 0, behavior: 'smooth' })
+      }
+    }
+    if (animeList.length > 0) {
+      prevCwLength.current = animeList.length
+    }
+  }, [animeList.length, continueWatching, isExpanded])
+
   const shouldRenderSection = !(!loading && animeList.length === 0 && !emptyState && !collapsible)
   if (!shouldRenderSection) return null
 

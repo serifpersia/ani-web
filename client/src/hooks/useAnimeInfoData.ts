@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import type { DetailedShowMeta } from '../types/player'
 import { fetchApi } from '../lib/fetchApi'
+import { useShowMeta } from './useShowMeta'
 
 interface UseAnimeInfoDataReturn {
   showMeta: DetailedShowMeta | undefined
@@ -14,44 +15,32 @@ interface UseAnimeInfoDataReturn {
 
 export function useAnimeInfoData(showId: string | undefined): UseAnimeInfoDataReturn {
   const queryClient = useQueryClient()
+  const { data: showMeta, isLoading: loadingMeta, error: showDataError } = useShowMeta(showId)
 
-  const {
-    data: showData,
-    isLoading: loadingMeta,
-    error: showDataError,
-  } = useQuery({
-    queryKey: ['show-data-info', showId],
+  const { data: watchlistData } = useQuery({
+    queryKey: ['watchlist-check', showId],
     queryFn: async () => {
-      if (!showId) throw new Error('No showId')
-      const [meta, watchlistStatus, episodeData] = await Promise.all([
-        fetchApi(`/api/show-meta/${showId}`),
-        fetchApi(`/api/watchlist/check/${showId}`).catch(() => ({ inWatchlist: false })),
-        fetchApi(`/api/episodes?showId=${showId}&mode=sub`).catch(() => null),
-      ])
-
-      let description = meta?.description
-      if (episodeData?.description) {
-        description = episodeData.description
-      }
-
-      return {
-        showMeta: { ...meta, description },
-        inWatchlist: watchlistStatus.inWatchlist ?? false,
-      }
+      if (!showId) return { inWatchlist: false }
+      return fetchApi(`/api/watchlist/check/${showId}`) as Promise<{
+        inWatchlist: boolean
+        status?: string | null
+      }>
     },
     enabled: !!showId,
   })
 
+  const inWatchlist = watchlistData?.inWatchlist ?? false
+
   const { mutateAsync: toggleWatchlistMutation } = useMutation({
-    mutationFn: async ({ wasIn, showMeta }: { wasIn: boolean; showMeta: DetailedShowMeta }) => {
+    mutationFn: async ({ wasIn, meta }: { wasIn: boolean; meta: Record<string, unknown> }) => {
       const endpoint = wasIn ? '/api/watchlist/remove' : '/api/watchlist/add'
       const payload = {
         id: showId,
-        name: showMeta.name || showMeta.names?.romaji,
-        thumbnail: showMeta.thumbnail,
-        nativeName: showMeta.names?.native,
-        englishName: showMeta.names?.english,
-        type: showMeta.type,
+        name: meta?.name || (meta?.names as Record<string, string> | undefined)?.romaji,
+        thumbnail: meta?.thumbnail,
+        nativeName: (meta?.names as Record<string, string> | undefined)?.native,
+        englishName: (meta?.names as Record<string, string> | undefined)?.english,
+        type: meta?.type,
       }
 
       const response = await fetch(endpoint, {
@@ -63,24 +52,17 @@ export function useAnimeInfoData(showId: string | undefined): UseAnimeInfoDataRe
       return !wasIn
     },
     onMutate: async ({ wasIn }) => {
-      await queryClient.cancelQueries({ queryKey: ['show-data-info', showId] })
-      const previousData = queryClient.getQueryData(['show-data-info', showId])
+      await queryClient.cancelQueries({ queryKey: ['watchlist-check', showId] })
       queryClient.setQueryData(
-        ['show-data-info', showId],
-        (old: { showMeta: DetailedShowMeta; inWatchlist: boolean } | undefined) => {
-          if (!old) return old
-          return {
-            ...old,
-            inWatchlist: !wasIn,
-          }
-        }
+        ['watchlist-check', showId],
+        (old: { inWatchlist: boolean } | undefined) => ({
+          ...old,
+          inWatchlist: !wasIn,
+        })
       )
-      return { previousData }
     },
-    onError: (err, variables, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(['show-data-info', showId], context.previousData)
-      }
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ['watchlist-check', showId] })
       toast.error('Failed to update watchlist')
     },
     onSuccess: (newInWatchlist) => {
@@ -90,13 +72,13 @@ export function useAnimeInfoData(showId: string | undefined): UseAnimeInfoDataRe
   })
 
   const toggleWatchlist = useCallback(async () => {
-    if (!showId || !showData?.showMeta) return
-    await toggleWatchlistMutation({ wasIn: !!showData.inWatchlist, showMeta: showData.showMeta })
-  }, [showId, showData, toggleWatchlistMutation])
+    if (!showId || !showMeta) return
+    await toggleWatchlistMutation({ wasIn: inWatchlist, meta: showMeta })
+  }, [showId, showMeta, inWatchlist, toggleWatchlistMutation])
 
   return {
-    showMeta: showData?.showMeta,
-    inWatchlist: !!showData?.inWatchlist,
+    showMeta: showMeta as DetailedShowMeta | undefined,
+    inWatchlist,
     loadingMeta,
     error: showDataError ? (showDataError as Error).message : null,
     toggleWatchlist,

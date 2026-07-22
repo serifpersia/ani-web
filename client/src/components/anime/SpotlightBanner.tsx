@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { FaStar } from 'react-icons/fa'
 import { Button } from '../common/Button'
 import type { Anime } from '../../hooks/useAnimeData'
@@ -24,7 +25,38 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   const isMobile = useIsMobile()
   const { titlePreference } = useTitlePreference()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const top6 = animeList.slice(0, 6)
+
+  useEffect(() => {
+    const items = animeList.slice(0, 6)
+    for (const anime of items) {
+      if (!anime._id || !/^\d+$/.test(anime._id)) continue
+      const existing = queryClient.getQueryData(['show-meta', anime._id])
+      if (!existing) {
+        queryClient.setQueryData(['show-meta', anime._id], {
+          id: anime._id,
+          name: anime.name,
+          nativeName: anime.nativeName,
+          englishName: anime.englishName,
+          thumbnail: anime.thumbnail,
+          bannerImage: anime.bannerImage,
+          description: anime.description,
+          genres: anime.genres || [],
+          score: anime.score,
+          type: anime.type,
+          status: anime.status,
+          episodeCount: anime.episodeCount,
+          isAdult: anime.isAdult,
+          names: {
+            romaji: anime.name,
+            english: anime.englishName || anime.name,
+            native: anime.nativeName || anime.name,
+          },
+        })
+      }
+    }
+  }, [animeList, queryClient])
 
   const getTitle = (anime: Anime) => {
     switch (titlePreference) {
@@ -149,11 +181,14 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
 
             {visibleGenres.length > 0 && (
               <div className={styles.genres}>
-                {visibleGenres.map((g) => (
-                  <span key={g.name} className={styles.genreTag}>
-                    {g.name}
-                  </span>
-                ))}
+                {visibleGenres.map((g) => {
+                  const genreName = typeof g === 'string' ? g : g?.name
+                  return (
+                    <span key={genreName} className={styles.genreTag}>
+                      {genreName}
+                    </span>
+                  )
+                })}
               </div>
             )}
 

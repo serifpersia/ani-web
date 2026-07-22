@@ -17,7 +17,6 @@ import SkeletonGrid from '../components/common/SkeletonGrid'
 import ErrorMessage from '../components/common/ErrorMessage'
 import RemoveConfirmationModal from '../components/common/RemoveConfirmationModal'
 import { Button } from '../components/common/Button'
-import SearchableSelect from '../components/common/SearchableSelect'
 
 import {
   usePaginatedWatchlist,
@@ -53,46 +52,17 @@ const typeOptions: Option[] = [
   { value: 'Movie', label: 'Movie' },
   { value: 'OVA', label: 'OVA' },
   { value: 'ONA', label: 'ONA' },
+  { value: 'TV_SHORT', label: 'TV Short' },
+  { value: 'SPECIAL', label: 'Special' },
 ]
 
 const seasonOptions: Option[] = [
   { value: 'ALL', label: 'All Seasons' },
-  { value: 'Winter', label: 'Winter' },
-  { value: 'Spring', label: 'Spring' },
-  { value: 'Summer', label: 'Summer' },
-  { value: 'Fall', label: 'Fall' },
+  { value: 'WINTER', label: 'Winter' },
+  { value: 'SPRING', label: 'Spring' },
+  { value: 'SUMMER', label: 'Summer' },
+  { value: 'FALL', label: 'Fall' },
 ]
-
-const countryOptions: Option[] = [
-  { value: 'ALL', label: 'All Countries' },
-  { value: 'JP', label: 'Japan' },
-  { value: 'CN', label: 'China' },
-]
-
-const languageOptions: Option[] = [
-  { value: 'ALL', label: 'All Languages' },
-  { value: 'sub', label: 'Subbed' },
-  { value: 'dub', label: 'Dubbed' },
-]
-
-const getGenreStateFromParams = (params: URLSearchParams) => {
-  const states: { [key: string]: 'include' | 'exclude' } = {}
-  params
-    .get('genres')
-    ?.split(',')
-    .filter(Boolean)
-    .forEach((genre) => {
-      states[genre] = 'include'
-    })
-  params
-    .get('excludeGenres')
-    ?.split(',')
-    .filter(Boolean)
-    .forEach((genre) => {
-      states[genre] = 'exclude'
-    })
-  return states
-}
 
 const Watchlist: React.FC = () => {
   const { filter: filterBy = 'All' } = useParams<{ filter: string }>()
@@ -100,29 +70,26 @@ const Watchlist: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const [page, setPage] = useState(parseInt(searchParams.get('page') || '1'))
-  const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'last_added')
   const [query, setQuery] = useState(searchParams.get('query') || '')
+  const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'last_added')
   const [type, setType] = useState(searchParams.get('type') || 'ALL')
   const [season, setSeason] = useState(searchParams.get('season') || 'ALL')
   const [year, setYear] = useState(searchParams.get('year') || 'ALL')
-  const [country, setCountry] = useState(searchParams.get('country') || 'ALL')
-  const [language, setLanguage] = useState(searchParams.get('translation') || 'ALL')
-  const [studio, setStudio] = useState(searchParams.get('studios') || 'ALL')
-  const [tag, setTag] = useState(searchParams.get('tags') || 'ALL')
-  const [genreStates, setGenreStates] = useState<{ [key: string]: 'include' | 'exclude' }>(() =>
-    getGenreStateFromParams(searchParams)
-  )
-  const [showFilters, setShowFilters] = useState(() => {
-    return ['type', 'season', 'year', 'country', 'translation', 'studios', 'tags', 'genres'].some(
-      (key) => searchParams.has(key)
-    )
+  const [genreStates, setGenreStates] = useState<{ [key: string]: 'include' | 'exclude' }>(() => {
+    const states: { [key: string]: 'include' | 'exclude' } = {}
+    const genres = searchParams.get('genres')?.split(',').filter(Boolean) || []
+    const exclude = searchParams.get('excludeGenres')?.split(',').filter(Boolean) || []
+    genres.forEach((g) => g && (states[g] = 'include'))
+    exclude.forEach((g) => g && (states[g] = 'exclude'))
+    return states
   })
+  const [showFilters, setShowFilters] = useState(() =>
+    ['type', 'season', 'year', 'genres', 'excludeGenres'].some((key) => searchParams.has(key))
+  )
   const { lowEndMode } = useLowEndMode()
   const { titlePreference } = useTitlePreference()
   const { data: metaData } = useGenresAndStudios()
   const availableGenres = metaData?.genres || []
-  const availableStudios = metaData?.studios || []
-  const availableTags = metaData?.tags || []
   const gridRef = useRef<HTMLDivElement>(null)
 
   const [itemToRemove, setItemToRemove] = useState<{ id: string; name: string } | null>(null)
@@ -162,11 +129,12 @@ const Watchlist: React.FC = () => {
     setType(searchParams.get('type') || 'ALL')
     setSeason(searchParams.get('season') || 'ALL')
     setYear(searchParams.get('year') || 'ALL')
-    setCountry(searchParams.get('country') || 'ALL')
-    setLanguage(searchParams.get('translation') || 'ALL')
-    setStudio(searchParams.get('studios') || 'ALL')
-    setTag(searchParams.get('tags') || 'ALL')
-    setGenreStates(getGenreStateFromParams(searchParams))
+    const states: { [key: string]: 'include' | 'exclude' } = {}
+    const genres = searchParams.get('genres')?.split(',').filter(Boolean) || []
+    const exclude = searchParams.get('excludeGenres')?.split(',').filter(Boolean) || []
+    genres.forEach((g) => g && (states[g] = 'include'))
+    exclude.forEach((g) => g && (states[g] = 'exclude'))
+    setGenreStates(states)
     setPage(parseInt(searchParams.get('page') || '1'))
   }, [searchParams])
 
@@ -219,16 +187,6 @@ const Watchlist: React.FC = () => {
     })),
   ]
 
-  const studioOptions: Option[] = [
-    { value: 'ALL', label: 'All Studios' },
-    ...availableStudios.map((s) => ({ value: s, label: s })),
-  ]
-
-  const tagOptions: Option[] = [
-    { value: 'ALL', label: 'All Tags' },
-    ...availableTags.map((t) => ({ value: t, label: t })),
-  ]
-
   const applyFilters = (nextSortBy = sortBy, newPage = 1) => {
     const params = new URLSearchParams()
     if (query.trim()) params.set('query', query.trim())
@@ -236,23 +194,15 @@ const Watchlist: React.FC = () => {
     if (type !== 'ALL') params.set('type', type)
     if (season !== 'ALL') params.set('season', season)
     if (year !== 'ALL') params.set('year', year)
-    if (country !== 'ALL') params.set('country', country)
-    if (language !== 'ALL') params.set('translation', language)
-    if (studio !== 'ALL') params.set('studios', studio)
-    if (tag !== 'ALL') params.set('tags', tag)
-
-    const genres = Object.entries(genreStates)
-      .filter(([, state]) => state === 'include')
-      .map(([genre]) => genre)
+    const includeGenres = Object.entries(genreStates)
+      .filter(([, s]) => s === 'include')
+      .map(([g]) => g)
     const excludeGenres = Object.entries(genreStates)
-      .filter(([, state]) => state === 'exclude')
-      .map(([genre]) => genre)
-
-    if (genres.length > 0) params.set('genres', genres.join(','))
+      .filter(([, s]) => s === 'exclude')
+      .map(([g]) => g)
+    if (includeGenres.length > 0) params.set('genres', includeGenres.join(','))
     if (excludeGenres.length > 0) params.set('excludeGenres', excludeGenres.join(','))
-
     if (newPage > 1) params.set('page', newPage.toString())
-
     setSearchParams(params)
     if (newPage !== page) {
       setPage(newPage)
@@ -273,10 +223,6 @@ const Watchlist: React.FC = () => {
     setType('ALL')
     setSeason('ALL')
     setYear('ALL')
-    setCountry('ALL')
-    setLanguage('ALL')
-    setStudio('ALL')
-    setTag('ALL')
     setGenreStates({})
     setSearchParams(new URLSearchParams())
     setPage(1)
@@ -285,10 +231,14 @@ const Watchlist: React.FC = () => {
   const toggleGenre = (genre: string) => {
     setGenreStates((prev) => {
       const current = prev[genre]
-      const next = current === 'include' ? 'exclude' : current === 'exclude' ? undefined : 'include'
       const newState = { ...prev }
-      if (next) newState[genre] = next
-      else delete newState[genre]
+      if (current === 'include') {
+        newState[genre] = 'exclude'
+      } else if (current === 'exclude') {
+        delete newState[genre]
+      } else {
+        newState[genre] = 'include'
+      }
       return newState
     })
   }
@@ -433,48 +383,6 @@ const Watchlist: React.FC = () => {
                 ))}
               </select>
             </div>
-            <div className={styles.filterItem}>
-              <label>Country</label>
-              <select value={country} onChange={(e) => setCountry(e.currentTarget.value)}>
-                {countryOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className={styles.filterItem}>
-              <label>Language</label>
-              <select value={language} onChange={(e) => setLanguage(e.currentTarget.value)}>
-                {languageOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {studioOptions.length > 1 && (
-              <div className={styles.filterItem}>
-                <label>Studio</label>
-                <SearchableSelect
-                  options={studioOptions}
-                  value={studio}
-                  onChange={setStudio}
-                  placeholder="All Studios"
-                />
-              </div>
-            )}
-            {tagOptions.length > 1 && (
-              <div className={styles.filterItem}>
-                <label>Tag</label>
-                <SearchableSelect
-                  options={tagOptions}
-                  value={tag}
-                  onChange={setTag}
-                  placeholder="All Tags"
-                />
-              </div>
-            )}
           </div>
 
           {availableGenres.length > 0 && (

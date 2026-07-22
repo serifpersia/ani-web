@@ -1,6 +1,6 @@
 import { DatabaseWrapper } from '../db'
 import { performWriteTransaction } from '../sync'
-import { searchAnilistByTitle } from './anilist'
+import { searchAnilistByTitle, getShowMetaById } from './anilist'
 import { WatchlistRepository } from '../repositories/watchlist.repository'
 import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
 import { dbGet, dbRun } from '../utils/db-utils'
@@ -9,13 +9,164 @@ import { Provider } from '../providers/provider.interface'
 
 const inFlightMigrations = new Map<string, Promise<string>>()
 
+async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): Promise<string> {
+  // Check if this numeric ID might be a MAL alias that should redirect to the canonical AniList ID
+  const metaRow = dbGet<{ anilistId: number | null }>(
+    db,
+    'SELECT anilistId FROM shows_meta WHERE id = ? AND anilistId IS NOT NULL',
+    [numericId]
+  )
+
+  // Determine the true anilistId for this numeric ID
+  let trueAnilistId: number | undefined
+  if (metaRow?.anilistId != null && String(metaRow.anilistId) !== numericId) {
+    // shows_meta already has a different anilistId — this is clearly a MAL alias
+    trueAnilistId = metaRow.anilistId
+  } else if (!metaRow || metaRow.anilistId === parseInt(numericId)) {
+    // Ambiguous or no local data — verify via AniList API
+    const meta = await getShowMetaById(numericId)
+    if (meta?.anilistId && meta.anilistId !== parseInt(numericId)) {
+      trueAnilistId = meta.anilistId
+    }
+  }
+
+  if (trueAnilistId) {
+    const canonicalId = String(trueAnilistId)
+    if (WatchlistRepository.exists(db, numericId)) {
+      // MAL alias is in the watchlist — migrate all entries to the canonical AniList ID
+      logger.info(
+        { aliasId: numericId, canonicalId },
+        'Migrating watchlist from MAL alias to canonical ID'
+      )
+      await performWriteTransaction(db, (tx) => {
+        tx.run('UPDATE OR IGNORE watchlist SET id = ? WHERE id = ?', [canonicalId, numericId])
+        tx.run('DELETE FROM watchlist WHERE id = ?', [numericId])
+        tx.run('UPDATE OR IGNORE shows_meta SET id = ?, anilistId = ? WHERE id = ?', [
+          canonicalId,
+          trueAnilistId,
+          numericId,
+        ])
+        tx.run('DELETE FROM shows_meta WHERE id = ?', [numericId])
+        tx.run('UPDATE OR IGNORE watched_episodes SET showId = ? WHERE showId = ?', [
+          canonicalId,
+          numericId,
+        ])
+        tx.run('DELETE FROM watched_episodes WHERE showId = ?', [numericId])
+        tx.run('UPDATE OR IGNORE queue SET showId = ? WHERE showId = ?', [canonicalId, numericId])
+        tx.run('DELETE FROM queue WHERE showId = ?', [numericId])
+        tx.run('UPDATE OR IGNORE dismissed_notifications SET showId = ? WHERE showId = ?', [
+          canonicalId,
+          numericId,
+        ])
+        tx.run('DELETE FROM dismissed_notifications WHERE showId = ?', [numericId])
+        tx.run('UPDATE OR IGNORE discovered_notifications SET showId = ? WHERE showId = ?', [
+          canonicalId,
+          numericId,
+        ])
+        tx.run('DELETE FROM discovered_notifications WHERE showId = ?', [numericId])
+        tx.run('INSERT OR REPLACE INTO legacy_id_mapping (legacyId, numericId) VALUES (?, ?)', [
+          numericId,
+          canonicalId,
+        ])
+      })
+      db.scheduleSave()
+      return canonicalId
+    }
+
+    // Not in watchlist — check if canonical ID is in the watchlist and save a mapping
+    if (WatchlistRepository.exists(db, canonicalId)) {
+      const existing = dbGet<{ numericId: string }>(
+        db,
+        'SELECT numericId FROM legacy_id_mapping WHERE legacyId = ?',
+        [numericId]
+      )
+      if (!existing || existing.numericId !== canonicalId) {
+        dbRun(db, 'INSERT OR REPLACE INTO legacy_id_mapping (legacyId, numericId) VALUES (?, ?)', [
+          numericId,
+          canonicalId,
+        ])
+        db.scheduleSave()
+        logger.info({ aliasId: numericId, canonicalId }, 'Mapped numeric alias to canonical ID')
+      }
+      return canonicalId
+    }
+  }
+
+  if (WatchlistRepository.exists(db, numericId)) return numericId
+
+  let legacyId: string | undefined
+
+  // 1. Check legacy_id_mapping for a legacy ID in the watchlist that maps to this numeric ID
+  const legacyRow = dbGet<{ legacyId: string }>(
+    db,
+    'SELECT legacyId FROM legacy_id_mapping WHERE numericId = ? AND legacyId IN (SELECT id FROM watchlist)',
+    [numericId]
+  )
+  if (legacyRow) {
+    legacyId = legacyRow.legacyId
+  }
+
+  // 2. If not found, check shows_meta by anilistId where the entry's id IS in the watchlist
+  if (!legacyId && trueAnilistId) {
+    const metaByAnilist = dbGet<{ id: string }>(
+      db,
+      'SELECT id FROM shows_meta WHERE anilistId = ? AND id IN (SELECT id FROM watchlist)',
+      [trueAnilistId]
+    )
+    if (metaByAnilist) {
+      legacyId = metaByAnilist.id
+    }
+  }
+
+  if (!legacyId) return numericId
+
+  logger.info({ legacyId, numericId }, 'Consolidating watchlist entry from legacy to numeric ID')
+
+  const aniListId = parseInt(numericId)
+  await performWriteTransaction(db, (tx) => {
+    tx.run('UPDATE OR IGNORE watchlist SET id = ? WHERE id = ?', [numericId, legacyId])
+    tx.run('DELETE FROM watchlist WHERE id = ?', [legacyId])
+    tx.run('UPDATE OR IGNORE shows_meta SET id = ?, anilistId = ? WHERE id = ?', [
+      numericId,
+      aniListId,
+      legacyId,
+    ])
+    tx.run('DELETE FROM shows_meta WHERE id = ?', [legacyId])
+    tx.run('UPDATE OR IGNORE watched_episodes SET showId = ? WHERE showId = ?', [
+      numericId,
+      legacyId,
+    ])
+    tx.run('DELETE FROM watched_episodes WHERE showId = ?', [legacyId])
+    tx.run('UPDATE OR IGNORE queue SET showId = ? WHERE showId = ?', [numericId, legacyId])
+    tx.run('DELETE FROM queue WHERE showId = ?', [legacyId])
+    tx.run('UPDATE OR IGNORE dismissed_notifications SET showId = ? WHERE showId = ?', [
+      numericId,
+      legacyId,
+    ])
+    tx.run('DELETE FROM dismissed_notifications WHERE showId = ?', [legacyId])
+    tx.run('UPDATE OR IGNORE discovered_notifications SET showId = ? WHERE showId = ?', [
+      numericId,
+      legacyId,
+    ])
+    tx.run('DELETE FROM discovered_notifications WHERE showId = ?', [legacyId])
+    tx.run('INSERT OR REPLACE INTO legacy_id_mapping (legacyId, numericId) VALUES (?, ?)', [
+      legacyId,
+      numericId,
+    ])
+  })
+  db.scheduleSave()
+  return numericId
+}
+
 async function migrateId(
   db: DatabaseWrapper,
   legacyId: string,
   providers: { [key: string]: Provider | undefined }
 ): Promise<string> {
   const isNumeric = /^\d+$/.test(legacyId)
-  if (isNumeric) return legacyId
+  if (isNumeric) {
+    return consolidateFromNumeric(db, legacyId)
+  }
 
   try {
     // 1. Check if mapping already exists
@@ -30,7 +181,7 @@ async function migrateId(
       } | null
       const canonicalId = mappedMeta?.anilistId ? String(mappedMeta.anilistId) : undefined
       if (!canonicalId || canonicalId === mapping.numericId) {
-        return mapping.numericId
+        return consolidateFromNumeric(db, mapping.numericId)
       }
 
       await performWriteTransaction(db, (tx) => {
@@ -39,8 +190,9 @@ async function migrateId(
           mapping.numericId,
         ])
         tx.run('DELETE FROM watchlist WHERE id = ?', [mapping.numericId])
-        tx.run('UPDATE OR IGNORE shows_meta SET id = ? WHERE id = ?', [
+        tx.run('UPDATE OR IGNORE shows_meta SET id = ?, anilistId = ? WHERE id = ?', [
           canonicalId,
+          parseInt(canonicalId),
           mapping.numericId,
         ])
         tx.run('DELETE FROM shows_meta WHERE id = ?', [mapping.numericId])
@@ -80,15 +232,27 @@ async function migrateId(
     // 2. We need to find the title/name of the show
     let showName: string | undefined
 
-    // Try shows_meta
-    const localMeta = (await ShowsMetaRepository.getById(db, legacyId)) as { name?: string } | null
+    // Try shows_meta by direct ID or anilistId
+    const localMeta = (await ShowsMetaRepository.getById(db, legacyId)) as {
+      name?: string
+      anilistId?: number
+    } | null
     if (localMeta && localMeta.name) {
       showName = localMeta.name
     } else {
-      // Try watchlist
-      const watchlistEntry = await WatchlistRepository.getById(db, legacyId)
-      if (watchlistEntry && watchlistEntry.name) {
-        showName = watchlistEntry.name
+      const metaByAnilist = dbGet<{ name: string; id: string }>(
+        db,
+        'SELECT id, name FROM shows_meta WHERE anilistId = ?',
+        [parseInt(legacyId) || 0]
+      )
+      if (metaByAnilist && metaByAnilist.name) {
+        showName = metaByAnilist.name
+      } else {
+        // Try watchlist
+        const watchlistEntry = await WatchlistRepository.getById(db, legacyId)
+        if (watchlistEntry && watchlistEntry.name) {
+          showName = watchlistEntry.name
+        }
       }
     }
 
@@ -106,14 +270,14 @@ async function migrateId(
 
     const newId = String(aniListShow.id)
 
-    // 5. Save the mapping to DB
-    dbRun(db, 'INSERT OR REPLACE INTO legacy_id_mapping (legacyId, numericId) VALUES (?, ?)', [
-      legacyId,
-      newId,
-    ])
-
-    // 6. Perform the DB updates across all tables
+    // 4. Perform the DB updates across all tables atomically
     await performWriteTransaction(db, (tx) => {
+      // Save the mapping
+      tx.run('INSERT OR REPLACE INTO legacy_id_mapping (legacyId, numericId) VALUES (?, ?)', [
+        legacyId,
+        newId,
+      ])
+
       // Update watchlist
       const legacyWatchlist = WatchlistRepository.getById(tx, legacyId)
       if (legacyWatchlist) {
@@ -132,7 +296,11 @@ async function migrateId(
         if (newShowsMetaExists) {
           tx.run('DELETE FROM shows_meta WHERE id = ?', [legacyId])
         } else {
-          tx.run('UPDATE shows_meta SET id = ? WHERE id = ?', [newId, legacyId])
+          tx.run('UPDATE shows_meta SET id = ?, anilistId = ? WHERE id = ?', [
+            newId,
+            aniListShow.id,
+            legacyId,
+          ])
         }
       }
 
@@ -170,7 +338,18 @@ export function getMigratedId(
   legacyId: string,
   providers: { [key: string]: Provider | undefined }
 ): Promise<string> {
-  if (/^\d+$/.test(legacyId)) return Promise.resolve(legacyId)
+  if (/^\d+$/.test(legacyId)) {
+    const existing = inFlightMigrations.get(legacyId)
+    if (existing) return existing
+
+    const migration = migrateId(db, legacyId, providers)
+    inFlightMigrations.set(legacyId, migration)
+    migration.then(
+      () => inFlightMigrations.delete(legacyId),
+      () => inFlightMigrations.delete(legacyId)
+    )
+    return migration
+  }
 
   const existing = inFlightMigrations.get(legacyId)
   if (existing) return existing
