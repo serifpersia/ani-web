@@ -118,7 +118,15 @@ export interface PlayerState {
   resumeTime: number
   resumeDuration: number
   skipIntervals: SkipInterval[]
-  selectedProvider: 'allanime' | 'animepahe' | '123anime' | 'animeya' | 'megaplay' | 'wh' | 'hn'
+  selectedProvider:
+    | 'allanime'
+    | 'animepahe'
+    | '123anime'
+    | 'animeya'
+    | 'megaplay'
+    | 'wh'
+    | 'hn'
+    | 'anilight'
   loadingShowData: boolean
   loadingVideo: boolean
   loadingDetails: boolean

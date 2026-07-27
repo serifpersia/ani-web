@@ -11,6 +11,15 @@ import fs from 'fs'
 import logger from '../logger'
 import { buildCfClearanceCookie, sanitizeCfClearance } from '../utils/cookie.utils'
 
+function firstString(value: unknown): string | undefined {
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) {
+    const first = value[0]
+    if (typeof first === 'string') return first
+  }
+  return undefined
+}
+
 const proxyCache = new NodeCache({ stdTTL: 30, checkperiod: 60 })
 
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 100 })
@@ -38,7 +47,14 @@ export class ProxyController {
     'animepahe.pw',
     'animepahe.ru',
   ])
-  private static readonly GOT_SCRAPING_SUFFIXES = ['.uwucdn.top', '.owocdn.top']
+  private static readonly GOT_SCRAPING_SUFFIXES = [
+    '.uwucdn.top',
+    '.owocdn.top',
+    '.streamzone1.site',
+    '.nekostream.site',
+    '.nukitashith.top',
+    '.aniwatchtv.site',
+  ]
 
   private static isGotScrapingHost(urlStr: string): boolean {
     try {
@@ -124,7 +140,8 @@ export class ProxyController {
           return res.status(resp.statusCode ?? 502).send('Upstream error')
         }
 
-        const baseUrl = new URL(urlStr)
+        const finalUrl = resp.url || urlStr
+        const baseUrl = new URL(finalUrl)
         const proxiedMediaUrl = (targetUrl: string) =>
           `/api/proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererStr)}` +
           (cookieStr ? `&cookie=${encodeURIComponent(sanitizeCfClearance(cookieStr))}` : '')
@@ -149,7 +166,7 @@ export class ProxyController {
             if (isProxied(trimmed)) return line
 
             const absolute = new URL(trimmed, baseUrl).href
-            return needsProxy || absolute.includes('.m3u8') ? proxiedMediaUrl(absolute) : absolute
+            return proxiedMediaUrl(absolute)
           })
           .join('\n')
 
@@ -177,7 +194,11 @@ export class ProxyController {
           }
 
           const ct = resp.headers['content-type']
-          if (ct) res.set('Content-Type', ct)
+          const isVtt = urlStr.endsWith('.vtt') || urlStr.includes('.vtt?')
+          res.set(
+            'Content-Type',
+            isVtt ? 'text/vtt; charset=utf-8' : ct || 'application/octet-stream'
+          )
           const cl = resp.headers['content-length']
           if (cl) res.set('Content-Length', cl)
           const cr = resp.headers['content-range']
@@ -188,9 +209,9 @@ export class ProxyController {
           res.set('Access-Control-Allow-Origin', '*')
           res.send(resp.body)
         } else {
-          // Plain media (yt-mp4, allanime, etc.) streams via axios without
-          // forwarding Range, matching the original pre-commit behavior.
-          const resp = await axiosInstance({
+          // Plain media streams (yt-mp4, allanime, etc.)
+          // Proxy using axios streaming (got-scraping does not support stream/buffer for these hosts)
+          const axiosResp = await axiosInstance({
             url: urlStr,
             method: 'get',
             headers,
@@ -198,23 +219,25 @@ export class ProxyController {
             timeout: 30000,
             signal: abortController.signal,
           })
-
-          if (resp.status !== 200 && resp.status !== 206) {
-            return res.status(resp.status ?? 502).send('Upstream error')
+          const status = axiosResp.status
+          if (status !== 200 && status !== 206) {
+            return res.status(status ?? 502).send('Upstream error')
           }
-
-          res.status(resp.status)
-          const ct = resp.headers['content-type']
-          if (ct) res.set('Content-Type', ct as string)
-          const cl = resp.headers['content-length']
-          if (cl) res.set('Content-Length', cl as string)
-          const cr = resp.headers['content-range']
-          if (cr) res.set('Content-Range', cr as string)
-          const ar = resp.headers['accept-ranges']
-          if (ar) res.set('Accept-Ranges', ar as string)
-
+          res.status(status)
+          const isVtt = urlStr.endsWith('.vtt') || urlStr.includes('.vtt?')
+          const ct = firstString(axiosResp.headers['content-type'])
+          res.set(
+            'Content-Type',
+            isVtt ? 'text/vtt; charset=utf-8' : ct || 'application/octet-stream'
+          )
+          const cl = firstString(axiosResp.headers['content-length'])
+          if (cl) res.set('Content-Length', cl)
+          const cr = axiosResp.headers['content-range']
+          if (cr) res.set('Content-Range', cr)
+          const ar = axiosResp.headers['accept-ranges']
+          if (ar) res.set('Accept-Ranges', ar)
           res.set('Access-Control-Allow-Origin', '*')
-          resp.data.pipe(res)
+          axiosResp.data.pipe(res)
         }
       }
     } catch (e) {

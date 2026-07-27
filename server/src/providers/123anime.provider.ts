@@ -120,9 +120,7 @@ export class _123AnimeProvider implements Provider {
     try {
       const rawQuery = options.query || ''
       const query = rawQuery
-        .replace(/[""]/g, '')
-        .replace(/[']/g, '')
-        .replace(/[.:]/g, ' ')
+        .replace(/["",':]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
 
@@ -139,11 +137,15 @@ export class _123AnimeProvider implements Provider {
       let results = await performSearch(query)
 
       if (results.length === 0) {
-        if (query.includes(':')) {
-          results = await performSearch(query.split(':')[0].trim())
+        const words = query.split(/\s+/).filter((w) => w.length >= 3)
+        if (words.length > 1) {
+          const mid = Math.max(1, Math.floor(words.length / 2))
+          const half = words.slice(0, mid).join(' ')
+          results = await performSearch(half)
         }
-        if (results.length === 0 && query.includes('-')) {
-          results = await performSearch(query.split('-')[0].trim())
+        if (results.length === 0 && words.length > 2) {
+          const firstThree = words.slice(0, 3).join(' ')
+          results = await performSearch(firstThree)
         }
       }
 
@@ -172,10 +174,55 @@ export class _123AnimeProvider implements Provider {
     }
   }
 
-  async resolveShowId(title: string, _romaji?: string): Promise<string | null> {
-    const results = await this.search({ query: title })
-    const best = results.length > 0 ? this.bestMatch(results, title) : undefined
-    return best?._id || null
+  async resolveShowId(title: string, romaji?: string): Promise<string | null> {
+    const queries = [title]
+    if (romaji && romaji !== title) {
+      queries.push(romaji)
+    }
+
+    const titleWords = new Set(
+      title
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length >= 2)
+    )
+
+    let bestScore = 0
+    let bestId: string | null = null
+
+    for (const q of queries) {
+      const results = await this.search({ query: q })
+      for (const r of results) {
+        const resultName = (r.name || r.englishName || '').toLowerCase()
+        const overlap = resultName.split(/\s+/).filter((w) => titleWords.has(w)).length
+        if (overlap > bestScore) {
+          bestScore = overlap
+          bestId = r._id ?? r.id ?? null
+        }
+      }
+      if (bestScore >= 3) break
+    }
+
+    if (bestScore < 3) {
+      const keywords = title
+        .split(/\s+/)
+        .filter((w) => w.length >= 4)
+        .slice(0, 3)
+        .join(' ')
+      if (keywords) {
+        const results = await this.search({ query: keywords })
+        for (const r of results) {
+          const resultName = (r.name || r.englishName || '').toLowerCase()
+          const overlap = resultName.split(/\s+/).filter((w) => titleWords.has(w)).length
+          if (overlap > bestScore) {
+            bestScore = overlap
+            bestId = r._id ?? r.id ?? null
+          }
+        }
+      }
+    }
+
+    return bestId
   }
 
   async getEpisodes(showId: string): Promise<EpisodeDetails | null> {

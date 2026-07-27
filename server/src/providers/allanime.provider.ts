@@ -1,6 +1,8 @@
-﻿import axios, { type AxiosRequestConfig } from 'axios'
+﻿import { gotScraping } from 'got-scraping'
 import logger from '../logger'
 import * as crypto from 'node:crypto'
+import { requestContext } from '../utils/request-context'
+import { sanitizeCfClearance } from '../utils/cookie.utils'
 import {
   Provider,
   Show,
@@ -27,6 +29,22 @@ const AA_BOOTSTRAP_BASE = '/client-crypto/v1/bootstrap'
 const AA_EPOCH_MS = 259_200_000
 const AA_GRACE_MS = 86_400_000
 const AA_TS_BUCKET_MS = 300_000
+
+function getAaHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const store = requestContext.getStore()
+  const rawCookie = store?.get('cookie') || ''
+  const cookieValue = sanitizeCfClearance(rawCookie)
+  const headers: Record<string, string> = {
+    'User-Agent': USER_AGENT,
+    Referer: REFERER,
+    Origin: 'https://mkissa.to',
+    ...extra,
+  }
+  if (cookieValue) {
+    headers['Cookie'] = `cf_clearance=${cookieValue}`
+  }
+  return headers
+}
 
 interface BootstrapData {
   epoch: number
@@ -178,30 +196,33 @@ export class AllAnimeProvider implements Provider {
     for (const epoch of epochs) {
       const token = this.makeBootToken(buildId, mask, epoch, lane)
       try {
-        const response = await axios.get(
-          `https://${AA_BOOTSTRAP_HOST}${AA_BOOTSTRAP_BASE}?buildId=${buildId}&k=${lane}`,
-          {
-            headers: {
-              'User-Agent': USER_AGENT,
-              Origin: 'https://mkissa.to',
-              Referer: 'https://mkissa.to/',
-              'x-build-id': buildId,
-              'x-aa-boot': token,
-            },
-            timeout: 10000,
-          }
-        )
-        const data = response.data as BootstrapData
+        const resp = await gotScraping({
+          url: `https://${AA_BOOTSTRAP_HOST}${AA_BOOTSTRAP_BASE}?buildId=${buildId}&k=${lane}`,
+          method: 'GET',
+          headers: getAaHeaders({
+            'x-build-id': buildId,
+            'x-aa-boot': token,
+          }),
+          responseType: 'text',
+          timeout: { request: 10000 },
+          followRedirect: true,
+          throwHttpErrors: false,
+        })
+        const data = JSON.parse(resp.body) as BootstrapData
         if (!data?.partB || !data?.epoch) {
           throw new Error('Invalid bootstrap response')
         }
         return data
       } catch (err: unknown) {
         if (
-          axios.isAxiosError(err) &&
-          (err.response?.data as Record<string, unknown>)?.error === 'unknown_build_id'
+          typeof err === 'object' &&
+          err !== null &&
+          (err as { response?: { data?: unknown } }).response
         ) {
-          throw new Error('AA_CRYPTO_STALE: unknown build ID', { cause: err })
+          const respData = (err as { response: { data?: { error?: string } } }).response.data
+          if (respData?.error === 'unknown_build_id') {
+            throw new Error('AA_CRYPTO_STALE: unknown build ID', { cause: err })
+          }
         }
         lastErr = err
       }
@@ -251,17 +272,38 @@ export class AllAnimeProvider implements Provider {
   }
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
-  private async _request(config: AxiosRequestConfig, retryCount = 0): Promise<any> {
+  private async _request(config: Record<string, unknown>, retryCount = 0): Promise<any> {
     /* eslint-enable @typescript-eslint/no-explicit-any */
     await this.ensureKey()
-    const response = await axios(config)
-    const responseData = response.data
+    const url = typeof config.url === 'string' ? config.url : String(config.url)
+    const method = ((config.method as string) || 'GET').toUpperCase() as 'GET' | 'POST'
+    const headers = { ...(config.headers || {}) } as Record<string, string>
+    const body = config.data ? JSON.stringify(config.data) : undefined
+    const timeoutMs = (config.timeout as number) || 15000
+
+    const resp = await gotScraping({
+      url,
+      method,
+      headers,
+      body,
+      responseType: 'text',
+      timeout: { request: timeoutMs },
+      followRedirect: true,
+      throwHttpErrors: false,
+    })
+
+    let responseData
+    try {
+      responseData = resp.body ? JSON.parse(resp.body) : null
+    } catch {
+      throw new Error('Invalid JSON response')
+    }
 
     if (responseData?.data?.tobeparsed) {
       responseData.data = this.decryptTobeparsed(responseData.data.tobeparsed)
     }
 
-    if (responseData.errors && responseData.errors.length > 0) {
+    if (responseData?.errors && responseData.errors.length > 0) {
       const errorMsg: string = responseData.errors[0].message
 
       const rateLimitMatch = errorMsg.match(
@@ -271,8 +313,8 @@ export class AllAnimeProvider implements Provider {
         if (retryCount >= 3) {
           throw new Error(`Rate limited after ${retryCount} retries: ${errorMsg}`)
         }
-        const timeout = parseInt(rateLimitMatch[1], 10)
-        await new Promise((resolve) => setTimeout(resolve, timeout * 1000))
+        const waitMs = parseInt(rateLimitMatch[1], 10) * 1000
+        await new Promise((resolve) => setTimeout(resolve, waitMs))
         return this._request(config, retryCount + 1)
       }
 
@@ -433,46 +475,68 @@ export class AllAnimeProvider implements Provider {
     variables: Record<string, unknown>,
     extensions?: Record<string, unknown>
   ): Promise<Show[]> {
-    const body: Record<string, unknown> = { variables }
     const fullQuery = `
       query ($search: SearchInput, $limit: Int, $page: Int, $translationType: VaildTranslationTypeEnumType, $countryOrigin: VaildCountryOriginEnumType) {
         shows(search: $search, limit: $limit, page: $page, translationType: $translationType, countryOrigin: $countryOrigin) {
           edges { _id name nativeName englishName thumbnail description type availableEpisodesDetail isAdult rating }
         }
       }`
-    if (extensions) {
-      body.extensions = extensions
-    } else {
-      body.query = fullQuery
-    }
-    try {
-      const responseData = await this._request({
-        method: 'POST',
-        url: API_ENDPOINT,
-        data: body,
-        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+    const variablesParam = encodeURIComponent(JSON.stringify(variables))
+
+    async function tryFetch(
+      provider: AllAnimeProvider,
+      extensionsParam?: string,
+      queryParam?: string
+    ) {
+      let requestUrl = `${API_ENDPOINT}?variables=${variablesParam}`
+      if (extensionsParam) {
+        requestUrl += `&extensions=${extensionsParam}`
+      } else if (queryParam) {
+        requestUrl += `&query=${queryParam}`
+      }
+      return provider._request({
+        method: 'GET',
+        url: requestUrl,
+        headers: getAaHeaders(),
         timeout: 15000,
       })
-      const shows = responseData?.data?.shows?.edges || []
-      return shows.map((show: Show) => ({
+    }
+
+    try {
+      let extensionsParam: string | undefined
+      if (extensions) {
+        extensionsParam = encodeURIComponent(JSON.stringify(extensions))
+      }
+      const responseData = await tryFetch(this, extensionsParam)
+      const rawShows = responseData?.data?.shows
+      const showsArray = Array.isArray(rawShows)
+        ? rawShows
+        : Array.isArray(rawShows?.edges)
+          ? rawShows.edges
+          : []
+      return showsArray.map((show: Show) => ({
         ...show,
-        thumbnail: this.deobfuscateUrl(show.thumbnail || ''),
+        thumbnail: this.deobfuscateUrl(
+          ((show as unknown as Record<string, unknown>).thumbnail as string) || ''
+        ),
       }))
     } catch (error: unknown) {
       const err = error as { message?: string }
-      if (err.message === 'PersistedQueryNotFound' && extensions) {
-        logger.info('Search hash expired, falling back to full query')
-        const responseData = await this._request({
-          method: 'POST',
-          url: API_ENDPOINT,
-          data: { variables, query: fullQuery },
-          headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-          timeout: 15000,
-        })
-        const shows = responseData?.data?.shows?.edges || []
-        return shows.map((show: Show) => ({
+      if (err.message === 'PersistedQueryNotFound') {
+        logger.info('AllAnime search hash expired, falling back to full query GET')
+        const queryParam = encodeURIComponent(fullQuery)
+        const responseData = await tryFetch(this, undefined, queryParam)
+        const rawShows = responseData?.data?.shows
+        const showsArray = Array.isArray(rawShows)
+          ? rawShows
+          : Array.isArray(rawShows?.edges)
+            ? rawShows.edges
+            : []
+        return showsArray.map((show: Show) => ({
           ...show,
-          thumbnail: this.deobfuscateUrl(show.thumbnail || ''),
+          thumbnail: this.deobfuscateUrl(
+            ((show as unknown as Record<string, unknown>).thumbnail as string) || ''
+          ),
         }))
       }
       throw error
@@ -514,19 +578,31 @@ export class AllAnimeProvider implements Provider {
       translationType: translation && translation !== 'ALL' ? translation : 'sub',
       countryOrigin: country && country !== 'ALL' ? country : 'ALL',
     }
-    return this._fetchShows(variables)
+    const extensions = {
+      persistedQuery: {
+        version: 1,
+        sha256Hash: '4717b9be6c8e5858850c4b5458c9b53076ebf27c0520279be29d5aed9f3679c7',
+      },
+    }
+    return this._fetchShows(variables, extensions)
   }
 
   async resolveShowId(title: string, _romaji?: string): Promise<string | null> {
+    const variables = { search: { query: title, allowAdult: true } }
+    const variablesParam = encodeURIComponent(JSON.stringify(variables))
+    const extensions = {
+      persistedQuery: {
+        version: 1,
+        sha256Hash: '4717b9be6c8e5858850c4b5458c9b53076ebf27c0520279be29d5aed9f3679c7',
+      },
+    }
+    const extensionsParam = encodeURIComponent(JSON.stringify(extensions))
+    const requestUrl = `${API_ENDPOINT}?variables=${variablesParam}&extensions=${extensionsParam}`
     try {
       const result = await this._request({
-        method: 'POST',
-        url: API_ENDPOINT,
-        data: {
-          query: `query($search: SearchInput) { shows(search: $search, limit: 1, page: 1, translationType: sub, countryOrigin: ALL) { edges { _id name } } }`,
-          variables: { search: { query: title, allowAdult: true } },
-        },
-        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+        method: 'GET',
+        url: requestUrl,
+        headers: getAaHeaders(),
         timeout: 10000,
       })
       const edge = result?.data?.shows?.edges?.[0]
@@ -534,7 +610,9 @@ export class AllAnimeProvider implements Provider {
         return edge._id as string
       }
       return null
-    } catch (err) {
+    } catch (err: unknown) {
+      const errMsg = (err as Error)?.message || ''
+      logger.warn({ err: errMsg, title }, 'AllAnime resolveShowId failed')
       return null
     }
   }
@@ -570,11 +648,13 @@ export class AllAnimeProvider implements Provider {
         sha256Hash: 'a0aca6827cc9a3ad7bc711da4d200a04adea8f1a7545dc418d5e92e74c3aad15',
       },
     }
+    const variablesParam = encodeURIComponent(JSON.stringify(variables))
+    const extensionsParam = encodeURIComponent(JSON.stringify(extensions))
+    const requestUrl = `${API_ENDPOINT}?variables=${variablesParam}&extensions=${extensionsParam}`
     try {
       const responseData = await this._request({
-        method: 'POST',
-        url: API_ENDPOINT,
-        data: { variables, extensions },
+        method: 'GET',
+        url: requestUrl,
         headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
         timeout: 15000,
       })
@@ -586,7 +666,7 @@ export class AllAnimeProvider implements Provider {
     } catch (error: unknown) {
       const err = error as { message?: string }
       if (err.message === 'PersistedQueryNotFound') {
-        logger.info('Popular hash expired, falling back to full query')
+        logger.info('AllAnime popular hash expired, falling back to full query GET')
         const fullQuery = `
           query ($type: VaildPopularTypeEnumType!, $size: Int!, $dateRange: Int, $page: Int, $allowAdult: Boolean, $allowUnknown: Boolean) {
             queryPopular(type: $type, size: $size, dateRange: $dateRange, page: $page, allowAdult: $allowAdult, allowUnknown: $allowUnknown) {
@@ -595,10 +675,11 @@ export class AllAnimeProvider implements Provider {
               }
             }
           }`
+        const queryParam = encodeURIComponent(fullQuery)
+        const fallbackUrl = `${API_ENDPOINT}?variables=${variablesParam}&query=${queryParam}`
         const responseData = await this._request({
-          method: 'POST',
-          url: API_ENDPOINT,
-          data: { query: fullQuery, variables },
+          method: 'GET',
+          url: fallbackUrl,
           headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
           timeout: 15000,
         })
@@ -664,34 +745,33 @@ export class AllAnimeProvider implements Provider {
   }
 
   async getShowMeta(showId: string, _ua?: string, _cookie?: string): Promise<Partial<Show> | null> {
+    const extensions = {
+      persistedQuery: {
+        version: 1,
+        sha256Hash: 'bc896210babaf9967479eb204c27b9cd8312f9d6b84cb7a8a8defe47bdd6da16',
+      },
+    }
+    const variablesParam = encodeURIComponent(JSON.stringify({ _id: showId }))
+    const extensionsParam = encodeURIComponent(JSON.stringify(extensions))
+    const requestUrl = `${API_ENDPOINT}?variables=${variablesParam}&extensions=${extensionsParam}`
     let responseData: { data?: { show?: Record<string, unknown> } }
     try {
       responseData = await this._request({
-        method: 'POST',
-        url: API_ENDPOINT,
-        data: {
-          variables: { _id: showId },
-          extensions: {
-            persistedQuery: {
-              version: 1,
-              sha256Hash: 'bc896210babaf9967479eb204c27b9cd8312f9d6b84cb7a8a8defe47bdd6da16',
-            },
-          },
-        },
+        method: 'GET',
+        url: requestUrl,
         headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
         timeout: 15000,
       })
     } catch (error: unknown) {
       const err = error as { message?: string }
       if (err.message === 'PersistedQueryNotFound') {
-        logger.info('Show meta hash expired, falling back to full query')
+        logger.info('AllAnime show meta hash expired, falling back to full query GET')
+        const fullQuery = `query($showId: String!) { show(_id: $showId) { _id name nativeName englishName altNames thumbnail thumbnails banner description genres tags type availableEpisodes availableEpisodesDetail episodeCount episodeDuration score averageScore isAdult status studios airedStart airedEnd rating countryOfOrigin season } }`
+        const queryParam = encodeURIComponent(fullQuery)
+        const fallbackUrl = `${API_ENDPOINT}?variables=${variablesParam}&query=${queryParam}`
         responseData = await this._request({
-          method: 'POST',
-          url: API_ENDPOINT,
-          data: {
-            query: `query($showId: String!) { show(_id: $showId) { _id name nativeName englishName altNames thumbnail thumbnails banner description genres tags type availableEpisodes availableEpisodesDetail episodeCount episodeDuration score averageScore isAdult status studios airedStart airedEnd rating countryOfOrigin season } }`,
-            variables: { showId },
-          },
+          method: 'GET',
+          url: fallbackUrl,
           headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
           timeout: 15000,
         })
@@ -758,16 +838,22 @@ export class AllAnimeProvider implements Provider {
     const cachedData = this.cache.get<EpisodeDetails>(cacheKey)
     if (cachedData) return cachedData
 
+    const extensions = {
+      persistedQuery: {
+        version: 1,
+        sha256Hash: 'bc896210babaf9967479eb204c27b9cd8312f9d6b84cb7a8a8defe47bdd6da16',
+      },
+    }
+    const variablesParam = encodeURIComponent(JSON.stringify({ _id: showId }))
+    const extensionsParam = encodeURIComponent(JSON.stringify(extensions))
+    const requestUrl = `${API_ENDPOINT}?variables=${variablesParam}&extensions=${extensionsParam}`
+
     let responseData: { data?: { show?: Record<string, unknown> } }
     try {
       responseData = await this._request({
-        method: 'POST',
-        url: API_ENDPOINT,
-        data: {
-          query: `query($showId: String!) { show(_id: $showId) { availableEpisodesDetail episodeCount description } }`,
-          variables: { showId },
-        },
-        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+        method: 'GET',
+        url: requestUrl,
+        headers: getAaHeaders(),
         timeout: 15000,
       })
     } catch {
@@ -800,26 +886,28 @@ export class AllAnimeProvider implements Provider {
 
   async getSkipTimes(showId: string, episodeNumber: string): Promise<SkipIntervals> {
     try {
+      const fullQuery = `query($showId: String!) { show(_id: $showId) { malId } }`
+      const variablesParam = encodeURIComponent(JSON.stringify({ showId }))
+      const queryParam = encodeURIComponent(fullQuery)
+      const requestUrl = `${API_ENDPOINT}?variables=${variablesParam}&query=${queryParam}`
       const responseData = await this._request({
-        method: 'POST',
-        url: API_ENDPOINT,
-        data: {
-          query: `query($showId: String!) { show(_id: $showId) { malId } }`,
-          variables: { showId },
-        },
+        method: 'GET',
+        url: requestUrl,
         headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
         timeout: 10000,
       })
       const malId = responseData?.data?.show?.malId
       if (!malId) return { found: false, results: [] }
-      const response = await axios.get(
-        `https://api.aniskip.com/v1/skip-times/${malId}/${episodeNumber}?types=op&types=ed`,
-        {
-          headers: { 'User-Agent': USER_AGENT },
-          timeout: 5000,
-        }
-      )
-      return response.data as SkipIntervals
+      const resp = await gotScraping({
+        url: `https://api.aniskip.com/v1/skip-times/${malId}/${episodeNumber}?types=op&types=ed`,
+        method: 'GET',
+        headers: { 'User-Agent': USER_AGENT },
+        responseType: 'text',
+        timeout: { request: 5000 },
+        followRedirect: true,
+        throwHttpErrors: false,
+      })
+      return JSON.parse(resp.body) as SkipIntervals
     } catch {
       return { found: false, results: [] }
     }
@@ -879,20 +967,17 @@ export class AllAnimeProvider implements Provider {
     } catch (error: unknown) {
       const err = error as { message?: string }
       if (err.message === 'PersistedQueryNotFound') {
-        logger.info('Episode hash expired, falling back to full query')
+        logger.info('Episode hash expired, falling back to full query GET')
+        const fullQuery = `query($showId: String!, $translationType: VaildTranslationTypeEnumType!, $episodeString: String!) { episode(showId: $showId translationType: $translationType episodeString: $episodeString) { episodeString uploadDate sourceUrls thumbnail notes } }`
+        const variablesParam = encodeURIComponent(
+          JSON.stringify({ showId, translationType: mode, episodeString: episodeNumber })
+        )
+        const queryParam = encodeURIComponent(fullQuery)
+        const fallbackUrl = `${API_ENDPOINT}?variables=${variablesParam}&query=${queryParam}`
         responseData = await this._request({
-          method: 'POST',
-          url: API_ENDPOINT,
-          data: {
-            query: `query($showId: String!, $translationType: VaildTranslationTypeEnumType!, $episodeString: String!) { episode(showId: $showId translationType: $translationType episodeString: $episodeString) { episodeString uploadDate sourceUrls thumbnail notes } }`,
-            variables: { showId, translationType: mode, episodeString: episodeNumber },
-          },
-          headers: {
-            'User-Agent': USER_AGENT,
-            Referer: 'https://mkissa.to/',
-            Origin: 'https://mkissa.to',
-            'x-build-id': AA_BUILD_ID(),
-          },
+          method: 'GET',
+          url: fallbackUrl,
+          headers: getAaHeaders({ 'x-build-id': AA_BUILD_ID() }),
           timeout: 15000,
         })
       } else if (
@@ -932,20 +1017,29 @@ export class AllAnimeProvider implements Provider {
               const finalUrl = decryptedUrl.startsWith('http')
                 ? decryptedUrl
                 : new URL(decryptedUrl, API_BASE_URL).href
-              const resp = await axios.get(finalUrl, {
+              const clockResp = await gotScraping({
+                url: finalUrl,
+                method: 'GET',
                 headers: { Referer: REFERER, 'User-Agent': USER_AGENT },
-                timeout: 10000,
+                responseType: 'text',
+                timeout: { request: 10000 },
+                followRedirect: true,
+                throwHttpErrors: false,
               })
-              const clockData = resp.data as RawClockData
+              const clockData = JSON.parse(clockResp.body) as RawClockData
               if (clockData && Array.isArray(clockData.links) && clockData.links.length > 0) {
                 const linkData = clockData.links[0]
                 if (linkData.hls) {
-                  const hlsResp = await axios.get(linkData.link, {
+                  const hlsResp = await gotScraping({
+                    url: linkData.link,
+                    method: 'GET',
                     headers: linkData.headers || { Referer: REFERER },
                     responseType: 'text',
-                    timeout: 10000,
+                    timeout: { request: 10000 },
+                    followRedirect: true,
+                    throwHttpErrors: false,
                   })
-                  const lines = (hlsResp.data as string).split('\n')
+                  const lines = hlsResp.body.split('\n')
                   for (let i = 0; i < lines.length; i++) {
                     if (lines[i].startsWith('#EXT-X-STREAM-INF')) {
                       const resMatch = lines[i].match(/RESOLUTION=\d+x(\d+)/)
@@ -1001,13 +1095,19 @@ export class AllAnimeProvider implements Provider {
           } else if (source.sourceName === 'Mp4') {
             const decryptedUrl = this.deobfuscateStreamUrl(source.sourceUrl)
             try {
-              const { data: embedHtml } = await axios.get(decryptedUrl, {
+              const embedResp = await gotScraping({
+                url: decryptedUrl,
+                method: 'GET',
                 headers: {
                   'User-Agent': USER_AGENT,
                   Referer: 'https://allanime.day/',
                 },
-                timeout: 10000,
+                responseType: 'text',
+                timeout: { request: 10000 },
+                followRedirect: true,
+                throwHttpErrors: false,
               })
+              const embedHtml = embedResp.body
               const match =
                 typeof embedHtml === 'string'
                   ? embedHtml.match(/src:\s*"(https:\/\/[^"]+\.mp4)"/)
@@ -1056,10 +1156,16 @@ export class AllAnimeProvider implements Provider {
             if (source.sourceName === 'Ok') {
               const decryptedUrl = this.deobfuscateStreamUrl(source.sourceUrl)
               try {
-                const { data: embedHtml } = await axios.get(decryptedUrl, {
+                const embedResp = await gotScraping({
+                  url: decryptedUrl,
+                  method: 'GET',
                   headers: { 'User-Agent': USER_AGENT, Referer: 'https://allanime.day/' },
-                  timeout: 10000,
+                  responseType: 'text',
+                  timeout: { request: 10000 },
+                  followRedirect: true,
+                  throwHttpErrors: false,
                 })
+                const embedHtml = embedResp.body
                 if (typeof embedHtml === 'string') {
                   const match = embedHtml.match(/data-options=['"]({.*?})['"]/)
                   if (match) {

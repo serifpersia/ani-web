@@ -18,6 +18,7 @@ import { MegaPlayProvider } from './providers/megaplay.provider'
 import { AnimePaheProvider } from './providers/animepahe.provider'
 import { WhProvider } from './providers/wh.provider'
 import { HnProvider } from './providers/hn.provider'
+import { AnilightProvider } from './providers/anilight.provider'
 import { googleDriveService } from './google'
 import { CONFIG } from './config'
 import { initializeDatabase, syncDownOnBoot, syncUp, initSyncProvider, waitForSync } from './sync'
@@ -59,6 +60,7 @@ const megaPlayProvider = new MegaPlayProvider(apiCache)
 const animepaheProvider = new AnimePaheProvider(apiCache)
 const whProvider = new WhProvider(apiCache)
 const hnProvider = new HnProvider(apiCache)
+const anilightProvider = new AnilightProvider(apiCache)
 
 const providers = {
   allanime: allAnimeProvider,
@@ -68,6 +70,7 @@ const providers = {
   animepahe: animepaheProvider,
   wh: whProvider,
   hn: hnProvider,
+  anilight: anilightProvider,
 }
 
 let db: DatabaseWrapper

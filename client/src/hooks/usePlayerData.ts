@@ -172,7 +172,7 @@ export const usePlayerData = (
       try {
         let providerShowId = showId
         if (
-          ['allanime', '123anime', 'animeya', 'megaplay', 'wh', 'hn'].includes(
+          ['allanime', '123anime', 'animeya', 'megaplay', 'wh', 'hn', 'anilight'].includes(
             uiState.selectedProvider
           )
         ) {

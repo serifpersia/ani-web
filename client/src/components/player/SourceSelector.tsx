@@ -3,9 +3,25 @@ import styles from './Player.module.css'
 import type { VideoSource } from '../../pages/Player'
 
 interface ProviderSelectorProps {
-  selectedProvider: 'allanime' | 'animepahe' | '123anime' | 'animeya' | 'megaplay' | 'wh' | 'hn'
+  selectedProvider:
+    | 'allanime'
+    | 'animepahe'
+    | '123anime'
+    | 'animeya'
+    | 'megaplay'
+    | 'wh'
+    | 'hn'
+    | 'anilight'
   onProviderChange: (
-    provider: 'allanime' | 'animepahe' | '123anime' | 'animeya' | 'megaplay' | 'wh' | 'hn'
+    provider:
+      | 'allanime'
+      | 'animepahe'
+      | '123anime'
+      | 'animeya'
+      | 'megaplay'
+      | 'wh'
+      | 'hn'
+      | 'anilight'
   ) => void
 }
 
@@ -29,9 +45,11 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
               | 'megaplay'
               | 'wh'
               | 'hn'
+              | 'anilight'
           )
         }
       >
+        <option value="anilight">Anilight</option>
         <option value="megaplay">MegaPlay</option>
         <option value="allanime">AllAnime</option>
         <option value="animepahe">AnimePahe</option>
