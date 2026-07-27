@@ -336,11 +336,12 @@
   }
 
   .info {
-    height: 95px !important;
-    padding: 6px 8px !important;
+    height: 115px !important;
+    padding: 8px 8px !important;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
+    gap: 4px;
   }
 
   .title {
@@ -408,11 +409,6 @@
   }
 
   .card.vertical .mobileBadges {
-    justify-content: center;
-  }
-
-  .metaRow {
-    margin-top: 2px;
     justify-content: center;
   }
 }

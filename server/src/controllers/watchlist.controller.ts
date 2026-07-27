@@ -569,6 +569,8 @@ export class WatchlistController {
       isAdult,
     })
 
+    const inWatchlist = WatchlistRepository.exists(req.db, showId)
+
     const genresStr = Array.isArray(genres) ? JSON.stringify(genres) : genres
     const anilistId = /^\d+$/.test(showId)
       ? (dbGet<{ anilistId: number }>(
@@ -593,14 +595,16 @@ export class WatchlistController {
         anilistId,
       })
 
-      WatchedEpisodesRepository.upsert(tx, {
-        showId,
-        episodeNumber,
-        currentTime,
-        duration,
-      })
+      if (inWatchlist) {
+        WatchedEpisodesRepository.upsert(tx, {
+          showId,
+          episodeNumber,
+          currentTime,
+          duration,
+        })
 
-      NotificationsRepository.deleteSpecificDismissed(tx, showId, episodeNumber)
+        NotificationsRepository.deleteSpecificDismissed(tx, showId, episodeNumber)
+      }
     })
 
     req.db.scheduleSave()
