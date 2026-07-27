@@ -451,12 +451,22 @@ export class WhProvider implements Provider {
 
       const result: VideoSource[] = [
         {
-          sourceName: 'WH',
+          sourceName: 'WH (Direct)',
           links,
           type: 'player',
           actualEpisodeNumber: targetEpisode,
         },
       ]
+
+      if (jwUrlMatch) {
+        const iframeUrl = cleanUrl(jwUrlMatch[0])
+        result.push({
+          sourceName: 'WH (Iframe)',
+          links: [{ resolutionStr: 'Auto', link: iframeUrl, hls: false }],
+          type: 'iframe',
+          actualEpisodeNumber: targetEpisode,
+        })
+      }
 
       this.cache.set(cacheKey, result, 3600)
       return result
