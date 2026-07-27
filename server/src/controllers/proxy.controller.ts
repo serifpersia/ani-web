@@ -99,7 +99,7 @@ export class ProxyController {
         const cookieHeader = buildCfClearanceCookie(cookieStr)
         if (cookieHeader) headers['Cookie'] = cookieHeader
       }
-      if (req.headers.range && urlStr.includes('.m3u8')) headers['Range'] = req.headers.range
+      if (req.headers.range) headers['Range'] = req.headers.range as string
 
       if (urlStr.includes('.m3u8')) {
         const cached = proxyCache.get<string>(cacheKey)
@@ -199,10 +199,11 @@ export class ProxyController {
             signal: abortController.signal,
           })
 
-          if (resp.status !== 200) {
+          if (resp.status !== 200 && resp.status !== 206) {
             return res.status(resp.status ?? 502).send('Upstream error')
           }
 
+          res.status(resp.status)
           const ct = resp.headers['content-type']
           if (ct) res.set('Content-Type', ct as string)
           const cl = resp.headers['content-length']

@@ -291,15 +291,64 @@ export class MegaPlayProvider implements Provider {
         throw new Error('No video sources found in API response')
       }
 
-      const links: VideoLink[] = sources.map((s) => ({
-        resolutionStr: 'Auto',
-        link: s.file,
-        hls: s.file.includes('.m3u8'),
-        headers: {
-          Referer: 'https://megaplay.buzz/',
-          'User-Agent': this.megaPlayHeaders['User-Agent'],
-        },
-      }))
+      const links: VideoLink[] = []
+      for (const s of sources) {
+        if (s.file.includes('.m3u8')) {
+          try {
+            const masterRes = await fetch(s.file, {
+              headers: {
+                Referer: 'https://megaplay.buzz/',
+                'User-Agent': this.megaPlayHeaders['User-Agent'],
+              },
+              signal: AbortSignal.timeout(10000),
+            })
+            if (masterRes.ok) {
+              const playlist = await masterRes.text()
+              const variantRe = /#EXT-X-STREAM-INF:([^\n]*)\n(\S+)/g
+              let m: RegExpExecArray | null
+              while ((m = variantRe.exec(playlist)) !== null) {
+                const attrs = m[1]
+                const label =
+                  attrs.match(/NAME="([^"]+)"/)?.[1] ||
+                  (attrs.match(/RESOLUTION=\d+x(\d+)/)?.[1] ?? '') + 'p' ||
+                  ''
+                if (!label || label === 'p') continue
+                const variantUrl = new URL(m[2], s.file).href
+                links.push({
+                  resolutionStr: label,
+                  link: variantUrl,
+                  hls: true,
+                  headers: {
+                    Referer: 'https://megaplay.buzz/',
+                    'User-Agent': this.megaPlayHeaders['User-Agent'],
+                  },
+                })
+              }
+            }
+          } catch {
+            // fall through to add master as Auto
+          }
+          links.push({
+            resolutionStr: 'Auto',
+            link: s.file,
+            hls: true,
+            headers: {
+              Referer: 'https://megaplay.buzz/',
+              'User-Agent': this.megaPlayHeaders['User-Agent'],
+            },
+          })
+        } else {
+          links.push({
+            resolutionStr: 'Auto',
+            link: s.file,
+            hls: false,
+            headers: {
+              Referer: 'https://megaplay.buzz/',
+              'User-Agent': this.megaPlayHeaders['User-Agent'],
+            },
+          })
+        }
+      }
 
       const subtitles: SubtitleTrack[] = (data.tracks || [])
         .filter((t) => {

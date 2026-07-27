@@ -54,6 +54,24 @@ function cleanUrl(raw: string): string {
   }
 }
 
+function extractDirectSrc(playerUrl: string): string {
+  const clean = playerUrl.replace(/&amp;/g, '&')
+  try {
+    const source = new URL(clean).searchParams.get('source')
+    if (source) return decodeURIComponent(source)
+  } catch {
+    const m = clean.match(/[?&]source=([^&]+)/i)
+    if (m) {
+      try {
+        return decodeURIComponent(m[1])
+      } catch {
+        return m[1]
+      }
+    }
+  }
+  return ''
+}
+
 async function fetchText(url: string): Promise<string> {
   const res = await fetch(url, {
     headers: {
@@ -194,6 +212,23 @@ function extractPlayerData(html: string) {
   if (sources.length === 0 && defaultSrc) {
     const labelGuess = defaultSrc.match(/_(\d+p)\./)?.[1] ?? 'default'
     sources.push({ src: defaultSrc, type: 'video/mp4', label: labelGuess })
+  }
+
+  if (sources.length === 0) {
+    const videoUrlRe = /https?:\/\/[^"' ]+\.(mp4|m3u8)[^"' ]*/gi
+    let vm: RegExpExecArray | null
+    const seen = new Set<string>()
+    while ((vm = videoUrlRe.exec(html)) !== null) {
+      const url = cleanUrl(vm[0])
+      if (seen.has(url)) continue
+      seen.add(url)
+      const label = url.match(/_(\d{3,4}p)\./)?.[1] ?? 'default'
+      sources.push({
+        src: url,
+        type: url.includes('.m3u8') ? 'application/x-mpegURL' : 'video/mp4',
+        label,
+      })
+    }
   }
 
   return { sources, defaultSrc, thumbnail, duration }
@@ -430,24 +465,52 @@ export class WhProvider implements Provider {
 
       const jwUrlMatch = watchHtml.match(/https:\/\/watchhentai\.net\/jwplayer\/\?[^'")\s]+/)
       let playerHtml = watchHtml
+      let directFallback = ''
+
       if (jwUrlMatch) {
         const jwUrl = cleanUrl(jwUrlMatch[0])
+        directFallback = extractDirectSrc(jwUrl)
         try {
-          playerHtml = await fetchText(jwUrl)
+          const res = await fetch(jwUrl, {
+            headers: {
+              'User-Agent': UA,
+              Referer: watchUrl,
+              Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.5',
+            },
+            signal: AbortSignal.timeout(30000),
+          })
+          if (res.ok) playerHtml = await res.text()
         } catch {
-          // use watchHtml as fallback
+          // use watchHtml or directFallback
         }
       }
 
       const playerData = extractPlayerData(playerHtml)
-      if (playerData.sources.length === 0) return null
+      const links: VideoLink[] = []
 
-      const links: VideoLink[] = playerData.sources.map((src) => ({
-        resolutionStr: src.label || 'Auto',
-        link: src.src,
-        hls:
-          src.type === 'application/x-mpegURL' || src.type === 'm3u8' || src.src.includes('.m3u8'),
-      }))
+      if (playerData.sources.length > 0) {
+        for (const src of playerData.sources) {
+          links.push({
+            resolutionStr: src.label || 'Auto',
+            link: src.src,
+            hls:
+              src.type === 'application/x-mpegURL' ||
+              src.type === 'm3u8' ||
+              src.src.includes('.m3u8'),
+            headers: { Referer: BASE_URL + '/' },
+          })
+        }
+      } else if (directFallback) {
+        links.push({
+          resolutionStr: directFallback.match(/_(\d+p)\./)?.[1] ?? 'Auto',
+          link: directFallback,
+          hls: directFallback.includes('.m3u8'),
+          headers: { Referer: BASE_URL + '/' },
+        })
+      } else {
+        return null
+      }
 
       const result: VideoSource[] = [
         {

@@ -145,6 +145,7 @@ export const usePlayerData = (
     if (
       showMeta?.isAdult &&
       uiState.selectedProvider !== 'wh' &&
+      uiState.selectedProvider !== 'hn' &&
       hasForcedAdultProvider.current !== showId
     ) {
       hasForcedAdultProvider.current = showId
@@ -171,7 +172,9 @@ export const usePlayerData = (
       try {
         let providerShowId = showId
         if (
-          ['allanime', '123anime', 'animeya', 'megaplay', 'wh'].includes(uiState.selectedProvider)
+          ['allanime', '123anime', 'animeya', 'megaplay', 'wh', 'hn'].includes(
+            uiState.selectedProvider
+          )
         ) {
           const names = showMeta?.names
           // AlAnime's `name` field is often the native Japanese script (e.g. "ブリーチ"

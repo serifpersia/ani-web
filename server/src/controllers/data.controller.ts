@@ -63,7 +63,8 @@ export class DataController {
       if ((e as Error).message === 'AUTH_REQUIRED') {
         return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'animepahe' })
       }
-      throw e
+      logger.error({ err: e, timeframe, page }, 'getPopular failed')
+      res.json([])
     }
   }
 
@@ -331,7 +332,8 @@ export class DataController {
       if ((e as Error).message === 'AUTH_REQUIRED') {
         return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'animepahe' })
       }
-      throw e
+      logger.error({ err: e }, 'search failed')
+      res.json([])
     }
   }
 
