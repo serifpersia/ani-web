@@ -137,10 +137,12 @@ app.use(
   createAuthRouter((database) => runSyncSequence(database))
 )
 
-app.use(
-  '/api',
-  createWatchlistRouter(allAnimeProvider, animepaheProvider, () => db)
+const { router: watchlistRouter, stopDiscovery } = createWatchlistRouter(
+  allAnimeProvider,
+  animepaheProvider,
+  () => db
 )
+app.use('/api', watchlistRouter)
 app.use('/api', createDataRouter(apiCache, providers))
 app.use('/api', createProxyRouter())
 app.use('/api', createInsightsRouter())
@@ -242,6 +244,7 @@ async function main() {
   const shutdown = async (signal?: string) => {
     if (isShuttingDown) return
     isShuttingDown = true
+    stopDiscovery()
     clearInterval(syncInterval)
     discordRPCService.disconnect()
     await watcher.close()

@@ -9,7 +9,7 @@ export function createWatchlistRouter(
   allAnime: AllAnimeProvider,
   animePahe: AnimePaheProvider,
   getDb: () => DatabaseWrapper
-): Router {
+): { router: Router; stopDiscovery: () => void } {
   const router = Router()
   const controller = new WatchlistController({ allAnime, animePahe })
 
@@ -54,5 +54,8 @@ export function createWatchlistRouter(
     res.json({ success: true })
   })
 
-  return router
+  return {
+    router,
+    stopDiscovery: () => controller.stopNotificationDiscovery(),
+  }
 }

@@ -75,10 +75,20 @@ export class WatchlistController {
   private allAnime: AllAnimeProvider
   private animePahe?: AnimePaheProvider
   private triggerDiscovery?: () => void
+  private discoveryIntervalId: ReturnType<typeof setInterval> | null = null
+  private stopped = false
 
   constructor(providers: { allAnime: AllAnimeProvider; animePahe?: AnimePaheProvider }) {
     this.allAnime = providers.allAnime
     this.animePahe = providers.animePahe
+  }
+
+  stopNotificationDiscovery(): void {
+    this.stopped = true
+    if (this.discoveryIntervalId !== null) {
+      clearInterval(this.discoveryIntervalId)
+      this.discoveryIntervalId = null
+    }
   }
 
   startNotificationDiscovery(getDb: () => DatabaseWrapper): void {
@@ -114,7 +124,7 @@ export class WatchlistController {
     }
 
     const runDiscovery = async (): Promise<void> => {
-      if (busy) return
+      if (busy || this.stopped) return
       busy = true
 
       const db = getDb()
@@ -131,10 +141,12 @@ export class WatchlistController {
         }
 
         const showIdMap = new Map<string, number>()
-        for (const show of watchingShows) {
-          const anilistId = await getAnilistId(show.id, show.name)
-          if (anilistId) {
-            showIdMap.set(show.id, anilistId)
+        const anilistResults = await Promise.all(
+          watchingShows.map((show) => getAnilistId(show.id, show.name).then((id) => ({ show, id })))
+        )
+        for (const { show, id } of anilistResults) {
+          if (id) {
+            showIdMap.set(show.id, id)
           }
         }
 
@@ -246,15 +258,23 @@ export class WatchlistController {
           }
         }
       } catch (e) {
-        logger.error({ err: e }, 'AniList notification discovery failed')
+        if ((e as Error)?.message === 'Database is closed') {
+          logger.info('Notification discovery stopped: database is closed')
+        } else {
+          logger.error({ err: e }, 'AniList notification discovery failed')
+        }
       } finally {
         busy = false
       }
     }
 
-    this.triggerDiscovery = () => runDiscovery()
+    this.triggerDiscovery = () => {
+      if (!this.stopped) runDiscovery()
+    }
 
-    setInterval(runDiscovery, 300000)
+    this.discoveryIntervalId = setInterval(() => {
+      if (!this.stopped) runDiscovery()
+    }, 300000)
     runDiscovery()
   }
 
@@ -648,8 +668,8 @@ export class WatchlistController {
 
     setImmediate(async () => {
       if (req.db.isClosedCheck()) return
-      const delay = () => new Promise((res) => setImmediate(res))
       for (const row of rows) {
+        if (req.db.isClosedCheck()) return
         const currentThumbnail = row.thumbnail || ''
         const fixedThumbnail = this.deobfuscateUrl(currentThumbnail, row.id)
         const needsThumbnailUpdate = fixedThumbnail !== currentThumbnail
@@ -692,8 +712,8 @@ export class WatchlistController {
           } finally {
             this.activeTypeFetches.delete(row.id)
           }
-          await delay()
         }
+        await new Promise((resolve) => setTimeout(resolve, 100))
       }
     })
   }
@@ -903,6 +923,18 @@ export class WatchlistController {
     })
 
     await req.db.saveNow()
+
+    if (name && !/^\d+$/.test(id)) {
+      searchAnilistByTitle(name)
+        .then((result) => {
+          if (result?.id) {
+            ShowsMetaRepository.upsert(req.db, { id, anilistId: result.id })
+            req.db.scheduleSave()
+          }
+        })
+        .catch(() => {})
+    }
+
     res.json({ success: true })
   }
 

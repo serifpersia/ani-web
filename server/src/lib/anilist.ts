@@ -2,9 +2,24 @@ import { Show } from '../providers/provider.interface'
 import logger from '../logger'
 
 const ANILIST_API = 'https://graphql.anilist.co'
-const ANILIST_MIN_INTERVAL = 2100
-let nextAnilistRequestAt = 0
+
+const BURST_CAPACITY = 12
+const REFILL_INTERVAL_MS = 750
+let tokens = BURST_CAPACITY
+let lastRefill = Date.now()
 let anilistCooldownUntil = 0
+
+function refillTokens(): void {
+  const now = Date.now()
+  if (now < lastRefill) return
+  const elapsed = now - lastRefill
+  const refillAmount = Math.floor(elapsed / REFILL_INTERVAL_MS)
+  if (refillAmount > 0) {
+    tokens = Math.min(BURST_CAPACITY, tokens + refillAmount)
+    lastRefill += refillAmount * REFILL_INTERVAL_MS
+  }
+}
+
 const anilistMemoryCache = new Map<string, { data: unknown; expiry: number }>()
 const ANILIST_MEMORY_TTL = 60 * 60 * 1000
 const airedEpisodesCache = new Map<string, { data: unknown; expiry: number }>()
@@ -128,14 +143,20 @@ function setCachedAiredEpisodes(key: string, data: unknown): void {
 async function waitForAnilistSlot(): Promise<void> {
   while (true) {
     const now = Date.now()
-    const scheduledAt = Math.max(now, nextAnilistRequestAt, anilistCooldownUntil)
-    nextAnilistRequestAt = scheduledAt + ANILIST_MIN_INTERVAL
 
-    if (scheduledAt > now) {
-      await new Promise((resolve) => setTimeout(resolve, scheduledAt - now))
+    if (now < anilistCooldownUntil) {
+      await new Promise((resolve) => setTimeout(resolve, anilistCooldownUntil - now))
+      continue
     }
 
-    if (Date.now() >= anilistCooldownUntil) return
+    refillTokens()
+
+    if (tokens >= 1) {
+      tokens -= 1
+      return
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, REFILL_INTERVAL_MS))
   }
 }
 
