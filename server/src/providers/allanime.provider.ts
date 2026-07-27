@@ -19,13 +19,14 @@ const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0'
 const REFERER = 'https://youtu-chan.com'
 
-// AllAnime anti-bot crypto constants — set via env vars, fallback to compiled defaults
-const AA_BUILD_ID = () => process.env.AA_BUILD_ID || '63'
+const AA_BUILD_ID = () => process.env.AA_BUILD_ID || '72'
 const AA_MASK_HEX = () =>
-  process.env.AA_MASK_HEX || 'a39b86dbbcf57f884f3e9074969e7fe26656c74012e4545605896621ffa441c1'
-const BOOTSTRAP_ENDPOINT = () =>
-  `https://api.mkissa.net/client-crypto/v1/bootstrap?buildId=${AA_BUILD_ID()}`
-const AA_TS_WINDOW_MS = 300_000
+  process.env.AA_MASK_HEX || 'ff420daab5d04687e46e093ecf02285c633b9278f39a594df945a70079a3bdcc'
+const AA_BOOTSTRAP_HOST = 'api.mkissa.net'
+const AA_BOOTSTRAP_BASE = '/client-crypto/v1/bootstrap'
+const AA_EPOCH_MS = 259_200_000
+const AA_GRACE_MS = 86_400_000
+const AA_TS_BUCKET_MS = 300_000
 
 interface BootstrapData {
   epoch: number
@@ -149,43 +150,84 @@ export class AllAnimeProvider implements Provider {
     this.aaAesKey = Buffer.alloc(32)
   }
 
+  private makeBootToken(buildId: string, mask: Buffer, epoch: number, lane: string): string {
+    const host = 'mkissa.to'
+    const keyGroup = 'mkissa'
+    const inner = crypto.createHmac('sha256', mask).update(`aa-boot:${buildId}`).digest()
+    const payload = `${buildId}:${keyGroup}:${host}:${epoch}:${lane}`
+    return crypto.createHmac('sha256', inner).update(payload).digest('hex')
+  }
+
+  private getFsEpoch(): number {
+    const now = Date.now()
+    const t = Math.floor(now / AA_EPOCH_MS)
+    return now - t * AA_EPOCH_MS < AA_GRACE_MS && t > 0 ? t - 1 : t
+  }
+
+  private getBhEpoch(): number {
+    return Math.floor(Date.now() / AA_EPOCH_MS)
+  }
+
   private async fetchBootstrap(): Promise<BootstrapData> {
-    try {
-      const response = await axios.get(BOOTSTRAP_ENDPOINT(), {
-        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
-        timeout: 10000,
-      })
-      const data = response.data as BootstrapData
-      if (!data?.partB || !data?.epoch) {
-        throw new Error('Invalid bootstrap response')
+    const buildId = AA_BUILD_ID()
+    const mask = Buffer.from(AA_MASK_HEX(), 'hex')
+    const lane = 'k7'
+    const epochs = [...new Set([this.getFsEpoch(), this.getBhEpoch()])]
+    let lastErr: unknown
+
+    for (const epoch of epochs) {
+      const token = this.makeBootToken(buildId, mask, epoch, lane)
+      try {
+        const response = await axios.get(
+          `https://${AA_BOOTSTRAP_HOST}${AA_BOOTSTRAP_BASE}?buildId=${buildId}&k=${lane}`,
+          {
+            headers: {
+              'User-Agent': USER_AGENT,
+              Origin: 'https://mkissa.to',
+              Referer: 'https://mkissa.to/',
+              'x-build-id': buildId,
+              'x-aa-boot': token,
+            },
+            timeout: 10000,
+          }
+        )
+        const data = response.data as BootstrapData
+        if (!data?.partB || !data?.epoch) {
+          throw new Error('Invalid bootstrap response')
+        }
+        return data
+      } catch (err: unknown) {
+        if (
+          axios.isAxiosError(err) &&
+          (err.response?.data as Record<string, unknown>)?.error === 'unknown_build_id'
+        ) {
+          throw new Error('AA_CRYPTO_STALE: unknown build ID', { cause: err })
+        }
+        lastErr = err
       }
-      return data
-    } catch (err: unknown) {
-      if (
-        axios.isAxiosError(err) &&
-        (err.response?.data as Record<string, unknown>)?.error === 'unknown_build_id'
-      ) {
-        throw new Error('AA_CRYPTO_STALE: unknown build ID', { cause: err })
-      }
-      throw err
     }
+    throw lastErr || new Error('Bootstrap failed for all epochs')
   }
 
   private deriveKey(partB: string): Buffer {
     const mask = Buffer.from(AA_MASK_HEX(), 'hex')
     const partBBuf = Buffer.from(partB, 'base64')
-    const key = Buffer.alloc(32)
-    for (let i = 0; i < 32; i++) {
+    const key = Buffer.alloc(partBBuf.length)
+    for (let i = 0; i < partBBuf.length; i++) {
       key[i] = mask[i % mask.length] ^ partBBuf[i]
     }
     return key
   }
 
   private async ensureKey(): Promise<void> {
-    if (this.aaAesKey.length === 32 && this.aaEpoch > 0) return
-    const bootstrap = await this.fetchBootstrap()
-    this.aaEpoch = bootstrap.epoch
-    this.aaAesKey = this.deriveKey(bootstrap.partB)
+    if (this.aaAesKey.length > 0 && this.aaEpoch > 0) return
+    try {
+      const bootstrap = await this.fetchBootstrap()
+      this.aaEpoch = bootstrap.epoch
+      this.aaAesKey = this.deriveKey(bootstrap.partB)
+    } catch (err) {
+      logger.warn({ err }, 'Bootstrap failed — crypto operations (streaming) unavailable')
+    }
   }
 
   async refreshKey(): Promise<void> {
@@ -238,18 +280,6 @@ export class AllAnimeProvider implements Provider {
         throw new Error('PersistedQueryNotFound')
       }
 
-      if (
-        errorMsg === 'AA_CRYPTO_STALE' ||
-        errorMsg === 'AA_CRYPTO_EXPIRED' ||
-        errorMsg === 'AA_CRYPTO_BUILD_MISMATCH' ||
-        errorMsg === 'AA_CRYPTO_QUERY_MISMATCH'
-      ) {
-        if (retryCount < 1) {
-          await this.refreshKey()
-          return this._request(config, retryCount + 1)
-        }
-      }
-
       throw new Error(`Server responded with unknown error: ${errorMsg}`)
     }
 
@@ -285,18 +315,18 @@ export class AllAnimeProvider implements Provider {
     }
   }
 
-  private makeAaReq(queryHash: string): string {
-    const ts = Math.floor(Date.now() / AA_TS_WINDOW_MS) * AA_TS_WINDOW_MS
+  private makeAaReq(queryHash: string, lane = 'k7'): string {
     const epoch = this.aaEpoch
+    const ts = Math.floor(Date.now() / AA_TS_BUCKET_MS) * AA_TS_BUCKET_MS
     const payload = JSON.stringify({
       v: 1,
       ts,
       epoch,
       buildId: AA_BUILD_ID(),
       qh: queryHash,
+      k: lane,
     })
-    const k = `${epoch}:${AA_BUILD_ID()}:${queryHash}:${ts}`
-    const iv = crypto.createHash('sha256').update(k).digest().subarray(0, 12)
+    const iv = crypto.randomBytes(12)
     const cipher = crypto.createCipheriv('aes-256-gcm', this.aaAesKey, iv)
     const encrypted = Buffer.concat([cipher.update(payload, 'utf8'), cipher.final()])
     const tag = cipher.getAuthTag()
@@ -800,10 +830,11 @@ export class AllAnimeProvider implements Provider {
     episodeNumber: string,
     mode: 'sub' | 'dub'
   ): Promise<VideoSource[] | null> {
-    const episodeQueryHash = '09caca435564416f37d5c78256c8e6e517007c3006529857e84ba2466bfcbea6'
+    const episodeQueryHash = 'f4662f4b7510b26795dd53ef824a0bf1740fbbc5d1273fab18222ac831bca8d0'
 
     const makeRequest = async () => {
-      const aaReqToken = this.makeAaReq(episodeQueryHash)
+      await this.ensureKey()
+      const aaReqToken = this.makeAaReq(episodeQueryHash, 'k7')
       const variablesParam = encodeURIComponent(
         JSON.stringify({ showId, translationType: mode, episodeString: episodeNumber })
       )
@@ -813,6 +844,7 @@ export class AllAnimeProvider implements Provider {
             version: 1,
             sha256Hash: episodeQueryHash,
           },
+          k: 'k7',
           aaReq: aaReqToken,
         })
       )
@@ -820,7 +852,12 @@ export class AllAnimeProvider implements Provider {
       return this._request({
         method: 'GET',
         url: requestUrl,
-        headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+        headers: {
+          'User-Agent': USER_AGENT,
+          Referer: 'https://mkissa.to/',
+          Origin: 'https://mkissa.to',
+          'x-build-id': AA_BUILD_ID(),
+        },
         timeout: 15000,
       })
     }
@@ -850,7 +887,12 @@ export class AllAnimeProvider implements Provider {
             query: `query($showId: String!, $translationType: VaildTranslationTypeEnumType!, $episodeString: String!) { episode(showId: $showId translationType: $translationType episodeString: $episodeString) { episodeString uploadDate sourceUrls thumbnail notes } }`,
             variables: { showId, translationType: mode, episodeString: episodeNumber },
           },
-          headers: { 'User-Agent': USER_AGENT, Referer: REFERER },
+          headers: {
+            'User-Agent': USER_AGENT,
+            Referer: 'https://mkissa.to/',
+            Origin: 'https://mkissa.to',
+            'x-build-id': AA_BUILD_ID(),
+          },
           timeout: 15000,
         })
       } else if (

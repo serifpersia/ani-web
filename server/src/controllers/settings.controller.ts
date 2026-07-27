@@ -204,9 +204,9 @@ export class SettingsController {
       if (chunkNames.length === 0) throw new Error('No chunks found in entry JS')
 
       const CDN = 'https://cdn.mkissa.net/all/mk/_app/immutable'
-      const buildIdRe = /\w+=\w+\(\d+\)!==["']string["']\?["'](\d+)["']/
+      const buildIdRe = /pf=[^?]+\?["'](\d+)["']/
 
-      let cryptoUrl = ''
+      let buildId = ''
       for (const name of chunkNames) {
         const url = `${CDN}/chunks/${name}`
         try {
@@ -215,8 +215,9 @@ export class SettingsController {
           })
           if (rangeRes.ok) {
             const text = await rangeRes.text()
-            if (buildIdRe.test(text)) {
-              cryptoUrl = url
+            const match = text.match(buildIdRe)
+            if (match) {
+              buildId = match[1]
               break
             }
           }
@@ -224,27 +225,9 @@ export class SettingsController {
           /* try next */
         }
       }
-      if (!cryptoUrl) throw new Error('Could not find crypto chunk')
-
-      const cryptoRes = await fetch(cryptoUrl, { headers: { 'User-Agent': UA } })
-      const cryptoCode = await cryptoRes.text()
-
-      const maskMatch = cryptoCode.match(/\b([a-f0-9]{64})\b/)
-      const buildIdMatch = cryptoCode.match(buildIdRe)
-      if (!maskMatch || !buildIdMatch) throw new Error('Could not extract crypto constants')
-
-      const maskHex = maskMatch[1]
-      const buildId = buildIdMatch[1]
-
-      const bootRes = await fetch(
-        `https://api.mkissa.net/client-crypto/v1/bootstrap?buildId=${buildId}`,
-        { headers: { 'User-Agent': UA, Referer: 'https://youtu-chan.com' } }
-      )
-      const bootData = await bootRes.json()
-      if (!bootData?.partB) throw new Error(`Bootstrap rejected build ID ${buildId}`)
+      if (!buildId) throw new Error('Could not extract buildId')
 
       process.env.AA_BUILD_ID = buildId
-      process.env.AA_MASK_HEX = maskHex
       await this.allAnimeProvider.refreshKey()
 
       const envLine = (key: string, val: string) => `${key}=${val}`
@@ -258,15 +241,15 @@ export class SettingsController {
         const lines = content
           .split('\n')
           .filter((l) => l && !l.startsWith('AA_BUILD_ID=') && !l.startsWith('AA_MASK_HEX='))
-        lines.push(envLine('AA_BUILD_ID', buildId), envLine('AA_MASK_HEX', maskHex))
+        lines.push(envLine('AA_BUILD_ID', buildId))
         fs.mkdirSync(path.dirname(filePath), { recursive: true })
         fs.writeFileSync(filePath, lines.join('\n') + '\n', 'utf-8')
       }
       upsertEnv(path.join(CONFIG.SERVER_ROOT, '.env'))
       upsertEnv(CONFIG.ENV_PATH)
 
-      logger.info({ buildId, maskHex: maskHex.slice(0, 16) + '…' }, 'AllAnime crypto recovered')
-      res.json({ success: true, buildId, maskHex })
+      logger.info({ buildId }, 'AllAnime buildId recovered')
+      res.json({ success: true, buildId })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err)
       logger.error({ err }, 'AllAnime recovery failed')
