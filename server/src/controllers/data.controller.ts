@@ -241,7 +241,7 @@ export class DataController {
         const hasTotal = typeof total === 'number' && Number.isFinite(total) && total > 0
 
         if (!hasTotal) {
-          episodes = await this.tryAllanimeFallback(showId, req.query.mode as 'sub' | 'dub')
+          episodes = await this.tryProviderEpisodesFallback(showId, req.query.mode as 'sub' | 'dub')
           if (episodes.length > 0) {
             setCachedAnilist(`eps:${showId}`, episodes)
           }
@@ -421,24 +421,29 @@ export class DataController {
     res.json({ genres, tags, studios })
   }
 
-  private tryAllanimeFallback = async (showId: string, mode: 'sub' | 'dub'): Promise<string[]> => {
+  private tryProviderEpisodesFallback = async (
+    showId: string,
+    mode: 'sub' | 'dub'
+  ): Promise<string[]> => {
     try {
       const meta = await getShowMetaById(showId)
       const title = meta?.name || meta?.englishName || meta?.nativeName
       if (!title) return []
 
-      const allanime = this.providers['allanime']
-      if (!allanime) return []
+      // anidb provides complete, normalized episode lists even when AniList
+      // has no episodeCount (e.g. One Piece) or wrong data (e.g. Detective Conan)
+      const provider = this.providers['anidb']
+      if (!provider) return []
 
-      const searchResults = await allanime.search({ query: title })
+      const searchResults = await provider.search({ query: title })
       if (!searchResults || searchResults.length === 0) return []
 
-      const firstResult = searchResults[0]
-      const allanimeShowId = firstResult._id || firstResult.id
-      if (!allanimeShowId) return []
+      const providerShowId = searchResults[0]._id || searchResults[0].id
+      if (!providerShowId) return []
 
-      const episodesData = await allanime.getEpisodes(allanimeShowId, mode)
-      return episodesData?.episodes || []
+      const episodesData = await provider.getEpisodes(providerShowId, mode)
+      if (episodesData?.episodes?.length) return episodesData.episodes
+      return []
     } catch {
       return []
     }

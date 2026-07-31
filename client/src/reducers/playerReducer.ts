@@ -14,6 +14,7 @@ export type Action =
         | 'wh'
         | 'hn'
         | 'anilight'
+        | 'anidb'
     }
   | { type: 'SET_OVERRIDE_SOURCE'; payload: { source: VideoSource; link: VideoLink } | null }
 
@@ -24,6 +25,7 @@ const getPreferredMode = (): 'sub' | 'dub' => {
 const getPreferredProvider = (): PlayerState['selectedProvider'] => {
   const provider = localStorage.getItem('preferredProvider')
   const validProviders: string[] = [
+    'anidb',
     'megaplay',
     'allanime',
     'animeya',
@@ -36,7 +38,7 @@ const getPreferredProvider = (): PlayerState['selectedProvider'] => {
   if (provider && validProviders.includes(provider)) {
     return provider as PlayerState['selectedProvider']
   }
-  return 'megaplay'
+  return 'anidb'
 }
 
 export const createInitialState = (): PlayerState => ({

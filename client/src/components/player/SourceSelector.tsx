@@ -12,6 +12,7 @@ interface ProviderSelectorProps {
     | 'wh'
     | 'hn'
     | 'anilight'
+    | 'anidb'
   onProviderChange: (
     provider:
       | 'allanime'
@@ -22,6 +23,7 @@ interface ProviderSelectorProps {
       | 'wh'
       | 'hn'
       | 'anilight'
+      | 'anidb'
   ) => void
 }
 
@@ -46,9 +48,11 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
               | 'wh'
               | 'hn'
               | 'anilight'
+              | 'anidb'
           )
         }
       >
+        <option value="anidb">AniDB</option>
         <option value="anilight">Anilight</option>
         <option value="megaplay">MegaPlay</option>
         <option value="allanime">AllAnime</option>
