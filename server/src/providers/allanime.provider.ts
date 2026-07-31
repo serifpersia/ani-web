@@ -21,9 +21,8 @@ const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0'
 const REFERER = 'https://youtu-chan.com'
 
-const AA_BUILD_ID = () => process.env.AA_BUILD_ID || '72'
-const AA_MASK_HEX = () =>
-  process.env.AA_MASK_HEX || 'ff420daab5d04687e46e093ecf02285c633b9278f39a594df945a70079a3bdcc'
+const AA_BUILD_ID = () => process.env.AA_BUILD_ID || '76'
+const AA_MASK_HEX = () => process.env.AA_MASK_HEX || 'c186dd7d994e141fded18be74b5ab450e17ad5b6a79a6f65041a14b58095768c'
 const AA_BOOTSTRAP_HOST = 'api.mkissa.net'
 const AA_BOOTSTRAP_BASE = '/client-crypto/v1/bootstrap'
 const AA_EPOCH_MS = 259_200_000
@@ -368,7 +367,12 @@ export class AllAnimeProvider implements Provider {
       qh: queryHash,
       k: lane,
     })
-    const iv = crypto.randomBytes(12)
+    // IV is deterministic: sha256(epoch:buildId:queryHash:ts:lane)[0:12] (matches site crypto)
+    const iv = crypto
+      .createHash('sha256')
+      .update(`${epoch}:${AA_BUILD_ID()}:${queryHash}:${ts}:${lane}`)
+      .digest()
+      .subarray(0, 12)
     const cipher = crypto.createCipheriv('aes-256-gcm', this.aaAesKey, iv)
     const encrypted = Buffer.concat([cipher.update(payload, 'utf8'), cipher.final()])
     const tag = cipher.getAuthTag()

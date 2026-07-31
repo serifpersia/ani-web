@@ -359,6 +359,8 @@ export class AnilightProvider implements Provider {
         )
         if (!data?.sources) continue
 
+        const links: { resolutionStr: string; link: string; hls: boolean }[] = []
+
         for (const source of data.sources) {
           let rawUrl = source.url || ''
           if (!rawUrl) continue
@@ -381,14 +383,11 @@ export class AnilightProvider implements Provider {
                 : `${source.quality}p`
               : 'Auto'
 
-          const links: { resolutionStr: string; link: string; hls: boolean }[] = [
-            { resolutionStr: qualityLabel, link: proxyUrl, hls: isHls },
-          ]
+          links.push({ resolutionStr: qualityLabel, link: proxyUrl, hls: isHls })
 
           if (isHls && rawUrl.endsWith('master.m3u8')) {
             try {
               const masterContent = curlGetText(rawUrl)
-              // If curlGetJSON text response available, parse sub-playlists
               if (
                 typeof masterContent === 'string' &&
                 masterContent.includes('#EXT-X-STREAM-INF')
@@ -418,69 +417,71 @@ export class AnilightProvider implements Provider {
               logger.warn({ rawUrl }, '[Anilight] Master playlist resolution parsing failed')
             }
           }
+        }
 
-          const subtitles = (data.tracks || [])
-            .filter((t) => t.file || t.url)
-            .map((t) => {
-              const raw = t.file || t.url || ''
-              return {
-                language: t.lang || t.label || 'en',
-                label: t.label || t.lang || 'English',
-                url:
-                  provider.id === 'misa' || provider.id === 'misora'
-                    ? `${ANILIGHT_API}/proxy/captions?url=${encodeURIComponent(raw)}`
-                    : raw,
+        if (links.length === 0) continue
+
+        const subtitles = (data.tracks || [])
+          .filter((t) => t.file || t.url)
+          .map((t) => {
+            const raw = t.file || t.url || ''
+            return {
+              language: t.lang || t.label || 'en',
+              label: t.label || t.lang || 'English',
+              url:
+                provider.id === 'misa' || provider.id === 'misora'
+                  ? `${ANILIGHT_API}/proxy/captions?url=${encodeURIComponent(raw)}`
+                  : raw,
+            }
+          })
+
+        if (provider.id === 'misora' || provider.id === 'misa') {
+          const m3u8Subs = subtitles
+            .map((s, i) => ({ ...s, i }))
+            .filter((s) => s.url.includes('.m3u8'))
+          for (const sub of m3u8Subs) {
+            let vttUrl: string | null = null
+            try {
+              const base = sub.url.replace(/\/[^/]*\.m3u8$/, '/')
+              const candidate = `${base}sub.vtt`
+              const vttResp = curlGetText(candidate)
+              if (vttResp && vttResp.includes('WEBVTT')) {
+                vttUrl = candidate
               }
-            })
-
-          if (provider.id === 'misora' || provider.id === 'misa') {
-            const m3u8Subs = subtitles
-              .map((s, i) => ({ ...s, i }))
-              .filter((s) => s.url.includes('.m3u8'))
-            for (const sub of m3u8Subs) {
-              let vttUrl: string | null = null
+            } catch {
+              // ignore
+            }
+            if (!vttUrl) {
               try {
-                const base = sub.url.replace(/\/[^/]*\.m3u8$/, '/')
-                const candidate = `${base}sub.vtt`
-                const vttResp = curlGetText(candidate)
-                if (vttResp && vttResp.includes('WEBVTT')) {
-                  vttUrl = candidate
+                const hashMatch = sub.url.match(/\/cachesub\/([^/]+)\//)
+                if (hashMatch?.[1]) {
+                  const candidate = `https://ani10.nukitashi.top/${hashMatch[1]}/sub.vtt`
+                  const vttResp = curlGetText(candidate)
+                  if (vttResp && vttResp.includes('WEBVTT')) {
+                    vttUrl = candidate
+                  }
                 }
               } catch {
                 // ignore
               }
-              if (!vttUrl) {
-                try {
-                  const hashMatch = sub.url.match(/\/cachesub\/([^/]+)\//)
-                  if (hashMatch?.[1]) {
-                    const candidate = `https://ani10.nukitashi.top/${hashMatch[1]}/sub.vtt`
-                    const vttResp = curlGetText(candidate)
-                    if (vttResp && vttResp.includes('WEBVTT')) {
-                      vttUrl = candidate
-                    }
-                  }
-                } catch {
-                  // ignore
-                }
-              }
-              if (vttUrl) {
-                subtitles[sub.i] = {
-                  language: sub.language,
-                  label: sub.label,
-                  url: vttUrl,
-                }
+            }
+            if (vttUrl) {
+              subtitles[sub.i] = {
+                language: sub.language,
+                label: sub.label,
+                url: vttUrl,
               }
             }
           }
-
-          sources.push({
-            sourceName: provider.id,
-            links,
-            subtitles: subtitles.length ? subtitles : undefined,
-            type: 'player',
-            actualEpisodeNumber: episodeNumber,
-          })
         }
+
+        sources.push({
+          sourceName: provider.id,
+          links,
+          subtitles: subtitles.length ? subtitles : undefined,
+          type: 'player',
+          actualEpisodeNumber: episodeNumber,
+        })
       }
 
       return sources.length ? sources : null

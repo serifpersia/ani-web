@@ -81,9 +81,9 @@ const SourceSelector: React.FC<SourceSelectorProps> = ({
     <div className={styles.sourceSelectionContainer}>
       <h4>Source</h4>
       <div className={styles.sourceButtons}>
-        {sources.map((source) => (
+        {sources.map((source, i) => (
           <button
-            key={source.sourceName}
+            key={`${source.sourceName}-${i}`}
             className={`${styles.sourceButton} ${selectedSource?.sourceName === source.sourceName ? styles.active : ''} `}
             onClick={() => onSourceChange(source)}
           >

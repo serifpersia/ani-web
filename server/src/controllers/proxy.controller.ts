@@ -136,7 +136,7 @@ export class ProxyController {
           throwHttpErrors: false,
         })
 
-        if (resp.statusCode !== 200) {
+        if (resp.statusCode !== 200 && resp.statusCode !== 206) {
           return res.status(resp.statusCode ?? 502).send('Upstream error')
         }
 
@@ -189,7 +189,7 @@ export class ProxyController {
             throwHttpErrors: false,
           })
 
-          if (resp.statusCode !== 200) {
+          if (resp.statusCode !== 200 && resp.statusCode !== 206) {
             return res.status(resp.statusCode ?? 502).send('Upstream error')
           }
 

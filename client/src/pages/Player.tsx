@@ -281,34 +281,31 @@ const Player: React.FC = () => {
     videoElement.addEventListener('loadedmetadata', handleLoaded, { once: true })
 
     if (state.selectedLink.hls) {
-      const canPlayNativeHls =
+      const Hls = (window as unknown as { Hls?: typeof Hls }).Hls
+      if (Hls && Hls.isSupported()) {
+        const isLowEnd = document.body.classList.contains('low-end')
+        const hls = new Hls({
+          maxBufferLength: isLowEnd ? 15 : 30,
+          maxMaxBufferLength: isLowEnd ? 30 : 60,
+          maxBufferSize: isLowEnd ? 25 * 1000 * 1000 : 60 * 1000 * 1000,
+          startLevel: -1,
+          enableWorker: true,
+        })
+        hlsInstance.current = hls
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (data.fatal && !hasAutoFallbackRef.current) {
+            handleVideoSourceErrorRef.current()
+          }
+        })
+        hls.loadSource(proxiedUrl)
+        hls.attachMedia(videoElement)
+      } else if (
         videoElement.canPlayType('application/vnd.apple.mpegurl') ||
         videoElement.canPlayType('application/x-mpegURL')
-
-      if (canPlayNativeHls) {
+      ) {
         videoElement.src = proxiedUrl
       } else {
-        const Hls = (window as unknown as { Hls?: typeof Hls }).Hls
-        if (Hls && Hls.isSupported()) {
-          const isLowEnd = document.body.classList.contains('low-end')
-          const hls = new Hls({
-            maxBufferLength: isLowEnd ? 15 : 30,
-            maxMaxBufferLength: isLowEnd ? 30 : 60,
-            maxBufferSize: isLowEnd ? 25 * 1000 * 1000 : 60 * 1000 * 1000,
-            startLevel: -1,
-            enableWorker: true,
-          })
-          hlsInstance.current = hls
-          hls.on(Hls.Events.ERROR, (_event, data) => {
-            if (data.fatal && !hasAutoFallbackRef.current) {
-              handleVideoSourceErrorRef.current()
-            }
-          })
-          hls.loadSource(proxiedUrl)
-          hls.attachMedia(videoElement)
-        } else {
-          videoElement.src = proxiedUrl
-        }
+        videoElement.src = proxiedUrl
       }
     } else {
       videoElement.src = proxiedUrl

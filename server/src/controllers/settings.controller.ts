@@ -1,4 +1,5 @@
 import { Request, Response } from 'express'
+import vm from 'node:vm'
 import { performWriteTransaction } from '../sync'
 import { searchAnilistByTitle } from '../lib/anilist'
 import { parseStringPromise } from 'xml2js'
@@ -180,54 +181,101 @@ export class SettingsController {
     }
   }
 
+  private static async extractAaCrypto(
+    chunkCode: string
+  ): Promise<{ buildId: string; maskHex: string }> {
+    const start = chunkCode.indexOf('const Sf=Ss;')
+    const end = chunkCode.indexOf('function US()')
+    if (start < 0 || end < 0) {
+      throw new Error('AA crypto code not found in chunk')
+    }
+    const extracted = `const __self = (function () {
+${chunkCode.slice(start, end)}
+return { qh, wf };
+})();`
+    const ctx = vm.createContext({
+      console: { log: () => {} },
+      TextEncoder,
+      Uint8Array,
+      ArrayBuffer,
+      btoa,
+      atob,
+      crypto: globalThis.crypto,
+    })
+    vm.runInContext(extracted, ctx)
+    const self = vm.runInContext('__self', ctx) as {
+      qh: (e?: string) => Uint8Array | null
+      wf: string
+    }
+    const mask = self.qh(self.wf || '76')
+    if (!mask || mask.length !== 32) {
+      throw new Error('AA mask derivation returned invalid result')
+    }
+    const maskHex = Array.from(mask)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')
+    return { buildId: String(self.wf || ''), maskHex }
+  }
+
   recoverAllanime = async (_req: Request, res: Response) => {
     if (!this.allAnimeProvider) {
       return res.status(500).json({ error: 'AllAnime provider not available' })
     }
     const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0'
 
+    const fetchText = async (url: string, extraHeaders: Record<string, string> = {}) => {
+      const r = await fetch(url, { headers: { 'User-Agent': UA, ...extraHeaders } })
+      if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`)
+      return r.text()
+    }
+
     try {
-      const htmlRes = await fetch('https://mkissa.to', { headers: { 'User-Agent': UA } })
-      const html = await htmlRes.text()
-      const entryMatch = html.match(/import\("([^"]+entry[/\\]app\.[^"]+\.js)"\)/i)
-      if (!entryMatch) throw new Error('Could not find entry JS URL')
-
-      const entryUrl = entryMatch[1].startsWith('http')
-        ? entryMatch[1]
-        : `https://mkissa.to${entryMatch[1]}`
-
-      const entryRes = await fetch(entryUrl, { headers: { 'User-Agent': UA } })
-      const entryCode = await entryRes.text()
-      const chunkNames = [
-        ...new Set([...entryCode.matchAll(/\.\.\/chunks\/([^"']+\.js)/g)].map((m) => m[1])),
+      const html = await fetchText('https://mkissa.to')
+      const assetsMatch = html.match(/assets:\s*"([^"]+)"/)
+      const assets = assetsMatch ? assetsMatch[1] : 'https://cdn.mkissa.net/all/mk'
+      const entryMatches = [
+        ...html.matchAll(/import\(\s*"([^"]+_app\/immutable\/entry\/[^"]+\.js)"/g),
       ]
-      if (chunkNames.length === 0) throw new Error('No chunks found in entry JS')
+      if (entryMatches.length < 2) {
+        throw new Error('Could not find app entry JS URLs')
+      }
+      const appUrl = entryMatches.map((m) => m[1]).find((u) => u.includes('/app.'))
+      if (!appUrl) throw new Error('Could not find app.js URL')
 
-      const CDN = 'https://cdn.mkissa.net/all/mk/_app/immutable'
-      const buildIdRe = /pf=[^?]+\?["'](\d+)["']/
+      const appCode = await fetchText(
+        appUrl.startsWith('http') ? appUrl : `https://mkissa.to${appUrl}`
+      )
+      const chunkNames = [
+        ...new Set([...appCode.matchAll(/\.\.\/chunks\/([^"']+\.js)/g)].map((m) => m[1])),
+      ]
+      if (chunkNames.length === 0) throw new Error('No chunks found in app JS')
 
-      let buildId = ''
+      let crypto: { buildId: string; maskHex: string } | null = null
       for (const name of chunkNames) {
-        const url = `${CDN}/chunks/${name}`
+        const url = `${assets}/_app/immutable/chunks/${name}`
         try {
           const rangeRes = await fetch(url, {
-            headers: { 'User-Agent': UA, Range: 'bytes=0-200000' },
+            headers: { 'User-Agent': UA, Range: 'bytes=0-300000' },
           })
-          if (rangeRes.ok) {
-            const text = await rangeRes.text()
-            const match = text.match(buildIdRe)
-            if (match) {
-              buildId = match[1]
-              break
-            }
+          if (!rangeRes.ok) continue
+          const text = await rangeRes.text()
+          if (text.includes('const Sf=Ss;') && text.includes('function US()')) {
+            crypto = await SettingsController.extractAaCrypto(text)
+            break
           }
         } catch {
           /* try next */
         }
       }
-      if (!buildId) throw new Error('Could not extract buildId')
+      if (!crypto) {
+        throw new Error('Could not extract AA crypto constants (buildId/mask)')
+      }
+      if (!crypto.buildId || !crypto.maskHex) {
+        throw new Error('Extracted empty buildId or mask')
+      }
 
-      process.env.AA_BUILD_ID = buildId
+      process.env.AA_BUILD_ID = crypto.buildId
+      process.env.AA_MASK_HEX = crypto.maskHex
       await this.allAnimeProvider.refreshKey()
 
       const envLine = (key: string, val: string) => `${key}=${val}`
@@ -241,15 +289,16 @@ export class SettingsController {
         const lines = content
           .split('\n')
           .filter((l) => l && !l.startsWith('AA_BUILD_ID=') && !l.startsWith('AA_MASK_HEX='))
-        lines.push(envLine('AA_BUILD_ID', buildId))
+        lines.push(envLine('AA_BUILD_ID', crypto.buildId))
+        lines.push(envLine('AA_MASK_HEX', crypto.maskHex))
         fs.mkdirSync(path.dirname(filePath), { recursive: true })
         fs.writeFileSync(filePath, lines.join('\n') + '\n', 'utf-8')
       }
       upsertEnv(path.join(CONFIG.SERVER_ROOT, '.env'))
       upsertEnv(CONFIG.ENV_PATH)
 
-      logger.info({ buildId }, 'AllAnime buildId recovered')
-      res.json({ success: true, buildId })
+      logger.info({ buildId: crypto.buildId }, 'AllAnime crypto constants recovered')
+      res.json({ success: true, buildId: crypto.buildId, maskHex: crypto.maskHex })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err)
       logger.error({ err }, 'AllAnime recovery failed')
