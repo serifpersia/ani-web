@@ -139,5 +139,5 @@ export interface Provider {
     mode?: 'sub' | 'dub'
   ): Promise<VideoSource[] | null>
   getSkipTimes(showId: string, episodeNumber: string): Promise<SkipIntervals>
-  resolveShowId?(title: string, romaji?: string): Promise<string | null>
+  resolveShowId?(title: string, romaji?: string, mode?: 'sub' | 'dub'): Promise<string | null>
 }

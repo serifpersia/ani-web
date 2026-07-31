@@ -154,7 +154,11 @@ export class DataController {
               // A title from local metadata is still enough to attempt provider resolution.
             }
           }
-          const resolved = await this.providers[providerKey]?.resolveShowId?.(targetTitle, romaji)
+          const resolved = await this.providers[providerKey]?.resolveShowId?.(
+            targetTitle,
+            romaji,
+            req.query.mode as 'sub' | 'dub' | undefined
+          )
           if (resolved) {
             showId = resolved
           } else {

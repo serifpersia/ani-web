@@ -58,7 +58,7 @@ async function gotGet(
       method: 'GET',
       headers: {
         'User-Agent': BROWSER_UA,
-        'Accept': '*/*',
+        Accept: '*/*',
         'Accept-Language': 'en-US,en;q=0.9',
         ...extraHeaders,
       },
@@ -308,7 +308,9 @@ export class AnidbProvider implements Provider {
     if (!resp || resp.status !== 200 || resp.body.includes('Just a moment')) return null
 
     const titleMatch = resp.body.match(/<h1[^>]*>([^<]*)<\/h1>/)
-    const posterMatch = resp.body.match(/<img[^>]*src="([^"]*\.(?:jpg|jpeg|png|webp)[^"]*)"[^>]*class="[^"]*(?:poster|cover|backdrop)[^"]*"/)
+    const posterMatch = resp.body.match(
+      /<img[^>]*src="([^"]*\.(?:jpg|jpeg|png|webp)[^"]*)"[^>]*class="[^"]*(?:poster|cover|backdrop)[^"]*"/
+    )
     const descriptionMatch = resp.body.match(/<meta[^>]*name="description"[^>]*content="([^"]*)"/)
     if (!titleMatch && !descriptionMatch) return null
 

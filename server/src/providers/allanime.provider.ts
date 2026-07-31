@@ -22,7 +22,8 @@ const USER_AGENT =
 const REFERER = 'https://youtu-chan.com'
 
 const AA_BUILD_ID = () => process.env.AA_BUILD_ID || '76'
-const AA_MASK_HEX = () => process.env.AA_MASK_HEX || 'c186dd7d994e141fded18be74b5ab450e17ad5b6a79a6f65041a14b58095768c'
+const AA_MASK_HEX = () =>
+  process.env.AA_MASK_HEX || 'c186dd7d994e141fded18be74b5ab450e17ad5b6a79a6f65041a14b58095768c'
 const AA_BOOTSTRAP_HOST = 'api.mkissa.net'
 const AA_BOOTSTRAP_BASE = '/client-crypto/v1/bootstrap'
 const AA_EPOCH_MS = 259_200_000

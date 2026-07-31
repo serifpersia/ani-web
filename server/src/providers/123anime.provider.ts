@@ -149,7 +149,7 @@ export class _123AnimeProvider implements Provider {
         }
       }
 
-      return results.map((anime: ApiAnime) => {
+      const mapped = results.map((anime: ApiAnime) => {
         const imageUrl = anime.thumbnail || anime.image || anime.poster
         const slugFromUrl = this.extractSlugFromUrl(imageUrl)
         const titleForSlug = anime.japanese_title || anime.title
@@ -168,13 +168,19 @@ export class _123AnimeProvider implements Provider {
           },
         }
       })
+
+      return mapped
     } catch (error) {
       logger.error({ err: error }, '123Anime search failed')
       return []
     }
   }
 
-  async resolveShowId(title: string, romaji?: string): Promise<string | null> {
+  async resolveShowId(
+    title: string,
+    romaji?: string,
+    mode?: 'sub' | 'dub'
+  ): Promise<string | null> {
     const queries = [title]
     if (romaji && romaji !== title) {
       queries.push(romaji)
@@ -192,18 +198,30 @@ export class _123AnimeProvider implements Provider {
 
     for (const q of queries) {
       const results = await this.search({ query: q })
+
       for (const r of results) {
         const resultName = (r.name || r.englishName || '').toLowerCase()
         const overlap = resultName.split(/\s+/).filter((w) => titleWords.has(w)).length
-        if (overlap > bestScore) {
-          bestScore = overlap
+        const typeBonus =
+          mode && r.type
+            ? r.type.toLowerCase() === mode
+              ? 10
+              : r.type.toLowerCase() === 'dub' && mode === 'sub'
+                ? -5
+                : r.type.toLowerCase() === 'sub' && mode === 'dub'
+                  ? -5
+                  : 0
+            : 0
+        const totalScore = overlap + typeBonus
+        if (totalScore > bestScore) {
+          bestScore = totalScore
           bestId = r._id ?? r.id ?? null
         }
       }
-      if (bestScore >= 3) break
+      if (bestScore >= 3 + (mode ? 10 : 0)) break
     }
 
-    if (bestScore < 3) {
+    if (bestScore < 3 + (mode ? 10 : 0)) {
       const keywords = title
         .split(/\s+/)
         .filter((w) => w.length >= 4)
@@ -214,8 +232,19 @@ export class _123AnimeProvider implements Provider {
         for (const r of results) {
           const resultName = (r.name || r.englishName || '').toLowerCase()
           const overlap = resultName.split(/\s+/).filter((w) => titleWords.has(w)).length
-          if (overlap > bestScore) {
-            bestScore = overlap
+          const typeBonus =
+            mode && r.type
+              ? r.type.toLowerCase() === mode
+                ? 10
+                : r.type.toLowerCase() === 'dub' && mode === 'sub'
+                  ? -5
+                  : r.type.toLowerCase() === 'sub' && mode === 'dub'
+                    ? -5
+                    : 0
+              : 0
+          const totalScore = overlap + typeBonus
+          if (totalScore > bestScore) {
+            bestScore = totalScore
             bestId = r._id ?? r.id ?? null
           }
         }
@@ -225,9 +254,9 @@ export class _123AnimeProvider implements Provider {
     return bestId
   }
 
-  async getEpisodes(showId: string): Promise<EpisodeDetails | null> {
+  async getEpisodes(showId: string, mode?: 'sub' | 'dub'): Promise<EpisodeDetails | null> {
     try {
-      const cacheKey = `123anime_eps_${showId}`
+      const cacheKey = `123anime_eps_${showId}_${mode || 'any'}`
       const cached = this.cache.get<EpisodeDetails>(cacheKey)
       if (cached) {
         return cached
@@ -240,10 +269,17 @@ export class _123AnimeProvider implements Provider {
         (results.length > 0 ? this.bestMatch(results, showId) : undefined)
 
       if (!show || !show.availableEpisodesDetail) {
+        logger.warn(
+          { showId, mode, matchedShow: show },
+          '123Anime getEpisodes no show or episodes detail found'
+        )
         return null
       }
 
-      const episodes = show.availableEpisodesDetail.sub || []
+      const episodes =
+        mode === 'dub'
+          ? show.availableEpisodesDetail.dub || []
+          : show.availableEpisodesDetail.sub || []
 
       const result: EpisodeDetails = {
         episodes,
@@ -253,12 +289,16 @@ export class _123AnimeProvider implements Provider {
       this.cache.set(cacheKey, result, 3600)
       return result
     } catch (error) {
-      logger.error({ err: error, showId }, '123Anime getEpisodes failed')
+      logger.error({ err: error, showId, mode }, '123Anime getEpisodes failed')
       return null
     }
   }
 
-  async getStreamUrls(showId: string, episodeNumber: string): Promise<VideoSource[] | null> {
+  async getStreamUrls(
+    showId: string,
+    episodeNumber: string,
+    mode?: 'sub' | 'dub'
+  ): Promise<VideoSource[] | null> {
     try {
       const query = showId.replace(/ /g, '-')
       const searchResults = await this.search({ query })
@@ -267,9 +307,15 @@ export class _123AnimeProvider implements Provider {
         return null
       }
 
-      const match =
-        searchResults.find((s) => s.id === showId || s._id === showId) ||
-        this.bestMatch(searchResults, showId)
+      const exactMatch = searchResults.find((s) => s.id === showId || s._id === showId) || undefined
+
+      const modeMatch = mode
+        ? searchResults.find((s) => (s.id || s._id) === showId && s.type === mode) ||
+          searchResults.find((s) => s.type === mode) ||
+          undefined
+        : undefined
+
+      const match = modeMatch || exactMatch || this.bestMatch(searchResults, showId)
       const animeId = match.id || match._id
 
       const url = `${BASE_URL}/episode-stream?id=${animeId}&ep=${episodeNumber}`
@@ -310,7 +356,7 @@ export class _123AnimeProvider implements Provider {
         },
       ]
     } catch (error) {
-      logger.error({ err: error, showId, episodeNumber }, '123Anime getStreamUrls failed')
+      logger.error({ err: error, showId, episodeNumber, mode }, '123Anime getStreamUrls failed')
       return null
     }
   }
