@@ -100,59 +100,55 @@
 
 .tabBar {
   display: flex;
-  gap: var(--space-3);
-  margin-bottom: var(--space-8);
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2.5rem;
   padding: 6px;
-  background: var(--bg-tertiary);
-  width: fit-content;
-  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-primary);
+  border-radius: var(--radius-full);
+  width: fit-content;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
 .tabButton {
-  border-radius: var(--radius-md) !important;
+  border-radius: var(--radius-full) !important;
   font-weight: 700 !important;
+  font-size: 0.85rem !important;
+  padding: 0.65rem 1.4rem !important;
   letter-spacing: 0.02em;
-  transition: all var(--transition-base) !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
   border: none !important;
   background: transparent !important;
-  color: var(--text-secondary) !important;
+  color: var(--text-muted) !important;
 }
 
 .tabButton:hover {
   color: var(--text-primary) !important;
-  background: var(--bg-elevated) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
 }
 
 .tabActive {
   background: var(--accent) !important;
-  border-color: var(--accent) !important;
-  color: #fff !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 15px var(--accent-glow) !important;
 }
 
 @media (max-width: 600px) {
   .tabBar {
     width: 100%;
-    flex-direction: column;
-    gap: 8px;
-    background: transparent;
-    border: none;
-    padding: 0;
+    border-radius: var(--radius-lg);
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .tabButton {
     width: 100%;
-    justify-content: flex-start !important;
-    padding: 0 1.5rem !important;
-    height: 48px !important;
-    background: var(--bg-tertiary) !important;
-    border: 1px solid var(--border-primary) !important;
-  }
-
-  .tabActive {
-    background: var(--accent) !important;
-    border-color: var(--accent) !important;
-    color: #fff !important;
+    justify-content: center !important;
+    padding: 0.65rem 0.5rem !important;
+    text-align: center;
   }
 }
 

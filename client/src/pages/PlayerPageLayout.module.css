@@ -269,12 +269,12 @@
   max-width: none !important;
   padding: 2.5rem !important;
   margin: 0 !important;
-  background-color: rgba(6, 6, 8, 0.94) !important; /* Sleek, dark dimmed backdrop */
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
+  background-color: #050507 !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
   animation: fadeIn 0.4s var(--ease-smooth) !important;
   overflow: hidden !important;
-  z-index: 9999 !important; /* Float above site header */
+  z-index: 9999 !important;
 }
 
 .theaterMode .playerMain {
@@ -293,8 +293,10 @@
   height: 100% !important;
   padding-top: 0 !important;
   border-radius: var(--radius-2xl) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  box-shadow:
+    0 20px 60px rgba(139, 92, 246, 0.15),
+    0 0 100px rgba(0, 0, 0, 0.9) !important;
   overflow: hidden !important;
   position: relative !important;
 }

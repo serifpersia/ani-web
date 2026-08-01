@@ -28,9 +28,6 @@ body {
 html,
 body,
 .app-container,
-header,
-main,
-footer,
 .posterWrapper,
 .dot,
 .genreTag {
@@ -39,6 +36,10 @@ footer,
   --darkreader-inline-bordercolor: none !important;
   --darkreader-inline-color: none !important;
   background-color: transparent;
+}
+
+body {
+  overflow-x: hidden;
 }
 
 body::before {

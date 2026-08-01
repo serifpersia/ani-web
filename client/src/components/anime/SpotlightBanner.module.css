@@ -1,44 +1,56 @@
 .bannerContainer {
-  width: 100%;
-  max-width: var(--max-width);
-  margin: 0 auto;
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
   margin-top: calc(-1 * var(--header-height));
   margin-bottom: 3rem;
   overflow: hidden;
-  position: relative;
+  background-color: var(--bg-main);
+  z-index: 2;
 }
 
 .posterWrapper {
   position: relative;
   width: 100%;
-  height: clamp(490px, 65vh, 780px);
+  height: clamp(520px, 70vh, 820px);
   overflow: hidden;
-  background-color: #000;
-}
-
-@media (max-width: 600px) {
-  .posterWrapper {
-    height: clamp(500px, 70vh, 800px);
-  }
+  background-color: var(--bg-main);
 }
 
 .posterImage {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 20%;
+  object-position: center;
   --darkreader-inline-bgcolor: none !important;
   --darkreader-inline-bgimage: none !important;
   --darkreader-inline-bordercolor: none !important;
   --darkreader-inline-color: none !important;
+  display: block;
+}
+
+@media (max-width: 600px) {
+  .posterWrapper {
+    height: clamp(640px, 83vh, 980px);
+  }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  .posterWrapper {
+    height: clamp(640px, 84vh, 980px);
+  }
 }
 
 .overlay {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(to right, rgba(0, 0, 0, 0.6) 0%, transparent 60%),
-    linear-gradient(to top, rgba(0, 0, 0, 0.55) 0%, transparent 45%);
+    linear-gradient(180deg, rgba(5, 5, 5, 0.85) 0%, rgba(5, 5, 5, 0.3) 25%, transparent 40%),
+    linear-gradient(90deg, rgba(5, 5, 5, 0.95) 0%, rgba(5, 5, 5, 0.6) 45%, transparent 80%),
+    linear-gradient(0deg, var(--bg-main) 0%, rgba(5, 5, 5, 0.4) 20%, transparent 50%);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -49,7 +61,7 @@
   width: 100%;
   max-width: var(--max-width);
   margin: 0 auto;
-  padding: var(--space-8) var(--space-8) var(--space-8);
+  padding: calc(var(--header-height) + 1rem) var(--space-8) var(--space-8);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -107,6 +119,16 @@
   max-width: 800px;
 }
 
+@media (max-width: 600px) {
+  .title {
+    font-size: 1.75rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
 .title:hover {
   color: var(--accent-light);
 }
@@ -144,27 +166,79 @@
 
 .actions {
   display: flex;
+  align-items: center;
   gap: 1rem;
-  margin-top: 0.5rem;
+  margin-top: 0.75rem;
+  z-index: 5;
 }
 
-.inlineWatch {
-  padding: 0.25rem 0.6rem;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
-  font-size: 0.75rem;
+.watchBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.8rem 2rem;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+  color: #ffffff;
+  font-size: 0.95rem;
   font-weight: 700;
-  border-radius: var(--radius-sm);
+  border: none;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
+  box-shadow: 0 4px 20px var(--accent-glow);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  letter-spacing: 0.02em;
 }
 
-.inlineWatch:hover {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
+.watchBtn:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 28px var(--accent-glow);
+  background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%);
+}
+
+.watchBtn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.detailsBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.8rem 1.75rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.detailsBtn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: translateY(-2px);
+  color: #ffffff;
+}
+
+.detailsBtn:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 600px) {
+  .actions {
+    width: 100%;
+    gap: 0.75rem;
+  }
+
+  .watchBtn,
+  .detailsBtn {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+  }
 }
 
 .dotRow {

@@ -257,7 +257,7 @@ const Settings: React.FC = () => {
                 <div className={styles.settingItem} style={{ marginTop: '1rem' }}>
                   <div className={styles.settingRow}>
                     <div style={{ minWidth: 0 }}>
-                      <h4 style={{ margin: 0, fontSize: '1rem' }}>Discord Rich Presence</h4>
+                      <h4 style={{ margin: 0, fontSize: '1rem' }}>Hide Mature Content</h4>
                       <p
                         style={{
                           margin: '0.25rem 0 0',

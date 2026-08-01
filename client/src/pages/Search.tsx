@@ -361,6 +361,110 @@ export default function Search() {
 
       {isError && <ErrorMessage message={error?.message || 'Error'} />}
 
+      {(type !== 'ALL' ||
+        season !== 'ALL' ||
+        year !== 'ALL' ||
+        Object.keys(anilistGenreState).length > 0) && (
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px',
+            alignItems: 'center',
+            marginBottom: '1.5rem',
+          }}
+        >
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+            Active Filters:
+          </span>
+
+          {type !== 'ALL' && (
+            <span
+              className="badge badge-secondary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              Type: {type}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  setType('ALL')
+                  handleSearch()
+                }}
+                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </span>
+          )}
+
+          {season !== 'ALL' && (
+            <span
+              className="badge badge-secondary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              Season: {season}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  setSeason('ALL')
+                  handleSearch()
+                }}
+                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </span>
+          )}
+
+          {year !== 'ALL' && (
+            <span
+              className="badge badge-secondary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              Year: {year}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  setYear('ALL')
+                  handleSearch()
+                }}
+                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </span>
+          )}
+
+          {Object.entries(anilistGenreState).map(([genre, state]) => (
+            <span
+              key={genre}
+              className={`badge ${state === 'include' ? 'badge-primary' : 'badge-danger'}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              {state === 'include' ? `+ ${genre}` : `- ${genre}`}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  setAnilistGenreState((prev) => {
+                    const copy = { ...prev }
+                    delete copy[genre]
+                    return copy
+                  })
+                  handleSearch()
+                }}
+                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className={styles.resultsHeader} ref={resultsRef}>
         <h2 className={styles.resultsTitle}>
           {query ? `Search Results for "${query}"` : 'Discover Anime'}

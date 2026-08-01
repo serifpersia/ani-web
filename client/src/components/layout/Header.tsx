@@ -59,9 +59,10 @@ const Header: React.FC = () => {
   const [query, setQuery] = useState('')
   const [visible, setVisible] = useState(true)
   const [isSearchFocused, setIsSearchFocused] = useState(false)
+  const [isAtTop, setIsAtTop] = useState(true)
   const navigate = useNavigate()
   const location = useLocation()
-  const lastScrollY = useRef(0)
+  const autoHideTimer = useRef<number | null>(null)
   const isHome = location.pathname === '/'
 
   const { data: user } = useQuery<UserProfile | null>({
@@ -71,21 +72,36 @@ const Header: React.FC = () => {
   })
 
   useEffect(() => {
+    const clearTimer = () => {
+      if (autoHideTimer.current) {
+        window.clearTimeout(autoHideTimer.current)
+        autoHideTimer.current = null
+      }
+    }
+
     const handleScroll = () => {
       const currentScrollY = window.scrollY
 
-      if (currentScrollY > 100 && currentScrollY > lastScrollY.current && !isSearchFocused) {
-        setVisible(false)
-      } else if (currentScrollY < lastScrollY.current || currentScrollY <= 100) {
+      if (currentScrollY <= 10) {
+        setIsAtTop(true)
         setVisible(true)
+        clearTimer()
+        return
       }
 
-      lastScrollY.current = currentScrollY
+      setIsAtTop(false)
+      setVisible(true)
+      clearTimer()
+
+      autoHideTimer.current = window.setTimeout(() => {
+        setVisible(false)
+      }, 2500)
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => {
       window.removeEventListener('scroll', handleScroll)
+      clearTimer()
     }
   }, [isSearchFocused])
 
@@ -105,18 +121,16 @@ const Header: React.FC = () => {
 
   return (
     <header
-      className={`${styles.header} ${visible ? '' : styles.hidden} ${!isHome ? styles.notHome : ''}`}
+      className={`${styles.header} ${!visible ? styles.hidden : ''} ${!isAtTop ? styles.scrolled : ''}`}
     >
       <div className={styles.headerInner}>
         <div className={styles.leftSection}>
           <button className={styles.hamburgerBtn} onClick={toggleSidebar} aria-label="Menu">
             <FaBars />
           </button>
-          {!isHome && (
-            <Link to="/" className={styles.logo} aria-label="Ani-Web Home">
-              <Logo />
-            </Link>
-          )}
+          <Link to="/" className={styles.logo} aria-label="Ani-Web Home">
+            <Logo />
+          </Link>
         </div>
 
         <div className={styles.rightSection}>

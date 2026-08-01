@@ -1,6 +1,13 @@
 import React, { memo, useState, useCallback } from 'react'
 import { Link, useNavigate, type To } from 'react-router-dom'
-import { FaMicrophone, FaClosedCaptioning, FaTimes, FaInfo } from 'react-icons/fa'
+import {
+  FaMicrophone,
+  FaClosedCaptioning,
+  FaTimes,
+  FaInfo,
+  FaPlay,
+  FaInfoCircle,
+} from 'react-icons/fa'
 import AnimePopup from './AnimePopup'
 import GenericModal from '../common/GenericModal'
 import { Button } from '../common/Button'
@@ -326,6 +333,12 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
             )}
 
             {rank !== undefined && <div className={styles.rankBadge}>#{rank}</div>}
+
+            {!isMobile && isHovered && (
+              <div className={styles.hoverOverlay}>
+                {continueWatching ? <FaPlay size={28} /> : <FaInfoCircle size={28} />}
+              </div>
+            )}
           </div>
 
           <div className={styles.info}>

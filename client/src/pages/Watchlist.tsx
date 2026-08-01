@@ -447,42 +447,194 @@ const Watchlist: React.FC = () => {
       ) : error ? (
         <ErrorMessage message={error.message} />
       ) : (
-        <div className={`${styles.grid} ${lowEndMode ? styles.lowEnd : ''}`}>
-          {sortedList.map((item) => (
-            <div key={item._id} className={styles.itemWrapper}>
-              <AnimeCard
-                anime={item}
-                continueWatching={isCW}
-                onRemove={() => handleRemove(item.id, item.name)}
-                layout="vertical"
-              />
-              {!isCW && (
-                <div className={styles.cardActions}>
-                  <select
-                    className={styles.statusSelect}
-                    value={item.status}
-                    onChange={(e) =>
-                      updateStatus.mutate({ id: item.id, status: e.currentTarget.value })
-                    }
-                  >
-                    {STATUS_OPTIONS.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
+        <>
+          {(type !== 'ALL' ||
+            season !== 'ALL' ||
+            year !== 'ALL' ||
+            Object.keys(genreStates).length > 0 ||
+            query.trim()) && (
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '8px',
+                alignItems: 'center',
+                marginBottom: '1.5rem',
+              }}
+            >
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                Active Filters:
+              </span>
+
+              {query.trim() && (
+                <span
+                  className="badge badge-secondary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  Search: {query}
                   <button
-                    className={styles.removeBtn}
-                    onClick={() => handleRemove(item.id, item.name)}
-                    title="Remove from Watchlist"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                      setQuery('')
+                      applyFilters()
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                    }}
                   >
-                    <FaTrash size={12} />
+                    ✕
                   </button>
-                </div>
+                </span>
               )}
+
+              {type !== 'ALL' && (
+                <span
+                  className="badge badge-secondary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  Type: {type}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                      setType('ALL')
+                      applyFilters()
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+
+              {season !== 'ALL' && (
+                <span
+                  className="badge badge-secondary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  Season: {season}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                      setSeason('ALL')
+                      applyFilters()
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+
+              {year !== 'ALL' && (
+                <span
+                  className="badge badge-secondary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  Year: {year}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                      setYear('ALL')
+                      applyFilters()
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+
+              {Object.entries(genreStates).map(([genre, state]) => (
+                <span
+                  key={genre}
+                  className={`badge ${state === 'include' ? 'badge-primary' : 'badge-danger'}`}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  {state === 'include' ? `+ ${genre}` : `- ${genre}`}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                      setGenreStates((prev) => {
+                        const copy = { ...prev }
+                        delete copy[genre]
+                        return copy
+                      })
+                      applyFilters()
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+
+          <div className={`${styles.grid} ${lowEndMode ? styles.lowEnd : ''}`}>
+            {sortedList.map((item) => (
+              <div key={item._id} className={styles.itemWrapper}>
+                <AnimeCard
+                  anime={item}
+                  continueWatching={isCW}
+                  onRemove={() => handleRemove(item.id, item.name)}
+                  layout="vertical"
+                />
+                {!isCW && (
+                  <div className={styles.cardActions}>
+                    <select
+                      className={styles.statusSelect}
+                      value={item.status}
+                      onChange={(e) =>
+                        updateStatus.mutate({ id: item.id, status: e.currentTarget.value })
+                      }
+                    >
+                      {STATUS_OPTIONS.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className={styles.removeBtn}
+                      onClick={() => handleRemove(item.id, item.name)}
+                      title="Remove from Watchlist"
+                    >
+                      <FaTrash size={12} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {!isLoading && sortedList.length === 0 && (

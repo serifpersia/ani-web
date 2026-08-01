@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { FaStar } from 'react-icons/fa'
+import { FaStar, FaPlay, FaInfoCircle } from 'react-icons/fa'
 import { Button } from '../common/Button'
 import type { Anime } from '../../hooks/useAnimeData'
 import { fixThumbnailUrl } from '../../lib/utils'
@@ -185,9 +185,6 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
                   <span>{anime.score}</span>
                 </div>
               )}
-              <button className={styles.inlineWatch} onClick={handleWatch}>
-                Watch Now
-              </button>
             </div>
 
             <span
@@ -221,6 +218,17 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
             )}
 
             {synopsis && <p className={styles.summary}>{synopsis}</p>}
+
+            <div className={styles.actions}>
+              <button className={styles.watchBtn} onClick={handleWatch}>
+                <FaPlay size={14} />
+                <span>Watch Now</span>
+              </button>
+              <button className={styles.detailsBtn} onClick={() => navigate(`/anime/${anime._id}`)}>
+                <FaInfoCircle size={15} />
+                <span>Details</span>
+              </button>
+            </div>
           </div>
 
           {top6.length > 1 && (
