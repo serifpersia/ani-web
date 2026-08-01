@@ -48,6 +48,13 @@ export const fixThumbnailUrl = (
     )
   }
 
+  if (finalUrl.includes('wp.youtube-anime.com/s4.anilist.co')) {
+    finalUrl = finalUrl.replace(
+      /https?:\/\/wp\.youtube-anime\.com\/s4\.anilist\.co/,
+      'https://s4.anilist.co'
+    )
+  }
+
   // Handle dimensions and proxying
   const cacheKey = `${finalUrl}-${width}-${height}`
   if (thumbnailCache.has(cacheKey)) {

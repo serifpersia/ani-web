@@ -40,13 +40,24 @@ async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): P
         'Migrating watchlist from MAL alias to canonical ID'
       )
       await performWriteTransaction(db, (tx) => {
-        tx.run('UPDATE OR IGNORE watchlist SET id = ? WHERE id = ?', [canonicalId, numericId])
-        tx.run('DELETE FROM watchlist WHERE id = ?', [numericId])
-        tx.run('UPDATE OR IGNORE shows_meta SET id = ?, anilistId = ? WHERE id = ?', [
+        const aliasWatchlist = WatchlistRepository.getById(tx, numericId)
+        const aliasShowsMeta = ShowsMetaRepository.getById(tx, numericId)
+
+        tx.run('UPDATE OR IGNORE watchlist SET id = ?, thumbnail = ? WHERE id = ?', [
           canonicalId,
-          trueAnilistId,
+          (aliasWatchlist as { thumbnail?: string } | null)?.thumbnail || '',
           numericId,
         ])
+        tx.run('DELETE FROM watchlist WHERE id = ?', [numericId])
+        tx.run(
+          'UPDATE OR IGNORE shows_meta SET id = ?, anilistId = ?, thumbnail = ? WHERE id = ?',
+          [
+            canonicalId,
+            trueAnilistId,
+            (aliasShowsMeta as { thumbnail?: string } | null)?.thumbnail || '',
+            numericId,
+          ]
+        )
         tx.run('DELETE FROM shows_meta WHERE id = ?', [numericId])
         tx.run('UPDATE OR IGNORE watched_episodes SET showId = ? WHERE showId = ?', [
           canonicalId,
@@ -125,11 +136,19 @@ async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): P
 
   const aniListId = parseInt(numericId)
   await performWriteTransaction(db, (tx) => {
-    tx.run('UPDATE OR IGNORE watchlist SET id = ? WHERE id = ?', [numericId, legacyId])
+    const legacyWatchlist = WatchlistRepository.getById(tx, legacyId)
+    const legacyShowsMeta = ShowsMetaRepository.getById(tx, legacyId)
+
+    tx.run('UPDATE OR IGNORE watchlist SET id = ?, thumbnail = ? WHERE id = ?', [
+      numericId,
+      (legacyWatchlist as { thumbnail?: string } | null)?.thumbnail || '',
+      legacyId,
+    ])
     tx.run('DELETE FROM watchlist WHERE id = ?', [legacyId])
-    tx.run('UPDATE OR IGNORE shows_meta SET id = ?, anilistId = ? WHERE id = ?', [
+    tx.run('UPDATE OR IGNORE shows_meta SET id = ?, anilistId = ?, thumbnail = ? WHERE id = ?', [
       numericId,
       aniListId,
+      (legacyShowsMeta as { thumbnail?: string } | null)?.thumbnail || '',
       legacyId,
     ])
     tx.run('DELETE FROM shows_meta WHERE id = ?', [legacyId])
@@ -182,16 +201,24 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
       }
 
       await performWriteTransaction(db, (tx) => {
-        tx.run('UPDATE OR IGNORE watchlist SET id = ? WHERE id = ?', [
+        const legacyWatchlist = WatchlistRepository.getById(tx, mapping.numericId)
+        const legacyShowsMeta = ShowsMetaRepository.getById(tx, mapping.numericId)
+
+        tx.run('UPDATE OR IGNORE watchlist SET id = ?, thumbnail = ? WHERE id = ?', [
           canonicalId,
+          (legacyWatchlist as { thumbnail?: string } | null)?.thumbnail || '',
           mapping.numericId,
         ])
         tx.run('DELETE FROM watchlist WHERE id = ?', [mapping.numericId])
-        tx.run('UPDATE OR IGNORE shows_meta SET id = ?, anilistId = ? WHERE id = ?', [
-          canonicalId,
-          parseInt(canonicalId),
-          mapping.numericId,
-        ])
+        tx.run(
+          'UPDATE OR IGNORE shows_meta SET id = ?, anilistId = ?, thumbnail = ? WHERE id = ?',
+          [
+            canonicalId,
+            parseInt(canonicalId),
+            (legacyShowsMeta as { thumbnail?: string } | null)?.thumbnail || '',
+            mapping.numericId,
+          ]
+        )
         tx.run('DELETE FROM shows_meta WHERE id = ?', [mapping.numericId])
         tx.run('UPDATE OR IGNORE watched_episodes SET showId = ? WHERE showId = ?', [
           canonicalId,
@@ -267,6 +294,14 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
 
     const newId = String(aniListShow.id)
 
+    let newThumbnail: string | undefined
+    try {
+      const freshMeta = await getShowMetaById(newId)
+      newThumbnail = freshMeta?.thumbnail
+    } catch {
+      newThumbnail = undefined
+    }
+
     // 4. Perform the DB updates across all tables atomically
     await performWriteTransaction(db, (tx) => {
       // Save the mapping
@@ -282,7 +317,11 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
         if (newWatchlistExists) {
           WatchlistRepository.delete(tx, legacyId)
         } else {
-          tx.run('UPDATE watchlist SET id = ? WHERE id = ?', [newId, legacyId])
+          tx.run('UPDATE watchlist SET id = ?, thumbnail = ? WHERE id = ?', [
+            newId,
+            newThumbnail || (legacyWatchlist as { thumbnail?: string }).thumbnail || '',
+            legacyId,
+          ])
         }
       }
 
@@ -293,9 +332,10 @@ async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string>
         if (newShowsMetaExists) {
           tx.run('DELETE FROM shows_meta WHERE id = ?', [legacyId])
         } else {
-          tx.run('UPDATE shows_meta SET id = ?, anilistId = ? WHERE id = ?', [
+          tx.run('UPDATE shows_meta SET id = ?, anilistId = ?, thumbnail = ? WHERE id = ?', [
             newId,
             aniListShow.id,
+            newThumbnail || (legacyShowsMeta as { thumbnail?: string }).thumbnail || '',
             legacyId,
           ])
         }

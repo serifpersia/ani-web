@@ -14,6 +14,7 @@ import {
 } from '../lib/anilist'
 import { getMigratedId } from '../lib/migration'
 import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
+import { WatchlistRepository } from '../repositories/watchlist.repository'
 import logger from '../logger'
 
 export class DataController {
@@ -378,6 +379,13 @@ export class DataController {
           type: meta.type,
           anilistId: meta.anilistId,
         })
+
+        const existingWatchlist = (await WatchlistRepository.getById(req.db, id)) as {
+          thumbnail?: string
+        } | null
+        if (existingWatchlist && existingWatchlist.thumbnail !== (meta.thumbnail || '')) {
+          WatchlistRepository.updateThumbnail(req.db, id, meta.thumbnail || '')
+        }
       }
 
       res.set('Cache-Control', 'public, max-age=3600').json(meta || {})
