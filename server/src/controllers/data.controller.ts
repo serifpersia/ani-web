@@ -10,6 +10,7 @@ import {
   getSchedule,
   searchAnilist,
   setCachedAnilist,
+  getSpotlightBanners,
 } from '../lib/anilist'
 import { getMigratedId } from '../lib/migration'
 import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
@@ -30,6 +31,16 @@ export class DataController {
       res.set('Cache-Control', 'public, max-age=300').json(data)
     } catch (e) {
       logger.error({ err: e }, 'Trending fetch failed')
+      res.json([])
+    }
+  }
+
+  getSpotlight = async (_req: Request, res: Response) => {
+    try {
+      const data = await getSpotlightBanners(1, 20)
+      res.set('Cache-Control', 'public, max-age=300').json(data)
+    } catch (e) {
+      logger.error({ err: e }, 'Spotlight fetch failed')
       res.json([])
     }
   }

@@ -57,6 +57,7 @@
     "crypto-js": "^4.2.0",
     "dotenv": "^17.4.2",
     "express": "^5.1.0",
+    "freekeys": "^0.0.4",
     "got-scraping": "^3.2.9",
     "multer": "^2.0.2",
     "node-cache": "^5.1.2",

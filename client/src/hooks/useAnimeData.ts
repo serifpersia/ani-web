@@ -53,6 +53,14 @@ export const useTrendingAnime = () => {
   })
 }
 
+export const useSpotlightBanners = () => {
+  return useQuery<Anime[]>({
+    queryKey: ['spotlight'],
+    queryFn: () => fetchApi('/api/spotlight'),
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
 export const useInfiniteTrendingList = (sort: string = 'TRENDING_DESC', size: number = 10) => {
   return useInfiniteQuery<Anime[]>({
     queryKey: ['trendingList', sort, size],

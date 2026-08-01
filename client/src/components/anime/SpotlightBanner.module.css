@@ -103,7 +103,7 @@
 }
 
 .title {
-  font-size: 3rem;
+  font-size: 2.5rem;
   line-height: 1.1;
   cursor: pointer;
   max-width: 800px;
@@ -194,7 +194,7 @@
 
 @media (max-width: 1200px) {
   .title {
-    font-size: 3rem;
+    font-size: 2.5rem;
   }
 }
 

@@ -15,7 +15,7 @@ import {
   usePaginatedCurrentSeason,
   useAllContinueWatching,
   useRemoveFromWatchlist,
-  useTrendingAnime,
+  useSpotlightBanners,
   useQueue,
   useRemoveFromQueue,
   useClearQueue,
@@ -97,7 +97,7 @@ const Home: React.FC = () => {
     ]
   )
 
-  const { data: trendingAnime } = useTrendingAnime()
+  const { data: spotlightAnime } = useSpotlightBanners()
   const cwList = useMemo(() => continueWatchingInfinite?.pages || [], [continueWatchingInfinite])
 
   const { data: currentSeason, isLoading: loadingSeason } = usePaginatedCurrentSeason(
@@ -275,7 +275,7 @@ const Home: React.FC = () => {
 
   return (
     <div style={{ paddingBottom: '2rem' }}>
-      <SpotlightBanner animeList={trendingAnime || []} />
+      <SpotlightBanner animeList={spotlightAnime || []} />
       <QueueRail
         title="Queue"
         items={queueData}

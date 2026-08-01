@@ -1,5 +1,6 @@
 import { Show } from '../providers/provider.interface'
 import logger from '../logger'
+import { findTmdbDefaultBackdrop } from './tmdb'
 
 const ANILIST_API = 'https://graphql.anilist.co'
 
@@ -453,6 +454,62 @@ export async function getTrending(
   if (!media) return []
 
   return media.map(fromAnilistMedia)
+}
+
+async function fetchAnilistMedia(
+  page: number = 1,
+  perPage: number = 20,
+  sort: AnilistSort = 'TRENDING_DESC',
+  status?: string
+): Promise<AnilistMedia[]> {
+  const statusFilter = status ? `status: ${status},` : ''
+  const query = `
+    query ($page: Int, $perPage: Int) {
+      Page(page: $page, perPage: $perPage) {
+        media(sort: ${sort}, type: ANIME, isAdult: false, ${statusFilter}) {
+          ${mediaFields()}
+        }
+      }
+    }
+  `
+
+  const result = await anilistRequest<{ Page: { media?: AnilistMedia[] } }>(query, {
+    page,
+    perPage,
+  })
+  return result?.data?.Page?.media ?? []
+}
+
+export async function getSpotlightBanners(page: number = 1, perPage: number = 20): Promise<Show[]> {
+  const media = await fetchAnilistMedia(page, perPage)
+  const results: Show[] = []
+
+  for (const m of media) {
+    if (results.length >= 6) break
+
+    let bannerImage: string | undefined
+
+    const tmdbBackdrop = await findTmdbDefaultBackdrop({
+      english: m.title?.english,
+      romaji: m.title?.romaji,
+      native: m.title?.native,
+    })
+
+    if (tmdbBackdrop) {
+      bannerImage = tmdbBackdrop
+    } else if (m.bannerImage) {
+      bannerImage = m.bannerImage
+    } else {
+      continue
+    }
+
+    results.push({
+      ...fromAnilistMedia(m),
+      bannerImage,
+    })
+  }
+
+  return results
 }
 
 export async function getShowMetaById(id: string): Promise<Show | null> {

@@ -106,6 +106,12 @@ export function createDataRouter(
     controller.getTrending
   )
 
+  router.get(
+    '/spotlight',
+    makeCacheMiddleware(apiCache, () => 'spotlight', 300),
+    controller.getSpotlight
+  )
+
   router.get('/genres-and-tags', controller.getGenresAndTags)
 
   return router
