@@ -5,10 +5,12 @@
 }
 
 .bellBtn {
-  background: none;
-  border: none;
-  color: var(--text-color);
-  font-size: 1.4rem;
+  background: rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text-primary);
+  font-size: 1.1rem;
   cursor: pointer;
   padding: var(--space-2);
   display: flex;
@@ -16,16 +18,17 @@
   justify-content: center;
   transition:
     transform 0.2s ease,
-    color 0.2s ease;
+    background 0.2s ease;
   position: relative;
-  width: 48px;
-  height: 48px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
 }
 
 .bellBtn:hover {
-  transform: scale(1.1);
-  color: var(--primary-color);
+  background: rgba(0, 0, 0, 0.25);
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: scale(1.05);
 }
 
 .badge {

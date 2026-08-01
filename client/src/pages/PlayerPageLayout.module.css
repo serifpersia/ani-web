@@ -18,10 +18,9 @@
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-xl);
-  height: calc(100vh - var(--header-height) - 4rem);
   position: sticky;
   top: calc(var(--header-height) + 2rem);
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   box-shadow: var(--glass-shadow);
@@ -40,7 +39,7 @@
   width: 100%;
   padding-top: 56.25%; /* 16:9 Aspect Ratio */
   background-color: #000;
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   position: relative;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);

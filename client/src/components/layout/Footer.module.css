@@ -1,4 +1,7 @@
 .footer {
+  width: 100%;
+  max-width: var(--max-width);
+  margin: 0 auto;
   padding: var(--space-12) var(--space-8);
   border-top: 1px solid var(--border-primary);
   display: flex;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { FaStar } from 'react-icons/fa'
@@ -8,7 +8,6 @@ import { fixThumbnailUrl } from '../../lib/utils'
 import styles from './SpotlightBanner.module.css'
 import { useLowEndMode } from '../../contexts/LowEndModeContext'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
-import useIsMobile from '../../hooks/useIsMobile'
 
 interface SpotlightBannerProps {
   animeList: Anime[]
@@ -17,12 +16,10 @@ interface SpotlightBannerProps {
 const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [autoplayResetKey, setAutoplayResetKey] = useState(0)
-  const [lastScrollTime, setLastScrollTime] = useState(0)
-  const [isAtTop, setIsAtTop] = useState(
-    () => typeof window !== 'undefined' && window.scrollY === 0
-  )
+  const [isPaused, setIsPaused] = useState(false)
+  const lastScrollTime = useRef(0)
+  const touchStartX = useRef<number>(0)
   const { lowEndMode } = useLowEndMode()
-  const isMobile = useIsMobile()
   const { titlePreference } = useTitlePreference()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -90,20 +87,25 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   }, [top6.length])
 
   useEffect(() => {
-    if (top6.length === 0) return
+    if (top6.length === 0 || isPaused) return
     const timer = setTimeout(nextSlide, 10000)
     return () => clearTimeout(timer)
-  }, [currentIndex, nextSlide, top6.length, autoplayResetKey])
+  }, [currentIndex, nextSlide, top6.length, autoplayResetKey, isPaused])
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsAtTop(window.scrollY === 0)
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        nextSlide()
+      }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        prevSlide()
+      }
     }
-
-    handleScroll()
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [nextSlide, prevSlide])
 
   if (top6.length === 0) return null
 
@@ -112,7 +114,6 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
   const rawDesc = anime.description ?? ''
   const synopsis = rawDesc.replace(/<[^>]*>?/gm, '').trim()
   const genres = anime.genres ?? []
-  const visibleGenres = genres.slice(0, isMobile ? 2 : 4)
 
   const bannerSrc = anime.bannerImage
     ? fixThumbnailUrl(anime.bannerImage, 1920, 840)
@@ -122,19 +123,6 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
     navigate(`/watch/${anime._id}`)
   }
 
-  const handleWheel = (e: React.WheelEvent) => {
-    if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && Math.abs(e.deltaY) > 5) {
-      e.preventDefault()
-      e.stopPropagation()
-      const now = Date.now()
-      if (now - lastScrollTime < 300) return
-      setLastScrollTime(now)
-      resetAutoplay()
-      if (e.deltaY > 0) nextSlide()
-      else prevSlide()
-    }
-  }
-
   const metadata = [
     anime.type || 'Anime',
     anime.status,
@@ -142,11 +130,44 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
     anime.rating,
   ].filter(Boolean)
 
-  if (isMobile) return null
+  const handleWheel = (e: React.WheelEvent) => {
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && Math.abs(e.deltaY) > 5) {
+      e.preventDefault()
+      e.stopPropagation()
+      const now = Date.now()
+      if (now - lastScrollTime.current < 300) return
+      lastScrollTime.current = now
+      resetAutoplay()
+      if (e.deltaY > 0) nextSlide()
+      else prevSlide()
+    }
+  }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const touchEndX = e.changedTouches[0].clientX
+    const deltaX = touchEndX - touchStartX.current
+    if (Math.abs(deltaX) > 50) {
+      resetAutoplay()
+      if (deltaX > 0) prevSlide()
+      else nextSlide()
+    }
+  }
 
   return (
-    <div className={`${styles.bannerContainer} ${isAtTop ? styles.bannerAtTop : ''}`}>
-      <div className={styles.posterWrapper}>
+    <div
+      className={styles.bannerContainer}
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
+      <div
+        className={styles.posterWrapper}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         <img
           key={`${currentIndex}-${autoplayResetKey}`}
           src={bannerSrc}
@@ -164,11 +185,18 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
                   <span>{anime.score}</span>
                 </div>
               )}
+              <button className={styles.inlineWatch} onClick={handleWatch}>
+                Watch Now
+              </button>
             </div>
 
-            <h1 className={styles.title} onClick={() => navigate(`/anime/${anime._id}`)}>
+            <span
+              key={currentIndex}
+              className={styles.title}
+              onClick={() => navigate(`/anime/${anime._id}`)}
+            >
               {getTitle(anime)}
-            </h1>
+            </span>
 
             <div className={styles.metaRow}>
               {metadata.map((item, idx) => (
@@ -179,9 +207,9 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
               ))}
             </div>
 
-            {visibleGenres.length > 0 && (
+            {genres.length > 0 && (
               <div className={styles.genres}>
-                {visibleGenres.map((g) => {
+                {genres.map((g) => {
                   const genreName = typeof g === 'string' ? g : g?.name
                   return (
                     <span key={genreName} className={styles.genreTag}>
@@ -193,12 +221,6 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
             )}
 
             {synopsis && <p className={styles.summary}>{synopsis}</p>}
-
-            <div className={styles.actions}>
-              <Button variant="primary" size="md" onClick={handleWatch}>
-                Watch Now
-              </Button>
-            </div>
           </div>
 
           {top6.length > 1 && (

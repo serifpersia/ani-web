@@ -16,12 +16,12 @@
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   color: var(--text-primary);
-  box-shadow: 20px 0 60px rgba(0, 0, 0, 0.5);
   border-right: 1px solid var(--border-primary);
 }
 
 .sidebar.open {
   transform: translateX(0);
+  box-shadow: 20px 0 60px rgba(0, 0, 0, 0.5);
 }
 
 .sidebarHeader {

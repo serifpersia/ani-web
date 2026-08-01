@@ -336,7 +336,7 @@
   }
 
   .info {
-    height: 115px !important;
+    height: auto !important;
     padding: 8px 8px !important;
     display: flex;
     flex-direction: column;

@@ -1,26 +1,25 @@
 .bannerContainer {
-  width: 100vw;
-  position: relative;
-  left: 50%;
-  right: 50%;
-  margin-left: -50vw;
-  margin-right: -50vw;
+  width: 100%;
+  max-width: var(--max-width);
+  margin: 0 auto;
   margin-top: calc(-1 * var(--header-height));
   margin-bottom: 3rem;
   overflow: hidden;
-  transition: margin-top var(--transition-fast);
-}
-
-.bannerAtTop {
-  margin-top: 0;
+  position: relative;
 }
 
 .posterWrapper {
   position: relative;
   width: 100%;
-  height: 520px;
+  height: clamp(490px, 65vh, 780px);
   overflow: hidden;
   background-color: #000;
+}
+
+@media (max-width: 600px) {
+  .posterWrapper {
+    height: clamp(500px, 70vh, 800px);
+  }
 }
 
 .posterImage {
@@ -28,19 +27,18 @@
   height: 100%;
   object-fit: cover;
   object-position: center 20%;
-  transition: opacity 0.5s ease-in-out;
+  --darkreader-inline-bgcolor: none !important;
+  --darkreader-inline-bgimage: none !important;
+  --darkreader-inline-bordercolor: none !important;
+  --darkreader-inline-color: none !important;
 }
 
 .overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    to right,
-    rgba(5, 5, 5, 0.95) 0%,
-    rgba(5, 5, 5, 0.8) 30%,
-    rgba(5, 5, 5, 0.2) 60%,
-    transparent 100%
-  );
+  background:
+    linear-gradient(to right, rgba(0, 0, 0, 0.6) 0%, transparent 60%),
+    linear-gradient(to top, rgba(0, 0, 0, 0.55) 0%, transparent 45%);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -51,11 +49,11 @@
   width: 100%;
   max-width: var(--max-width);
   margin: 0 auto;
-  padding: var(--space-6) var(--space-8) var(--space-8);
+  padding: var(--space-8) var(--space-8) var(--space-8);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: center;
   min-height: 100%;
   gap: 1.25rem;
   z-index: 4;
@@ -107,19 +105,6 @@
   line-height: 1.1;
   cursor: pointer;
   max-width: 800px;
-  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  animation: slideRight 0.8s var(--ease-smooth) both;
-}
-
-@keyframes slideRight {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
 }
 
 .title:hover {
@@ -155,7 +140,6 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   max-width: 750px;
-  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.5);
 }
 
 .actions {
@@ -164,9 +148,28 @@
   margin-top: 0.5rem;
 }
 
+.inlineWatch {
+  padding: 0.25rem 0.6rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.inlineWatch:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
 .dotRow {
   position: absolute;
-  bottom: 2rem;
+  bottom: 1.5rem;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -189,52 +192,4 @@
 .dotRow .activeDot {
   width: 32px;
   background: var(--accent);
-  box-shadow: 0 0 10px var(--accent-glow);
-}
-
-@media (max-width: 1200px) {
-  .title {
-    font-size: 2.5rem;
-  }
-}
-
-@media (max-width: 768px) {
-  .bannerContainer {
-    margin-top: calc(-1 * var(--space-3));
-    margin-bottom: 2rem;
-  }
-
-  .posterWrapper {
-    height: 380px;
-  }
-
-  .overlay {
-    padding: 0;
-    justify-content: flex-end;
-    background: linear-gradient(
-      to top,
-      rgba(5, 5, 5, 0.98) 0%,
-      rgba(5, 5, 5, 0.8) 40%,
-      rgba(5, 5, 5, 0.2) 100%
-    );
-  }
-
-  .content {
-    padding: 0 var(--space-4) 4.5rem;
-    gap: 0.75rem;
-    max-width: 100%;
-  }
-
-  .title {
-    font-size: 2.25rem;
-    text-shadow: none;
-  }
-
-  .summary {
-    -webkit-line-clamp: 2;
-    font-size: 0.95rem;
-    line-height: 1.5;
-    max-width: 100%;
-    text-shadow: none;
-  }
 }

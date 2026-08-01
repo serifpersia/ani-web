@@ -483,9 +483,36 @@
   }
 }
 
+@media (max-width: 768px) {
+  .heroSection {
+    padding-bottom: var(--space-8);
+  }
+
+  .heroContent {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+    padding: var(--space-12) var(--space-4) 0;
+  }
+
+  .posterContainer {
+    position: relative;
+    top: 0;
+    max-width: 240px;
+    margin: 0 auto;
+    margin-bottom: var(--space-4);
+    animation: none;
+  }
+
+  .infoGlass {
+    padding: var(--space-6);
+    animation: none;
+  }
+}
+
 @media (max-width: 480px) {
   .infoGlass {
     padding: var(--space-6);
+    animation: none;
   }
 
   .title {

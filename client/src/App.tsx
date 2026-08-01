@@ -118,7 +118,7 @@ function App() {
       />
       <Header />
       <Sidebar />
-      <main>
+      <main style={{ paddingTop: 'var(--header-height)' }}>
         <ErrorBoundary>
           <Suspense fallback={<TopProgressBar />}>
             <Routes>

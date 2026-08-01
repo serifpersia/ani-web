@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react'
+import React, { useRef, useEffect, useMemo, useCallback, useState, useLayoutEffect } from 'react'
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -102,6 +102,7 @@ const Player: React.FC = () => {
   const hlsInstance = useRef<Hls | null>(null)
   const isMobile = useIsMobile()
   const rafIdRef = useRef<number | null>(null)
+  const episodeSidebarRef = useRef<HTMLDivElement>(null)
   const seekToTimeRef = useRef<number>(0)
   const resumeTimeRef = useRef(state.resumeTime)
   const showResumeModalRef = useRef(state.showResumeModal)
@@ -164,6 +165,26 @@ const Player: React.FC = () => {
       }
     }
   }, [isTheaterMode])
+
+  useLayoutEffect(() => {
+    if (player.state.isFullscreen || isTheaterMode) return
+
+    const videoWrapper = refs.playerContainerRef.current
+    const sidebar = episodeSidebarRef.current
+    if (!videoWrapper || !sidebar) return
+
+    const updateHeight = () => {
+      const height = videoWrapper.getBoundingClientRect().height
+      sidebar.style.height = `${height}px`
+    }
+
+    updateHeight()
+
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(videoWrapper)
+
+    return () => observer.disconnect()
+  }, [player.state.isFullscreen, isTheaterMode, refs.playerContainerRef])
 
   const { data: suggestedEpisode } = useQuery({
     queryKey: ['suggestedEpisode', showId],
@@ -1038,7 +1059,7 @@ const Player: React.FC = () => {
       />
 
       {!isTheaterMode && (
-        <aside className={layoutStyles.episodeSidebar}>
+        <aside ref={episodeSidebarRef} className={layoutStyles.episodeSidebar}>
           {state.loadingShowData ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
               Loading Episodes...

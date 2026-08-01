@@ -385,10 +385,12 @@
     min-width: 0;
     width: 100%;
     overflow: hidden;
+    justify-items: center;
   }
 
   .itemWrapper {
     width: 100%;
+    max-width: 160px;
     min-width: 0;
     overflow: hidden;
     height: auto;
