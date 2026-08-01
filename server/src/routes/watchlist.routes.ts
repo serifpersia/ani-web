@@ -3,11 +3,13 @@ import { WatchlistController } from '../controllers/watchlist.controller'
 import { AnimePaheProvider } from '../providers/animepahe.provider'
 import { discordRPCService } from '../discord-rpc'
 import { DatabaseWrapper } from '../db'
+import { NotificationsRepository } from '../repositories/notifications.repository'
+import { WatchlistRepository } from '../repositories/watchlist.repository'
 
 export function createWatchlistRouter(
   animePahe: AnimePaheProvider,
   getDb: () => DatabaseWrapper
-): { router: Router; stopDiscovery: () => void } {
+): { router: Router; stopDiscovery: () => void; runDiscoveryIfNeeded: () => Promise<void> } {
   const router = Router()
   const controller = new WatchlistController({ animePahe })
 
@@ -55,5 +57,13 @@ export function createWatchlistRouter(
   return {
     router,
     stopDiscovery: () => controller.stopNotificationDiscovery(),
+    runDiscoveryIfNeeded: async () => {
+      if (!getDb || getDb().isClosedCheck()) return
+      const hasNotifications = await NotificationsRepository.hasActiveNotifications(getDb())
+      const watchingShows = await WatchlistRepository.getWatchingShows(getDb())
+      if (!hasNotifications && watchingShows.length > 0) {
+        controller.triggerDiscovery?.()
+      }
+    },
   }
 }

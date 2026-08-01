@@ -1,5 +1,5 @@
 import { DatabaseWrapper } from '../db'
-import { dbAll, dbRun } from '../utils/db-utils'
+import { dbAll, dbGet, dbRun } from '../utils/db-utils'
 
 export const NotificationsRepository = {
   getDismissedByShow: (db: DatabaseWrapper, showId: string) =>
@@ -68,4 +68,25 @@ export const NotificationsRepository = {
         'DELETE FROM discovered_notifications WHERE EXISTS (SELECT 1 FROM watched_episodes we WHERE we.showId = discovered_notifications.showId AND we.episodeNumber = discovered_notifications.episodeNumber)'
       ),
     ]),
+
+  hasAnyDiscovered: (db: DatabaseWrapper) =>
+    Promise.resolve(
+      dbGet<{ count: number }>(db, 'SELECT COUNT(*) as count FROM discovered_notifications')
+    ).then((row) => (row?.count || 0) > 0),
+
+  hasActiveNotifications: (db: DatabaseWrapper) =>
+    Promise.resolve(
+      dbGet<{ count: number }>(
+        db,
+        `SELECT COUNT(*) as count FROM discovered_notifications dn
+         WHERE NOT EXISTS (
+           SELECT 1 FROM dismissed_notifications dn2 
+           WHERE dn2.showId = dn.showId AND dn2.episodeNumber = dn.episodeNumber
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM watched_episodes we 
+           WHERE we.showId = dn.showId AND we.episodeNumber = dn.episodeNumber
+         )`
+      )
+    ).then((row) => (row?.count || 0) > 0),
 }

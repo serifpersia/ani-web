@@ -75,6 +75,7 @@ const providers = {
 
 let db: DatabaseWrapper
 let isShuttingDown = false
+let runDiscoveryIfNeeded: () => Promise<void> = async () => {}
 
 async function runSyncSequence(
   database: DatabaseWrapper,
@@ -143,10 +144,12 @@ app.use(
   createAuthRouter((database) => runSyncSequence(database))
 )
 
-const { router: watchlistRouter, stopDiscovery } = createWatchlistRouter(
-  animepaheProvider,
-  () => db
-)
+const {
+  router: watchlistRouter,
+  stopDiscovery,
+  runDiscoveryIfNeeded: _runDiscoveryIfNeeded,
+} = createWatchlistRouter(animepaheProvider, () => db)
+runDiscoveryIfNeeded = _runDiscoveryIfNeeded
 app.use('/api', watchlistRouter)
 app.use('/api', createDataRouter(apiCache, providers))
 app.use('/api', createProxyRouter())
@@ -215,6 +218,12 @@ async function main() {
 
   if (!fs.existsSync(CONFIG.LOCAL_MANIFEST_PATH)) {
     fs.writeFileSync(CONFIG.LOCAL_MANIFEST_PATH, JSON.stringify({ version: 0 }))
+  }
+
+  try {
+    await runDiscoveryIfNeeded()
+  } catch (err) {
+    logger.error({ err }, 'One-time notification discovery on startup failed')
   }
 
   let hasUnsyncedChanges = false

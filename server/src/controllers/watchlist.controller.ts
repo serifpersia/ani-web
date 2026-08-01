@@ -73,7 +73,7 @@ export class WatchlistController {
   private activeTypeFetches = new Set<string>()
   private lastFinishedStatusCheckAt = 0
   private animePahe?: AnimePaheProvider
-  private triggerDiscovery?: () => void
+  triggerDiscovery?: () => void
   private discoveryIntervalId: ReturnType<typeof setInterval> | null = null
   private stopped = false
 
@@ -255,6 +255,8 @@ export class WatchlistController {
             db.scheduleSave()
           }
         }
+
+        await NotificationsRepository.cleanupWatchedNotifications(db)
       } catch (e) {
         if ((e as Error)?.message === 'Database is closed') {
           logger.info('Notification discovery stopped: database is closed')
@@ -273,7 +275,6 @@ export class WatchlistController {
     this.discoveryIntervalId = setInterval(() => {
       if (!this.stopped) runDiscovery()
     }, 300000)
-    runDiscovery()
   }
 
   private getProviderForId(showId: string): AnimePaheProvider | null {
