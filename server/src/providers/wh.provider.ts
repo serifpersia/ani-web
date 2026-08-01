@@ -1,11 +1,9 @@
 import NodeCache from 'node-cache'
-import * as cheerio from 'cheerio'
 import {
   Provider,
   Show,
   VideoSource,
   EpisodeDetails,
-  SkipIntervals,
   SearchOptions,
   VideoLink,
 } from './provider.interface'
@@ -125,33 +123,6 @@ function parseSearchArticles(html: string) {
       }
     } else if (href && title) {
       results.push({ title, url: resolveUrl(href), poster, year })
-    }
-  }
-  return results
-}
-
-function parseSeriesArticles(html: string) {
-  const results: { title: string; url: string; thumbnail: string; number: string }[] = []
-  const articles = extractArticles(html)
-  for (const art of articles) {
-    const hrefM = art.match(/<a\s[^>]*\bhref=["']([^"']+)["']/i)
-    const href = hrefM ? hrefM[1] : ''
-    const h3M = art.match(/<h3(?:\s[^>]*)?>([^<]+)<\/h3>/i)
-    const title = h3M ? cleanText(h3M[1]) : ''
-    const thumbnail = extractImgUrl(art)
-    const numM = art.match(/episode[-\s]?(\d+)/i)
-    const number = numM ? numM[1] : ''
-
-    if (!title) {
-      const altM = art.match(/\balt=["']([^"']+)["']/i)
-      if (altM) {
-        const altTitle = cleanText(altM[1])
-        if (altTitle && href) {
-          results.push({ title: altTitle, url: resolveUrl(href), thumbnail, number })
-        }
-      }
-    } else if (href && title) {
-      results.push({ title, url: resolveUrl(href), thumbnail, number })
     }
   }
   return results
@@ -333,7 +304,7 @@ export class WhProvider implements Provider {
     return null
   }
 
-  async getEpisodes(showId: string, _mode: 'sub' | 'dub'): Promise<EpisodeDetails | null> {
+  async getEpisodes(showId: string): Promise<EpisodeDetails | null> {
     try {
       if (!showId) return null
 
@@ -537,95 +508,5 @@ export class WhProvider implements Provider {
       logger.error({ error, showId, episodeNumber }, '[WH] getStreamUrls failed')
       return null
     }
-  }
-
-  async getShowMeta(showId: string): Promise<Partial<Show> | null> {
-    try {
-      if (!showId) return null
-
-      const html = await fetchText(`${BASE_URL}/series/${showId}/`)
-      const $ = cheerio.load(html)
-
-      const title = cleanText($('h1').first().text() || $('h2').first().text())
-      const descMatch = html.match(
-        /<div[^>]*class="[^"]*wp-content[^"]*"[\s\S]*?>([\s\S]*?)<\/div>/i
-      )
-      const description = descMatch ? cleanText($(descMatch[1]).text()) : ''
-      const posterMatch = html.match(/class="[^"]*poster[^"]*"[\s\S]*?data-src="([^"]+)"/i)
-      const poster = posterMatch ? unwrapTimthumb(posterMatch[1]) : ''
-
-      const info: Record<string, string> = {}
-      $('.anime-info p, .info p, p').each((_, el) => {
-        const text = cleanText($(el).text())
-        const idx = text.indexOf(':')
-        if (idx > -1) {
-          info[text.substring(0, idx).trim()] = text.substring(idx + 1).trim()
-        }
-      })
-
-      const year = info['Year'] || info['Released'] || info['Aired'] || ''
-      const yearMatch = year.match(/\d{4}/)
-      const yearNum = yearMatch ? Number(yearMatch[0]) : null
-
-      const genres: { name: string }[] = []
-      $('.anime-genre a, .genre a, a[href*="/genre/"]').each((_, el) => {
-        const name = cleanText($(el).text())
-        if (name) genres.push({ name })
-      })
-
-      const episodes: string[] = []
-      const articles = extractArticles(html)
-      for (const art of articles) {
-        const numM = art.match(/episode[-\s]?(\d+)/i)
-        if (numM) episodes.push(numM[1])
-      }
-
-      return {
-        _id: showId,
-        id: showId,
-        name: title,
-        englishName: title,
-        nativeName: title,
-        thumbnail: poster,
-        bannerImage: '',
-        description,
-        type: 'TV',
-        year: yearNum,
-        status: info['Status'] || undefined,
-        rating: info['Rating'] || undefined,
-        genres,
-        availableEpisodesDetail: {
-          sub: episodes,
-          dub: [],
-        },
-      }
-    } catch (error) {
-      logger.error({ error, showId }, '[WH] getShowMeta failed')
-      return null
-    }
-  }
-
-  async getPopular(
-    _timeframe: 'daily' | 'weekly' | 'monthly' | 'all',
-    _page?: number,
-    _size?: number
-  ): Promise<Show[]> {
-    return []
-  }
-
-  async getSchedule(_date: Date): Promise<Show[]> {
-    return []
-  }
-
-  async getSeasonal(_page: number): Promise<Show[]> {
-    return []
-  }
-
-  async getLatestReleases(_page?: number, _size?: number): Promise<Show[]> {
-    return []
-  }
-
-  async getSkipTimes(_showId: string, _episodeNumber: string): Promise<SkipIntervals> {
-    return { found: false, results: [] }
   }
 }

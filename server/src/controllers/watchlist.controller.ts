@@ -1,7 +1,6 @@
 import { Request, Response } from 'express'
 import logger from '../logger'
 import { DatabaseWrapper } from '../db'
-import { AllAnimeProvider } from '../providers/allanime.provider'
 import { AnimePaheProvider } from '../providers/animepahe.provider'
 import { performWriteTransaction } from '../sync'
 import { WatchlistRepository } from '../repositories/watchlist.repository'
@@ -24,6 +23,7 @@ import {
   searchAnilistByTitle,
   getAiredEpisodesForShows,
   getShowMetaById,
+  getAnilistEpisodes,
 } from '../lib/anilist'
 import { getMigratedId } from '../lib/migration'
 
@@ -72,14 +72,12 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export class WatchlistController {
   private activeTypeFetches = new Set<string>()
   private lastFinishedStatusCheckAt = 0
-  private allAnime: AllAnimeProvider
   private animePahe?: AnimePaheProvider
   private triggerDiscovery?: () => void
   private discoveryIntervalId: ReturnType<typeof setInterval> | null = null
   private stopped = false
 
-  constructor(providers: { allAnime: AllAnimeProvider; animePahe?: AnimePaheProvider }) {
-    this.allAnime = providers.allAnime
+  constructor(providers: { animePahe?: AnimePaheProvider }) {
     this.animePahe = providers.animePahe
   }
 
@@ -278,14 +276,14 @@ export class WatchlistController {
     runDiscovery()
   }
 
-  private getProviderForId(showId: string): AllAnimeProvider | AnimePaheProvider {
+  private getProviderForId(showId: string): AnimePaheProvider | null {
     if (UUID_RE.test(showId) && this.animePahe) return this.animePahe
-    return this.allAnime
+    return null
   }
 
   private deobfuscateUrl(url: string, showId?: string): string {
     if (!showId || !UUID_RE.test(showId)) {
-      return this.allAnime.deobfuscateUrl(url)
+      return url
     }
     return url
   }
@@ -535,10 +533,7 @@ export class WatchlistController {
       isAdult,
     } = req.body
 
-    const showId = await getMigratedId(req.db, showIdRaw, {
-      allanime: this.allAnime,
-      animepahe: this.animePahe,
-    })
+    const showId = await getMigratedId(req.db, showIdRaw)
 
     const titlePreferenceRow = await SettingsRepository.getByKey(req.db, 'titlePreference')
     const titlePreference = titlePreferenceRow ? titlePreferenceRow.value : 'englishName'
@@ -551,8 +546,9 @@ export class WatchlistController {
     }
 
     let actualEpisodeNumber = episodeNumber
-    if (this.getProviderForId(showId).name === 'AnimePahe') {
-      const epData = await this.getProviderForId(showId).getEpisodes(
+    const providerForId = this.getProviderForId(showId)
+    if (providerForId?.name === 'AnimePahe') {
+      const epData = await providerForId.getEpisodes(
         showId,
         'sub',
         req.headers['x-animepahe-ua'] as string,
@@ -569,7 +565,7 @@ export class WatchlistController {
 
     let discordThumbnails: string[] | undefined
     try {
-      const meta = await this.getProviderForId(showId).getShowMeta(showId)
+      const meta = await providerForId?.getShowMeta(showId)
       if (meta?.thumbnails) discordThumbnails = meta.thumbnails
     } catch {
       // Non-critical, Discord will fall back to logo
@@ -583,7 +579,7 @@ export class WatchlistController {
       duration: duration || 0,
       thumbnail: this.deobfuscateUrl(showThumbnail || '', showId),
       isPlaying: isPlaying !== false,
-      providerName: this.getProviderForId(showId).name,
+      providerName: providerForId?.name,
       sessionId,
       thumbnails: discordThumbnails,
       isAdult,
@@ -633,10 +629,7 @@ export class WatchlistController {
 
   removeContinueWatching = async (req: Request, res: Response) => {
     const { showId: showIdRaw } = req.body
-    const showId = await getMigratedId(req.db, showIdRaw, {
-      allanime: this.allAnime,
-      animepahe: this.animePahe,
-    })
+    const showId = await getMigratedId(req.db, showIdRaw)
     await performWriteTransaction(req.db, (tx) => {
       WatchedEpisodesRepository.deleteByShow(tx, showId)
       NotificationsRepository.deleteByShow(tx, showId)
@@ -685,7 +678,7 @@ export class WatchlistController {
             }
 
             if (!row.type) {
-              const meta = await this.getProviderForId(row.id).getShowMeta(
+              const meta = await this.getProviderForId(row.id)?.getShowMeta(
                 row.id,
                 req.headers['x-animepahe-ua'] as string,
                 req.headers['x-animepahe-cookie'] as string
@@ -719,10 +712,7 @@ export class WatchlistController {
   }
 
   checkWatchlist = async (req: Request, res: Response) => {
-    const showId = await getMigratedId(req.db, req.params.showId as string, {
-      allanime: this.allAnime,
-      animepahe: this.animePahe,
-    })
+    const showId = await getMigratedId(req.db, req.params.showId as string)
     const item = await WatchlistRepository.getById(req.db, showId)
     res.json({ inWatchlist: !!item, status: item?.status ?? null })
   }
@@ -754,10 +744,7 @@ export class WatchlistController {
       return res.status(400).json({ error: 'showId and episodeNumber are required' })
     }
 
-    const showId = await getMigratedId(req.db, showIdRaw, {
-      allanime: this.allAnime,
-      animepahe: this.animePahe,
-    })
+    const showId = await getMigratedId(req.db, showIdRaw)
 
     const existing = await QueueRepository.getByEpisode(req.db, showId, String(episodeNumber))
 
@@ -786,10 +773,7 @@ export class WatchlistController {
 
   removeFromQueue = async (req: Request, res: Response) => {
     const { showId: showIdRaw, episodeNumber } = req.body
-    const showId = await getMigratedId(req.db, showIdRaw, {
-      allanime: this.allAnime,
-      animepahe: this.animePahe,
-    })
+    const showId = await getMigratedId(req.db, showIdRaw)
     await performWriteTransaction(req.db, (tx) => {
       QueueRepository.removeEpisode(tx, showId, String(episodeNumber))
     })
@@ -817,10 +801,7 @@ export class WatchlistController {
 
   getSuggestedQueueEpisode = async (req: Request, res: Response) => {
     const showIdRaw = req.params.showId as string
-    const showId = await getMigratedId(req.db, showIdRaw, {
-      allanime: this.allAnime,
-      animepahe: this.animePahe,
-    })
+    const showId = await getMigratedId(req.db, showIdRaw)
     const resumeProgress = await WatchedEpisodesRepository.getLatestResumeProgress(req.db, showId)
 
     if (resumeProgress) {
@@ -833,14 +814,17 @@ export class WatchlistController {
 
     const [watchedEpisodes, episodeData] = await Promise.all([
       WatchedEpisodesRepository.getByShow(req.db, showId),
-      this.getProviderForId(showId)
-        .getEpisodes(showId, 'sub')
-        .catch(() => null),
+      /^\d+$/.test(showId)
+        ? getAnilistEpisodes(showId)
+        : this.getProviderForId(showId)
+            ?.getEpisodes(showId, 'sub')
+            .then((d) => d?.episodes ?? [])
+            .catch(() => []),
     ])
 
     const watchedSet = new Set(watchedEpisodes.map((ep) => ep.episodeNumber.toString()))
-    const episodes = episodeData?.episodes?.length
-      ? [...episodeData.episodes].sort((a, b) => parseFloat(a) - parseFloat(b))
+    const episodes = episodeData?.length
+      ? [...episodeData].sort((a, b) => parseFloat(a) - parseFloat(b))
       : []
 
     const finishedEpisodes = watchedEpisodes
@@ -864,10 +848,7 @@ export class WatchlistController {
   }
 
   getEpisodeProgress = async (req: Request, res: Response) => {
-    const showId = await getMigratedId(req.db, req.params.showId as string, {
-      allanime: this.allAnime,
-      animepahe: this.animePahe,
-    })
+    const showId = await getMigratedId(req.db, req.params.showId as string)
     const progress = await WatchedEpisodesRepository.getByShowAndEpisode(
       req.db,
       showId,
@@ -877,10 +858,7 @@ export class WatchlistController {
   }
 
   getWatchedEpisodes = async (req: Request, res: Response) => {
-    const showId = await getMigratedId(req.db, req.params.showId as string, {
-      allanime: this.allAnime,
-      animepahe: this.animePahe,
-    })
+    const showId = await getMigratedId(req.db, req.params.showId as string)
     const episodes = await WatchedEpisodesRepository.getWatchedEpisodeNumbers(req.db, showId)
     res.json(episodes)
   }
@@ -888,14 +866,11 @@ export class WatchlistController {
   addToWatchlist = async (req: Request, res: Response) => {
     const { id: idRaw, status, nativeName, englishName } = req.body
     let { name, thumbnail, type } = req.body
-    const id = await getMigratedId(req.db, idRaw, {
-      allanime: this.allAnime,
-      animepahe: this.animePahe,
-    })
+    const id = await getMigratedId(req.db, idRaw)
 
     if (id && !id.startsWith('show_')) {
       try {
-        const meta = await this.getProviderForId(id).getShowMeta(
+        const meta = await this.getProviderForId(id)?.getShowMeta(
           id,
           req.headers['x-animepahe-ua'] as string,
           req.headers['x-animepahe-cookie'] as string
@@ -940,10 +915,7 @@ export class WatchlistController {
 
   removeFromWatchlist = async (req: Request, res: Response) => {
     const { id: idRaw } = req.body
-    const id = await getMigratedId(req.db, idRaw, {
-      allanime: this.allAnime,
-      animepahe: this.animePahe,
-    })
+    const id = await getMigratedId(req.db, idRaw)
     await performWriteTransaction(req.db, (tx) => {
       WatchlistRepository.delete(tx, id)
       WatchedEpisodesRepository.deleteByShow(tx, id)
@@ -954,10 +926,7 @@ export class WatchlistController {
 
   updateWatchlistStatus = async (req: Request, res: Response) => {
     const { id: idRaw, status } = req.body
-    const id = await getMigratedId(req.db, idRaw, {
-      allanime: this.allAnime,
-      animepahe: this.animePahe,
-    })
+    const id = await getMigratedId(req.db, idRaw)
     await performWriteTransaction(req.db, (tx) => {
       WatchlistRepository.updateStatus(tx, id, status)
     })

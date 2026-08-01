@@ -4,7 +4,6 @@ import type { VideoSource } from '../../pages/Player'
 
 interface ProviderSelectorProps {
   selectedProvider:
-    | 'allanime'
     | 'animepahe'
     | '123anime'
     | 'animeya'
@@ -14,16 +13,7 @@ interface ProviderSelectorProps {
     | 'anilight'
     | 'anidb'
   onProviderChange: (
-    provider:
-      | 'allanime'
-      | 'animepahe'
-      | '123anime'
-      | 'animeya'
-      | 'megaplay'
-      | 'wh'
-      | 'hn'
-      | 'anilight'
-      | 'anidb'
+    provider: 'animepahe' | '123anime' | 'animeya' | 'megaplay' | 'wh' | 'hn' | 'anilight' | 'anidb'
   ) => void
 }
 
@@ -40,7 +30,6 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
         onChange={(e) =>
           onProviderChange(
             e.target.value as
-              | 'allanime'
               | 'animepahe'
               | '123anime'
               | 'animeya'
@@ -55,7 +44,6 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
         <option value="anidb">AniDB</option>
         <option value="anilight">Anilight</option>
         <option value="megaplay">MegaPlay</option>
-        <option value="allanime">AllAnime</option>
         <option value="animepahe">AnimePahe</option>
         <option value="animeya">Animeya</option>
         <option value="123anime">123Anime</option>

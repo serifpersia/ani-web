@@ -1,18 +1,10 @@
 import NodeCache from 'node-cache'
-import {
-  Provider,
-  Show,
-  VideoSource,
-  EpisodeDetails,
-  SkipIntervals,
-  SearchOptions,
-} from './provider.interface'
+import { Provider, Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
 import logger from '../logger'
 import { execFileSync } from 'node:child_process'
 
 const ANILIGHT_API = 'https://api.anilight.live/api'
 const SITE_BASE = 'https://anilight.live'
-const PROVIDER = 'anilight'
 
 const BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -296,28 +288,7 @@ export class AnilightProvider implements Provider {
     return results[0].id || null
   }
 
-  async getShowMeta(showId: string): Promise<Partial<Show> | null> {
-    try {
-      const { slug } = parseShowId(showId)
-      if (!slug) return null
-
-      const data = await curlGetJSON<AnilightAnime>(
-        `${ANILIGHT_API}/anime/${encodeURIComponent(slug)}`
-      )
-
-      if (!data) {
-        return null
-      }
-
-      const meta = mapAnimeToShow(data)
-      return meta
-    } catch (error) {
-      logger.error({ error, showId }, '[Anilight] getShowMeta failed')
-      return null
-    }
-  }
-
-  async getEpisodes(showId: string, _mode: 'sub' | 'dub'): Promise<EpisodeDetails | null> {
+  async getEpisodes(showId: string): Promise<EpisodeDetails | null> {
     try {
       const { slug } = parseShowId(showId)
       if (!slug) return null
@@ -489,29 +460,5 @@ export class AnilightProvider implements Provider {
       logger.error({ error, showId, episodeNumber }, '[Anilight] getStreamUrls failed')
       return null
     }
-  }
-
-  async getPopular(
-    _timeframe: 'daily' | 'weekly' | 'monthly' | 'all',
-    _page?: number,
-    _size?: number
-  ): Promise<Show[]> {
-    return []
-  }
-
-  async getSchedule(_date: Date): Promise<Show[]> {
-    return []
-  }
-
-  async getSeasonal(_page: number): Promise<Show[]> {
-    return []
-  }
-
-  async getLatestReleases(_page?: number, _size?: number): Promise<Show[]> {
-    return []
-  }
-
-  async getSkipTimes(_showId: string, _episodeNumber: string): Promise<SkipIntervals> {
-    return { found: false, results: [] }
   }
 }

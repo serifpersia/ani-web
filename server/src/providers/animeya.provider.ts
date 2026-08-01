@@ -1,15 +1,6 @@
 import NodeCache from 'node-cache'
 import * as cheerio from 'cheerio'
-import {
-  Provider,
-  Show,
-  VideoSource,
-  EpisodeDetails,
-  SkipIntervals,
-  SearchOptions,
-  VideoLink,
-  SubtitleTrack,
-} from './provider.interface'
+import { Provider, Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
 import logger from '../logger'
 
 const UA =
@@ -666,7 +657,7 @@ export class AnimeyaProvider implements Provider {
     }
   }
 
-  async getEpisodes(showId: string, mode: 'sub' | 'dub'): Promise<EpisodeDetails | null> {
+  async getEpisodes(showId: string): Promise<EpisodeDetails | null> {
     try {
       const cacheKey = `animeya_eps_${showId}`
       const cached = this.cache.get<EpisodeDetails>(cacheKey)
@@ -711,7 +702,6 @@ export class AnimeyaProvider implements Provider {
         const subType = (source.subType || '').toUpperCase()
         const langue = (source.langue || '').toUpperCase()
 
-        const isSub = ['SOFT', 'HARD', 'SUB'].includes(subType)
         const isDub = subType === 'DUB' || (subType === 'NONE' && langue === 'ENG')
 
         if (mode === 'dub' && !isDub) continue
@@ -845,50 +835,5 @@ export class AnimeyaProvider implements Provider {
       logger.error({ err: error, showId, episodeNumber }, 'Animeya getStreamUrls failed')
       return null
     }
-  }
-
-  async getShowMeta(showId: string): Promise<Partial<Show> | null> {
-    try {
-      const info = await this.getInfoInternal(showId)
-      return {
-        _id: info.id,
-        id: info.id,
-        name: info.title,
-        englishName: info.title,
-        thumbnail: info.cover,
-        description: info.description,
-        availableEpisodesDetail: {
-          sub: info.episodes.map((ep) => String(ep.episodeNumber)),
-          dub: [],
-        },
-      }
-    } catch (error) {
-      logger.error({ err: error, showId }, 'Animeya getShowMeta failed')
-      return null
-    }
-  }
-
-  async getPopular(
-    _timeframe: 'daily' | 'weekly' | 'monthly' | 'all',
-    _page?: number,
-    _size?: number
-  ): Promise<Show[]> {
-    return []
-  }
-
-  async getSchedule(_date: Date): Promise<Show[]> {
-    return []
-  }
-
-  async getSeasonal(_page: number): Promise<Show[]> {
-    return []
-  }
-
-  async getLatestReleases(_page?: number, _size?: number): Promise<Show[]> {
-    return []
-  }
-
-  async getSkipTimes(_showId: string, _episodeNumber: string): Promise<SkipIntervals> {
-    return { found: false, results: [] }
   }
 }

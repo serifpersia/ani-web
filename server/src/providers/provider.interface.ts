@@ -83,50 +83,13 @@ export interface EpisodeDetails {
   availableEpisodesDetail?: EpisodeDetail[]
 }
 
-export interface SkipInterval {
-  interval: {
-    startTime: number
-    endTime: number
-  }
-  skipType: 'op' | 'ed'
-  skipId: string
-  episodeLength: number
-}
-
-export interface SkipIntervals {
-  found: boolean
-  results: SkipInterval[]
-}
-
 export interface SearchOptions {
   query?: string
-  season?: string
-  year?: string
-  sortBy?: string
-  page?: string
-  limit?: string
-  type?: string
-  country?: string
-  translation?: string
-  genres?: string
-  excludeGenres?: string
-  tags?: string
-  excludeTags?: string
-  studios?: string
 }
 
 export interface Provider {
   name: string
   search(options: SearchOptions): Promise<Show[]>
-  getPopular(
-    timeframe: 'daily' | 'weekly' | 'monthly' | 'all',
-    page?: number,
-    size?: number
-  ): Promise<Show[]>
-  getSchedule(date: Date): Promise<Show[]>
-  getSeasonal(page: number): Promise<Show[]>
-  getLatestReleases(page?: number, size?: number): Promise<Show[]>
-  getShowMeta(showId: string, ua?: string, cookie?: string): Promise<Partial<Show> | null>
   getEpisodes(
     showId: string,
     mode?: 'sub' | 'dub',
@@ -138,6 +101,5 @@ export interface Provider {
     episodeNumber: string,
     mode?: 'sub' | 'dub'
   ): Promise<VideoSource[] | null>
-  getSkipTimes(showId: string, episodeNumber: string): Promise<SkipIntervals>
   resolveShowId?(title: string, romaji?: string, mode?: 'sub' | 'dub'): Promise<string | null>
 }

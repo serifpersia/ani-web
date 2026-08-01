@@ -1,12 +1,5 @@
 import NodeCache from 'node-cache'
-import {
-  Provider,
-  Show,
-  VideoSource,
-  EpisodeDetails,
-  SkipIntervals,
-  SearchOptions,
-} from './provider.interface'
+import { Provider, Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
 import logger from '../logger'
 
 interface ApiAnime {
@@ -39,15 +32,6 @@ export class _123AnimeProvider implements Provider {
 
   constructor(cache: NodeCache) {
     this.cache = cache
-  }
-
-  private createSlug(title: string): string {
-    return title
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-+|-+$/g, '')
   }
 
   private normalizeSlugForSearch(title: string): string {
@@ -359,34 +343,5 @@ export class _123AnimeProvider implements Provider {
       logger.error({ err: error, showId, episodeNumber, mode }, '123Anime getStreamUrls failed')
       return null
     }
-  }
-
-  async getShowMeta(showId: string): Promise<Partial<Show> | null> {
-    const results = await this.search({ query: showId.replace(/ /g, '-') })
-    return results.find((s) => s.id === showId || s._id === showId) || null
-  }
-
-  async getPopular(
-    _timeframe: 'daily' | 'weekly' | 'monthly' | 'all',
-    _page?: number,
-    _size?: number
-  ): Promise<Show[]> {
-    return []
-  }
-
-  async getSchedule(_date: Date): Promise<Show[]> {
-    return []
-  }
-
-  async getSeasonal(_page: number): Promise<Show[]> {
-    return []
-  }
-
-  async getLatestReleases(_page?: number, _size?: number): Promise<Show[]> {
-    return []
-  }
-
-  async getSkipTimes(_showId: string, _episodeNumber: string): Promise<SkipIntervals> {
-    return { found: false, results: [] }
   }
 }

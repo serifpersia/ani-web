@@ -231,7 +231,7 @@ function stripHtml(input?: string | null): string {
 }
 
 export function fromAnilistMedia(m: AnilistMedia): Show {
-  const id = (m.idMal ?? m.id).toString()
+  const id = m.id.toString()
   const title = m.title
   const name = title?.romaji || title?.english || title?.native || 'Unknown'
 

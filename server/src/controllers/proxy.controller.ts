@@ -209,7 +209,7 @@ export class ProxyController {
           res.set('Access-Control-Allow-Origin', '*')
           res.send(resp.body)
         } else {
-          // Plain media streams (yt-mp4, allanime, etc.)
+          // Plain media streams (yt-mp4, etc.)
           // Proxy using axios streaming (got-scraping does not support stream/buffer for these hosts)
           const axiosResp = await axiosInstance({
             url: urlStr,
@@ -411,7 +411,7 @@ export class ProxyController {
     const abortController = new AbortController()
     this.abortWhenClientLeaves(res, abortController)
 
-    let refererValue = 'https://allanime.day'
+    let refererValue = 'https://anilist.co/'
     const headers: Record<string, string> = {
       'User-Agent':
         (ua as string) ||
@@ -431,8 +431,6 @@ export class ProxyController {
         refererValue = 'https://anilist.co/'
       } else if (targetUrl.includes('gogocdn.net')) {
         refererValue = 'https://gogoanime.lu/'
-      } else if (targetUrl.includes('youtube-anime.com') || targetUrl.includes('allanime.day')) {
-        refererValue = 'https://allanime.day/'
       } else if (targetUrl.includes('animeya.cc')) {
         refererValue = 'https://animeya.cc/'
       }

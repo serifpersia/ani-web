@@ -119,7 +119,6 @@ export interface PlayerState {
   resumeDuration: number
   skipIntervals: SkipInterval[]
   selectedProvider:
-    | 'allanime'
     | 'animepahe'
     | '123anime'
     | 'animeya'

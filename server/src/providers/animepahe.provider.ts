@@ -8,7 +8,6 @@ import {
   VideoSource,
   EpisodeDetails,
   EpisodeDetail,
-  SkipIntervals,
   SearchOptions,
 } from './provider.interface'
 import logger from '../logger'
@@ -649,24 +648,5 @@ export class AnimePaheProvider implements Provider {
       logger.error({ showId, error: (e as Error).message }, 'Failed to fetch AnimePahe metadata')
       return null
     }
-  }
-  async getPopular(
-    _timeframe: 'daily' | 'weekly' | 'monthly' | 'all',
-    _page?: number,
-    _size?: number
-  ): Promise<Show[]> {
-    return []
-  }
-  async getSchedule(_date: Date): Promise<Show[]> {
-    return []
-  }
-  async getSeasonal(_page: number): Promise<Show[]> {
-    return []
-  }
-  async getLatestReleases(_page?: number, _size?: number): Promise<Show[]> {
-    return []
-  }
-  async getSkipTimes(_showId: string, _episodeNumber: string): Promise<SkipIntervals> {
-    return { found: false, results: [] }
   }
 }

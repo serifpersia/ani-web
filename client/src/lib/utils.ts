@@ -24,12 +24,7 @@ export const fixThumbnailUrl = (
 
   let finalUrl = url
 
-  // 1. Resolve host issues
-  if (finalUrl.includes('wp.youtube-anime.com')) {
-    finalUrl = finalUrl.replace('wp.youtube-anime.com', 'allanime.day')
-  }
-
-  // 2. Resolve aln host issues (confirmed working host)
+  // 1. Resolve aln host issues (confirmed working host)
   if (finalUrl.includes('aln.youtube-anime.com')) {
     finalUrl = finalUrl.replace(
       /https?:\/\/allanime\.day\/aln\.youtube-anime\.com/,
@@ -45,7 +40,7 @@ export const fixThumbnailUrl = (
     }
   }
 
-  // 3. Resolve Anilist CDN issues
+  // 2. Resolve Anilist CDN issues
   if (finalUrl.includes('allanime.day/s4.anilist.co')) {
     finalUrl = finalUrl.replace(
       /https?:\/\/allanime\.day\/s4\.anilist\.co/,

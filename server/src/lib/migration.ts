@@ -5,7 +5,6 @@ import { WatchlistRepository } from '../repositories/watchlist.repository'
 import { ShowsMetaRepository } from '../repositories/shows-meta.repository'
 import { dbGet, dbRun } from '../utils/db-utils'
 import logger from '../logger'
-import { Provider } from '../providers/provider.interface'
 
 const inFlightMigrations = new Map<string, Promise<string>>()
 
@@ -22,11 +21,13 @@ async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): P
   if (metaRow?.anilistId != null && String(metaRow.anilistId) !== numericId) {
     // shows_meta already has a different anilistId — this is clearly a MAL alias
     trueAnilistId = metaRow.anilistId
-  } else if (!metaRow || metaRow.anilistId === parseInt(numericId)) {
-    // Ambiguous or no local data — verify via AniList API
-    const meta = await getShowMetaById(numericId)
-    if (meta?.anilistId && meta.anilistId !== parseInt(numericId)) {
-      trueAnilistId = meta.anilistId
+  } else if (!metaRow) {
+    // No local shows_meta — only verify via AniList if there's existing data that could be a MAL alias
+    if (WatchlistRepository.exists(db, numericId)) {
+      const meta = await getShowMetaById(numericId)
+      if (meta?.anilistId && meta.anilistId !== parseInt(numericId)) {
+        trueAnilistId = meta.anilistId
+      }
     }
   }
 
@@ -158,11 +159,7 @@ async function consolidateFromNumeric(db: DatabaseWrapper, numericId: string): P
   return numericId
 }
 
-async function migrateId(
-  db: DatabaseWrapper,
-  legacyId: string,
-  providers: { [key: string]: Provider | undefined }
-): Promise<string> {
+async function migrateId(db: DatabaseWrapper, legacyId: string): Promise<string> {
   const isNumeric = /^\d+$/.test(legacyId)
   if (isNumeric) {
     return consolidateFromNumeric(db, legacyId)
@@ -333,16 +330,12 @@ async function migrateId(
   }
 }
 
-export function getMigratedId(
-  db: DatabaseWrapper,
-  legacyId: string,
-  providers: { [key: string]: Provider | undefined }
-): Promise<string> {
+export function getMigratedId(db: DatabaseWrapper, legacyId: string): Promise<string> {
   if (/^\d+$/.test(legacyId)) {
     const existing = inFlightMigrations.get(legacyId)
     if (existing) return existing
 
-    const migration = migrateId(db, legacyId, providers)
+    const migration = migrateId(db, legacyId)
     inFlightMigrations.set(legacyId, migration)
     migration.then(
       () => inFlightMigrations.delete(legacyId),
@@ -354,7 +347,7 @@ export function getMigratedId(
   const existing = inFlightMigrations.get(legacyId)
   if (existing) return existing
 
-  const migration = migrateId(db, legacyId, providers)
+  const migration = migrateId(db, legacyId)
   inFlightMigrations.set(legacyId, migration)
   migration.then(
     () => inFlightMigrations.delete(legacyId),

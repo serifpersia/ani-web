@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express'
 import { DataController } from '../controllers/data.controller'
-import { Provider, Show } from '../providers/provider.interface'
+import { Provider } from '../providers/provider.interface'
 import NodeCache from 'node-cache'
 
 function makeCacheMiddleware(
@@ -35,16 +35,6 @@ export function createDataRouter(
 ): Router {
   const router = Router()
   const controller = new DataController(providers)
-
-  router.get(
-    '/popular/:timeframe',
-    makeCacheMiddleware(
-      apiCache,
-      (req) =>
-        `popular-${(req.params.timeframe as string).toLowerCase()}-${req.query.page || 1}-${req.query.size || 10}`
-    ),
-    controller.getPopular
-  )
 
   router.get(
     '/schedule/:date',
@@ -93,7 +83,7 @@ export function createDataRouter(
     '/show-meta/:id',
     makeCacheMiddleware(
       apiCache,
-      (req) => `meta-${req.params.id}-${req.query.provider || 'allanime'}`,
+      (req) => `meta-${req.params.id}`,
       3600,
       (d) => !!d
     ),

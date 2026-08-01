@@ -1,17 +1,15 @@
 import { Router } from 'express'
 import { WatchlistController } from '../controllers/watchlist.controller'
-import { AllAnimeProvider } from '../providers/allanime.provider'
 import { AnimePaheProvider } from '../providers/animepahe.provider'
 import { discordRPCService } from '../discord-rpc'
 import { DatabaseWrapper } from '../db'
 
 export function createWatchlistRouter(
-  allAnime: AllAnimeProvider,
   animePahe: AnimePaheProvider,
   getDb: () => DatabaseWrapper
 ): { router: Router; stopDiscovery: () => void } {
   const router = Router()
-  const controller = new WatchlistController({ allAnime, animePahe })
+  const controller = new WatchlistController({ animePahe })
 
   controller.startNotificationDiscovery(getDb)
 

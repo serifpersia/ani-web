@@ -6,7 +6,6 @@ export type Action =
   | {
       type: 'SET_PROVIDER'
       payload:
-        | 'allanime'
         | 'animepahe'
         | '123anime'
         | 'animeya'
@@ -27,7 +26,6 @@ const getPreferredProvider = (): PlayerState['selectedProvider'] => {
   const validProviders: string[] = [
     'anidb',
     'megaplay',
-    'allanime',
     'animeya',
     'animepahe',
     '123anime',

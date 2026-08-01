@@ -39,7 +39,6 @@ import type { QueueItem } from '../hooks/useAnimeData'
 import type { VideoLink, SubtitleTrack } from '../types/player'
 import AnimeMetaDetails from '../components/anime/AnimeMetaDetails'
 import SynopsisText from '../components/anime/SynopsisText'
-import RecoveryModal from '../components/anime/RecoveryModal'
 import { getSuggestedEpisode } from '../lib/queue'
 import AnimePaheCookieModal from '../components/anime/AnimePaheCookieModal'
 
@@ -134,6 +133,8 @@ const Player: React.FC = () => {
   const { data: queue = [] } = useQueue()
   const addQueue = useAddToQueue()
   const removeQueue = useRemoveFromQueue()
+  const removeQueueRef = useRef(removeQueue)
+  removeQueueRef.current = removeQueue
   const clearQueue = useClearQueue()
   const reorderQueue = useReorderQueue()
   const [queueConfirmed, setQueueConfirmed] = useState(false)
@@ -354,16 +355,23 @@ const Player: React.FC = () => {
   }, [state.selectedSource, dispatch, setPreferredSource])
   handleVideoSourceErrorRef.current = handleVideoSourceError
 
+  const matchesQueueItem = (item: QueueItem, id: string | undefined, metaId: string | undefined) =>
+    item.showId === id || (!!metaId && item.showId === metaId)
+
   const handlePlaybackFinished = useCallback(() => {
     actions.onEnded()
 
     const itemToRemove = queue.find(
-      (item) => item.showId === showId && item.episodeNumber === state.currentEpisode
+      (item) =>
+        matchesQueueItem(item, showId, state.showMeta?.id) &&
+        item.episodeNumber === state.currentEpisode
     )
 
     if (queue.length > 0) {
       const activeQueueIndex = queue.findIndex(
-        (item) => item.showId === showId && item.episodeNumber === state.currentEpisode
+        (item) =>
+          matchesQueueItem(item, showId, state.showMeta?.id) &&
+          item.episodeNumber === state.currentEpisode
       )
 
       const nextItem = activeQueueIndex >= 0 ? queue[activeQueueIndex + 1] || null : queue[0]
@@ -371,7 +379,7 @@ const Player: React.FC = () => {
       setPendingQueueTransition({ nextItem, playedItem: itemToRemove || null })
       setQueueCountdown(2)
     } else if (itemToRemove) {
-      removeQueue.mutate({
+      removeQueueRef.current.mutate({
         showId: itemToRemove.showId,
         episodeNumber: itemToRemove.episodeNumber,
       })
@@ -392,8 +400,8 @@ const Player: React.FC = () => {
     actions,
     navigate,
     queue,
-    removeQueue,
     showId,
+    state.showMeta?.id,
     state.currentEpisode,
     state.episodes,
     state.isAutoplayEnabled,
@@ -406,10 +414,14 @@ const Player: React.FC = () => {
     actions.onEnded()
 
     const itemToRemove = queue.find(
-      (item) => item.showId === showId && item.episodeNumber === state.currentEpisode
+      (item) =>
+        matchesQueueItem(item, showId, state.showMeta?.id) &&
+        item.episodeNumber === state.currentEpisode
     )
     const activeQueueIndex = queue.findIndex(
-      (item) => item.showId === showId && item.episodeNumber === state.currentEpisode
+      (item) =>
+        matchesQueueItem(item, showId, state.showMeta?.id) &&
+        item.episodeNumber === state.currentEpisode
     )
     const nextItem = activeQueueIndex >= 0 ? queue[activeQueueIndex + 1] || null : queue[0]
 
@@ -418,17 +430,23 @@ const Player: React.FC = () => {
         showId: itemToRemove.showId,
         episodeNumber: itemToRemove.episodeNumber,
       })
-    } else if (queue[0]) {
-      removeQueue.mutate({
-        showId: queue[0].showId,
-        episodeNumber: queue[0].episodeNumber,
-      })
     }
 
     if (nextItem) {
       navigate(`/watch/${nextItem.showId}/${nextItem.episodeNumber}`)
+    } else if (itemToRemove) {
+      dispatch({ type: 'SET_STATE', payload: { showResumeModal: true } })
     }
-  }, [actions, navigate, queue, removeQueue, showId, state.currentEpisode])
+  }, [
+    actions,
+    navigate,
+    queue,
+    removeQueue,
+    showId,
+    state.showMeta?.id,
+    state.currentEpisode,
+    dispatch,
+  ])
 
   const handleNextEpisode = useCallback(() => {
     if (nextEpisode) {
@@ -493,7 +511,7 @@ const Player: React.FC = () => {
       setQueueCountdown(null)
 
       if (playedItem) {
-        removeQueue.mutate({
+        removeQueueRef.current.mutate({
           showId: playedItem.showId,
           episodeNumber: playedItem.episodeNumber,
         })
@@ -501,6 +519,8 @@ const Player: React.FC = () => {
 
       if (nextItem) {
         navigate(`/watch/${nextItem.showId}/${nextItem.episodeNumber}`)
+      } else if (playedItem) {
+        dispatch({ type: 'SET_STATE', payload: { showResumeModal: true } })
       }
       return
     }
@@ -510,7 +530,7 @@ const Player: React.FC = () => {
     }, 1000)
 
     return () => window.clearTimeout(timer)
-  }, [pendingQueueTransition, queueCountdown, navigate, removeQueue])
+  }, [pendingQueueTransition, queueCountdown, navigate, dispatch])
 
   useEffect(() => {
     if (state.showResumeModal && player.state.isFullscreen) {
@@ -881,12 +901,9 @@ const Player: React.FC = () => {
   const isCurrentEpisodeWatched = !!(
     state.currentEpisode && state.watchedEpisodes.includes(state.currentEpisode)
   )
-  const [showAaRecovery, setShowAaRecovery] = useState(false)
 
   const showManualWatchedButton =
-    (state.selectedProvider?.toLowerCase() !== 'allanime' &&
-      state.selectedProvider !== 'megaplay') ||
-    state.selectedSource?.type === 'iframe'
+    state.selectedProvider !== 'megaplay' || state.selectedSource?.type === 'iframe'
   const queuedItem = useMemo(() => {
     if (!showId || !suggestedEpisode) return undefined
     return queue.find(
@@ -1106,16 +1123,6 @@ const Player: React.FC = () => {
                   <p className={styles.errorSubtext}>
                     Please try selecting a different provider below.
                   </p>
-                  {state.selectedProvider?.toLowerCase() === 'allanime' && !showAaRecovery && (
-                    <button
-                      className={styles.retryButton}
-                      onClick={() => setShowAaRecovery(true)}
-                      data-speed-boost-ignore="true"
-                      style={{ marginTop: 8 }}
-                    >
-                      Recover AllAnime
-                    </button>
-                  )}
                   <button
                     className={styles.retryButton}
                     onClick={() => window.location.reload()}
@@ -1417,8 +1424,6 @@ const Player: React.FC = () => {
           navigate(`/watch/${showId}/${ep}`)
         }}
       />
-
-      <RecoveryModal show={showAaRecovery} onClose={() => setShowAaRecovery(false)} />
     </div>
   )
 }

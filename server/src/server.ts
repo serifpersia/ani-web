@@ -11,7 +11,6 @@ import { DatabaseWrapper } from './db'
 import chokidar from 'chokidar'
 import logger from './logger'
 
-import { AllAnimeProvider } from './providers/allanime.provider'
 import { _123AnimeProvider as Anime123Provider } from './providers/123anime.provider'
 import { AnimeyaProvider } from './providers/animeya.provider'
 import { MegaPlayProvider } from './providers/megaplay.provider'
@@ -54,18 +53,16 @@ app.use((req, res, next) => {
 
 const apiCache = new NodeCache({ stdTTL: 3600 })
 
-const allAnimeProvider = new AllAnimeProvider(apiCache)
 const _123AnimeProvider = new Anime123Provider(apiCache)
 const animeyaProvider = new AnimeyaProvider(apiCache)
 const megaPlayProvider = new MegaPlayProvider(apiCache)
 const animepaheProvider = new AnimePaheProvider(apiCache)
 const whProvider = new WhProvider(apiCache)
-const hnProvider = new HnProvider(apiCache)
+const hnProvider = new HnProvider()
 const anilightProvider = new AnilightProvider(apiCache)
 const anidbProvider = new AnidbProvider(apiCache)
 
 const providers = {
-  allanime: allAnimeProvider,
   '123anime': _123AnimeProvider,
   animeya: animeyaProvider,
   megaplay: megaPlayProvider,
@@ -147,7 +144,6 @@ app.use(
 )
 
 const { router: watchlistRouter, stopDiscovery } = createWatchlistRouter(
-  allAnimeProvider,
   animepaheProvider,
   () => db
 )
@@ -162,8 +158,7 @@ app.use(
     initializeDatabase,
     (newDb) => {
       db = newDb
-    },
-    allAnimeProvider
+    }
   )
 )
 

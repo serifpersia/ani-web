@@ -1,6 +1,5 @@
 import { Request, Response } from 'express'
 import { Provider, Show } from '../providers/provider.interface'
-import { AllAnimeProvider } from '../providers/allanime.provider'
 import { genres, tags, studios } from '../constants.json'
 import {
   getTrending,
@@ -19,9 +18,10 @@ import logger from '../logger'
 export class DataController {
   constructor(private providers: { [key: string]: Provider }) {}
 
-  private getProvider(req: Request): Provider {
-    const providerName = (req.query.provider as string) || 'allanime'
-    return this.providers[providerName.toLowerCase()] || this.providers['allanime']
+  private getProvider(req: Request): Provider | null {
+    const providerName = (req.query.provider as string)?.toLowerCase()
+    if (!providerName) return null
+    return this.providers[providerName] || null
   }
 
   getTrending = async (_req: Request, res: Response) => {
@@ -44,26 +44,6 @@ export class DataController {
       res.set('Cache-Control', 'public, max-age=300').json(data)
     } catch (e) {
       logger.error({ err: e }, 'Popular list fetch failed')
-      res.json([])
-    }
-  }
-
-  getPopular = async (req: Request, res: Response) => {
-    const timeframe = (req.params.timeframe as string).toLowerCase() as
-      | 'daily'
-      | 'weekly'
-      | 'monthly'
-      | 'all'
-    const page = parseInt(req.query.page as string) || 1
-    const size = parseInt(req.query.size as string) || 10
-    try {
-      const data = await this.getProvider(req).getPopular(timeframe, page, size)
-      res.set('Cache-Control', 'public, max-age=300').json(data)
-    } catch (e) {
-      if ((e as Error).message === 'AUTH_REQUIRED') {
-        return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'animepahe' })
-      }
-      logger.error({ err: e, timeframe, page }, 'getPopular failed')
       res.json([])
     }
   }
@@ -93,8 +73,7 @@ export class DataController {
           return res.json(data)
         }
       }
-      const data = await this.getProvider(req).getSkipTimes(showId, episodeNumber)
-      res.json(data)
+      res.json({ found: false, results: [] })
     } catch {
       res.json({ found: false, results: [] })
     }
@@ -181,6 +160,9 @@ export class DataController {
                 return res.json([])
               }
             } catch (fallbackErr) {
+              if ((fallbackErr as Error).message === 'AUTH_REQUIRED') {
+                throw fallbackErr
+              }
               logger.error(
                 { err: fallbackErr, provider: providerKey, showId, title: targetTitle },
                 '[Video] fallback provider search failed'
@@ -197,7 +179,9 @@ export class DataController {
         }
       }
 
-      const urls = await this.getProvider(req).getStreamUrls(
+      const provider = this.getProvider(req)
+      if (!provider) return res.json([])
+      const urls = await provider.getStreamUrls(
         showId,
         req.query.episodeNumber as string,
         req.query.mode as 'sub' | 'dub'
@@ -219,7 +203,7 @@ export class DataController {
       return res.json({ episodes: [] })
     }
 
-    const showId = await getMigratedId(req.db, showIdRaw, this.providers)
+    const showId = await getMigratedId(req.db, showIdRaw)
 
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(showId)) {
       try {
@@ -240,19 +224,13 @@ export class DataController {
     if (isNumeric) {
       let episodes: string[] = []
       try {
-        const meta = await getShowMetaById(showId)
-        const total = meta?.episodeCount as number | undefined | null
-        const hasTotal = typeof total === 'number' && Number.isFinite(total) && total > 0
+        episodes = await getAnilistEpisodes(showId)
 
-        if (!hasTotal) {
+        if (episodes.length === 0) {
           episodes = await this.tryProviderEpisodesFallback(showId, req.query.mode as 'sub' | 'dub')
           if (episodes.length > 0) {
             setCachedAnilist(`eps:${showId}`, episodes)
           }
-        }
-
-        if (episodes.length === 0) {
-          episodes = await getAnilistEpisodes(showId)
         }
       } catch (e) {
         logger.error({ err: e, showId }, 'Episodes fetch failed')
@@ -262,9 +240,9 @@ export class DataController {
       return
     }
 
-    const providerName = (req.query.provider as string) || 'allanime'
-    const provider = this.providers[providerName.toLowerCase()]
-    if (provider && providerName.toLowerCase() !== 'allanime') {
+    const providerName = (req.query.provider as string)?.toLowerCase()
+    const provider = providerName ? this.providers[providerName] : this.providers['anidb']
+    if (provider) {
       try {
         const data = await provider.getEpisodes(showId, req.query.mode as 'sub' | 'dub')
         if (data?.episodes?.length) {
@@ -275,67 +253,44 @@ export class DataController {
       }
     }
 
-    try {
-      if (this.providers['allanime']) {
-        const data = await this.providers['allanime'].getEpisodes(
-          showId,
-          req.query.mode as 'sub' | 'dub'
-        )
-        if (data?.episodes?.length) {
-          return res.json(data)
-        }
-      }
-    } catch {
-      // ignore
-    }
-
     res.json({ episodes: [] })
   }
 
   search = async (req: Request, res: Response) => {
     try {
-      const providerName = (req.query.provider as string) || 'anilist'
-      if (providerName.toLowerCase() !== 'animepahe') {
-        const query = (req.query.query as string) || ''
-        const page = parseInt(req.query.page as string) || 1
-        const perPage = parseInt(req.query.limit as string) || 14
-        const sort = (req.query.sortBy as string) || undefined
+      const query = (req.query.query as string) || ''
+      const page = parseInt(req.query.page as string) || 1
+      const perPage = parseInt(req.query.limit as string) || 14
+      const sort = (req.query.sortBy as string) || undefined
 
-        const result = await searchAnilist({
-          query,
-          page,
-          perPage,
-          format: req.query.type as string,
-          status: req.query.status as string,
-          season: req.query.season as string,
-          seasonYear: req.query.year ? parseInt(req.query.year as string) : undefined,
-          countryOfOrigin: req.query.country as string,
-          genre: req.query.genres as string,
-          genre_not_in: req.query.excludeGenres
-            ? (req.query.excludeGenres as string).split(',')
-            : undefined,
-          tag_not_in: req.query.excludeTags
-            ? (req.query.excludeTags as string).split(',')
-            : undefined,
-          averageScore_greater: req.query.minScore
-            ? parseInt(req.query.minScore as string)
-            : undefined,
-          episodes_greater: req.query.minEpisodes
-            ? parseInt(req.query.minEpisodes as string)
-            : undefined,
-          isAdult:
-            req.query.adult === 'true' ? true : req.query.adult === 'false' ? false : undefined,
-          sort,
-        })
-        return res.json(result)
-      }
-
-      const data = await this.getProvider(req).search(req.query)
-      res.json(data)
+      const result = await searchAnilist({
+        query,
+        page,
+        perPage,
+        format: req.query.type as string,
+        status: req.query.status as string,
+        season: req.query.season as string,
+        seasonYear: req.query.year ? parseInt(req.query.year as string) : undefined,
+        countryOfOrigin: req.query.country as string,
+        genre: req.query.genres as string,
+        genre_not_in: req.query.excludeGenres
+          ? (req.query.excludeGenres as string).split(',')
+          : undefined,
+        tag_not_in: req.query.excludeTags
+          ? (req.query.excludeTags as string).split(',')
+          : undefined,
+        averageScore_greater: req.query.minScore
+          ? parseInt(req.query.minScore as string)
+          : undefined,
+        episodes_greater: req.query.minEpisodes
+          ? parseInt(req.query.minEpisodes as string)
+          : undefined,
+        isAdult:
+          req.query.adult === 'true' ? true : req.query.adult === 'false' ? false : undefined,
+        sort,
+      })
+      return res.json(result)
     } catch (e) {
-      if ((e as Error).message === 'AUTH_REQUIRED') {
-        return res.status(403).json({ error: 'AUTH_REQUIRED', provider: 'animepahe' })
-      }
       logger.error({ err: e }, 'search failed')
       res.json([])
     }
@@ -369,7 +324,7 @@ export class DataController {
 
   getShowMeta = async (req: Request, res: Response) => {
     const showIdRaw = req.params.id as string
-    const id = await getMigratedId(req.db, showIdRaw, this.providers)
+    const id = await getMigratedId(req.db, showIdRaw)
     const isNumeric = /^\d+$/.test(id)
 
     if (isNumeric) {

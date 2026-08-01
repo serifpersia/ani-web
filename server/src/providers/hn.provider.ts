@@ -1,11 +1,8 @@
-import NodeCache from 'node-cache'
-import * as cheerio from 'cheerio'
 import {
   Provider,
   Show,
   VideoSource,
   EpisodeDetails,
-  SkipIntervals,
   SearchOptions,
   VideoLink,
 } from './provider.interface'
@@ -16,10 +13,6 @@ const API_URL = 'https://admin.hentaini.com/api'
 const CDN_URL = 'https://admin.hentaini.com/uploads'
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36'
-
-function cleanText(text: string): string {
-  return text.replace(/\s+/g, ' ').trim()
-}
 
 async function fetchText(url: string): Promise<string> {
   const res = await fetch(url, {
@@ -48,17 +41,6 @@ async function fetchApi<T>(path: string): Promise<T | null> {
     return res.json()
   } catch {
     return null
-  }
-}
-
-function parseGenres(raw: string | null): { name: string }[] {
-  if (!raw) return []
-  try {
-    const list = JSON.parse(raw)
-    if (!Array.isArray(list)) return []
-    return list.map((g: { text?: string }) => ({ name: g.text || '' })).filter((g) => g.name)
-  } catch {
-    return []
   }
 }
 
@@ -155,12 +137,6 @@ function parseNuxtData(html: string): NuxtEntry | null {
 
 export class HnProvider implements Provider {
   name = 'HN'
-
-  private cache: NodeCache
-
-  constructor(cache: NodeCache) {
-    this.cache = cache
-  }
 
   private bestMatch(
     results: { title: string; slug: string; poster: string }[],
@@ -269,7 +245,7 @@ export class HnProvider implements Provider {
     return null
   }
 
-  async getEpisodes(showId: string, _mode: 'sub' | 'dub'): Promise<EpisodeDetails | null> {
+  async getEpisodes(showId: string): Promise<EpisodeDetails | null> {
     try {
       if (!showId) return null
 
@@ -350,80 +326,5 @@ export class HnProvider implements Provider {
       logger.error({ error, showId, episodeNumber }, '[HN] getStreamUrls failed')
       return null
     }
-  }
-
-  async getShowMeta(showId: string): Promise<Partial<Show> | null> {
-    try {
-      if (!showId) return null
-
-      const html = await fetchText(`${BASE_URL}/h/${showId}`)
-      const $ = cheerio.load(html)
-
-      const title = cleanText($('h1').first().text() || $('title').first().text())
-        .replace(/^Watch\s+/i, '')
-        .replace(/\s+Episodes Online in HD\s*\|\s*Hentaini\s*$/i, '')
-        .trim()
-
-      const description =
-        $('meta[property="og:description"]').attr('content') ||
-        $('meta[name="description"]').attr('content') ||
-        ''
-
-      const poster = $('meta[property="og:image"]').attr('content') || ''
-
-      const episodes: string[] = []
-      const episodeRe = new RegExp(`/h/${showId}/(\\d+)`, 'g')
-      let m: RegExpExecArray | null
-      while ((m = episodeRe.exec(html)) !== null) {
-        episodes.push(m[1])
-      }
-
-      const genres: { name: string }[] = []
-      $('a[href*="?genre="]').each((_, el) => {
-        const name = cleanText($(el).text())
-        if (name) genres.push({ name })
-      })
-
-      return {
-        _id: showId,
-        id: showId,
-        name: title,
-        englishName: title,
-        thumbnail: poster,
-        bannerImage: '',
-        description,
-        type: 'TV',
-        year: null,
-        genres,
-        availableEpisodesDetail: { sub: episodes, dub: [] },
-      }
-    } catch (error) {
-      logger.error({ error, showId }, '[HN] getShowMeta failed')
-      return null
-    }
-  }
-
-  async getPopular(
-    _timeframe: 'daily' | 'weekly' | 'monthly' | 'all',
-    _page?: number,
-    _size?: number
-  ): Promise<Show[]> {
-    return []
-  }
-
-  async getSchedule(_date: Date): Promise<Show[]> {
-    return []
-  }
-
-  async getSeasonal(_page: number): Promise<Show[]> {
-    return []
-  }
-
-  async getLatestReleases(_page?: number, _size?: number): Promise<Show[]> {
-    return []
-  }
-
-  async getSkipTimes(_showId: string, _episodeNumber: string): Promise<SkipIntervals> {
-    return { found: false, results: [] }
   }
 }

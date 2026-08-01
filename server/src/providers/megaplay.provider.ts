@@ -6,7 +6,6 @@ import {
   VideoLink,
   SubtitleTrack,
   EpisodeDetails,
-  SkipIntervals,
   SearchOptions,
 } from './provider.interface'
 import logger from '../logger'
@@ -32,14 +31,9 @@ interface AniListMedia {
   averageScore?: number | null
 }
 
-interface AniListPage {
-  media?: AniListMedia[]
-  airingSchedule?: { media?: AniListMedia }[]
-}
-
 export class MegaPlayProvider implements Provider {
   name = 'MegaPlay'
-  private megaPlayBase = 'https://megaplay.buzz/stream/mal'
+  private megaPlayBase = 'https://megaplay.buzz/stream/ani'
   private cache: NodeCache
 
   constructor(cache: NodeCache) {
@@ -60,7 +54,7 @@ export class MegaPlayProvider implements Provider {
   }
 
   private toShow(media: AniListMedia): Show {
-    const id = (media.idMal ?? media.id).toString()
+    const id = media.id.toString()
     const title = media.title
     const name = title?.romaji || title?.english || title?.native || 'Unknown'
 
@@ -163,7 +157,7 @@ export class MegaPlayProvider implements Provider {
 
       if (results.length > 0) {
         const best = this.bestMatch(media, query)
-        const bestIndex = media.findIndex((m) => (m.idMal ?? m.id) === (best.idMal ?? best.id))
+        const bestIndex = media.findIndex((m) => m.id === best.id)
         if (bestIndex > 0) {
           const [bestItem] = results.splice(bestIndex, 1)
           results.unshift(bestItem)
@@ -182,7 +176,7 @@ export class MegaPlayProvider implements Provider {
     return results[0]?._id || null
   }
 
-  async getEpisodes(showId: string, _mode: 'sub' | 'dub'): Promise<EpisodeDetails | null> {
+  async getEpisodes(showId: string): Promise<EpisodeDetails | null> {
     try {
       if (!/^\d+$/.test(showId)) return null
 
@@ -190,14 +184,15 @@ export class MegaPlayProvider implements Provider {
       const cached = this.cache.get<EpisodeDetails>(cacheKey)
       if (cached) return cached
 
-      const gql = `query ($idMal: Int) {
-        Media (idMal: $idMal, type: ANIME) {
+      const gql = `query ($id: Int) {
+        Media (id: $id, type: ANIME) {
           episodes
           status
+          idMal
         }
       }`
 
-      const data = await anilistRequest<{ Media: AniListMedia }>(gql, { idMal: Number(showId) })
+      const data = await anilistRequest<{ Media: AniListMedia }>(gql, { id: Number(showId) })
       const media = data?.data?.Media
       if (!media) return null
 
@@ -232,6 +227,169 @@ export class MegaPlayProvider implements Provider {
     Referer: 'https://megaplay.buzz/',
   }
 
+  private async getMalId(anilistId: string): Promise<string | null> {
+    const cacheKey = `megaplay_malid_${anilistId}`
+    const cached = this.cache.get<string>(cacheKey)
+    if (cached !== undefined) return cached || null
+
+    try {
+      const gql = `query ($id: Int) {
+        Media (id: $id, type: ANIME) {
+          idMal
+        }
+      }`
+      const data = await anilistRequest<{ Media: { idMal?: number | null } }>(gql, {
+        id: Number(anilistId),
+      })
+      const idMal = data?.data?.Media?.idMal
+      if (!idMal) {
+        this.cache.set(cacheKey, '', 3600)
+        return null
+      }
+      const result = String(idMal)
+      this.cache.set(cacheKey, result, 86400)
+      return result
+    } catch {
+      return null
+    }
+  }
+
+  private async tryFetchStream(
+    showId: string,
+    targetEpisode: string,
+    mode: 'sub' | 'dub',
+    endpoint: 'ani' | 'mal'
+  ): Promise<VideoSource[] | null> {
+    const base = this.megaPlayBase.replace('/ani', `/${endpoint}`)
+    const streamPageUrl = `${base}/${showId}/${targetEpisode}/${mode}`
+
+    const pageRes = await fetch(streamPageUrl, {
+      headers: this.megaPlayHeaders,
+    })
+    if (!pageRes.ok) return null
+
+    const html = await pageRes.text()
+    const idMatch = html.match(/data-id="([0-9]+)"/)
+    const extractedId = idMatch ? idMatch[1] : html.match(/<title>File ([0-9]+)/i)?.[1]
+    if (!extractedId) return null
+
+    const sourcesRes = await fetch(`${this.megaPlayApi}?id=${extractedId}`, {
+      headers: {
+        ...this.megaPlayHeaders,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    })
+    if (!sourcesRes.ok) return null
+
+    const data = (await sourcesRes.json()) as {
+      sources?: { file: string; type?: string }[] | { file: string; type?: string }
+      tracks?: { file: string; label?: string; kind?: string }[]
+    }
+
+    let sources: { file: string; type?: string }[] = []
+    if (Array.isArray(data.sources)) {
+      sources = data.sources
+    } else if (data.sources && 'file' in data.sources) {
+      sources = [data.sources]
+    }
+
+    if (sources.length === 0) return null
+
+    const links: VideoLink[] = []
+    for (const s of sources) {
+      if (s.file.includes('.m3u8')) {
+        try {
+          const masterRes = await fetch(s.file, {
+            headers: {
+              Referer: 'https://megaplay.buzz/',
+              'User-Agent': this.megaPlayHeaders['User-Agent'],
+            },
+            signal: AbortSignal.timeout(10000),
+          })
+          if (masterRes.ok) {
+            const playlist = await masterRes.text()
+            const variantRe = /#EXT-X-STREAM-INF:([^\n]*)\n(\S+)/g
+            let m: RegExpExecArray | null
+            while ((m = variantRe.exec(playlist)) !== null) {
+              const attrs = m[1]
+              const label =
+                attrs.match(/NAME="([^"]+)"/)?.[1] ||
+                (attrs.match(/RESOLUTION=\d+x(\d+)/)?.[1] ?? '') + 'p' ||
+                ''
+              if (!label || label === 'p') continue
+              const variantUrl = new URL(m[2], s.file).href
+              links.push({
+                resolutionStr: label,
+                link: variantUrl,
+                hls: true,
+                headers: {
+                  Referer: 'https://megaplay.buzz/',
+                  'User-Agent': this.megaPlayHeaders['User-Agent'],
+                },
+              })
+            }
+          }
+        } catch {
+          // fall through to add master as Auto
+        }
+        links.push({
+          resolutionStr: 'Auto',
+          link: s.file,
+          hls: true,
+          headers: {
+            Referer: 'https://megaplay.buzz/',
+            'User-Agent': this.megaPlayHeaders['User-Agent'],
+          },
+        })
+      } else {
+        links.push({
+          resolutionStr: 'Auto',
+          link: s.file,
+          hls: false,
+          headers: {
+            Referer: 'https://megaplay.buzz/',
+            'User-Agent': this.megaPlayHeaders['User-Agent'],
+          },
+        })
+      }
+    }
+
+    const subtitles: SubtitleTrack[] = (data.tracks || [])
+      .filter((t) => {
+        const kind = (t.kind || '').toLowerCase()
+        return t.file && (!kind || kind.includes('caption') || kind.includes('sub'))
+      })
+      .map((t) => ({
+        language: t.label || 'Unknown',
+        label: t.label || 'Unknown',
+        url: t.file,
+      }))
+
+    return [
+      {
+        sourceName: `MegaPlay (${mode.toUpperCase()})`,
+        links,
+        subtitles,
+        type: 'player',
+        actualEpisodeNumber: targetEpisode,
+      },
+      {
+        sourceName: `MegaPlay (${mode.toUpperCase()}) [Fallback]`,
+        links: [
+          {
+            link: streamPageUrl,
+            resolutionStr: 'Auto',
+            hls: false,
+            headers: { Referer: 'https://megaplay.buzz/' },
+          },
+        ],
+        subtitles: [],
+        type: 'iframe',
+        actualEpisodeNumber: targetEpisode,
+      },
+    ]
+  }
+
   async getStreamUrls(
     showId: string,
     episodeNumber: string,
@@ -249,301 +407,21 @@ export class MegaPlayProvider implements Provider {
       const cached = this.cache.get<VideoSource[]>(cacheKey)
       if (cached) return cached
 
-      const streamPageUrl = `${this.megaPlayBase}/${showId}/${targetEpisode}/${mode}`
-
-      const pageRes = await fetch(streamPageUrl, {
-        headers: this.megaPlayHeaders,
-      })
-      if (!pageRes.ok) {
-        throw new Error(`Stream page failed: ${pageRes.statusText}`)
-      }
-
-      const html = await pageRes.text()
-      const idMatch = html.match(/data-id="([0-9]+)"/)
-      const extractedId = idMatch ? idMatch[1] : html.match(/<title>File ([0-9]+)/i)?.[1]
-      if (!extractedId) {
-        throw new Error('Could not extract media ID from stream page')
-      }
-
-      const sourcesRes = await fetch(`${this.megaPlayApi}?id=${extractedId}`, {
-        headers: {
-          ...this.megaPlayHeaders,
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-      })
-      if (!sourcesRes.ok) {
-        throw new Error(`Sources API failed: ${sourcesRes.statusText}`)
-      }
-
-      const data = (await sourcesRes.json()) as {
-        sources?: { file: string; type?: string }[] | { file: string; type?: string }
-        tracks?: { file: string; label?: string; kind?: string }[]
-      }
-
-      let sources: { file: string; type?: string }[] = []
-      if (Array.isArray(data.sources)) {
-        sources = data.sources
-      } else if (data.sources && 'file' in data.sources) {
-        sources = [data.sources]
-      }
-
-      if (sources.length === 0) {
-        throw new Error('No video sources found in API response')
-      }
-
-      const links: VideoLink[] = []
-      for (const s of sources) {
-        if (s.file.includes('.m3u8')) {
-          try {
-            const masterRes = await fetch(s.file, {
-              headers: {
-                Referer: 'https://megaplay.buzz/',
-                'User-Agent': this.megaPlayHeaders['User-Agent'],
-              },
-              signal: AbortSignal.timeout(10000),
-            })
-            if (masterRes.ok) {
-              const playlist = await masterRes.text()
-              const variantRe = /#EXT-X-STREAM-INF:([^\n]*)\n(\S+)/g
-              let m: RegExpExecArray | null
-              while ((m = variantRe.exec(playlist)) !== null) {
-                const attrs = m[1]
-                const label =
-                  attrs.match(/NAME="([^"]+)"/)?.[1] ||
-                  (attrs.match(/RESOLUTION=\d+x(\d+)/)?.[1] ?? '') + 'p' ||
-                  ''
-                if (!label || label === 'p') continue
-                const variantUrl = new URL(m[2], s.file).href
-                links.push({
-                  resolutionStr: label,
-                  link: variantUrl,
-                  hls: true,
-                  headers: {
-                    Referer: 'https://megaplay.buzz/',
-                    'User-Agent': this.megaPlayHeaders['User-Agent'],
-                  },
-                })
-              }
-            }
-          } catch {
-            // fall through to add master as Auto
-          }
-          links.push({
-            resolutionStr: 'Auto',
-            link: s.file,
-            hls: true,
-            headers: {
-              Referer: 'https://megaplay.buzz/',
-              'User-Agent': this.megaPlayHeaders['User-Agent'],
-            },
-          })
-        } else {
-          links.push({
-            resolutionStr: 'Auto',
-            link: s.file,
-            hls: false,
-            headers: {
-              Referer: 'https://megaplay.buzz/',
-              'User-Agent': this.megaPlayHeaders['User-Agent'],
-            },
-          })
+      let result = await this.tryFetchStream(showId, targetEpisode, mode, 'ani')
+      if (!result) {
+        const malId = await this.getMalId(showId)
+        if (malId) {
+          result = await this.tryFetchStream(malId, targetEpisode, mode, 'mal')
         }
       }
 
-      const subtitles: SubtitleTrack[] = (data.tracks || [])
-        .filter((t) => {
-          const kind = (t.kind || '').toLowerCase()
-          return t.file && (!kind || kind.includes('caption') || kind.includes('sub'))
-        })
-        .map((t) => ({
-          language: t.label || 'Unknown',
-          label: t.label || 'Unknown',
-          url: t.file,
-        }))
-
-      const result: VideoSource[] = [
-        {
-          sourceName: `MegaPlay (${mode.toUpperCase()})`,
-          links,
-          subtitles,
-          type: 'player',
-          actualEpisodeNumber: targetEpisode,
-        },
-        {
-          sourceName: `MegaPlay (${mode.toUpperCase()}) [Fallback]`,
-          links: [
-            {
-              link: streamPageUrl,
-              resolutionStr: 'Auto',
-              hls: false,
-              headers: { Referer: 'https://megaplay.buzz/' },
-            },
-          ],
-          subtitles: [],
-          type: 'iframe',
-          actualEpisodeNumber: targetEpisode,
-        },
-      ]
-
-      this.cache.set(cacheKey, result, 3600)
+      if (result) {
+        this.cache.set(cacheKey, result, 3600)
+      }
       return result
     } catch (error) {
       logger.error({ error, showId, episodeNumber, mode }, '[MegaPlay] getStreamUrls failed')
       return null
     }
-  }
-
-  async getShowMeta(showId: string): Promise<Partial<Show> | null> {
-    try {
-      if (!/^\d+$/.test(showId)) return null
-
-      const gql = `query ($idMal: Int) {
-        Media (idMal: $idMal, type: ANIME) {
-          ${this.mediaFields}
-        }
-      }`
-
-      const data = await anilistRequest<{ Media: AniListMedia }>(gql, { idMal: Number(showId) })
-      const media = data?.data?.Media
-      if (!media) return null
-
-      return this.toShow(media)
-    } catch (error) {
-      logger.error({ error, showId }, 'MegaPlay getShowMeta failed')
-      return null
-    }
-  }
-
-  async getPopular(
-    _timeframe: 'daily' | 'weekly' | 'monthly' | 'all',
-    page?: number,
-    size?: number
-  ): Promise<Show[]> {
-    try {
-      const gql = `query ($page: Int, $perPage: Int) {
-        Page (page: $page, perPage: $perPage) {
-          media (sort: POPULARITY_DESC, type: ANIME) {
-            ${this.mediaFields}
-          }
-        }
-      }`
-
-      const data = await anilistRequest<{ Page: { media: AniListMedia[] } }>(gql, {
-        page: page || 1,
-        perPage: size || 10,
-      })
-      const media = data?.data?.Page?.media
-      if (!media) return []
-
-      return media.map((m) => this.toShow(m))
-    } catch {
-      return []
-    }
-  }
-
-  async getSchedule(date: Date): Promise<Show[]> {
-    try {
-      const dayStart = Math.floor(date.getTime() / 1000)
-      const dayEnd = dayStart + 86400
-
-      const gql = `query ($dayStart: Int, $dayEnd: Int) {
-        Page (perPage: 50) {
-          airingSchedule (airingAt_greater: $dayStart, airingAt_lesser: $dayEnd) {
-            media {
-              ${this.mediaFields}
-            }
-          }
-        }
-      }`
-
-      const data = await anilistRequest<{ Page: { airingSchedule: { media?: AniListMedia }[] } }>(
-        gql,
-        { dayStart, dayEnd }
-      )
-      const schedule = data?.data?.Page?.airingSchedule
-      if (!schedule) return []
-
-      const seen = new Set<number>()
-      const results: Show[] = []
-      for (const entry of schedule) {
-        const media = entry.media
-        if (!media) continue
-        const key = media.idMal ?? media.id
-        if (seen.has(key)) continue
-        seen.add(key)
-        results.push(this.toShow(media))
-      }
-
-      return results
-    } catch {
-      return []
-    }
-  }
-
-  async getSeasonal(page: number): Promise<Show[]> {
-    try {
-      const now = new Date()
-      const month = now.getMonth() + 1
-      let season: 'WINTER' | 'SPRING' | 'SUMMER' | 'FALL'
-      let year = now.getFullYear()
-      if (month === 12 || month <= 2) {
-        season = 'WINTER'
-        if (month === 12) year += 1
-      } else if (month <= 5) {
-        season = 'SPRING'
-      } else if (month <= 8) {
-        season = 'SUMMER'
-      } else {
-        season = 'FALL'
-      }
-
-      const gql = `query ($page: Int, $perPage: Int, $season: MediaSeason, $year: Int) {
-        Page (page: $page, perPage: $perPage) {
-          media (season: $season, seasonYear: $year, type: ANIME, sort: POPULARITY_DESC) {
-            ${this.mediaFields}
-          }
-        }
-      }`
-
-      const data = await anilistRequest<{ Page: { media: AniListMedia[] } }>(gql, {
-        page,
-        perPage: 20,
-        season,
-        year,
-      })
-      const media = data?.data?.Page?.media
-      if (!media) return []
-
-      return media.map((m) => this.toShow(m))
-    } catch {
-      return []
-    }
-  }
-
-  async getLatestReleases(page?: number, size?: number): Promise<Show[]> {
-    try {
-      const gql = `query ($page: Int, $perPage: Int) {
-        Page (page: $page, perPage: $perPage) {
-          media (status: RELEASING, sort: POPULARITY_DESC, type: ANIME) {
-            ${this.mediaFields}
-          }
-        }
-      }`
-
-      const data = await anilistRequest<{ Page: { media: AniListMedia[] } }>(gql, {
-        page: page || 1,
-        perPage: size || 10,
-      })
-      const media = data?.data?.Page?.media
-      if (!media) return []
-
-      return media.map((m) => this.toShow(m))
-    } catch {
-      return []
-    }
-  }
-
-  async getSkipTimes(_showId: string, _episodeNumber: string): Promise<SkipIntervals> {
-    return { found: false, results: [] }
   }
 }

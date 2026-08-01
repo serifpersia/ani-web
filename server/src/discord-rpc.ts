@@ -12,7 +12,7 @@ interface DiscordActivityData {
   duration: number
   thumbnail: string
   isPlaying: boolean
-  providerName: string
+  providerName?: string
   sessionId?: string
   thumbnails?: string[]
   isAdult?: boolean
@@ -202,13 +202,7 @@ class DiscordRPCService {
       if (url.includes('s4.anilist.co') || url.includes('anilistcdn')) {
         return true
       }
-      const blockedDomains = [
-        'youtube-anime.com',
-        'allanime.day',
-        'animepahe',
-        'animeya.cc',
-        'gogocdn.net',
-      ]
+      const blockedDomains = ['youtube-anime.com', 'animepahe', 'animeya.cc', 'gogocdn.net']
       return !blockedDomains.some((domain) => url.includes(domain))
     }
 

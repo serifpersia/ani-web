@@ -1,13 +1,6 @@
 import NodeCache from 'node-cache'
 import { gotScraping } from 'got-scraping'
-import {
-  Provider,
-  Show,
-  VideoSource,
-  EpisodeDetails,
-  SkipIntervals,
-  SearchOptions,
-} from './provider.interface'
+import { Provider, Show, VideoSource, EpisodeDetails, SearchOptions } from './provider.interface'
 import logger from '../logger'
 
 const BASE = 'https://anidb.app'
@@ -268,7 +261,7 @@ export class AnidbProvider implements Provider {
     }
   }
 
-  async resolveShowId(title: string, romaji?: string): Promise<string | null> {
+  async resolveShowId(title: string): Promise<string | null> {
     const query = (title || '').trim()
     if (!query) return null
 
@@ -300,33 +293,7 @@ export class AnidbProvider implements Provider {
     return buildShowId(best)
   }
 
-  async getShowMeta(showId: string): Promise<Partial<Show> | null> {
-    const { animeId, slug } = parseShowId(showId)
-    if (!animeId || !slug) return null
-
-    const resp = await gotGet(`${BASE}/anime/${encodeURIComponent(slug)}-${animeId}`)
-    if (!resp || resp.status !== 200 || resp.body.includes('Just a moment')) return null
-
-    const titleMatch = resp.body.match(/<h1[^>]*>([^<]*)<\/h1>/)
-    const posterMatch = resp.body.match(
-      /<img[^>]*src="([^"]*\.(?:jpg|jpeg|png|webp)[^"]*)"[^>]*class="[^"]*(?:poster|cover|backdrop)[^"]*"/
-    )
-    const descriptionMatch = resp.body.match(/<meta[^>]*name="description"[^>]*content="([^"]*)"/)
-    if (!titleMatch && !descriptionMatch) return null
-
-    return {
-      _id: showId,
-      id: showId,
-      name: titleMatch ? decodeEntities(titleMatch[1].trim()) : slug,
-      englishName: titleMatch ? decodeEntities(titleMatch[1].trim()) : slug,
-      thumbnail: posterMatch ? posterMatch[1] : undefined,
-      description: descriptionMatch ? decodeEntities(descriptionMatch[1].trim()) : '',
-      type: 'TV',
-      availableEpisodesDetail: { sub: [], dub: [] },
-    }
-  }
-
-  async getEpisodes(showId: string, _mode: 'sub' | 'dub'): Promise<EpisodeDetails | null> {
+  async getEpisodes(showId: string): Promise<EpisodeDetails | null> {
     try {
       const { animeId } = parseShowId(showId)
       if (!animeId) return null
@@ -410,29 +377,5 @@ export class AnidbProvider implements Provider {
       logger.error({ error, showId, episodeNumber }, '[AniDB] getStreamUrls failed')
       return null
     }
-  }
-
-  async getPopular(
-    _timeframe: 'daily' | 'weekly' | 'monthly' | 'all',
-    _page?: number,
-    _size?: number
-  ): Promise<Show[]> {
-    return []
-  }
-
-  async getSchedule(_date: Date): Promise<Show[]> {
-    return []
-  }
-
-  async getSeasonal(_page: number): Promise<Show[]> {
-    return []
-  }
-
-  async getLatestReleases(_page?: number, _size?: number): Promise<Show[]> {
-    return []
-  }
-
-  async getSkipTimes(_showId: string, _episodeNumber: string): Promise<SkipIntervals> {
-    return { found: false, results: [] }
   }
 }

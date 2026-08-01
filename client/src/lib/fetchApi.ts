@@ -25,14 +25,6 @@ export const fetchApi = async (url: string) => {
       window.dispatchEvent(new CustomEvent('ANIMEPAHE_AUTH_REQUIRED'))
     }
 
-    if (
-      errorMsg.includes('AA_CRYPTO_STALE') ||
-      errorMsg.includes('AA_CRYPTO_EXPIRED') ||
-      errorMsg.includes('AA_CRYPTO_BUILD_MISMATCH')
-    ) {
-      window.dispatchEvent(new CustomEvent('ALLANIME_RECOVERY_NEEDED'))
-    }
-
     throw new Error(errorMsg || `Failed to fetch from ${url}`)
   }
   return response.json()

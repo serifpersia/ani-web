@@ -53,37 +53,11 @@ export const useTrendingAnime = () => {
   })
 }
 
-export const usePopularAnime = (timeframe: string) => {
-  return useQuery<Anime[]>({
-    queryKey: ['popular', timeframe],
-    queryFn: () => fetchApi(`/api/popular/${timeframe}`),
-  })
-}
-
-export const usePaginatedPopularAnime = (timeframe: string, page: number, size: number = 7) => {
-  return useQuery<Anime[]>({
-    queryKey: ['popular', timeframe, page, size],
-    queryFn: () => fetchApi(`/api/popular/${timeframe}?page=${page}&size=${size}`),
-  })
-}
-
 export const useInfiniteTrendingList = (sort: string = 'TRENDING_DESC', size: number = 10) => {
   return useInfiniteQuery<Anime[]>({
     queryKey: ['trendingList', sort, size],
     queryFn: ({ pageParam = 1 }) =>
       fetchApi(`/api/popular-list?sort=${sort}&page=${pageParam as number}&size=${size}`),
-    initialPageParam: 1,
-    getNextPageParam: (lastPage: Anime[], allPages) => {
-      return lastPage.length >= size ? allPages.length + 1 : undefined
-    },
-  })
-}
-
-export const useInfinitePopularAnime = (timeframe: string, size: number = 7) => {
-  return useInfiniteQuery<Anime[]>({
-    queryKey: ['popularInfinite', timeframe, size],
-    queryFn: ({ pageParam = 1 }) =>
-      fetchApi(`/api/popular/${timeframe}?page=${pageParam as number}&size=${size}`),
     initialPageParam: 1,
     getNextPageParam: (lastPage: Anime[], allPages) => {
       return lastPage.length >= size ? allPages.length + 1 : undefined

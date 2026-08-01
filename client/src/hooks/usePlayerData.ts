@@ -82,26 +82,12 @@ export const usePlayerData = (
     queryFn: async () => {
       if (!showId) throw new Error('No showId')
 
-      const showTitle = (showMeta?.name as string) || (showMeta?.englishName as string) || ''
-
       const fetchEpisodes = async (): Promise<{
         episodes: string[]
         description?: string
       } | null> => {
-        if (uiState.selectedProvider === 'animepahe') {
-          try {
-            let url = `/api/episodes?showId=${showId}&mode=${uiState.currentMode}&provider=animepahe`
-            if (showTitle) url += `&title=${encodeURIComponent(showTitle)}`
-            const data = await fetchApi(url)
-            if (data?.episodes?.length) return data
-          } catch {
-            // ignore
-          }
-        }
         try {
-          let url = `/api/episodes?showId=${showId}&mode=${uiState.currentMode}`
-          if (showTitle) url += `&title=${encodeURIComponent(showTitle)}`
-          const data = await fetchApi(url)
+          const data = await fetchApi(`/api/episodes?showId=${showId}&mode=${uiState.currentMode}`)
           if (data?.episodes?.length) return data
         } catch {
           // ignore
@@ -164,144 +150,12 @@ export const usePlayerData = (
       currentEpisode,
       uiState.selectedProvider,
       uiState.currentMode,
-      showMeta?.name,
     ],
     queryFn: async () => {
       if (!showId || !currentEpisode) throw new Error('Missing params')
 
       try {
-        let providerShowId = showId
-        if (
-          ['allanime', '123anime', 'animeya', 'megaplay', 'wh', 'hn', 'anilight', 'anidb'].includes(
-            uiState.selectedProvider
-          )
-        ) {
-          const names = showMeta?.names
-          // AlAnime's `name` field is often the native Japanese script (e.g. "ブリーチ"
-          // for Bleach), which gets mapped to names.romaji. Sending katakana/kanji to
-          // other providers causes them to search for the transliteration ("Burichi")
-          // and return no results. Guard against this by only using romaji when it is
-          // pure ASCII, otherwise fall back to the English name.
-          const isAscii = (s: string) => {
-            for (let i = 0; i < s.length; i++) {
-              if (s.charCodeAt(i) > 127) return false
-            }
-            return true
-          }
-          const romajiName = names?.romaji && isAscii(names.romaji) ? names.romaji : null
-          const englishName = names?.english || showMeta?.englishName || showMeta?.name
-          const searchQuery =
-            uiState.currentMode === 'dub' ? englishName || romajiName : romajiName || englishName
-
-          if (searchQuery) {
-            let searchResults
-            try {
-              searchResults = await fetchApi(
-                `/api/search?query=${encodeURIComponent(searchQuery)}&provider=${uiState.selectedProvider}`
-              )
-            } catch {
-              searchResults = []
-            }
-            if (searchResults && searchResults.length > 0) {
-              interface SearchResult {
-                id: string
-                session?: string
-                name?: string
-                title?: string
-                _id?: string
-              }
-              // Score each result by title closeness to the search query AND
-              // whether it matches the current sub/dub mode.
-              // Scoring:
-              //   +4  exact title match (case-insensitive)
-              //   +2  title starts with query
-              //   +1  title contains query
-              //   +0  id starts with normalised query slug
-              //   -10 wrong mode (dub result when sub wanted, or vice versa)
-              const qLower = (searchQuery as string).toLowerCase().trim()
-              const toSlug = (s: string) =>
-                s
-                  .toLowerCase()
-                  .replace(/[^a-z0-9]+/g, '-')
-                  .replace(/^-+|-+$/g, '')
-              const qSlug = toSlug(qLower)
-
-              let bestMatch: SearchResult = searchResults[0]
-              let bestScore = -Infinity
-
-              for (const s of searchResults as SearchResult[]) {
-                const title = (s.name || s.title || '').toLowerCase().trim()
-                const sid = (s.id || '').toLowerCase()
-                const isDubResult =
-                  title.includes('(dub)') || title.endsWith(' dub') || sid.endsWith('-dub')
-                const wantDub = uiState.currentMode === 'dub'
-
-                let score = 0
-                if (title === qLower) score += 4
-                else if (title.startsWith(qLower)) score += 2
-                else if (title.includes(qLower)) score += 1
-                else if (sid.startsWith(qSlug)) score += 0
-
-                // Heavy penalty for wrong mode so a correct-mode partial match
-                // beats an exact wrong-mode match
-                if (isDubResult !== wantDub) score -= 10
-
-                if (score > bestScore) {
-                  bestScore = score
-                  bestMatch = s
-                }
-              }
-
-              providerShowId = bestMatch.session || bestMatch.id || bestMatch._id
-            }
-          }
-        } else if (uiState.selectedProvider === 'animepahe') {
-          const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-          if (!UUID_RE.test(showId)) {
-            const searchQueries = [
-              showMeta?.name || showId,
-              showMeta?.englishName || showMeta?.names?.english || '',
-            ].filter(Boolean)
-
-            let bestScore = -Infinity
-            let bestResult: { id?: string; session?: string; name?: string } = {}
-
-            for (const searchQuery of searchQueries) {
-              let searchResults: Array<{
-                id?: string
-                session?: string
-                name?: string
-                englishName?: string
-              }> = []
-              try {
-                searchResults = await fetchApi(
-                  `/api/search?query=${encodeURIComponent(searchQuery)}&provider=animepahe`
-                )
-              } catch {
-                searchResults = []
-              }
-              const queryWords = new Set(
-                searchQuery
-                  .toLowerCase()
-                  .split(/\s+/)
-                  .filter((w) => w.length >= 2)
-              )
-              for (const r of searchResults) {
-                const name = (r.name || r.englishName || '').toLowerCase()
-                const overlap = name.split(/\s+/).filter((w) => queryWords.has(w)).length
-                if (overlap > bestScore) {
-                  bestScore = overlap
-                  bestResult = r
-                }
-              }
-              if (bestScore >= 3) break
-            }
-
-            providerShowId = bestResult.session || bestResult.id || ''
-          } else {
-            providerShowId = showId
-          }
-        }
+        const providerShowId = showId
 
         const [sources, progress, preferredSourceData, skipTimesData] = await Promise.all([
           fetchApi(
@@ -309,9 +163,7 @@ export const usePlayerData = (
           ).catch(() => null),
           fetchApi(`/api/episode-progress/${showId}/${currentEpisode}`).catch(() => null),
           fetchApi(`/api/settings?key=preferredSource`).catch(() => null),
-          fetchApi(
-            `/api/skip-times/${showId}/${currentEpisode}?provider=${uiState.selectedProvider}`
-          ).catch(() => []),
+          fetchApi(`/api/skip-times/${showId}/${currentEpisode}`).catch(() => []),
         ])
 
         const preferredSourceName = preferredSourceData?.value
@@ -397,7 +249,7 @@ export const usePlayerData = (
         throw e
       }
     },
-    enabled: !!showId && !!currentEpisode && !!showMeta,
+    enabled: !!showId && !!currentEpisode,
   })
 
   const loadingDetails = false
