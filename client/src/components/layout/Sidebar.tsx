@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink } from 'react-router'
 import { useSidebar } from '../../hooks/useSidebar'
 import styles from './Sidebar.module.css'
 import { FaHome, FaSearch, FaClock, FaFileImport, FaCog, FaChartPie } from 'react-icons/fa'

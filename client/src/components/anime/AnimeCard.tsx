@@ -1,5 +1,5 @@
 import React, { memo, useState, useCallback } from 'react'
-import { Link, useNavigate, type To } from 'react-router-dom'
+import { Link, useNavigate, type To } from 'react-router'
 import {
   FaMicrophone,
   FaClosedCaptioning,

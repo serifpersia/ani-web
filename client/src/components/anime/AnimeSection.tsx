@@ -1,5 +1,5 @@
 import React, { useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { FaChevronDown, FaChevronLeft, FaChevronRight, FaChevronUp } from 'react-icons/fa'
 import AnimeCard from './AnimeCard'
 import AnimeCardSkeleton from './AnimeCardSkeleton'

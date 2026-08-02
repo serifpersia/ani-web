@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
 import { Button } from '../components/common/Button'
 import TitlePreferenceToggle from '../components/common/TitlePreferenceToggle'
 import styles from './Settings.module.css'

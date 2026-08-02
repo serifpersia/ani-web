@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { FaStar, FaPlay, FaInfoCircle, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import { Button } from '../common/Button'

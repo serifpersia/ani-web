@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useMemo, useCallback, useState, useLayoutEffect } from 'react'
-import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router'
 import toast from 'react-hot-toast'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import styles from './Player.module.css'

@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, useParams, Route, Routes } from 'react-router-dom'
+import { Navigate, useParams, Route, Routes } from 'react-router'
 import TopProgressBar from '../components/common/TopProgressBar'
 
 const AnimeInfo = lazy(() => import('../components/anime/AnimeInfo'))

@@ -1,5 +1,5 @@
 import React from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { FaBars, FaChevronDown, FaChevronUp, FaTimes } from 'react-icons/fa'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'
 import type { QueueItem } from '../../hooks/useAnimeData'

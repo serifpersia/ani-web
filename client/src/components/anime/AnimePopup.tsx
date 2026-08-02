@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { FaStar, FaPlay, FaTv, FaPlus, FaCheck } from 'react-icons/fa'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { useAnimeInfoData } from '../../hooks/useAnimeInfoData'
 import { useQueue, useAddToQueue, useRemoveFromQueue } from '../../hooks/useAnimeData'
 import { useTitlePreference } from '../../contexts/TitlePreferenceContext'

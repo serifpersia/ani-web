@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite'
+import { fileURLToPath, URL } from 'node:url'
 import preact from '@preact/preset-vite'
 
 export default defineConfig({
-  plugins: [preact()],
+  plugins: [preact({ reactAliasesEnabled: false })],
   server: {
     host: '0.0.0.0',
     proxy: {
@@ -14,12 +15,16 @@ export default defineConfig({
     },
   },
   resolve: {
-    alias: {
-      react: 'preact/compat',
-      'react-dom/test-utils': 'preact/test-utils',
-      'react-dom': 'preact/compat',
-      'react/jsx-runtime': 'preact/jsx-runtime',
-    },
+    alias: [
+      {
+        find: /^react$/,
+        replacement: fileURLToPath(new URL('./src/lib/preact-compat.js', import.meta.url)),
+      },
+      { find: /^react\/jsx-runtime$/, replacement: 'preact/jsx-runtime' },
+      { find: /^react-dom$/, replacement: 'preact/compat' },
+      { find: /^react-dom\/client$/, replacement: 'preact/compat/client' },
+      { find: /^react-dom\/test-utils$/, replacement: 'preact/test-utils' },
+    ],
   },
   build: {
     rollupOptions: {
@@ -28,7 +33,7 @@ export default defineConfig({
           if (id.includes('node_modules')) {
             if (
               id.includes('preact') ||
-              id.includes('react-router-dom') ||
+              id.includes('react-router') ||
               id.includes('@tanstack/react-query')
             ) {
               return 'vendor'

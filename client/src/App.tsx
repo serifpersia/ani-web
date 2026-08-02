@@ -1,5 +1,5 @@
 import { useEffect, Suspense, lazy } from 'react'
-import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useParams, useLocation } from 'react-router'
 import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
 import Footer from './components/layout/Footer'

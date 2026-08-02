@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { FaCheck, FaPlus, FaTimes } from 'react-icons/fa'
 import { fixThumbnailUrl } from '../../lib/utils'
 import type { Notification } from '../../hooks/useAnimeData'
