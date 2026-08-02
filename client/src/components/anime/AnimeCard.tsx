@@ -211,6 +211,12 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
           ? `/watch/${anime._id}/${anime.episodeNumber}`
           : `/anime/${anime._id}`
 
+    const isWatchLink = (() => {
+      if (typeof linkTarget === 'string') return linkTarget.startsWith('/watch/')
+      const pathname = (linkTarget as { pathname?: string }).pathname
+      return typeof pathname === 'string' && pathname.startsWith('/watch/')
+    })()
+
     const showAnyBar = hasProgress || showFullBar
     const progressPercent = hasProgress ? (ct / dur) * 100 : showFullBar ? 100 : 0
 
@@ -336,7 +342,7 @@ const AnimeCard: React.FC<AnimeCardProps> = memo(
 
             {!isMobile && isHovered && (
               <div className={styles.hoverOverlay}>
-                {continueWatching ? <FaPlay size={28} /> : <FaInfoCircle size={28} />}
+                {isWatchLink ? <FaPlay size={28} /> : <FaInfoCircle size={28} />}
               </div>
             )}
           </div>
