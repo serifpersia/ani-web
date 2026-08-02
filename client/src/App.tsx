@@ -3,7 +3,6 @@ import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-do
 import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
 import Footer from './components/layout/Footer'
-import ScrollToTopButton from './components/common/ScrollToTopButton'
 import { useTelemetry } from './hooks/useTelemetry'
 import VirtualKeyboard from './components/common/VirtualKeyboard'
 import { useVirtualKeyboard } from './hooks/useVirtualKeyboard'
@@ -138,7 +137,6 @@ function App() {
         </ErrorBoundary>
       </main>
       <Footer />
-      <ScrollToTopButton />
       <VirtualKeyboard
         activeInputRef={virtualKeyboard.activeInputRef}
         isVisible={virtualKeyboard.isVisible}

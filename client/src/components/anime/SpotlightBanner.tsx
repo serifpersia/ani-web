@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { FaStar, FaPlay, FaInfoCircle } from 'react-icons/fa'
+import { FaStar, FaPlay, FaInfoCircle, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import { Button } from '../common/Button'
 import type { Anime } from '../../hooks/useAnimeData'
 import { fixThumbnailUrl } from '../../lib/utils'
@@ -174,6 +174,38 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
           alt={getTitle(anime)}
           className={`${styles.posterImage} ${!lowEndMode ? styles.fadeIn : ''}`}
         />
+
+        {top6.length > 1 && (
+          <>
+            <button
+              className={`${styles.navArrow} ${styles.prevArrow}`}
+              onClick={() => {
+                resetAutoplay()
+                prevSlide()
+              }}
+              aria-label="Previous slide"
+            >
+              <FaChevronLeft size={20} />
+            </button>
+            <button
+              className={`${styles.navArrow} ${styles.nextArrow}`}
+              onClick={() => {
+                resetAutoplay()
+                nextSlide()
+              }}
+              aria-label="Next slide"
+            >
+              <FaChevronRight size={20} />
+            </button>
+          </>
+        )}
+
+        {!isPaused && top6.length > 1 && (
+          <div
+            key={`progress-${currentIndex}-${autoplayResetKey}`}
+            className={styles.progressBar}
+          />
+        )}
 
         <div className={styles.overlay}>
           <div className={styles.content}>

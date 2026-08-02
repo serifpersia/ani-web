@@ -98,9 +98,20 @@ const Header: React.FC = () => {
       }, 2500)
     }
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+      } else if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
+        searchInputRef.current?.blur()
+      }
+    }
+
     window.addEventListener('scroll', handleScroll, { passive: true })
+    window.addEventListener('keydown', handleKeyDown)
     return () => {
       window.removeEventListener('scroll', handleScroll)
+      window.removeEventListener('keydown', handleKeyDown)
       clearTimer()
     }
   }, [isSearchFocused])
@@ -131,6 +142,32 @@ const Header: React.FC = () => {
           <Link to="/" className={styles.logo} aria-label="Ani-Web Home">
             <Logo />
           </Link>
+          <nav className={styles.desktopNav}>
+            <Link
+              to="/"
+              className={`${styles.navLink} ${location.pathname === '/' ? styles.navLinkActive : ''}`}
+            >
+              Home
+            </Link>
+            <Link
+              to="/watchlist"
+              className={`${styles.navLink} ${location.pathname === '/watchlist' ? styles.navLinkActive : ''}`}
+            >
+              Watchlist
+            </Link>
+            <Link
+              to="/insights"
+              className={`${styles.navLink} ${location.pathname === '/insights' ? styles.navLinkActive : ''}`}
+            >
+              Insights
+            </Link>
+            <Link
+              to="/settings"
+              className={`${styles.navLink} ${location.pathname.startsWith('/settings') ? styles.navLinkActive : ''}`}
+            >
+              Settings
+            </Link>
+          </nav>
         </div>
 
         <div className={styles.rightSection}>
