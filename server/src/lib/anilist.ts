@@ -4,8 +4,9 @@ import { findTmdbDefaultBackdrop } from './tmdb'
 
 const ANILIST_API = 'https://graphql.anilist.co'
 
-const BURST_CAPACITY = 12
-const REFILL_INTERVAL_MS = 750
+const BURST_CAPACITY = 8
+const DEFAULT_REFILL_INTERVAL_MS = 1500
+let refillIntervalMs = DEFAULT_REFILL_INTERVAL_MS
 let tokens = BURST_CAPACITY
 let lastRefill = Date.now()
 let anilistCooldownUntil = 0
@@ -14,10 +15,38 @@ function refillTokens(): void {
   const now = Date.now()
   if (now < lastRefill) return
   const elapsed = now - lastRefill
-  const refillAmount = Math.floor(elapsed / REFILL_INTERVAL_MS)
+  const refillAmount = Math.floor(elapsed / refillIntervalMs)
   if (refillAmount > 0) {
     tokens = Math.min(BURST_CAPACITY, tokens + refillAmount)
-    lastRefill += refillAmount * REFILL_INTERVAL_MS
+    lastRefill += refillAmount * refillIntervalMs
+  }
+}
+
+function applyRateLimitHeaders(headers: Headers): void {
+  const readHeader = (name: string): number | null => {
+    const raw = headers.get(name)
+    if (raw === null || raw === '') return null
+    const value = Number.parseInt(raw as string, 10)
+    return Number.isFinite(value) && value >= 0 ? value : null
+  }
+
+  const limit = readHeader('X-RateLimit-Limit')
+  const remaining = readHeader('X-RateLimit-Remaining')
+
+  if (limit !== null && limit > 0) {
+    const reserve = Math.max(1, Math.round(limit * 0.2))
+    const safeRate = Math.max(1, limit - reserve)
+    refillIntervalMs = Math.max(300, Math.min(60000, Math.round(60000 / safeRate)))
+  }
+
+  if (remaining !== null && remaining <= 2) {
+    const reset = readHeader('X-RateLimit-Reset')
+    if (reset !== null) {
+      const resetMs = reset * 1000
+      if (resetMs > Date.now()) {
+        anilistCooldownUntil = Math.max(anilistCooldownUntil, resetMs)
+      }
+    }
   }
 }
 
@@ -157,7 +186,7 @@ async function waitForAnilistSlot(): Promise<void> {
       return
     }
 
-    await new Promise((resolve) => setTimeout(resolve, REFILL_INTERVAL_MS))
+    await new Promise((resolve) => setTimeout(resolve, refillIntervalMs))
   }
 }
 
@@ -175,12 +204,15 @@ async function performAnilistRequest<T>(
       body: JSON.stringify({ query, variables }),
     })
 
+    applyRateLimitHeaders(response.headers)
+
     if (response.status === 429 && retryCount < 5) {
       const retryAfterHeader = Number.parseInt(response.headers.get('Retry-After') || '', 10)
       const retryAfter =
         Number.isFinite(retryAfterHeader) && retryAfterHeader >= 0 ? retryAfterHeader : 5
       const delay = Math.min(retryAfter * 1000, 60000)
       anilistCooldownUntil = Math.max(anilistCooldownUntil, Date.now() + delay)
+      refillIntervalMs = Math.min(60000, Math.max(refillIntervalMs, 1500) * 1.15)
       logger.warn({ retryAfter, retryCount }, 'AniList rate limited, retrying')
       return performAnilistRequest(query, variables, retryCount + 1)
     }

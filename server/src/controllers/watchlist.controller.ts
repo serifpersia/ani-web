@@ -75,6 +75,7 @@ export class WatchlistController {
   private animePahe?: AnimePaheProvider
   triggerDiscovery?: () => void
   private discoveryIntervalId: ReturnType<typeof setInterval> | null = null
+  private lastExternalDiscoveryAt = 0
   private stopped = false
 
   constructor(providers: { animePahe?: AnimePaheProvider }) {
@@ -139,8 +140,19 @@ export class WatchlistController {
         }
 
         const showIdMap = new Map<string, number>()
-        const anilistResults = await Promise.all(
-          watchingShows.map((show) => getAnilistId(show.id, show.name).then((id) => ({ show, id })))
+        const MAP_CONCURRENCY = 4
+        const anilistResults: { show: (typeof watchingShows)[number]; id: number | null }[] = []
+        let nextIndex = 0
+        const worker = async (): Promise<void> => {
+          while (nextIndex < watchingShows.length) {
+            const show = watchingShows[nextIndex]
+            nextIndex += 1
+            const id = await getAnilistId(show.id, show.name)
+            anilistResults.push({ show, id })
+          }
+        }
+        await Promise.all(
+          Array.from({ length: Math.min(MAP_CONCURRENCY, watchingShows.length) }, () => worker())
         )
         for (const { show, id } of anilistResults) {
           if (id) {
@@ -269,7 +281,11 @@ export class WatchlistController {
     }
 
     this.triggerDiscovery = () => {
-      if (!this.stopped) runDiscovery()
+      if (this.stopped) return
+      const now = Date.now()
+      if (now - this.lastExternalDiscoveryAt < 120000) return
+      this.lastExternalDiscoveryAt = now
+      runDiscovery()
     }
 
     this.discoveryIntervalId = setInterval(() => {
