@@ -2,6 +2,7 @@ import React from 'react'
 import { Link } from 'react-router'
 import { FaGithub, FaHeart, FaChevronUp, FaDiscord } from 'react-icons/fa'
 import styles from './Footer.module.css'
+import packageJson from '../../../package.json'
 
 const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear()
@@ -23,7 +24,7 @@ const Footer: React.FC = () => {
           <div className={styles.brandMeta}>
             <div className={styles.statusPill}>
               <span className={styles.statusDot} />
-              <span>v2.3.4</span>
+              <span>v{packageJson.version}</span>
             </div>
             <p className={styles.brandTagline}>Fast, local anime streaming.</p>
           </div>

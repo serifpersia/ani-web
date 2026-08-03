@@ -1,12 +1,26 @@
 .skeleton {
-  background: linear-gradient(
+  position: relative;
+  overflow: hidden;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+.skeleton::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
     90deg,
-    var(--bg-tertiary) 0%,
-    var(--bg-elevated) 50%,
-    var(--bg-tertiary) 100%
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.05) 20%,
+    rgba(255, 255, 255, 0.12) 60%,
+    rgba(255, 255, 255, 0)
   );
-  background-size: 200% 100%;
-  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  animation: shimmer 1.8s infinite ease-in-out;
+  content: '';
 }
 
 .skeleton-text {
@@ -31,11 +45,8 @@
   overflow: hidden;
 }
 
-@keyframes skeleton-pulse {
-  0% {
-    background-position: 200% 0;
-  }
+@keyframes shimmer {
   100% {
-    background-position: -200% 0;
+    transform: translateX(100%);
   }
 }

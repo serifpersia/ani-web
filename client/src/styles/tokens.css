@@ -24,9 +24,12 @@
 
   /* ===== COLOR: NEUTRAL ===== */
   --bg-main: #050505;
+  --bg-primary: #17171a;
   --bg-secondary: #0f0f11;
   --bg-tertiary: #18181b;
   --bg-elevated: #27272a;
+  --primary-color: var(--accent);
+  --header-bg: rgba(12, 12, 15, 0.82);
 
   --text-primary: #ffffff;
   --text-secondary: #a1a1aa;
@@ -111,6 +114,11 @@
   --transition-base: 0.3s var(--ease-smooth);
   --transition-normal: 0.4s var(--ease-smooth);
   --transition-slow: 0.5s var(--ease-smooth);
+
+  /* ===== TV / SPATIAL NAVIGATION TOKENS ===== */
+  --focus-ring-color: var(--accent-light);
+  --focus-ring-glow: 0 0 0 3px rgba(139, 92, 246, 0.4), 0 0 20px var(--accent-glow);
+  --focus-scale: scale(1.05);
 }
 
 @media (min-width: 1920px) {

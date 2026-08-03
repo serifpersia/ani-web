@@ -44,11 +44,16 @@
   outline-offset: 2px;
 }
 
-.cardWrapper:hover .card {
+.cardWrapper:hover .card,
+.cardWrapper:focus-within .card {
   transform: translateY(-6px);
   border-color: var(--border-accent);
-  box-shadow: none;
   background-color: var(--bg-tertiary);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+}
+
+.cardWrapper:focus-within {
+  z-index: 5;
 }
 
 .hoverOverlay {
@@ -66,7 +71,8 @@
   z-index: 8;
 }
 
-.cardWrapper:hover .hoverOverlay {
+.cardWrapper:hover .hoverOverlay,
+.cardWrapper:focus-within .hoverOverlay {
   opacity: 1;
 }
 
@@ -374,9 +380,11 @@
   }
 
   .title {
-    height: 2.5em !important; /* Exactly 2 lines at 1.25 line-height */
-    margin-bottom: 2px !important;
-    font-size: 0.78rem !important;
+    height: auto !important;
+    min-height: 2.4em;
+    max-height: 2.6em;
+    margin-bottom: 4px !important;
+    font-size: 0.82rem !important;
     line-height: 1.25;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -385,6 +393,15 @@
     overflow: hidden;
     word-break: break-word;
     color: var(--text-primary);
+  }
+
+  .removeBtn,
+  .infoBtn {
+    min-width: 36px;
+    min-height: 36px;
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
   }
 
   .mobileBadges {

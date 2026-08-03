@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, Link } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { FaStar, FaPlay, FaInfoCircle, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import { Button } from '../common/Button'
@@ -219,13 +219,14 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
               )}
             </div>
 
-            <span
+            <Link
               key={currentIndex}
+              to={`/anime/${anime._id}`}
               className={styles.title}
-              onClick={() => navigate(`/anime/${anime._id}`)}
+              aria-label={`View details for ${getTitle(anime)}`}
             >
               {getTitle(anime)}
-            </span>
+            </Link>
 
             <div className={styles.metaRow}>
               {metadata.map((item, idx) => (

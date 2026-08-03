@@ -12,7 +12,27 @@
   width: 100%;
   aspect-ratio: 3 / 4;
   background-color: var(--bg-tertiary);
-  animation: pulse 1.5s infinite ease-in-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.poster::after,
+.line::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.05) 20%,
+    rgba(255, 255, 255, 0.12) 60%,
+    rgba(255, 255, 255, 0)
+  );
+  animation: shimmer 1.8s infinite ease-in-out;
 }
 
 .info {
@@ -24,10 +44,11 @@
 }
 
 .line {
+  position: relative;
+  overflow: hidden;
   height: 18px;
   border-radius: var(--radius-sm);
   background-color: var(--bg-tertiary);
-  animation: pulse 1.5s infinite ease-in-out;
 }
 
 .line.short {
@@ -35,15 +56,9 @@
   height: 14px;
 }
 
-@keyframes pulse {
-  0% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+@keyframes shimmer {
   100% {
-    opacity: 1;
+    transform: translateX(100%);
   }
 }
 

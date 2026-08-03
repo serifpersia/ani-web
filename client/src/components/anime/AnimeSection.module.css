@@ -108,6 +108,13 @@
   transform: scale(0.9);
 }
 
+@media (hover: none), (pointer: coarse) {
+  .nav-button {
+    width: 44px;
+    height: 44px;
+  }
+}
+
 .carousel-container {
   position: relative;
   width: 100%;

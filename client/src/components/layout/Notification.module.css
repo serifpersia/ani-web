@@ -210,6 +210,12 @@
   opacity: 1;
 }
 
+@media (hover: none), (pointer: coarse) {
+  .removeItem {
+    opacity: 1;
+  }
+}
+
 .removeItem:hover {
   color: #ff4d4f;
 }
@@ -240,6 +246,12 @@
     width: 40px;
     height: 40px;
     font-size: 1.2rem;
+  }
+
+  .removeItem {
+    padding: 0.6rem;
+    min-width: 36px;
+    min-height: 36px;
   }
 
   .badge {

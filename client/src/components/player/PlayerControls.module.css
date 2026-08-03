@@ -70,20 +70,6 @@
   border-radius: 50%;
 }
 
-.backBtn {
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 1.6rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--transition-fast);
-  padding: 8px;
-  border-radius: 50%;
-}
-
 .backBtn:hover {
   background: rgba(15, 15, 17, 0.6);
   color: white;

@@ -274,6 +274,7 @@ export const usePlayerData = (
     },
     onSuccess: (newInWatchlist) => {
       toast.success(newInWatchlist ? 'Added to watchlist' : 'Removed from watchlist')
+      queryClient.invalidateQueries({ queryKey: ['player-data', showId] })
       queryClient.invalidateQueries({ queryKey: ['show-data', showId] })
       queryClient.invalidateQueries({ queryKey: ['watchlist'] })
     },

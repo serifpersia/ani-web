@@ -45,6 +45,13 @@
   cursor: not-allowed;
 }
 
+@media (hover: none), (pointer: coarse) {
+  .nav-button {
+    width: 44px;
+    height: 44px;
+  }
+}
+
 .page-info {
   font-size: 0.9rem;
   font-weight: 800;
