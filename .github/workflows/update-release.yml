@@ -121,6 +121,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Update npm
+        run: npm install -g npm@latest
+
       - name: Publish to NPM
         run: |
           echo "DISCORD_CLIENT_ID=$DISCORD_CLIENT_ID" > server/.env
@@ -128,12 +131,3 @@ jobs:
         env:
           VITE_TELEMETRY_URL: ${{ secrets.TELEMETRY_URL }}
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
-
-      - name: Unpublish Previous Version
-        run: |
-          PREV_VERSION=$(npm view ani-web version 2>/dev/null || echo "")
-          if [ -n "$PREV_VERSION" ]; then
-            npm unpublish ani-web@$PREV_VERSION --force
-          fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
