@@ -305,6 +305,56 @@ export class WatchlistController {
     return url
   }
 
+  private showsMetaChanged(
+    db: DatabaseWrapper,
+    showId: string,
+    candidate: {
+      name?: string
+      thumbnail?: string
+      nativeName?: string
+      englishName?: string
+      genres?: string
+      popularityScore?: number
+      status?: string
+      episodeCount?: number
+      type?: string
+      anilistId?: number
+    }
+  ): boolean {
+    const existing = ShowsMetaRepository.getById(db, showId) as {
+      name?: string | null
+      thumbnail?: string | null
+      nativeName?: string | null
+      englishName?: string | null
+      genres?: string | null
+      popularityScore?: number | null
+      status?: string | null
+      episodeCount?: number | null
+      type?: string | null
+      anilistId?: number | null
+    } | null
+
+    if (!existing) return true
+
+    const differs = (incoming: unknown, stored: unknown) => {
+      if (incoming === undefined || incoming === null || incoming === '') return false
+      return String(incoming) !== String(stored ?? '')
+    }
+
+    return (
+      differs(candidate.name, existing.name) ||
+      differs(candidate.thumbnail, existing.thumbnail) ||
+      differs(candidate.nativeName, existing.nativeName) ||
+      differs(candidate.englishName, existing.englishName) ||
+      differs(candidate.genres, existing.genres) ||
+      differs(candidate.popularityScore, existing.popularityScore) ||
+      differs(candidate.status, existing.status) ||
+      differs(candidate.episodeCount, existing.episodeCount) ||
+      differs(candidate.type, existing.type) ||
+      differs(candidate.anilistId, existing.anilistId)
+    )
+  }
+
   private normalizeFilterValue(value: unknown): string | undefined {
     if (typeof value !== 'string') return undefined
     const trimmed = value.trim()
@@ -613,34 +663,45 @@ export class WatchlistController {
         )?.anilistId ?? parseInt(showId))
       : undefined
 
-    await performWriteTransaction(req.db, (tx) => {
-      ShowsMetaRepository.upsert(tx, {
-        id: showId,
-        name: showName,
-        thumbnail: this.deobfuscateUrl(showThumbnail, showId),
-        nativeName,
-        englishName,
-        genres: genresStr,
-        popularityScore,
-        status,
-        episodeCount,
-        type,
-        anilistId,
+    const metaCandidate = {
+      name: showName,
+      thumbnail: this.deobfuscateUrl(showThumbnail, showId),
+      nativeName,
+      englishName,
+      genres: genresStr,
+      popularityScore,
+      status,
+      episodeCount,
+      type,
+      anilistId,
+    }
+
+    const metaChanged = this.showsMetaChanged(req.db, showId, metaCandidate)
+
+    if (metaChanged || inWatchlist) {
+      await performWriteTransaction(req.db, (tx) => {
+        if (metaChanged) {
+          ShowsMetaRepository.upsert(tx, {
+            id: showId,
+            ...metaCandidate,
+          })
+        }
+
+        if (inWatchlist) {
+          WatchedEpisodesRepository.upsert(tx, {
+            showId,
+            episodeNumber,
+            currentTime,
+            duration,
+          })
+
+          NotificationsRepository.deleteSpecificDismissed(tx, showId, episodeNumber)
+        }
       })
 
-      if (inWatchlist) {
-        WatchedEpisodesRepository.upsert(tx, {
-          showId,
-          episodeNumber,
-          currentTime,
-          duration,
-        })
+      req.db.scheduleSave()
+    }
 
-        NotificationsRepository.deleteSpecificDismissed(tx, showId, episodeNumber)
-      }
-    })
-
-    req.db.scheduleSave()
     res.json({ success: true })
   }
 
