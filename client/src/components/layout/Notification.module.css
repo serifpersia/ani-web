@@ -8,9 +8,9 @@
   background: rgba(0, 0, 0, 0.15);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: none;
   color: var(--text-primary);
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   cursor: pointer;
   padding: var(--space-2);
   display: flex;
@@ -20,8 +20,8 @@
     transform 0.2s ease,
     background 0.2s ease;
   position: relative;
-  width: 46px;
-  height: 46px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
 }
 
@@ -33,19 +33,20 @@
 
 .badge {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 2px;
+  right: -4px;
   background-color: #ff4d4f;
   color: white;
   font-size: 0.65rem;
   font-weight: bold;
   padding: 2px 5px;
   border-radius: 10px;
-  min-width: 14px;
+  min-width: 16px;
   text-align: center;
-  border: 2px solid var(--header-bg);
+  border: none;
   pointer-events: none;
   animation: bounce 0.5s ease-out;
+  line-height: 1;
 }
 
 @keyframes bounce {
@@ -243,8 +244,8 @@
   }
 
   .bellBtn {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     font-size: 1.2rem;
   }
 
@@ -255,7 +256,9 @@
   }
 
   .badge {
-    top: 4px;
-    right: 4px;
+    top: 0;
+    right: -2px;
+    font-size: 0.6rem;
+    padding: 1px 4px;
   }
 }

@@ -318,6 +318,12 @@
   box-shadow: 0 0 10px var(--accent-glow);
   z-index: 11;
   animation: progressTimer 10s linear forwards;
+  transition: opacity 0.3s ease;
+}
+
+.progressBarPaused {
+  animation-play-state: paused;
+  opacity: 0;
 }
 
 @keyframes progressTimer {

@@ -26,9 +26,6 @@ const Sidebar: React.FC = () => {
     <>
       <aside className={`${styles.sidebar} ${isOpen ? styles.open : ''} sidebar`}>
         <div className={styles.sidebarHeader}>
-          <Link to="/" className={styles.logo} onClick={handleNavLinkClick}>
-            <Logo />
-          </Link>
           <button
             className={styles.closeBtn}
             onClick={() => setIsOpen(false)}
@@ -36,6 +33,9 @@ const Sidebar: React.FC = () => {
           >
             &times;
           </button>
+          <Link to="/" className={styles.logo} onClick={handleNavLinkClick}>
+            <Logo />
+          </Link>
         </div>
 
         <nav className={styles.navSection}>
@@ -53,7 +53,7 @@ const Sidebar: React.FC = () => {
           ))}
         </nav>
 
-        <div className={styles.versionInfo}>Version {packageJson.version}</div>
+        <div className={styles.versionInfo}>v{packageJson.version}</div>
       </aside>
       {isOpen && (
         <div

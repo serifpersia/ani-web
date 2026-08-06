@@ -200,10 +200,10 @@ const SpotlightBanner: React.FC<SpotlightBannerProps> = ({ animeList }) => {
           </>
         )}
 
-        {!isPaused && top6.length > 1 && (
+        {top6.length > 1 && (
           <div
             key={`progress-${currentIndex}-${autoplayResetKey}`}
-            className={styles.progressBar}
+            className={`${styles.progressBar} ${isPaused ? styles.progressBarPaused : ''}`}
           />
         )}
 
