@@ -600,3 +600,179 @@
     transform: translateY(0);
   }
 }
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.manageBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 40px;
+  padding: 0 var(--space-4);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-lg);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.manageBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--text-secondary);
+}
+
+.manageBtn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  box-shadow: 0 4px 15px var(--accent-glow);
+}
+
+.manageBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-6);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--glass-shadow);
+  width: 100%;
+  box-sizing: border-box;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.selectAllBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.selectAllBtn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.selectAllBtn svg {
+  color: var(--accent);
+}
+
+.manageCount {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--accent-light);
+  white-space: nowrap;
+}
+
+.manageSpacer {
+  flex: 1;
+}
+
+.manageStatusSelect {
+  height: 38px;
+  padding: 0 0.75rem;
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid var(--border-primary) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.manageStatusSelect:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.manageRemoveBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 38px;
+  padding: 0 var(--space-4);
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.manageRemoveBtn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: #ef4444;
+}
+
+.manageRemoveBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.itemWrapper {
+  position: relative;
+}
+
+.selectOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.selectOverlay:hover {
+  background: rgba(108, 159, 255, 0.12);
+}
+
+.itemWrapper.selected .selectOverlay {
+  background: rgba(108, 159, 255, 0.15);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px var(--accent-glow);
+}
+
+.selectBadge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.45);
+  color: white;
+  transition: all var(--transition-fast);
+}
+
+.itemWrapper.selected .selectBadge {
+  background: var(--accent);
+  border-color: var(--accent);
+}

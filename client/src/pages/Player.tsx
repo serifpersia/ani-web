@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useMemo, useCallback, useState, useLayoutEffect } from 'react'
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router'
 import toast from 'react-hot-toast'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import styles from './Player.module.css'
 import layoutStyles from './PlayerPageLayout.module.css'
 import {
@@ -28,19 +28,13 @@ import SourceSelector from '../components/player/SourceSelector'
 import { ProviderSelector } from '../components/player/SourceSelector'
 import useVideoPlayer from '../hooks/useVideoPlayer'
 import { usePlayerData } from '../hooks/usePlayerData'
-import {
-  useQueue,
-  useRemoveFromQueue,
-  useClearQueue,
-  useReorderQueue,
-  useAddToQueue,
-} from '../hooks/useAnimeData'
+import { useQueue, useRemoveFromQueue, useClearQueue, useReorderQueue } from '../hooks/useAnimeData'
 import type { QueueItem } from '../hooks/useAnimeData'
 import type { VideoLink, SubtitleTrack } from '../types/player'
 import AnimeMetaDetails from '../components/anime/AnimeMetaDetails'
 import SynopsisText from '../components/anime/SynopsisText'
-import { getSuggestedEpisode } from '../lib/queue'
 import AnimePaheCookieModal from '../components/anime/AnimePaheCookieModal'
+import QueueOptionsButton from '../components/anime/QueueOptionsButton'
 
 const Player: React.FC = () => {
   const { id: showId, episodeNumber } = useParams<{ id: string; episodeNumber?: string }>()
@@ -57,6 +51,7 @@ const Player: React.FC = () => {
     setPreferredSource,
     handleToggleDetails,
     markEpisodeWatched,
+    prefetchEpisodeSources,
     isMarkingWatched,
     isUpdatingWatchlistStatus,
   } = usePlayerData(showId, episodeNumber, (location.state as Record<string, unknown>) || null)
@@ -132,13 +127,11 @@ const Player: React.FC = () => {
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
   const lastInteractionTimeRef = useRef(0)
   const { data: queue = [] } = useQueue()
-  const addQueue = useAddToQueue()
   const removeQueue = useRemoveFromQueue()
   const removeQueueRef = useRef(removeQueue)
   removeQueueRef.current = removeQueue
   const clearQueue = useClearQueue()
   const reorderQueue = useReorderQueue()
-  const [queueConfirmed, setQueueConfirmed] = useState(false)
   const [isTheaterMode, setIsTheaterMode] = useState<boolean>(() => {
     try {
       return localStorage.getItem('playerTheaterMode') === 'true'
@@ -186,11 +179,6 @@ const Player: React.FC = () => {
     return () => observer.disconnect()
   }, [player.state.isFullscreen, isTheaterMode, refs.playerContainerRef])
 
-  const { data: suggestedEpisode } = useQuery({
-    queryKey: ['suggestedEpisode', showId],
-    queryFn: () => getSuggestedEpisode(showId as string),
-    enabled: !!showId,
-  })
   const currentEpisodeIndex = useMemo(
     () => state.episodes.findIndex((ep) => ep === state.currentEpisode),
     [state.episodes, state.currentEpisode]
@@ -269,6 +257,7 @@ const Player: React.FC = () => {
     }
 
     if (state.selectedSource.subtitles) {
+      const subtitlesEnabled = localStorage.getItem('playerSubtitlesEnabled') !== 'false'
       state.selectedSource.subtitles.forEach((sub) => {
         const track = document.createElement('track')
         track.kind = 'subtitles'
@@ -284,11 +273,14 @@ const Player: React.FC = () => {
           track.src = subUrl
         }
 
-        if (sub.lang === 'en' || sub.label === 'English') {
+        if (subtitlesEnabled && (sub.lang === 'en' || sub.label === 'English')) {
           track.default = true
         }
         videoElement.appendChild(track)
       })
+      if (!subtitlesEnabled) {
+        actions.setActiveSubtitleTrack('off')
+      }
       actions.setAvailableSubtitles(state.selectedSource.subtitles)
     }
 
@@ -748,7 +740,11 @@ const Player: React.FC = () => {
   }, [refs.videoRef, setAvailableSubtitles])
 
   useEffect(() => {
-    if (player.state.activeSubtitleTrack === null && player.state.availableSubtitles.length > 0) {
+    if (
+      player.state.activeSubtitleTrack === null &&
+      player.state.availableSubtitles.length > 0 &&
+      localStorage.getItem('playerSubtitlesEnabled') !== 'false'
+    ) {
       const englishTrack = player.state.availableSubtitles.find(
         (t) => t.lang === 'en' || t.label === 'English'
       )
@@ -925,35 +921,9 @@ const Player: React.FC = () => {
 
   const showManualWatchedButton =
     state.selectedProvider !== 'megaplay' || state.selectedSource?.type === 'iframe'
-  const queuedItem = useMemo(() => {
-    if (!showId || !suggestedEpisode) return undefined
-    return queue.find(
-      (item) => item.showId === showId && item.episodeNumber === suggestedEpisode.episodeNumber
-    )
-  }, [queue, showId, suggestedEpisode])
-
-  const handleQueueToggle = async () => {
-    if (!showId || !state.showMeta?.name) return
-
-    const suggestion = suggestedEpisode || (await getSuggestedEpisode(showId))
-
-    if (queuedItem) {
-      removeQueue.mutate({ showId, episodeNumber: queuedItem.episodeNumber })
-      return
-    }
-
-    setQueueConfirmed(true)
-    addQueue.mutate({
-      showId,
-      episodeNumber: suggestion.episodeNumber,
-      showName: state.showMeta.name || state.showMeta.names?.romaji,
-      showThumbnail: state.showMeta.thumbnail,
-      nativeName: state.showMeta.names?.native,
-      englishName: state.showMeta.names?.english,
-      type: state.showMeta.type,
-    })
-    window.setTimeout(() => setQueueConfirmed(false), 1000)
-  }
+  const prefetchNextEpisodeRef = useRef(prefetchEpisodeSources)
+  prefetchNextEpisodeRef.current = prefetchEpisodeSources
+  const prefetchedForRef = useRef<string>('')
 
   useEffect(() => {
     const videoElement = refs.videoRef.current
@@ -974,6 +944,36 @@ const Player: React.FC = () => {
       }
 
       const progress = currentTime / duration
+
+      if (duration - currentTime <= 60) {
+        const activeQueueIndex = queue.findIndex(
+          (item) =>
+            matchesQueueItem(item, showId, state.showMeta?.id) &&
+            item.episodeNumber === state.currentEpisode
+        )
+        const nextQueueItem =
+          queue.length > 0
+            ? activeQueueIndex >= 0
+              ? queue[activeQueueIndex + 1] || null
+              : queue[0]
+            : null
+
+        const prefetchKey = nextQueueItem
+          ? `${nextQueueItem.showId}:${nextQueueItem.episodeNumber}`
+          : hasNextEpisode
+            ? `${showId}:${nextEpisode}`
+            : ''
+
+        if (prefetchKey && prefetchedForRef.current !== prefetchKey) {
+          prefetchedForRef.current = prefetchKey
+          if (nextQueueItem) {
+            prefetchNextEpisodeRef.current(nextQueueItem.episodeNumber, nextQueueItem.showId)
+          } else {
+            prefetchNextEpisodeRef.current(nextEpisode)
+          }
+        }
+      }
+
       setShowNextEpisodePrompt(hasNextEpisode && progress >= 0.8)
       setHasReachedEpisodeEnd(currentTime >= Math.max(duration * 0.98, duration - 10))
     }
@@ -986,7 +986,16 @@ const Player: React.FC = () => {
       videoElement.removeEventListener('timeupdate', handleThresholds)
       videoElement.removeEventListener('loadedmetadata', handleThresholds)
     }
-  }, [refs.videoRef, hasNextEpisode, state.currentEpisode, state.selectedSource])
+  }, [
+    refs.videoRef,
+    hasNextEpisode,
+    state.currentEpisode,
+    state.selectedSource,
+    nextEpisode,
+    showId,
+    queue,
+    state.showMeta?.id,
+  ])
 
   const handleMarkEpisodeWatched = useCallback(async () => {
     if (!showId || !state.currentEpisode || !state.showMeta.name || isMarkingWatched) return
@@ -1347,13 +1356,16 @@ const Player: React.FC = () => {
                       {state.inWatchlist ? <FaCheck size={14} /> : <FaPlus size={14} />}
                       {state.inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
                     </button>
-                    <button
-                      className={`${styles.watchlistBtn} ${styles.queueBtn} ${queuedItem || queueConfirmed ? styles.queueActive : ''}`}
-                      onClick={handleQueueToggle}
-                    >
-                      {queuedItem || queueConfirmed ? <FaCheck size={14} /> : <FaPlus size={14} />}
-                      {queuedItem || queueConfirmed ? 'Queued' : 'Queue'}
-                    </button>
+                    <QueueOptionsButton
+                      showId={showId}
+                      showName={state.showMeta.name || state.showMeta.names?.romaji}
+                      showThumbnail={state.showMeta.thumbnail}
+                      nativeName={state.showMeta.names?.native}
+                      englishName={state.showMeta.names?.english}
+                      showType={state.showMeta.type}
+                      className={`${styles.watchlistBtn} ${styles.queueBtn}`}
+                      activeClassName={styles.queueActive}
+                    />
                     {showManualWatchedButton && (
                       <button
                         className={`${styles.watchlistBtn} ${styles.markWatchedBtn} ${isCurrentEpisodeWatched ? styles.markWatchedDone : ''}`}

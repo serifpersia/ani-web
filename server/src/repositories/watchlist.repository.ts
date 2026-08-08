@@ -95,6 +95,21 @@ export const WatchlistRepository = {
   delete: (db: DatabaseWrapper, id: string) =>
     dbRun(db, 'DELETE FROM watchlist WHERE id = ?', [id]),
 
+  deleteMany: (db: DatabaseWrapper, ids: string[]) => {
+    if (ids.length === 0) return Promise.resolve()
+    const placeholders = ids.map(() => '?').join(', ')
+    return dbRun(db, `DELETE FROM watchlist WHERE id IN (${placeholders})`, ids)
+  },
+
+  updateStatusMany: (db: DatabaseWrapper, ids: string[], status: string) => {
+    if (ids.length === 0) return Promise.resolve()
+    const placeholders = ids.map(() => '?').join(', ')
+    return dbRun(db, `UPDATE watchlist SET status = ? WHERE id IN (${placeholders})`, [
+      status,
+      ...ids,
+    ])
+  },
+
   getWatchingShows: (db: DatabaseWrapper) =>
     dbAll<{
       id: string

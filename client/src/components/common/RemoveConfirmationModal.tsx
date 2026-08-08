@@ -8,6 +8,7 @@ interface RemoveConfirmationModalProps {
   onConfirm: (options: { removeFromWatchlist?: boolean; rememberPreference?: boolean }) => void
   animeName: string
   scenario: 'continueWatching' | 'watchlist'
+  count?: number
 }
 
 export default function RemoveConfirmationModal({
@@ -16,6 +17,7 @@ export default function RemoveConfirmationModal({
   onConfirm,
   animeName,
   scenario,
+  count,
 }: RemoveConfirmationModalProps) {
   const [rememberPreference, setRememberPreference] = useState(false)
   const [removeFromWatchlist, setRemoveFromWatchlist] = useState(false)
@@ -35,8 +37,10 @@ export default function RemoveConfirmationModal({
   }
 
   const title = scenario === 'continueWatching' ? 'Reset Progress' : 'Remove from Watchlist'
-  const message =
-    scenario === 'continueWatching'
+  const isBulk = typeof count === 'number' && count > 1
+  const message = isBulk
+    ? `Are you sure you want to remove ${count} items from your watchlist?`
+    : scenario === 'continueWatching'
       ? `Are you sure you want to remove your watch progress for "${animeName}"?`
       : `Are you sure you want to remove "${animeName}" from your watchlist?`
 
@@ -62,7 +66,7 @@ export default function RemoveConfirmationModal({
             Also remove from my watchlist
           </label>
         )}
-        {scenario === 'watchlist' && (
+        {scenario === 'watchlist' && !isBulk && (
           <label
             style={{
               display: 'flex',

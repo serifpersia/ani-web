@@ -45,6 +45,9 @@ export const QueueRepository = {
       episodeNumber,
     ]),
 
+  getByShow: (db: DatabaseWrapper, showId: string) =>
+    dbAll<QueueRow>(db, 'SELECT * FROM queue WHERE showId = ? ORDER BY queue_order ASC', [showId]),
+
   getMaxOrder: async (db: DatabaseWrapper) => {
     const row = await dbGet<{ maxOrder: number }>(
       db,
@@ -62,6 +65,33 @@ export const QueueRepository = {
 
   removeEpisode: (db: DatabaseWrapper, showId: string, episodeNumber: string) =>
     dbRun(db, 'DELETE FROM queue WHERE showId = ? AND episodeNumber = ?', [showId, episodeNumber]),
+
+  addManyToEnd: async (
+    db: DatabaseWrapper,
+    episodes: { showId: string; episodeNumber: string }[]
+  ) => {
+    if (episodes.length === 0) return
+    let nextOrder = (await QueueRepository.getMaxOrder(db)) + 1
+    for (const episode of episodes) {
+      const existing = await QueueRepository.getByEpisode(db, episode.showId, episode.episodeNumber)
+      if (existing) continue
+      await dbRun(db, 'INSERT INTO queue (showId, episodeNumber, queue_order) VALUES (?, ?, ?)', [
+        episode.showId,
+        episode.episodeNumber,
+        nextOrder,
+      ])
+      nextOrder += 1
+    }
+  },
+
+  removeMany: (db: DatabaseWrapper, showId: string, episodeNumbers: string[]) => {
+    if (episodeNumbers.length === 0) return Promise.resolve()
+    const placeholders = episodeNumbers.map(() => '?').join(', ')
+    return dbRun(db, `DELETE FROM queue WHERE showId = ? AND episodeNumber IN (${placeholders})`, [
+      showId,
+      ...episodeNumbers,
+    ])
+  },
 
   clear: (db: DatabaseWrapper) => dbRun(db, 'DELETE FROM queue'),
 

@@ -10,6 +10,10 @@ import {
   FaTrash,
   FaChevronLeft,
   FaChevronRight,
+  FaCheck,
+  FaCheckCircle,
+  FaRegCircle,
+  FaPencilAlt,
 } from 'react-icons/fa'
 
 import AnimeCard from '../components/anime/AnimeCard'
@@ -21,6 +25,8 @@ import { Button } from '../components/common/Button'
 import {
   usePaginatedWatchlist,
   useRemoveFromWatchlist,
+  useBatchRemoveFromWatchlist,
+  useBatchUpdateWatchlistStatus,
   usePaginatedAllContinueWatching,
   useGenresAndStudios,
 } from '../hooks/useAnimeData'
@@ -92,7 +98,14 @@ const Watchlist: React.FC = () => {
   const availableGenres = metaData?.genres || []
   const gridRef = useRef<HTMLDivElement>(null)
 
-  const [itemToRemove, setItemToRemove] = useState<{ id: string; name: string } | null>(null)
+  const [itemToRemove, setItemToRemove] = useState<{
+    id?: string
+    ids?: string[]
+    name?: string
+  } | null>(null)
+
+  const [manageMode, setManageMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const isCW = filterBy === 'Continue Watching'
   const watchlistQueryString = useMemo(() => {
@@ -136,6 +149,7 @@ const Watchlist: React.FC = () => {
     exclude.forEach((g) => g && (states[g] = 'exclude'))
     setGenreStates(states)
     setPage(parseInt(searchParams.get('page') || '1'))
+    setSelectedIds(new Set())
   }, [searchParams])
 
   const updateStatus = useMutation({
@@ -259,6 +273,12 @@ const Watchlist: React.FC = () => {
 
   const confirmRemove = (opts: { removeFromWatchlist?: boolean; rememberPreference?: boolean }) => {
     if (!itemToRemove) return
+    if (itemToRemove.ids) {
+      bulkRemove.mutate(itemToRemove.ids)
+      setSelectedIds(new Set())
+      setItemToRemove(null)
+      return
+    }
     if (isCW) {
       removeCw.mutate(itemToRemove.id)
       if (opts.removeFromWatchlist) {
@@ -274,6 +294,51 @@ const Watchlist: React.FC = () => {
 
   const handleStatusChange = (id: string, status: string) => {
     updateStatus.mutate({ id, status })
+  }
+
+  const bulkRemove = useBatchRemoveFromWatchlist()
+  const bulkUpdateStatus = useBatchUpdateWatchlistStatus()
+
+  const toggleManageMode = () => {
+    setManageMode((prev) => {
+      const next = !prev
+      if (!next) setSelectedIds(new Set())
+      return next
+    })
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const pageIds = sortedList.map((item) => item.id)
+  const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
+
+  const handleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(pageIds))
+    }
+  }
+
+  const handleBulkStatus = (status: string) => {
+    if (selectedIds.size === 0) return
+    bulkUpdateStatus.mutate({ ids: [...selectedIds], status })
+    setSelectedIds(new Set())
+  }
+
+  const handleBulkRemove = () => {
+    if (selectedIds.size === 0) return
+    setItemToRemove({ ids: [...selectedIds] })
   }
 
   const canGoNext = list.length >= 14 && nextPageData && nextPageData.data.length > 0
@@ -419,28 +484,76 @@ const Watchlist: React.FC = () => {
           <span className={styles.itemCount}>({total} items)</span>
         </h3>
 
-        {total > 0 && (
-          <div className={styles.pagination}>
+        <div className={styles.headerActions}>
+          {!isCW && (
             <button
-              className={styles.pageBtn}
-              onClick={() => handlePageChange(page - 1)}
-              disabled={page === 1 || isLoading}
+              className={`${styles.manageBtn} ${manageMode ? styles.active : ''}`}
+              onClick={toggleManageMode}
             >
-              <FaChevronLeft size={14} />
+              <FaPencilAlt size={13} />
+              <span>Bulk Manage</span>
             </button>
-            <span className={styles.pageInfo}>
-              Page <strong>{page}</strong>
-            </span>
-            <button
-              className={styles.pageBtn}
-              onClick={() => handlePageChange(page + 1)}
-              disabled={!canGoNext || isLoading}
-            >
-              <FaChevronRight size={14} />
-            </button>
-          </div>
-        )}
+          )}
+          {total > 0 && (
+            <div className={styles.pagination}>
+              <button
+                className={styles.pageBtn}
+                onClick={() => handlePageChange(page - 1)}
+                disabled={page === 1 || isLoading}
+              >
+                <FaChevronLeft size={14} />
+              </button>
+              <span className={styles.pageInfo}>
+                Page <strong>{page}</strong>
+              </span>
+              <button
+                className={styles.pageBtn}
+                onClick={() => handlePageChange(page + 1)}
+                disabled={!canGoNext || isLoading}
+              >
+                <FaChevronRight size={14} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+
+      {manageMode && (
+        <div className={styles.manageBar}>
+          <button className={styles.selectAllBtn} onClick={handleSelectAll}>
+            {allSelected ? <FaCheckCircle size={16} /> : <FaRegCircle size={16} />}
+            <span>{allSelected ? 'Clear Page' : 'Select All'}</span>
+          </button>
+          <span className={styles.manageCount}>{selectedIds.size} selected</span>
+          <div className={styles.manageSpacer} />
+          <select
+            className={styles.manageStatusSelect}
+            value=""
+            onChange={(e) => {
+              if (e.currentTarget.value) {
+                handleBulkStatus(e.currentTarget.value)
+              }
+            }}
+            disabled={selectedIds.size === 0}
+            title="Set status for selected items"
+          >
+            <option value="">Set status…</option>
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <button
+            className={styles.manageRemoveBtn}
+            onClick={handleBulkRemove}
+            disabled={selectedIds.size === 0}
+          >
+            <FaTrash size={13} />
+            <span>Remove Selected</span>
+          </button>
+        </div>
+      )}
 
       {isLoading ? (
         <SkeletonGrid />
@@ -599,40 +712,57 @@ const Watchlist: React.FC = () => {
           )}
 
           <div className={`${styles.grid} ${lowEndMode ? styles.lowEnd : ''}`}>
-            {sortedList.map((item) => (
-              <div key={item._id} className={styles.itemWrapper}>
-                <AnimeCard
-                  anime={item}
-                  continueWatching={isCW}
-                  onRemove={() => handleRemove(item.id, item.name)}
-                  layout="vertical"
-                />
-                {!isCW && (
-                  <div className={styles.cardActions}>
-                    <select
-                      className={styles.statusSelect}
-                      value={item.status}
-                      onChange={(e) =>
-                        updateStatus.mutate({ id: item.id, status: e.currentTarget.value })
-                      }
+            {sortedList.map((item) => {
+              const selected = selectedIds.has(item.id)
+              return (
+                <div
+                  key={item._id}
+                  className={`${styles.itemWrapper} ${selected ? styles.selected : ''}`}
+                >
+                  {manageMode && (
+                    <div
+                      className={styles.selectOverlay}
+                      onClick={() => toggleSelect(item.id)}
+                      title={selected ? 'Deselect' : 'Select'}
                     >
-                      {STATUS_OPTIONS.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      className={styles.removeBtn}
-                      onClick={() => handleRemove(item.id, item.name)}
-                      title="Remove from Watchlist"
-                    >
-                      <FaTrash size={12} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+                      <span className={styles.selectBadge}>
+                        {selected ? <FaCheck size={12} /> : null}
+                      </span>
+                    </div>
+                  )}
+                  <AnimeCard
+                    anime={item}
+                    continueWatching={isCW}
+                    onRemove={() => handleRemove(item.id, item.name)}
+                    layout="vertical"
+                  />
+                  {!isCW && !manageMode && (
+                    <div className={styles.cardActions}>
+                      <select
+                        className={styles.statusSelect}
+                        value={item.status}
+                        onChange={(e) =>
+                          updateStatus.mutate({ id: item.id, status: e.currentTarget.value })
+                        }
+                      >
+                        {STATUS_OPTIONS.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className={styles.removeBtn}
+                        onClick={() => handleRemove(item.id, item.name)}
+                        title="Remove from Watchlist"
+                      >
+                        <FaTrash size={12} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </>
       )}
@@ -675,6 +805,7 @@ const Watchlist: React.FC = () => {
         onConfirm={confirmRemove}
         animeName={itemToRemove?.name || ''}
         scenario={isCW ? 'continueWatching' : 'watchlist'}
+        count={itemToRemove?.ids?.length}
       />
     </div>
   )

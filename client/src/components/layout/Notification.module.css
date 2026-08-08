@@ -33,15 +33,19 @@
 
 .badge {
   position: absolute;
-  top: 2px;
-  right: -4px;
+  top: 6px;
+  right: 6px;
   background-color: #ff4d4f;
   color: white;
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   font-weight: bold;
-  padding: 2px 5px;
-  border-radius: 10px;
-  min-width: 16px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   border: none;
   pointer-events: none;
@@ -125,6 +129,32 @@
 
 .clearAllBtn:hover {
   background: rgba(255, 255, 255, 0.05);
+}
+
+.discoveryStatusRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.5rem 1rem;
+  font-size: 0.72rem;
+  color: var(--text-muted, #9a9aa5);
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.spinIcon {
+  color: var(--accent, #6c9fff);
+  animation: spin 0.9s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .list {
@@ -256,9 +286,11 @@
   }
 
   .badge {
-    top: 0;
-    right: -2px;
-    font-size: 0.6rem;
-    padding: 1px 4px;
+    top: 5px;
+    right: 6px;
+    font-size: 0.58rem;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 3px;
   }
 }

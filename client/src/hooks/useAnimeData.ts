@@ -161,6 +161,7 @@ export const useAddToQueue = () => {
         toast.success('Removed from queue')
       }
       queryClient.invalidateQueries({ queryKey: ['queue'] })
+      queryClient.invalidateQueries({ queryKey: ['queue-remaining'] })
     },
     onError: (error: Error) => {
       toast.error(`Failed to update queue: ${error.message}`)
@@ -182,6 +183,84 @@ export const useRemoveFromQueue = () => {
     onSuccess: () => {
       toast.success('Removed from queue')
       queryClient.invalidateQueries({ queryKey: ['queue'] })
+      queryClient.invalidateQueries({ queryKey: ['queue-remaining'] })
+      queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
+      queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
+      queryClient.invalidateQueries({ queryKey: ['continueWatching'] })
+      queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to remove: ${error.message}`)
+    },
+  })
+}
+
+export const useQueueRemainingEpisodes = (showId?: string, enabled: boolean = true) => {
+  return useQuery<{ showId: string; episodes: string[] }>({
+    queryKey: ['queue-remaining', showId],
+    queryFn: () => fetchApi(`/api/queue/remaining/${showId}`),
+    enabled: !!showId && enabled,
+    staleTime: 1000 * 60,
+  })
+}
+
+export interface QueueAddPayload {
+  showId: string
+  showName?: string
+  showThumbnail?: string
+  nativeName?: string
+  englishName?: string
+  type?: string
+}
+
+export const useAddToQueueBatch = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      episodeNumbers,
+      ...meta
+    }: QueueAddPayload & { episodeNumbers: string[] }) => {
+      const response = await fetch('/api/queue/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...meta, episodeNumbers }),
+      })
+      if (!response.ok) throw new Error('Failed to update queue')
+      return response.json() as Promise<{ success: boolean; added: number }>
+    },
+    onSuccess: (data, variables) => {
+      const count = data.added ?? variables.episodeNumbers.length
+      toast.success(`${count} ${count === 1 ? 'episode' : 'episodes'} added to queue`)
+      queryClient.invalidateQueries({ queryKey: ['queue'] })
+      queryClient.invalidateQueries({ queryKey: ['queue-remaining'] })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update queue: ${error.message}`)
+    },
+  })
+}
+
+export const useRemoveFromQueueBatch = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      showId,
+      episodeNumbers,
+    }: {
+      showId: string
+      episodeNumbers?: string[]
+    }) => {
+      const response = await fetch('/api/queue/remove-many', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ showId, episodeNumbers }),
+      })
+      if (!response.ok) throw new Error('Failed to remove queue items')
+    },
+    onSuccess: () => {
+      toast.success('Removed from queue')
+      queryClient.invalidateQueries({ queryKey: ['queue'] })
+      queryClient.invalidateQueries({ queryKey: ['queue-remaining'] })
       queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
       queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
       queryClient.invalidateQueries({ queryKey: ['continueWatching'] })
@@ -203,6 +282,7 @@ export const useClearQueue = () => {
     onSuccess: () => {
       toast.success('Queue cleared')
       queryClient.invalidateQueries({ queryKey: ['queue'] })
+      queryClient.invalidateQueries({ queryKey: ['queue-remaining'] })
       queryClient.invalidateQueries({ queryKey: ['continueWatchingFast'] })
       queryClient.invalidateQueries({ queryKey: ['continueWatchingUpNext'] })
       queryClient.invalidateQueries({ queryKey: ['continueWatching'] })
@@ -366,6 +446,53 @@ export const useRemoveFromWatchlist = () => {
   })
 }
 
+export const useBatchUpdateWatchlistStatus = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ ids, status }: { ids: string[]; status: string }) => {
+      const response = await fetch('/api/watchlist/batch-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, status }),
+      })
+      if (!response.ok) throw new Error('Failed to update watchlist statuses')
+      return response.json() as Promise<{ success: boolean; updated: number }>
+    },
+    onSuccess: (data) => {
+      toast.success(`Status updated for ${data.updated ?? 0} items`)
+      queryClient.invalidateQueries({ queryKey: ['watchlist'] })
+      queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update statuses: ${error.message}`)
+    },
+  })
+}
+
+export const useBatchRemoveFromWatchlist = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const response = await fetch('/api/watchlist/remove-many', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      })
+      if (!response.ok) throw new Error('Failed to remove from watchlist')
+      return response.json() as Promise<{ success: boolean; removed: number }>
+    },
+    onSuccess: (data) => {
+      const count = data.removed ?? 0
+      toast.success(`Removed ${count} ${count === 1 ? 'item' : 'items'} from watchlist`)
+      queryClient.invalidateQueries({ queryKey: ['watchlist'] })
+      queryClient.invalidateQueries({ queryKey: ['allContinueWatching'] })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to remove: ${error.message}`)
+    },
+  })
+}
+
 export interface Notification {
   showId: string
   name: string
@@ -382,6 +509,74 @@ export const useNotifications = (enabled: boolean = true) => {
     queryFn: () => fetchApi('/api/notifications'),
     enabled,
     refetchInterval: 30000,
+  })
+}
+
+export interface DiscoveryStatus {
+  running: boolean
+  state: 'idle' | 'running' | 'complete' | 'empty' | 'error'
+  total: number
+  done: number
+  lastRunAt: number
+}
+
+export const useDiscoveryStatus = (enabled: boolean = true) => {
+  return useQuery<DiscoveryStatus>({
+    queryKey: ['discovery-status'],
+    queryFn: () => fetchApi('/api/discovery/status'),
+    enabled,
+    refetchInterval: (query) => {
+      const data = query.state.data as DiscoveryStatus | undefined
+      return data?.running ? 2000 : false
+    },
+  })
+}
+
+export const useTriggerDiscovery = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/discovery/refresh', { method: 'POST' })
+      if (!response.ok) throw new Error('Failed to trigger discovery')
+      return response.json() as Promise<DiscoveryStatus & { success: boolean; started: boolean }>
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData<DiscoveryStatus>(['discovery-status'], {
+        running: data.running,
+        state: data.state,
+        total: data.total,
+        done: data.done,
+        lastRunAt: data.lastRunAt,
+      })
+      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ['discovery-status'] })
+    },
+  })
+}
+
+export const useNudgeDiscovery = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/discovery/nudge', { method: 'POST' })
+      if (!response.ok) throw new Error('Failed to trigger discovery')
+      return response.json() as Promise<DiscoveryStatus & { success: boolean; started: boolean }>
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData<DiscoveryStatus>(['discovery-status'], {
+        running: data.running,
+        state: data.state,
+        total: data.total,
+        done: data.done,
+        lastRunAt: data.lastRunAt,
+      })
+      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ['discovery-status'] })
+    },
   })
 }
 

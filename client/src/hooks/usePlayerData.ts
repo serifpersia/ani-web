@@ -20,6 +20,7 @@ interface UsePlayerDataReturn {
   setPreferredSource: (sourceName: string) => Promise<void>
   handleToggleDetails: () => Promise<void>
   markEpisodeWatched: (episodeNumber: string, duration: number) => Promise<void>
+  prefetchEpisodeSources: (episodeNumber: string, targetShowId?: string) => void
   isMarkingWatched: boolean
   isUpdatingWatchlistStatus: boolean
 }
@@ -33,6 +34,125 @@ interface RawSkipInterval {
   }
   start_time?: number
   end_time?: number
+}
+
+interface VideoFetchUiState {
+  selectedProvider: PlayerState['selectedProvider']
+  currentMode: 'sub' | 'dub'
+}
+
+export interface FetchedVideoData {
+  videoSources: VideoSource[]
+  selectedSource: VideoSource | null
+  selectedLink: VideoLink | null
+  resumeTime: number
+  resumeDuration: number
+  showResumeModal: boolean
+  skipIntervals: SkipInterval[]
+  fetchedEpisodeNumber: string
+}
+
+async function fetchVideoSources(
+  showId: string | undefined,
+  episodeNumber: string | undefined,
+  ui: VideoFetchUiState,
+  dispatch: React.Dispatch<Action>,
+  silentToast: boolean = false
+): Promise<FetchedVideoData> {
+  if (!showId || !episodeNumber) throw new Error('Missing params')
+
+  try {
+    const [sources, progress, preferredSourceData, skipTimesData] = await Promise.all([
+      fetchApi(
+        `/api/video?showId=${showId}&episodeNumber=${episodeNumber}&mode=${ui.currentMode}&provider=${ui.selectedProvider}`
+      ).catch(() => null),
+      fetchApi(`/api/episode-progress/${showId}/${episodeNumber}`).catch(() => null),
+      fetchApi(`/api/settings?key=preferredSource`).catch(() => null),
+      fetchApi(`/api/skip-times/${showId}/${episodeNumber}`).catch(() => []),
+    ])
+
+    const preferredSourceName = preferredSourceData?.value
+
+    const modeMatchedSources =
+      (sources as VideoSource[] | null)?.filter((s) => {
+        const name = s.sourceName.toLowerCase()
+        if (ui.currentMode === 'dub') {
+          return name.includes('eng') || name.includes('dub')
+        } else {
+          return (
+            name.includes('jpn') ||
+            name.includes('sub') ||
+            (!name.includes('eng') && !name.includes('dub'))
+          )
+        }
+      }) ?? []
+
+    const pool =
+      modeMatchedSources.length > 0 ? modeMatchedSources : ((sources as VideoSource[] | null) ?? [])
+    let sourceToSelect: VideoSource | null = pool.length > 0 ? pool[0] : null
+
+    if (preferredSourceName) {
+      const found = pool.find((s: VideoSource) => s.sourceName === preferredSourceName)
+      if (found) sourceToSelect = found
+    }
+
+    const selectedLink =
+      sourceToSelect && sourceToSelect.links.length > 0
+        ? sourceToSelect.links.sort(
+            (a: VideoLink, b: VideoLink) =>
+              (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
+          )[0]
+        : null
+
+    const resumeTime = progress?.currentTime || 0
+    const resumeDuration = progress?.duration || 0
+    const rawSkips = Array.isArray(skipTimesData) ? skipTimesData : skipTimesData?.results || []
+
+    const skipIntervals: SkipInterval[] = rawSkips
+      .map((item: RawSkipInterval) => ({
+        skip_id: item.skip_id || '',
+        skip_type: item.skip_type || '',
+        start_time: item.interval?.start_time ?? item.start_time ?? 0,
+        end_time: item.interval?.end_time ?? item.end_time ?? 0,
+      }))
+      .filter((i: SkipInterval) => i.end_time > 0)
+
+    if (!sources || sources.length === 0) {
+      if (!silentToast) {
+        toast.error(`No video sources found for ${ui.selectedProvider}`)
+      }
+    }
+
+    return {
+      videoSources: sources as VideoSource[],
+      selectedSource: sourceToSelect,
+      selectedLink,
+      resumeTime,
+      resumeDuration,
+      showResumeModal: resumeTime > 5 && sourceToSelect?.type !== 'iframe',
+      skipIntervals,
+      fetchedEpisodeNumber: episodeNumber,
+    }
+  } catch (e) {
+    const error = e as Error & { provider?: string }
+    if (error.message === 'AUTH_REQUIRED') {
+      dispatch({
+        type: 'SET_STATE',
+        payload: { showCookieModal: true, cookieProvider: error.provider },
+      })
+      return {
+        videoSources: [],
+        selectedSource: null,
+        selectedLink: null,
+        resumeTime: 0,
+        resumeDuration: 0,
+        showResumeModal: false,
+        skipIntervals: [],
+        fetchedEpisodeNumber: episodeNumber,
+      }
+    }
+    throw e
+  }
 }
 
 export const usePlayerData = (
@@ -151,104 +271,7 @@ export const usePlayerData = (
       uiState.selectedProvider,
       uiState.currentMode,
     ],
-    queryFn: async () => {
-      if (!showId || !currentEpisode) throw new Error('Missing params')
-
-      try {
-        const providerShowId = showId
-
-        const [sources, progress, preferredSourceData, skipTimesData] = await Promise.all([
-          fetchApi(
-            `/api/video?showId=${providerShowId}&episodeNumber=${currentEpisode}&mode=${uiState.currentMode}&provider=${uiState.selectedProvider}`
-          ).catch(() => null),
-          fetchApi(`/api/episode-progress/${showId}/${currentEpisode}`).catch(() => null),
-          fetchApi(`/api/settings?key=preferredSource`).catch(() => null),
-          fetchApi(`/api/skip-times/${showId}/${currentEpisode}`).catch(() => []),
-        ])
-
-        const preferredSourceName = preferredSourceData?.value
-
-        const modeMatchedSources =
-          (sources as VideoSource[] | null)?.filter((s) => {
-            const name = s.sourceName.toLowerCase()
-            if (uiState.currentMode === 'dub') {
-              return name.includes('eng') || name.includes('dub')
-            } else {
-              return (
-                name.includes('jpn') ||
-                name.includes('sub') ||
-                (!name.includes('eng') && !name.includes('dub'))
-              )
-            }
-          }) ?? []
-
-        const pool =
-          modeMatchedSources.length > 0
-            ? modeMatchedSources
-            : ((sources as VideoSource[] | null) ?? [])
-        let sourceToSelect: VideoSource | null = pool.length > 0 ? pool[0] : null
-
-        if (preferredSourceName) {
-          const found = pool.find((s: VideoSource) => s.sourceName === preferredSourceName)
-          if (found) sourceToSelect = found
-        }
-
-        const selectedLink =
-          sourceToSelect && sourceToSelect.links.length > 0
-            ? sourceToSelect.links.sort(
-                (a: VideoLink, b: VideoLink) =>
-                  (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0)
-              )[0]
-            : null
-
-        const resumeTime = progress?.currentTime || 0
-        const resumeDuration = progress?.duration || 0
-        const rawSkips = Array.isArray(skipTimesData) ? skipTimesData : skipTimesData?.results || []
-
-        const skipIntervals: SkipInterval[] = rawSkips
-          .map((item: RawSkipInterval) => ({
-            skip_id: item.skip_id || '',
-            skip_type: item.skip_type || '',
-            start_time: item.interval?.start_time ?? item.start_time ?? 0,
-            end_time: item.interval?.end_time ?? item.end_time ?? 0,
-          }))
-          .filter((i: SkipInterval) => i.end_time > 0)
-
-        if (!sources || sources.length === 0) {
-          toast.error(`No video sources found for ${uiState.selectedProvider}`)
-        }
-
-        return {
-          videoSources: sources as VideoSource[],
-          selectedSource: sourceToSelect,
-          selectedLink,
-          resumeTime,
-          resumeDuration,
-          showResumeModal: resumeTime > 5 && sourceToSelect?.type !== 'iframe',
-          skipIntervals,
-          fetchedEpisodeNumber: currentEpisode,
-        }
-      } catch (e) {
-        const error = e as Error & { provider?: string }
-        if (error.message === 'AUTH_REQUIRED') {
-          dispatch({
-            type: 'SET_STATE',
-            payload: { showCookieModal: true, cookieProvider: error.provider },
-          })
-          return {
-            videoSources: [],
-            selectedSource: null,
-            selectedLink: null,
-            resumeTime: 0,
-            resumeDuration: 0,
-            showResumeModal: false,
-            skipIntervals: [],
-            fetchedEpisodeNumber: currentEpisode,
-          }
-        }
-        throw e
-      }
-    },
+    queryFn: () => fetchVideoSources(showId, currentEpisode, uiState, dispatch),
     enabled: !!showId && !!currentEpisode,
   })
 
@@ -441,6 +464,34 @@ export const usePlayerData = (
     currentEpisode,
   ])
 
+  const prefetchEpisodeSources = useCallback(
+    (episodeNumber: string, targetShowId?: string) => {
+      const id = targetShowId || showId
+      if (!id || !episodeNumber) return
+
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      const provider =
+        UUID_RE.test(id) && uiState.selectedProvider !== 'animepahe'
+          ? 'animepahe'
+          : uiState.selectedProvider
+
+      void queryClient.prefetchQuery({
+        queryKey: ['video-sources', id, episodeNumber, provider, uiState.currentMode],
+        queryFn: () =>
+          fetchVideoSources(
+            id,
+            episodeNumber,
+            { selectedProvider: provider, currentMode: uiState.currentMode },
+            dispatch,
+            true
+          ),
+        staleTime: 5 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
+      })
+    },
+    [showId, queryClient, uiState, dispatch]
+  )
+
   return {
     state: state as PlayerState,
     dispatch,
@@ -449,6 +500,7 @@ export const usePlayerData = (
     setPreferredSource,
     handleToggleDetails,
     markEpisodeWatched,
+    prefetchEpisodeSources,
     isMarkingWatched: markEpisodeWatchedMutation.isPending,
     isUpdatingWatchlistStatus,
   }

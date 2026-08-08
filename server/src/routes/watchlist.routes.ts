@@ -3,13 +3,11 @@ import { WatchlistController } from '../controllers/watchlist.controller'
 import { AnimePaheProvider } from '../providers/animepahe.provider'
 import { discordRPCService } from '../discord-rpc'
 import { DatabaseWrapper } from '../db'
-import { NotificationsRepository } from '../repositories/notifications.repository'
-import { WatchlistRepository } from '../repositories/watchlist.repository'
 
 export function createWatchlistRouter(
   animePahe: AnimePaheProvider,
   getDb: () => DatabaseWrapper
-): { router: Router; stopDiscovery: () => void; runDiscoveryIfNeeded: () => Promise<void> } {
+): { router: Router; stopDiscovery: () => void } {
   const router = Router()
   const controller = new WatchlistController({ animePahe })
 
@@ -23,11 +21,16 @@ export function createWatchlistRouter(
   router.get('/watchlist/check/:showId', controller.checkWatchlist)
   router.post('/watchlist/add', controller.addToWatchlist)
   router.post('/watchlist/remove', controller.removeFromWatchlist)
+  router.post('/watchlist/remove-many', controller.batchRemoveFromWatchlist)
   router.post('/watchlist/status', controller.updateWatchlistStatus)
+  router.post('/watchlist/batch-status', controller.batchUpdateWatchlistStatus)
   router.get('/queue', controller.getQueue)
   router.get('/queue/suggested/:showId', controller.getSuggestedQueueEpisode)
+  router.get('/queue/remaining/:showId', controller.getQueueRemainingEpisodes)
   router.post('/queue/add', controller.addToQueue)
+  router.post('/queue/batch', controller.addToQueueBatch)
   router.post('/queue/remove', controller.removeFromQueue)
+  router.post('/queue/remove-many', controller.removeFromQueueBatch)
   router.post('/queue/clear', controller.clearQueue)
   router.post('/queue/reorder', controller.reorderQueue)
   router.get('/episode-progress/:showId/:episodeNumber', controller.getEpisodeProgress)
@@ -35,6 +38,17 @@ export function createWatchlistRouter(
   router.get('/notifications', controller.getNotifications)
   router.post('/notifications/dismiss', controller.dismissNotification)
   router.post('/notifications/clear-all', controller.clearAllNotifications)
+  router.get('/discovery/status', (req, res) => {
+    res.json(controller.getDiscoveryStatus())
+  })
+  router.post('/discovery/nudge', (req, res) => {
+    const started = controller.triggerDiscovery?.(false) ?? false
+    res.json({ success: true, started, ...controller.getDiscoveryStatus() })
+  })
+  router.post('/discovery/refresh', (req, res) => {
+    const started = controller.triggerDiscovery?.(true) ?? false
+    res.json({ success: true, started, ...controller.getDiscoveryStatus() })
+  })
 
   router.post('/discord/clear', (req, res) => {
     const { sessionId } = req.body
@@ -57,13 +71,5 @@ export function createWatchlistRouter(
   return {
     router,
     stopDiscovery: () => controller.stopNotificationDiscovery(),
-    runDiscoveryIfNeeded: async () => {
-      if (!getDb || getDb().isClosedCheck()) return
-      const hasNotifications = await NotificationsRepository.hasActiveNotifications(getDb())
-      const watchingShows = await WatchlistRepository.getWatchingShows(getDb())
-      if (!hasNotifications && watchingShows.length > 0) {
-        controller.triggerDiscovery?.()
-      }
-    },
   }
 }

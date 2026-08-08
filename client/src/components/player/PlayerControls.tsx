@@ -13,6 +13,7 @@ import {
   FaTv,
   FaChevronLeft,
   FaForward,
+  FaClosedCaptioning,
 } from 'react-icons/fa'
 import { MdReplay10, MdForward10, MdFastForward, MdSkipNext } from 'react-icons/md'
 import type { VideoSource, VideoLink, SkipInterval } from '../../types/player'
@@ -186,6 +187,24 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
           ? 'showing'
           : 'hidden'
     })
+  }
+
+  const isSubtitleActive = state.activeSubtitleTrack !== null && state.activeSubtitleTrack !== 'off'
+
+  const handleCCToggle = () => {
+    if (!refs.videoRef.current) return
+    if (isSubtitleActive) {
+      handleSubtitleSelection('off')
+      localStorage.setItem('playerSubtitlesEnabled', 'false')
+      return
+    }
+    if (state.availableSubtitles.length === 0) return
+    const englishTrack = state.availableSubtitles.find(
+      (t) => t.lang === 'en' || t.label === 'English'
+    )
+    const trackToActivate = englishTrack || state.availableSubtitles[0]
+    handleSubtitleSelection(trackToActivate.label || trackToActivate.lang)
+    localStorage.setItem('playerSubtitlesEnabled', 'true')
   }
 
   const renderVolumeIcon = () => {
@@ -422,6 +441,15 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
               aria-label="Autoplay"
             >
               <MdSkipNext size={24} />
+            </button>
+
+            <button
+              className={`${styles.controlBtn} ${isSubtitleActive ? styles.active : ''}`}
+              onClick={handleCCToggle}
+              title={isSubtitleActive ? 'Disable Subtitles' : 'Enable Subtitles'}
+              aria-label="Toggle Subtitles"
+            >
+              <FaClosedCaptioning size={22} />
             </button>
 
             <button
