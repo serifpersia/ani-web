@@ -23,6 +23,7 @@ function useDiscordPageStatus() {
     else if (path.startsWith('/anime/')) page = 'anime'
     else if (path.startsWith('/insights')) page = 'insights'
     else if (path.startsWith('/settings')) page = 'settings'
+    else if (path.startsWith('/map')) page = 'map'
     else if (path.startsWith('/mal')) page = 'mal'
 
     fetch('/api/discord/status', {
@@ -40,6 +41,7 @@ const Player = lazy(() => import('./pages/Player'))
 const Search = lazy(() => import('./pages/Search'))
 const MAL = lazy(() => import('./pages/MAL'))
 const Insights = lazy(() => import('./pages/Insights'))
+const UserMap = lazy(() => import('./pages/Map'))
 const AnimeInfoPage = lazy(() => import('./pages/AnimeInfoPage'))
 
 import { useSidebar } from './hooks/useSidebar'
@@ -127,6 +129,7 @@ function App() {
               <Route path="/settings" element={<Settings />} />
               <Route path="/mal" element={<MAL />} />
               <Route path="/insights" element={<Insights />} />
+              <Route path="/map" element={<UserMap />} />
               <Route path="/anime/:id" element={<AnimeInfoPage />} />
               <Route path="/watch/:id" element={<Player />} />
               <Route path="/watch/:id/:episodeNumber" element={<Player />} />

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useSearchParams } from 'react-router'
+import { useSearchParams, useNavigate } from 'react-router'
 import { Button } from '../components/common/Button'
 import TitlePreferenceToggle from '../components/common/TitlePreferenceToggle'
 import styles from './Settings.module.css'
@@ -24,6 +24,7 @@ type SettingsTab = 'general' | 'sync' | 'watchlist' | 'database'
 
 const Settings: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const initialTab = searchParams.get('tab') as SettingsTab | null
   const [activeTab, setActiveTab] = useState<SettingsTab>(
     initialTab && ['general', 'sync', 'watchlist', 'database'].includes(initialTab)
@@ -288,10 +289,10 @@ const Settings: React.FC = () => {
                         color: 'var(--text-secondary)',
                       }}
                     >
-                      Share anonymous installation data to help track active users. Collected:
-                      Hardware-based Anonymous ID, App Version, First Seen/Last Seen timestamps, and
-                      User Agent string. No other personal information or usage habits are
-                      collected.
+                      Share anonymous installation data to help track active users and location.
+                      Collected: Hardware-based Anonymous ID, App Version, First Seen/Last Seen
+                      timestamps, User Agent string, and coarse location (timezone only, e.g.
+                      'Europe/Berlin'). No other personal information or usage habits are collected.
                     </p>
                   </div>
                   <ToggleSwitch
@@ -329,9 +330,18 @@ const Settings: React.FC = () => {
                       <p style={{ margin: '0' }}>
                         <strong>Browser:</strong> {navigator.userAgent.substring(0, 60)}...
                       </p>
+                      <p style={{ margin: '0' }}>
+                        <strong>Timezone:</strong>{' '}
+                        {Intl.DateTimeFormat().resolvedOptions().timeZone}
+                      </p>
                     </div>
                   </div>
                 )}
+                <div style={{ marginTop: '1rem' }}>
+                  <Button variant="secondary" size="sm" onClick={() => navigate('/map')}>
+                    View User Map
+                  </Button>
+                </div>
               </div>
 
               {localStorage.getItem('agreedToViewMature') === 'true' && (

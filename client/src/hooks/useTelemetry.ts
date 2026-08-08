@@ -75,6 +75,7 @@ export const useTelemetry = () => {
             id: installationId,
             version: packageJson.version,
             userAgent: getPrivacyFriendlyUserAgent(),
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           }),
         })
         localStorage.setItem('last_telemetry_ping', now.toString())

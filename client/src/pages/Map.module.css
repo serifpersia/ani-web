@@ -1,0 +1,122 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-6);
+  margin-bottom: var(--space-8);
+  animation: fadeIn 0.8s var(--ease-smooth);
+}
+
+.subtitle {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  margin: var(--space-2) 0 0;
+  max-width: 560px;
+}
+
+.mapCard {
+  background: var(--glass-bg);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow);
+  padding: var(--space-4);
+  overflow-x: auto;
+  animation: slideUpIn 0.8s var(--ease-smooth);
+}
+
+.canvasWrap {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.canvas {
+  display: block;
+  width: 1200px;
+  height: auto;
+  max-width: 100%;
+}
+
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(10, 10, 14, 0.92);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  box-shadow: var(--glass-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 10;
+}
+
+.tooltip strong {
+  color: var(--accent-light);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.3px;
+}
+
+.tooltip span {
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-8);
+}
+
+.statCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  background: var(--glass-bg);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow);
+  padding: var(--space-5) var(--space-6);
+  transition: all var(--transition-base);
+}
+
+.statCard:hover {
+  border-color: var(--border-accent);
+  transform: translateY(-2px);
+}
+
+.statCard > svg {
+  font-size: 1.4rem;
+  color: var(--accent);
+}
+
+.statValue {
+  display: block;
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.statLabel {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-tertiary);
+}
+
+.loading {
+  padding: var(--space-16);
+  text-align: center;
+  color: var(--text-tertiary);
+  animation: fadeIn 0.6s var(--ease-smooth);
+}
+
+.error {
+  padding: var(--space-16);
+  text-align: center;
+  color: var(--color-danger);
+  animation: fadeIn 0.6s var(--ease-smooth);
+}
